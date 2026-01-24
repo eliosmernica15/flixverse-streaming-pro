@@ -116,14 +116,17 @@ const Index = () => {
       <Navigation />
       
       <main>
-        <PersonalizedWelcome />
-        
         {featuredMovie && (
           <HeroBanner movie={featuredMovie} />
         )}
+        
+        {/* Welcome banner positioned after hero */}
+        <div className="relative z-20 -mt-24 mb-8">
+          <PersonalizedWelcome />
+        </div>
 
         {/* Content Sections */}
-        <div className="relative -mt-36 z-10">
+        <div className="relative z-10">
           {/* Background ambient effects */}
           <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-red-500/5 rounded-full blur-[200px] pointer-events-none" />
           <div className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[200px] pointer-events-none" />
