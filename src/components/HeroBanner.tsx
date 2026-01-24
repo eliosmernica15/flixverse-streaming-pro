@@ -1,9 +1,12 @@
 
-import { Play, Star, Plus, Info, Check } from "lucide-react";
+import { Play, Star, Plus, Info, Check, Volume2, VolumeX } from "lucide-react";
 import { TMDBMovie, getImageUrl, getContentTitle } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useToast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface HeroBannerProps {
   movie: TMDBMovie;
@@ -13,6 +16,8 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
   const { isAuthenticated } = useAuth();
   const { addToList, isInList } = useUserMovieList();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [isMuted, setIsMuted] = useState(true);
 
   const title = getContentTitle(movie);
   const backdropUrl = movie.backdrop_path ? getImageUrl(movie.backdrop_path, 'original') : '';
@@ -21,7 +26,13 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
   const isInMyList = isAuthenticated ? isInList(movie.id) : false;
 
   const handlePlayClick = () => {
-    window.open(`/movie/${movie.id}?autoplay=true`, '_blank');
+    const contentType = movie.media_type === 'tv' ? 'tv' : 'movie';
+    navigate(`/movie/${movie.id}?type=${contentType}&autoplay=true`);
+  };
+
+  const handleMoreInfo = () => {
+    const contentType = movie.media_type === 'tv' ? 'tv' : 'movie';
+    navigate(`/movie/${movie.id}?type=${contentType}`);
   };
 
   const handleAddToList = async () => {
@@ -48,107 +59,209 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
       });
     }
   };
+
   return (
-    <div className="relative h-[90vh] lg:h-screen overflow-hidden">
-      {/* Background Image with Ken Burns effect */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105 animate-pulse-slow"
-        style={{ 
-          backgroundImage: `url(${backdropUrl})`,
-          animation: 'kenburns 20s ease-in-out infinite alternate'
-        }}
+    <div className="relative h-[95vh] lg:h-screen overflow-hidden">
+      {/* Background Image with parallax effect */}
+      <motion.div 
+        className="absolute inset-0"
+        initial={{ scale: 1.1 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 1.5, ease: "easeOut" }}
       >
-        {/* Multi-layer gradient for depth */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent"></div>
-        
-        {/* Subtle animated overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.3)_100%)]"></div>
-      </div>
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ 
+            backgroundImage: `url(${backdropUrl})`,
+          }}
+        >
+          {/* Cinematic gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/50" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black" />
+          
+          {/* Vignette effect */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,transparent,rgba(0,0,0,0.5))]" />
+          
+          {/* Noise texture for cinematic feel */}
+          <div className="absolute inset-0 opacity-[0.015] noise-overlay" />
+          
+          {/* Animated ambient glow */}
+          <motion.div 
+            className="absolute -bottom-20 -left-20 w-96 h-96 bg-red-500/20 rounded-full blur-[120px]"
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [0.2, 0.3, 0.2] 
+            }}
+            transition={{ 
+              duration: 8, 
+              repeat: Infinity,
+              ease: "easeInOut" 
+            }}
+          />
+          <motion.div 
+            className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[150px]"
+            animate={{ 
+              scale: [1, 1.3, 1],
+              opacity: [0.1, 0.2, 0.1] 
+            }}
+            transition={{ 
+              duration: 10, 
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 2 
+            }}
+          />
+        </div>
+      </motion.div>
 
       {/* Content */}
-      <div className="relative z-10 flex items-center h-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <div className="relative z-10 flex items-end lg:items-center h-full pb-32 lg:pb-0">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="max-w-3xl">
-            {/* Content type badge */}
-            <div className="inline-flex items-center space-x-2 mb-4 animate-fade-in">
-              <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full uppercase tracking-wider">
+            {/* Badges */}
+            <motion.div 
+              className="flex flex-wrap items-center gap-3 mb-5"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <span className="px-4 py-1.5 bg-gradient-to-r from-red-600 to-red-500 text-white text-xs font-bold rounded-lg uppercase tracking-wider shadow-lg shadow-red-500/30">
                 {movie.media_type === 'tv' ? 'Series' : 'Movie'}
               </span>
-              <span className="px-3 py-1 bg-white/10 backdrop-blur-sm text-white text-xs font-medium rounded-full">
-                Featured
+              <span className="px-4 py-1.5 glass-card text-white text-xs font-medium rounded-lg flex items-center space-x-1.5">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span>Featured</span>
               </span>
-            </div>
-            
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-6 text-white leading-[1.1] tracking-tight animate-fade-in">
-              {title}
-            </h1>
-            
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-6 animate-fade-in">
-              <div className="flex items-center space-x-1.5 bg-yellow-500/20 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <span className="text-yellow-400 font-semibold">{movie.vote_average?.toFixed(1)}</span>
-              </div>
               {releaseYear && (
-                <span className="px-3 py-1.5 bg-white/10 backdrop-blur-sm text-white text-sm font-medium rounded-full">
+                <span className="px-4 py-1.5 glass-card text-white text-xs font-medium rounded-lg">
                   {releaseYear}
                 </span>
               )}
-              <span className="px-3 py-1.5 bg-white/10 backdrop-blur-sm text-white text-sm font-medium rounded-full">
-                {movie.media_type === 'tv' ? 'TV Series' : 'Movie'}
+            </motion.div>
+            
+            {/* Title */}
+            <motion.h1 
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-5 text-white leading-[1.05] tracking-tight"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              {title}
+            </motion.h1>
+            
+            {/* Meta info */}
+            <motion.div 
+              className="flex flex-wrap items-center gap-4 mb-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <div className="flex items-center space-x-2 bg-yellow-500/20 backdrop-blur-sm px-4 py-2 rounded-xl border border-yellow-500/20">
+                <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                <span className="text-yellow-400 font-bold text-lg">{movie.vote_average?.toFixed(1)}</span>
+              </div>
+              <span className="px-4 py-2 glass-card text-white text-sm font-medium rounded-xl">
+                {movie.media_type === 'tv' ? 'TV Series' : 'Feature Film'}
               </span>
-            </div>
+              <span className="text-gray-400 text-sm hidden sm:inline">
+                HD Available
+              </span>
+            </motion.div>
 
-            <p className="text-base sm:text-lg md:text-xl mb-8 text-gray-300 leading-relaxed line-clamp-3 max-w-2xl animate-fade-in">
+            {/* Overview */}
+            <motion.p 
+              className="text-base sm:text-lg md:text-xl mb-8 text-gray-300 leading-relaxed line-clamp-3 max-w-2xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
               {movie.overview}
-            </p>
+            </motion.p>
 
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 animate-fade-in">
-              <button 
+            {/* Action Buttons */}
+            <motion.div 
+              className="flex flex-wrap items-center gap-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <motion.button 
                 onClick={handlePlayClick}
-                className="group flex items-center space-x-3 bg-white text-black px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg hover:bg-gray-100 transition-all duration-300 hover:scale-105 shadow-2xl shadow-white/20"
+                className="group flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all duration-300 shadow-2xl shadow-white/20 hover:shadow-white/30 btn-shine"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-current group-hover:scale-110 transition-transform" />
+                <Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
                 <span>Play Now</span>
-              </button>
+              </motion.button>
               
-              <button 
+              <motion.button 
                 onClick={handleAddToList}
                 disabled={!isAuthenticated && isInMyList}
-                className="group flex items-center space-x-3 bg-white/15 backdrop-blur-md text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold text-base sm:text-lg hover:bg-white/25 transition-all duration-300 hover:scale-105 border border-white/20"
+                className="group flex items-center space-x-3 glass-premium text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white/20 transition-all duration-300"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
               >
                 {isInMyList ? (
-                  <Check className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" />
+                  <Check className="w-6 h-6 text-green-400" />
                 ) : (
-                  <Plus className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-90 transition-transform duration-300" />
+                  <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
                 )}
                 <span>{isInMyList ? 'In My List' : 'Add to List'}</span>
-              </button>
+              </motion.button>
 
-              <button 
-                className="group p-3 sm:p-4 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-all duration-300 hover:scale-110 border border-white/10"
+              <motion.button 
+                onClick={handleMoreInfo}
+                className="group p-4 glass-card rounded-xl hover:bg-white/15 transition-all duration-300"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                title="More Info"
               >
-                <Info className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-              </button>
-            </div>
+                <Info className="w-6 h-6 text-white" />
+              </motion.button>
+
+              <motion.button 
+                onClick={() => setIsMuted(!isMuted)}
+                className="group p-4 glass-card rounded-xl hover:bg-white/15 transition-all duration-300"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? (
+                  <VolumeX className="w-6 h-6 text-white" />
+                ) : (
+                  <Volume2 className="w-6 h-6 text-white" />
+                )}
+              </motion.button>
+            </motion.div>
           </div>
         </div>
       </div>
 
-      {/* Bottom fade for smooth transition to content */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent pointer-events-none"></div>
+      {/* Bottom gradient for smooth content transition */}
+      <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
       
-      {/* Decorative elements */}
-      <div className="absolute bottom-20 right-10 w-64 h-64 bg-red-500/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute top-40 right-40 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl pointer-events-none"></div>
-
-      <style>{`
-        @keyframes kenburns {
-          from { transform: scale(1); }
-          to { transform: scale(1.1); }
-        }
-      `}</style>
+      {/* Scroll indicator */}
+      <motion.div 
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden lg:flex flex-col items-center space-y-2"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5 }}
+      >
+        <span className="text-xs text-gray-500 uppercase tracking-widest">Scroll to explore</span>
+        <motion.div 
+          className="w-6 h-10 border-2 border-gray-600 rounded-full flex justify-center"
+          animate={{ y: [0, 5, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <motion.div 
+            className="w-1.5 h-3 bg-red-500 rounded-full mt-2"
+            animate={{ y: [0, 8, 0], opacity: [1, 0.5, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        </motion.div>
+      </motion.div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Play, Star, Heart, Film, Tv, Plus, Info } from "lucide-react";
+import { Play, Star, Heart, Film, Tv, Plus, Info, Clock } from "lucide-react";
 import { getImageUrl, TMDBMovie, getContentTitle, getContentReleaseDate, getContentType } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -40,9 +40,9 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
   const mouseY = useMotionValue(0);
 
   // Spring config for smooth animation
-  const springConfig = { damping: 25, stiffness: 300 };
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [8, -8]), springConfig);
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-8, 8]), springConfig);
+  const springConfig = { damping: 20, stiffness: 250 };
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [10, -10]), springConfig);
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-10, 10]), springConfig);
 
   // Shine effect position
   const shineX = useSpring(useTransform(mouseX, [-0.5, 0.5], [0, 100]), springConfig);
@@ -149,14 +149,21 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
     ? genreNames[movie.genre_ids[0]] 
     : null;
 
+  // Rating color based on score
+  const getRatingColor = (rating: number) => {
+    if (rating >= 7.5) return 'from-green-500 to-emerald-500';
+    if (rating >= 6) return 'from-yellow-500 to-amber-500';
+    return 'from-red-500 to-orange-500';
+  };
+
   return (
     <motion.div 
       ref={cardRef}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.05 }}
+      transition={{ duration: 0.5, delay: index * 0.04, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="relative group cursor-pointer"
-      style={{ perspective: 1000 }}
+      style={{ perspective: 1200 }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -164,31 +171,43 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
     >
       {/* Card Container with 3D Tilt */}
       <motion.div 
-        className="relative overflow-hidden rounded-xl bg-gray-900"
+        className="relative overflow-hidden rounded-2xl bg-gray-900/50"
         style={{
           rotateX: isHovered ? rotateX : 0,
           rotateY: isHovered ? rotateY : 0,
           transformStyle: 'preserve-3d',
-          boxShadow: isHovered 
-            ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(239, 68, 68, 0.15)'
-            : '0 10px 30px -10px rgba(0, 0, 0, 0.5)',
         }}
-        whileHover={{ scale: 1.05, zIndex: 10 }}
+        whileHover={{ scale: 1.04, zIndex: 20 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
-        {/* Glow Effect */}
+        {/* Dynamic glow effect */}
         <motion.div
-          className="absolute -inset-1 bg-gradient-to-r from-red-500/30 via-purple-500/20 to-blue-500/30 rounded-xl blur-xl"
+          className="absolute -inset-2 rounded-2xl blur-xl"
+          style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(168, 85, 247, 0.3), rgba(59, 130, 246, 0.4))',
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isHovered ? 1 : 0 }}
+          transition={{ duration: 0.4 }}
+        />
+        
+        {/* Card border glow */}
+        <motion.div
+          className="absolute inset-0 rounded-2xl"
+          style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.5), transparent 50%, rgba(168, 85, 247, 0.5))',
+            padding: '1px',
+          }}
           initial={{ opacity: 0 }}
           animate={{ opacity: isHovered ? 1 : 0 }}
           transition={{ duration: 0.3 }}
         />
         
         {/* Poster Image */}
-        <div className="relative aspect-[2/3] overflow-hidden rounded-xl">
+        <div className="relative aspect-[2/3] overflow-hidden rounded-2xl">
           {/* Skeleton loader */}
           {!imageLoaded && (
-            <div className="absolute inset-0 bg-gray-800 skeleton-shimmer" />
+            <div className="absolute inset-0 bg-gray-800/80 skeleton-shimmer" />
           )}
           
           <motion.img
@@ -198,70 +217,77 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
             onError={handleImageError}
             onLoad={() => setImageLoaded(true)}
             initial={{ scale: 1 }}
-            animate={{ scale: isHovered ? 1.1 : 1 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            animate={{ scale: isHovered ? 1.12 : 1 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
           />
 
-          {/* Shine Sweep Effect */}
+          {/* Shine effect overlay */}
           <motion.div
             className="absolute inset-0 pointer-events-none"
             style={{
               background: isHovered 
-                ? `radial-gradient(circle at ${shineX.get()}% ${shineY.get()}%, rgba(255,255,255,0.15) 0%, transparent 50%)`
+                ? `radial-gradient(circle at ${shineX.get()}% ${shineY.get()}%, rgba(255,255,255,0.2) 0%, transparent 60%)`
                 : 'none',
-              opacity: isHovered ? 1 : 0,
             }}
-          />
-
-          {/* Shine line sweep on hover */}
-          <motion.div
-            className="absolute inset-0 pointer-events-none overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: isHovered ? 1 : 0 }}
-          >
-            <motion.div
-              className="absolute w-[200%] h-full"
-              style={{
-                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)',
-                transform: 'skewX(-20deg)',
-              }}
-              initial={{ x: '-100%' }}
-              animate={isHovered ? { x: '100%' } : { x: '-100%' }}
-              transition={{ duration: 0.8, ease: 'easeInOut' }}
-            />
-          </motion.div>
+            transition={{ duration: 0.3 }}
+          />
+
+          {/* Sweep shine animation */}
+          <AnimatePresence>
+            {isHovered && (
+              <motion.div
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.div
+                  className="absolute w-[200%] h-full"
+                  style={{
+                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
+                    transform: 'skewX(-20deg)',
+                  }}
+                  initial={{ x: '-100%' }}
+                  animate={{ x: '100%' }}
+                  transition={{ duration: 0.8, ease: 'easeInOut' }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
           
           {/* Content Type Badge */}
           <motion.div 
-            className="absolute top-3 left-3 flex items-center space-x-1 bg-black/70 backdrop-blur-md text-white text-xs font-medium px-2.5 py-1 rounded-full border border-white/10"
+            className="absolute top-3 left-3 flex items-center space-x-1.5 glass-premium text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
           >
-            {contentType === 'tv' ? <Tv className="w-3 h-3" /> : <Film className="w-3 h-3" />}
+            {contentType === 'tv' ? <Tv className="w-3.5 h-3.5" /> : <Film className="w-3.5 h-3.5" />}
             <span>{contentType === 'tv' ? 'Series' : 'Movie'}</span>
           </motion.div>
 
-          {/* Rating Badge */}
+          {/* Rating Badge with dynamic color */}
           <motion.div 
-            className="absolute top-3 right-3 flex items-center space-x-1 bg-yellow-500/90 backdrop-blur-sm text-black text-xs font-bold px-2 py-1 rounded-full"
+            className={`absolute top-3 right-3 flex items-center space-x-1.5 bg-gradient-to-r ${getRatingColor(rating)} text-white text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-lg`}
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.15 }}
           >
-            <Star className="w-3 h-3 fill-current" />
+            <Star className="w-3.5 h-3.5 fill-current" />
             <span>{rating.toFixed(1)}</span>
           </motion.div>
 
-          {/* Genre Badge - Reveals on hover */}
+          {/* Genre Badge - Shows on hover */}
           <AnimatePresence>
             {isHovered && primaryGenre && (
               <motion.div
-                className="absolute top-12 left-3 bg-white/20 backdrop-blur-md text-white text-xs font-medium px-2.5 py-1 rounded-full border border-white/20"
+                className="absolute top-14 left-3 glass-card text-white text-xs font-medium px-3 py-1.5 rounded-lg"
                 initial={{ opacity: 0, y: -10, scale: 0.8 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.25 }}
               >
                 {primaryGenre}
               </motion.div>
@@ -270,9 +296,9 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
           
           {/* Gradient Overlay */}
           <motion.div 
-            className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"
-            initial={{ opacity: 0.6 }}
-            animate={{ opacity: isHovered ? 1 : 0.6 }}
+            className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"
+            initial={{ opacity: 0.5 }}
+            animate={{ opacity: isHovered ? 0.95 : 0.5 }}
             transition={{ duration: 0.3 }}
           />
           
@@ -280,15 +306,15 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
           <AnimatePresence>
             {isHovered && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                transition={{ duration: 0.2 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
                 className="absolute inset-0 flex flex-col justify-end p-4"
               >
                 {/* Title & Year */}
                 <motion.h3 
-                  className="text-white font-bold text-base mb-1 line-clamp-2 drop-shadow-lg"
+                  className="text-white font-bold text-lg mb-1 line-clamp-2 drop-shadow-lg"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 }}
@@ -296,14 +322,15 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
                   {displayTitle}
                 </motion.h3>
                 {year && (
-                  <motion.p 
-                    className="text-gray-400 text-sm mb-3"
+                  <motion.div 
+                    className="flex items-center space-x-2 text-gray-400 text-sm mb-4"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.1 }}
                   >
-                    {year}
-                  </motion.p>
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{year}</span>
+                  </motion.div>
                 )}
                 
                 {/* Action Buttons */}
@@ -314,7 +341,7 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
                   transition={{ delay: 0.15 }}
                 >
                   <motion.button 
-                    className="flex-1 flex items-center justify-center space-x-2 bg-white text-black py-2.5 rounded-lg font-semibold text-sm"
+                    className="flex-1 flex items-center justify-center space-x-2 bg-white text-black py-3 rounded-xl font-bold text-sm shadow-lg"
                     onClick={handlePlayClick}
                     whileHover={{ scale: 1.02, backgroundColor: "#f3f4f6" }}
                     whileTap={{ scale: 0.98 }}
@@ -324,10 +351,10 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
                   </motion.button>
                   
                   <motion.button 
-                    className={`p-2.5 rounded-lg ${
+                    className={`p-3 rounded-xl transition-colors ${
                       isInMyList 
-                        ? 'bg-red-500 text-white' 
-                        : 'bg-white/20 backdrop-blur-sm text-white'
+                        ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white' 
+                        : 'glass-card text-white hover:bg-white/20'
                     }`}
                     onClick={handleAddToListClick}
                     whileHover={{ scale: 1.1 }}
@@ -358,7 +385,7 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
                   </motion.button>
 
                   <motion.button 
-                    className="p-2.5 rounded-lg bg-white/20 backdrop-blur-sm text-white"
+                    className="p-3 rounded-xl glass-card text-white hover:bg-white/20"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCardClick();
@@ -378,15 +405,21 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
       
       {/* Title below card (visible when not hovered) */}
       <motion.div 
-        className="mt-2 px-1"
+        className="mt-3 px-1"
         initial={{ opacity: 1 }}
         animate={{ opacity: isHovered ? 0 : 1 }}
         transition={{ duration: 0.2 }}
       >
-        <h3 className="text-white text-sm font-medium truncate">{displayTitle}</h3>
-        {year && (
-          <p className="text-gray-500 text-xs">{year}</p>
-        )}
+        <h3 className="text-white text-sm font-semibold truncate">{displayTitle}</h3>
+        <div className="flex items-center justify-between mt-1">
+          {year && (
+            <p className="text-gray-500 text-xs">{year}</p>
+          )}
+          <div className="flex items-center space-x-1">
+            <Star className="w-3 h-3 text-yellow-500 fill-current" />
+            <span className="text-gray-400 text-xs">{rating.toFixed(1)}</span>
+          </div>
+        </div>
       </motion.div>
     </motion.div>
   );
