@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profiles - users can read any profile, write only their own
+    match /profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+    
+    // User movie lists - users can only access their own movie list
+    match /user_movie_lists/{docId} {
+      allow read, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.user_id 
+                    && request.auth.uid == request.resource.data.user_id;
+    }
+
+    // Reviews - anyone authenticated can read, users can write their own
+    match /reviews/{reviewId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
+    // Comments - anyone authenticated can read, users can write their own
+    match /comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
+    // Likes - users can manage their own likes
+    match /likes/{likeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
+    // Content ratings - users can manage their own ratings
+    match /content_ratings/{ratingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
+    // Follows - users can manage their own follows
+    match /follows/{followId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.follower_id;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.follower_id;
+    }
+
+    // Watch history - users can only access their own history
+    match /watch_history/{historyId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+    }
+
+    // Notifications - users can only access their own notifications
+    match /notifications/{notificationId} {
+      allow read, update: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated();
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
+    // Activity feed - anyone authenticated can read
+    match /activity_feed/{activityId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+  }
+}
