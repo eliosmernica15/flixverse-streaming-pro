@@ -1,12 +1,13 @@
 
 import { useState, useEffect } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import MovieDetails from "@/components/MovieDetails";
 import { useToast } from "@/hooks/use-toast";
 
 const MovieDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const movieId = id ? parseInt(id) : 0;
   const mediaType = searchParams.get('type') as "movie" | "tv" || "movie";
   const autoplay = searchParams.get('autoplay') === 'true';
@@ -22,7 +23,12 @@ const MovieDetailsPage = () => {
   }, [autoplay, toast]);
 
   const handleClose = () => {
-    window.close();
+    // Check if there's history to go back to, otherwise go home
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
   };
 
   if (!movieId) {
