@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
 import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
+import { useUserMovieList } from "@/hooks/useUserMovieList";
+import { useAuth } from "@/hooks/useAuth";
 import VideoPlayer from "./VideoPlayer";
 import ReviewSection from "./ReviewSection";
 import CommentSection from "./CommentSection";
@@ -18,13 +20,14 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
   const [content, setContent] = useState<TMDBMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isInMyList, setIsInMyList] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
   const [showSeasonDropdown, setShowSeasonDropdown] = useState(false);
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+  const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
 
   useEffect(() => {
     let isMounted = true;
@@ -48,10 +51,6 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
 
         console.log('Content loaded successfully:', contentData);
         setContent(contentData);
-        
-        // Check if content is in user's list
-        const myList = JSON.parse(localStorage.getItem('myMovieList') || '[]');
-        setIsInMyList(myList.includes(movieId));
         
       } catch (err) {
         console.error('Error loading content details:', err);
@@ -85,25 +84,46 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
     setTimeout(() => onClose(), 300);
   };
 
-  const handleAddToList = () => {
-    const myList = JSON.parse(localStorage.getItem('myMovieList') || '[]');
+  const handleAddToList = async () => {
+    if (!content) return;
+    
     const contentTitle = content?.title || content?.name || 'Unknown';
     
-    if (isInMyList) {
-      const updatedList = myList.filter((id: number) => id !== movieId);
-      localStorage.setItem('myMovieList', JSON.stringify(updatedList));
-      setIsInMyList(false);
+    if (!isAuthenticated) {
       toast({
-        title: "Removed from My List",
-        description: `${contentTitle} has been removed from your list.`,
+        title: "Sign in required",
+        description: "Please sign in to add items to your list.",
+        variant: "destructive",
       });
-    } else {
-      const updatedList = [...myList, movieId];
-      localStorage.setItem('myMovieList', JSON.stringify(updatedList));
-      setIsInMyList(true);
+      return;
+    }
+
+    const isCurrentlyInList = isInList(movieId);
+    
+    try {
+      if (isCurrentlyInList) {
+        await removeFromList(movieId);
+        toast({
+          title: "Removed from My List",
+          description: `${contentTitle} has been removed from your list.`,
+        });
+      } else {
+        const movieData: TMDBMovie = {
+          ...content,
+          id: movieId,
+          media_type: mediaType || (content.first_air_date ? 'tv' : 'movie'),
+        };
+        await addToList(movieData);
+        toast({
+          title: "Added to My List",
+          description: `${contentTitle} has been added to your list.`,
+        });
+      }
+    } catch (error: any) {
       toast({
-        title: "Added to My List",
-        description: `${contentTitle} has been added to your list.`,
+        title: "Error",
+        description: error.message || "Failed to update your list.",
+        variant: "destructive",
       });
     }
   };
@@ -399,14 +419,15 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
                 
                 <button 
                   onClick={handleAddToList}
+                  disabled={isOperating(movieId)}
                   className={`group p-4 rounded-full transition-all duration-300 hover:scale-110 border ${
-                    isInMyList 
+                    isInList(movieId) 
                       ? 'bg-red-500 border-red-500 text-white' 
                       : 'bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20'
-                  }`}
-                  title={isInMyList ? 'Remove from List' : 'Add to List'}
+                  } ${isOperating(movieId) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={isInList(movieId) ? 'Remove from List' : 'Add to List'}
                 >
-                  <Heart className={`w-6 h-6 ${isInMyList ? 'fill-current' : ''}`} />
+                  <Heart className={`w-6 h-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
                 </button>
               </div>
            </div>
