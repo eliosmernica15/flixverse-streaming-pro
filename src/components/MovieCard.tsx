@@ -90,6 +90,17 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAuthenticated) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in or sign up to watch movies and TV shows.",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        navigate('/auth');
+      }, 1500);
+      return;
+    }
     const contentType = getContentType(movie);
     navigate(`/movie/${movie.id}?type=${contentType}&autoplay=true`);
   };

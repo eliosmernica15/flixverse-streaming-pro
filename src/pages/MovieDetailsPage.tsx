@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import MovieDetails from "@/components/MovieDetails";
 import { useToast } from "@/hooks/use-toast";
@@ -23,12 +23,9 @@ const MovieDetailsPage = () => {
   }, [autoplay, toast]);
 
   const handleClose = () => {
-    // Check if there's history to go back to, otherwise go home
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/');
-    }
+    // Always navigate to home page for reliable behavior
+    // This ensures the back button works even when navigating directly to the page
+    navigate('/');
   };
 
   if (!movieId) {

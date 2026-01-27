@@ -129,6 +129,20 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
   };
 
   const handleWatch = (episode?: number) => {
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in or sign up to watch movies and TV shows.",
+        variant: "destructive",
+      });
+      // Redirect to auth page after a short delay
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 1500);
+      return;
+    }
+
     const contentTitle = content?.title || content?.name || 'Unknown';
     const isTVShow = content?.media_type === 'tv' || mediaType === 'tv';
     const episodeToPlay = episode || selectedEpisode;
@@ -237,8 +251,9 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
       <div className="relative w-full">
         {/* Back Button */}
         <button
+          type="button"
           onClick={handleClose}
-          className="fixed top-4 left-4 sm:top-6 sm:left-6 z-[100] flex items-center space-x-2 px-3 sm:px-4 py-2 bg-black/60 backdrop-blur-xl rounded-full border border-white/10 hover:bg-white/10 transition-all duration-300 group"
+          className="fixed top-4 left-4 sm:top-6 sm:left-6 z-[999] flex items-center space-x-2 px-3 sm:px-4 py-2 bg-black/60 backdrop-blur-xl rounded-full border border-white/10 hover:bg-white/10 transition-all duration-300 group cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-x-1 transition-transform" />
           <span className="text-white text-xs sm:text-sm font-medium">Back</span>
@@ -248,7 +263,7 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
         <div className="relative min-h-screen w-full flex flex-col">
           {/* Background with Ken Burns effect */}
           <div 
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
             style={{ 
               backgroundImage: `url(${getBackdropUrl(content.backdrop_path)})`,
               animation: 'kenburns 25s ease-in-out infinite alternate'
