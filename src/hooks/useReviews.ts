@@ -3,7 +3,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   onSnapshot,
   addDoc,
   updateDoc,
@@ -37,28 +36,35 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
       return;
     }
 
+    setLoading(true);
+
+    // Use simpler query without orderBy to avoid composite index issues
     const q = query(
       collection(db, 'reviews'),
       where('content_id', '==', contentId),
       where('content_type', '==', contentType),
-      orderBy('created_at', 'desc'),
       limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const reviewsList: Review[] = [];
-      snapshot.forEach((doc) => {
-        const review = { id: doc.id, ...doc.data() } as Review;
+      snapshot.forEach((docSnapshot) => {
+        const review = { id: docSnapshot.id, ...docSnapshot.data() } as Review;
         reviewsList.push(review);
         // Check if this is the user's review
         if (user && review.user_id === user.uid) {
           setUserReview(review);
         }
       });
+      // Sort client-side to avoid composite index issues
+      reviewsList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setReviews(reviewsList);
       setLoading(false);
     }, (error) => {
       console.error('Error fetching reviews:', error);
+      if (error.code === 'failed-precondition') {
+        console.log('Composite index may be building. Reviews will appear once ready.');
+      }
       setLoading(false);
     });
 

@@ -3,7 +3,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   onSnapshot,
   addDoc,
   updateDoc,
@@ -30,23 +29,31 @@ export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') =>
       return;
     }
 
+    setLoading(true);
+
+    // Try with simpler query first (without orderBy that requires composite index)
     const q = query(
       collection(db, 'comments'),
       where('content_id', '==', contentId),
       where('content_type', '==', contentType),
-      orderBy('created_at', 'desc'),
       limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const commentsList: Comment[] = [];
-      snapshot.forEach((doc) => {
-        commentsList.push({ id: doc.id, ...doc.data() } as Comment);
+      snapshot.forEach((docSnapshot) => {
+        commentsList.push({ id: docSnapshot.id, ...docSnapshot.data() } as Comment);
       });
+      // Sort client-side to avoid composite index issues
+      commentsList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setComments(commentsList);
       setLoading(false);
     }, (error) => {
       console.error('Error fetching comments:', error);
+      // If composite index error, try simpler query
+      if (error.code === 'failed-precondition') {
+        console.log('Composite index may be building. Comments will appear once ready.');
+      }
       setLoading(false);
     });
 
