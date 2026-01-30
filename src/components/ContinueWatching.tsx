@@ -31,9 +31,11 @@ const ContinueWatching = () => {
   };
 
   const handleContinue = (item: typeof continueWatchingItems[0]) => {
+    // Pass resume position in URL params
+    const resumeParam = item.progress_seconds > 0 ? `&resume=${item.progress_seconds}` : '';
     const url = item.content_type === 'tv' && item.season && item.episode
-      ? `/movie/${item.content_id}?type=${item.content_type}&autoplay=true`
-      : `/movie/${item.content_id}?type=${item.content_type}&autoplay=true`;
+      ? `/movie/${item.content_id}?type=${item.content_type}&autoplay=true&season=${item.season}&episode=${item.episode}${resumeParam}`
+      : `/movie/${item.content_id}?type=${item.content_type}&autoplay=true${resumeParam}`;
     navigate(url);
   };
 

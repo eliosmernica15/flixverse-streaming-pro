@@ -31,7 +31,6 @@ export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') =>
 
     setLoading(true);
 
-    // Try with simpler query first (without orderBy that requires composite index)
     const q = query(
       collection(db, 'comments'),
       where('content_id', '==', contentId),
@@ -50,10 +49,6 @@ export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') =>
       setLoading(false);
     }, (error) => {
       console.error('Error fetching comments:', error);
-      // If composite index error, try simpler query
-      if (error.code === 'failed-precondition') {
-        console.log('Composite index may be building. Comments will appear once ready.');
-      }
       setLoading(false);
     });
 

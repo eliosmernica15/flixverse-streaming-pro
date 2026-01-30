@@ -5,6 +5,7 @@ import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason
 import { useToast } from "@/hooks/use-toast";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useAuth } from "@/hooks/useAuth";
+import { useWatchHistory } from "@/hooks/useWatchHistory";
 import VideoPlayer from "./VideoPlayer";
 import ReviewSection from "./ReviewSection";
 import CommentSection from "./CommentSection";
@@ -14,20 +15,25 @@ interface MovieDetailsProps {
   movieId: number;
   mediaType?: "movie" | "tv";
   onClose: () => void;
+  autoplay?: boolean;
+  resumePosition?: number;
+  initialSeason?: number;
+  initialEpisode?: number;
 }
 
-const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
+const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePosition, initialSeason, initialEpisode }: MovieDetailsProps) => {
   const [content, setContent] = useState<TMDBMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [selectedSeason, setSelectedSeason] = useState<number>(1);
-  const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
+  const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
+  const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
   const [showSeasonDropdown, setShowSeasonDropdown] = useState(false);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
+  const { getProgress } = useWatchHistory();
 
   useEffect(() => {
     let isMounted = true;
@@ -76,6 +82,17 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
       clearTimeout(timer);
     };
   }, [movieId, mediaType]);
+
+  // Handle autoplay
+  useEffect(() => {
+    if (autoplay && content && !showPlayer) {
+      // Small delay to ensure content is fully loaded
+      const timer = setTimeout(() => {
+        setShowPlayer(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [autoplay, content, showPlayer]);
 
   // No body scroll lock needed - component has its own scroll container
 
@@ -630,19 +647,34 @@ const MovieDetails = ({ movieId, mediaType, onClose }: MovieDetailsProps) => {
       </div>
 
       {/* Video Player */}
-      {showPlayer && content && (
-        <div className="fixed inset-0 z-[9999]">
-          <VideoPlayer 
-            movieId={content.id} 
-            title={contentTitle}
-            description={content.overview}
-            onClose={() => setShowPlayer(false)}
-            mediaType={isTV ? "tv" : "movie"}
-            season={isTV ? selectedSeason : undefined}
-            episode={isTV ? selectedEpisode : undefined}
-          />
-        </div>
-      )}
+      {showPlayer && content && (() => {
+        const watchProgress = getProgress(content.id, isTV ? selectedSeason : undefined, isTV ? selectedEpisode : undefined);
+        // For movies, use runtime. For TV shows, use default 45 minutes (2700 seconds) if runtime not available
+        let totalDuration: number | undefined;
+        if (isTV) {
+          // TV episodes typically run 40-50 minutes, use 45 as default
+          totalDuration = content.runtime ? content.runtime * 60 : 45 * 60; // Default to 45 minutes for TV episodes
+        } else {
+          totalDuration = content.runtime ? content.runtime * 60 : undefined; // Convert minutes to seconds
+        }
+        
+        return (
+          <div key={`player-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ''}`} className="fixed inset-0 z-[9999]">
+            <VideoPlayer 
+              movieId={content.id} 
+              title={contentTitle}
+              description={content.overview}
+              onClose={() => setShowPlayer(false)}
+              mediaType={isTV ? "tv" : "movie"}
+              season={isTV ? selectedSeason : undefined}
+              episode={isTV ? selectedEpisode : undefined}
+              posterPath={content.poster_path}
+              resumePosition={watchProgress?.progress_seconds}
+              totalDuration={totalDuration}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 };

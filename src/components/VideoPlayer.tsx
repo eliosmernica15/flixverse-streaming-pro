@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Server, ArrowLeft, Maximize2, Minimize2, MonitorPlay, Tv, Film, RefreshCw, AlertTriangle } from "lucide-react";
+import { useWatchHistory } from "@/hooks/useWatchHistory";
+import { useToast } from "@/hooks/use-toast";
 
 interface VideoPlayerProps {
   movieId: number;
@@ -11,14 +13,20 @@ interface VideoPlayerProps {
   season?: number;
   episode?: number;
   posterPath?: string;
+  resumePosition?: number; // Resume position in seconds
+  totalDuration?: number; // Total duration in seconds
 }
 
-const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, mediaType = "movie", season, episode, posterPath }: VideoPlayerProps) => {
+const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, mediaType = "movie", season, episode, posterPath, resumePosition, totalDuration }: VideoPlayerProps) => {
   const [currentServer, setCurrentServer] = useState(0);
   const [showServerSelector, setShowServerSelector] = useState(false);
   const [isTheaterMode, setIsTheaterMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const startTimeRef = useRef<number | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const { updateProgress } = useWatchHistory();
+  const { toast } = useToast();
 
   // Build streaming sources with proper TMDB ID format
   const streamingSources = [
@@ -85,12 +93,14 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        handleClose();
+      }
       if (e.key === 't' || e.key === 'T') setIsTheaterMode(prev => !prev);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [handleClose]);
 
   // Reset loading state when server changes
   useEffect(() => {
@@ -100,12 +110,57 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
     return () => clearTimeout(timer);
   }, [currentServer]);
 
+  // Cleanup progress tracking on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
+
   const handleRetry = () => {
     setIsLoading(true);
     setHasError(false);
+    // Clear progress tracking when switching servers
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+    startTimeRef.current = null;
     // Try next server
     setCurrentServer((prev) => (prev + 1) % streamingSources.length);
   };
+
+  const handleClose = useCallback(async () => {
+    // Save progress before closing
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+    
+    if (startTimeRef.current && totalDuration && !isTrailer) {
+      const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const finalProgress = (resumePosition || 0) + elapsedSeconds;
+      
+      if (finalProgress < totalDuration) {
+        try {
+          await updateProgress(
+            movieId,
+            mediaType,
+            title,
+            posterPath || null,
+            finalProgress,
+            totalDuration,
+            season,
+            episode
+          );
+        } catch (error) {
+          console.error('Error saving final watch progress:', error);
+        }
+      }
+    }
+    
+    onClose();
+  }, [movieId, mediaType, title, posterPath, season, episode, totalDuration, resumePosition, isTrailer, updateProgress, onClose]);
 
   return (
     <div className="fixed inset-0 bg-black z-50 animate-fade-in overflow-hidden">
@@ -123,7 +178,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
               {/* Left: Back & Title */}
               <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 sm:py-2.5 bg-white/10 hover:bg-white/20 rounded-lg sm:rounded-xl transition-all duration-300 group backdrop-blur-sm border border-white/5"
                 >
                   <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-x-1 transition-transform" />
@@ -217,7 +272,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
 
                 {/* Close */}
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center bg-white/10 hover:bg-red-500 rounded-lg sm:rounded-xl transition-all duration-300 border border-white/5 backdrop-blur-sm group"
                   title="Close (Esc)"
                 >
@@ -275,7 +330,51 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
                 allowFullScreen
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => setIsLoading(false)}
+                onLoad={() => {
+                  setIsLoading(false);
+                  // Start tracking progress when iframe loads
+                  if (!isTrailer && totalDuration) {
+                    startTimeRef.current = Date.now();
+                    
+                    // Show resume notification if resuming
+                    if (resumePosition && resumePosition > 60) {
+                      const minutes = Math.floor(resumePosition / 60);
+                      toast({
+                        title: "Resuming playback",
+                        description: `Continuing from ${minutes} minute${minutes > 1 ? 's' : ''} in`,
+                      });
+                    }
+
+                    // Update progress every 30 seconds
+                    if (progressIntervalRef.current) {
+                      clearInterval(progressIntervalRef.current);
+                    }
+                    progressIntervalRef.current = setInterval(async () => {
+                      if (startTimeRef.current) {
+                        const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
+                        const currentProgress = (resumePosition || 0) + elapsedSeconds;
+                        
+                        // Only update if we have valid data
+                        if (currentProgress < totalDuration) {
+                          try {
+                            await updateProgress(
+                              movieId,
+                              mediaType,
+                              title,
+                              posterPath || null,
+                              currentProgress,
+                              totalDuration,
+                              season,
+                              episode
+                            );
+                          } catch (error) {
+                            console.error('Error updating watch progress:', error);
+                          }
+                        }
+                      }
+                    }, 30000); // Update every 30 seconds
+                  }
+                }}
                 onError={() => setHasError(true)}
               />
             </div>

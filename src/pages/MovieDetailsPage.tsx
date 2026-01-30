@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import MovieDetails from "@/components/MovieDetails";
 import { useToast } from "@/hooks/use-toast";
@@ -11,16 +11,29 @@ const MovieDetailsPage = () => {
   const movieId = id ? parseInt(id) : 0;
   const mediaType = searchParams.get('type') as "movie" | "tv" || "movie";
   const autoplay = searchParams.get('autoplay') === 'true';
+  const resumePosition = searchParams.get('resume') ? parseInt(searchParams.get('resume')!) : undefined;
+  const season = searchParams.get('season') ? parseInt(searchParams.get('season')!) : undefined;
+  const episode = searchParams.get('episode') ? parseInt(searchParams.get('episode')!) : undefined;
   const { toast } = useToast();
+  const autoplayTriggered = useRef(false);
 
   useEffect(() => {
-    if (autoplay) {
-      toast({
-        title: "Auto-playing content",
-        description: "Starting playback automatically...",
-      });
+    if (autoplay && !autoplayTriggered.current) {
+      autoplayTriggered.current = true;
+      if (resumePosition && resumePosition > 60) {
+        const minutes = Math.floor(resumePosition / 60);
+        toast({
+          title: "Resuming playback",
+          description: `Continuing from ${minutes} minute${minutes > 1 ? 's' : ''} in`,
+        });
+      } else {
+        toast({
+          title: "Auto-playing content",
+          description: "Starting playback automatically...",
+        });
+      }
     }
-  }, [autoplay, toast]);
+  }, [autoplay, resumePosition, toast]);
 
   const handleClose = () => {
     // Always navigate to home page for reliable behavior
@@ -41,6 +54,10 @@ const MovieDetailsPage = () => {
       movieId={movieId}
       mediaType={mediaType}
       onClose={handleClose}
+      autoplay={autoplay}
+      resumePosition={resumePosition}
+      initialSeason={season}
+      initialEpisode={episode}
     />
   );
 };

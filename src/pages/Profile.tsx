@@ -312,39 +312,107 @@ const Profile = () => {
 
             {/* History Tab */}
             <TabsContent value="history">
-              {recentlyWatched.length === 0 ? (
+              {history.length === 0 ? (
                 <div className="text-center py-12">
                   <Clock className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                   <p className="text-gray-400">No watch history yet</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {recentlyWatched.map((item, index) => (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/movie/${item.content_id}?type=${item.content_type}`)}
-                    >
-                      <img
-                        src={item.content_poster_path ? getImageUrl(item.content_poster_path) : '/placeholder.svg'}
-                        alt={item.content_title}
-                        className="w-12 h-18 object-cover rounded-lg"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium truncate">{item.content_title}</p>
-                        {item.season && item.episode && (
-                          <p className="text-gray-400 text-sm">Season {item.season}, Episode {item.episode}</p>
-                        )}
-                        <p className="text-gray-500 text-xs">
-                          {new Date(item.watched_at).toLocaleDateString()}
-                        </p>
+                <div className="space-y-4">
+                  {/* Continue Watching Section */}
+                  {continueWatching.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3 flex items-center space-x-2">
+                        <Clock className="w-5 h-5 text-red-500" />
+                        <span>Continue Watching</span>
+                      </h3>
+                      <div className="space-y-3 mb-6">
+                        {continueWatching.map((item, index) => {
+                          const progressPercentage = Math.round((item.progress_seconds / item.total_duration_seconds) * 100);
+                          return (
+                            <motion.div
+                              key={item.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+                              onClick={() => {
+                                const resumeParam = item.progress_seconds > 0 ? `&resume=${item.progress_seconds}` : '';
+                                const url = item.content_type === 'tv' && item.season && item.episode
+                                  ? `/movie/${item.content_id}?type=${item.content_type}&autoplay=true&season=${item.season}&episode=${item.episode}${resumeParam}`
+                                  : `/movie/${item.content_id}?type=${item.content_type}&autoplay=true${resumeParam}`;
+                                navigate(url);
+                              }}
+                            >
+                              <img
+                                src={item.content_poster_path ? getImageUrl(item.content_poster_path) : '/placeholder.svg'}
+                                alt={item.content_title}
+                                className="w-12 h-18 object-cover rounded-lg"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-medium truncate">{item.content_title}</p>
+                                {item.season && item.episode && (
+                                  <p className="text-gray-400 text-sm">Season {item.season}, Episode {item.episode}</p>
+                                )}
+                                <div className="mt-2">
+                                  <div className="w-full bg-gray-700 rounded-full h-1.5">
+                                    <div 
+                                      className="bg-red-500 h-1.5 rounded-full transition-all"
+                                      style={{ width: `${progressPercentage}%` }}
+                                    />
+                                  </div>
+                                  <p className="text-gray-500 text-xs mt-1">
+                                    {Math.round(progressPercentage)}% watched • {new Date(item.watched_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <ChevronRight className="w-5 h-5 text-gray-500" />
+                            </motion.div>
+                          );
+                        })}
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-500" />
-                    </motion.div>
-                  ))}
+                    </div>
+                  )}
+
+                  {/* Recently Watched Section */}
+                  {recentlyWatched.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Recently Watched</h3>
+                      <div className="space-y-3">
+                        {recentlyWatched.map((item, index) => (
+                          <motion.div
+                            key={item.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+                            onClick={() => {
+                              const url = item.content_type === 'tv' && item.season && item.episode
+                                ? `/movie/${item.content_id}?type=${item.content_type}&season=${item.season}&episode=${item.episode}`
+                                : `/movie/${item.content_id}?type=${item.content_type}`;
+                              navigate(url);
+                            }}
+                          >
+                            <img
+                              src={item.content_poster_path ? getImageUrl(item.content_poster_path) : '/placeholder.svg'}
+                              alt={item.content_title}
+                              className="w-12 h-18 object-cover rounded-lg"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white font-medium truncate">{item.content_title}</p>
+                              {item.season && item.episode && (
+                                <p className="text-gray-400 text-sm">Season {item.season}, Episode {item.episode}</p>
+                              )}
+                              <p className="text-gray-500 text-xs">
+                                Completed • {new Date(item.watched_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <ChevronRight className="w-5 h-5 text-gray-500" />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>
