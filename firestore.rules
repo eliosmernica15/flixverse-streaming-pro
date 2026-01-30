@@ -46,6 +46,13 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
     }
 
+    // Review likes - users can manage their own review likes
+    match /review_likes/{likeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
     // Content ratings - users can manage their own ratings
     match /content_ratings/{ratingId} {
       allow read: if isAuthenticated();

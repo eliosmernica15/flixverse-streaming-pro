@@ -18,9 +18,10 @@ export const useUserProfile = () => {
 
     const profileRef = doc(db, 'profiles', user.uid);
     
-    const unsubscribe = onSnapshot(profileRef, (docSnap) => {
+    const unsubscribe = onSnapshot(profileRef, async (docSnap) => {
       if (docSnap.exists()) {
         setProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
+        setLoading(false);
       } else {
         // Create profile if it doesn't exist
         const newProfile: UserProfile = {
@@ -30,10 +31,14 @@ export const useUserProfile = () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        setDoc(profileRef, newProfile);
-        setProfile(newProfile);
+        try {
+          await setDoc(profileRef, newProfile);
+          setProfile(newProfile);
+        } catch (error) {
+          console.error('Error creating profile:', error);
+        }
+        setLoading(false);
       }
-      setLoading(false);
     }, (error) => {
       console.error('Error fetching profile:', error);
       setLoading(false);
