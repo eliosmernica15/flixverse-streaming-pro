@@ -10,6 +10,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  getDoc,
   limit,
   increment
 } from 'firebase/firestore';
@@ -27,6 +28,9 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
 
   // Fetch reviews for a specific content
   useEffect(() => {
+    // Reset userReview when content changes
+    setUserReview(null);
+    
     if (!contentId || !contentType) {
       setReviews([]);
       setLoading(false);
@@ -112,7 +116,19 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
       throw new Error('User must be logged in to update a review');
     }
 
+    // Verify ownership
     const reviewRef = doc(db, 'reviews', reviewId);
+    const reviewDoc = await getDoc(reviewRef);
+    
+    if (!reviewDoc.exists()) {
+      throw new Error('Review not found');
+    }
+    
+    const reviewData = reviewDoc.data();
+    if (reviewData.user_id !== user.uid) {
+      throw new Error('You can only update your own reviews');
+    }
+
     await updateDoc(reviewRef, {
       rating,
       review_text: reviewText,
@@ -126,8 +142,82 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
       throw new Error('User must be logged in to delete a review');
     }
 
-    await deleteDoc(doc(db, 'reviews', reviewId));
+    // Verify ownership
+    const reviewRef = doc(db, 'reviews', reviewId);
+    const reviewDoc = await getDoc(reviewRef);
+    
+    if (!reviewDoc.exists()) {
+      throw new Error('Review not found');
+    }
+    
+    const reviewData = reviewDoc.data();
+    if (reviewData.user_id !== user.uid) {
+      throw new Error('You can only delete your own reviews');
+    }
+
+    await deleteDoc(reviewRef);
     setUserReview(null);
+  };
+
+  // Like a review
+  const likeReview = async (reviewId: string) => {
+    if (!user) {
+      throw new Error('User must be logged in to like a review');
+    }
+
+    try {
+      // Check if user already liked this review
+      const likesQuery = query(
+        collection(db, 'review_likes'),
+        where('review_id', '==', reviewId),
+        where('user_id', '==', user.uid)
+      );
+      const existingLikes = await getDocs(likesQuery);
+      
+      const reviewRef = doc(db, 'reviews', reviewId);
+      
+      if (!existingLikes.empty) {
+        // Unlike - remove the like
+        const likeDoc = existingLikes.docs[0];
+        await deleteDoc(doc(db, 'review_likes', likeDoc.id));
+        await updateDoc(reviewRef, {
+          likes_count: increment(-1)
+        });
+        return false; // Returns false to indicate unliked
+      } else {
+        // Like - add new like
+        await addDoc(collection(db, 'review_likes'), {
+          review_id: reviewId,
+          user_id: user.uid,
+          created_at: new Date().toISOString()
+        });
+        await updateDoc(reviewRef, {
+          likes_count: increment(1)
+        });
+        return true; // Returns true to indicate liked
+      }
+    } catch (error) {
+      console.error('Error liking review:', error);
+      throw error;
+    }
+  };
+
+  // Check if user has liked a review
+  const hasUserLikedReview = async (reviewId: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      const likesQuery = query(
+        collection(db, 'review_likes'),
+        where('review_id', '==', reviewId),
+        where('user_id', '==', user.uid)
+      );
+      const existingLikes = await getDocs(likesQuery);
+      return !existingLikes.empty;
+    } catch (error) {
+      console.error('Error checking like status:', error);
+      return false;
+    }
   };
 
   // Get average rating for content
@@ -144,6 +234,8 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     addReview,
     updateReview,
     deleteReview,
+    likeReview,
+    hasUserLikedReview,
     getAverageRating,
     reviewCount: reviews.length
   };

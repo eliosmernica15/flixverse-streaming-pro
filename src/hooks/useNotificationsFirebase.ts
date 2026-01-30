@@ -64,45 +64,65 @@ export const useNotifications = () => {
   const markAsRead = async (notificationId: string) => {
     if (!user) return;
 
-    const notificationRef = doc(db, 'notifications', notificationId);
-    await updateDoc(notificationRef, { read: true });
+    try {
+      const notificationRef = doc(db, 'notifications', notificationId);
+      await updateDoc(notificationRef, { read: true });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      throw error;
+    }
   };
 
   // Mark all notifications as read
   const markAllAsRead = async () => {
     if (!user || notifications.length === 0) return;
 
-    const batch = writeBatch(db);
-    
-    notifications
-      .filter(n => !n.read)
-      .forEach(notification => {
-        const ref = doc(db, 'notifications', notification.id);
-        batch.update(ref, { read: true });
-      });
+    try {
+      const batch = writeBatch(db);
+      
+      notifications
+        .filter(n => !n.read)
+        .forEach(notification => {
+          const ref = doc(db, 'notifications', notification.id);
+          batch.update(ref, { read: true });
+        });
 
-    await batch.commit();
+      await batch.commit();
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      throw error;
+    }
   };
 
   // Delete a notification
   const deleteNotification = async (notificationId: string) => {
     if (!user) return;
 
-    await deleteDoc(doc(db, 'notifications', notificationId));
+    try {
+      await deleteDoc(doc(db, 'notifications', notificationId));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      throw error;
+    }
   };
 
   // Clear all notifications
   const clearAll = async () => {
     if (!user || notifications.length === 0) return;
 
-    const batch = writeBatch(db);
-    
-    notifications.forEach(notification => {
-      const ref = doc(db, 'notifications', notification.id);
-      batch.delete(ref);
-    });
+    try {
+      const batch = writeBatch(db);
+      
+      notifications.forEach(notification => {
+        const ref = doc(db, 'notifications', notification.id);
+        batch.delete(ref);
+      });
 
-    await batch.commit();
+      await batch.commit();
+    } catch (error) {
+      console.error('Error clearing all notifications:', error);
+      throw error;
+    }
   };
 
   return {

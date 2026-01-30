@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, ThumbsUp, MessageCircle, User, Send, Trash2, Edit2 } from 'lucide-react';
 import { useReviews } from '@/hooks/useReviews';
 import { useAuth } from '@/hooks/useAuth';
@@ -70,12 +70,20 @@ const ReviewCard = ({
   review, 
   isOwner,
   onEdit,
-  onDelete 
+  onDelete,
+  onLike,
+  isLiked,
+  isLiking,
+  isAuthenticated
 }: { 
   review: Review; 
   isOwner: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onLike: () => void;
+  isLiked: boolean;
+  isLiking: boolean;
+  isAuthenticated: boolean;
 }) => {
   const timeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -135,8 +143,16 @@ const ReviewCard = ({
           </p>
           
           <div className="flex items-center space-x-4 mt-3">
-            <button className="flex items-center space-x-1 text-gray-400 hover:text-white transition-colors text-sm">
-              <ThumbsUp className="w-4 h-4" />
+            <button 
+              onClick={onLike}
+              disabled={isLiking || !isAuthenticated}
+              className={`flex items-center space-x-1 transition-colors text-sm ${
+                isLiked 
+                  ? 'text-red-400 hover:text-red-300' 
+                  : 'text-gray-400 hover:text-white'
+              } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''} ${isLiking ? 'opacity-50' : ''}`}
+            >
+              <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
               <span>{review.likes_count}</span>
             </button>
             <button className="flex items-center space-x-1 text-gray-400 hover:text-white transition-colors text-sm">
@@ -156,10 +172,68 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
   const [reviewText, setReviewText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [likedReviews, setLikedReviews] = useState<Set<string>>(new Set());
+  const [likingReviews, setLikingReviews] = useState<Set<string>>(new Set());
   
-  const { reviews, userReview, loading, addReview, updateReview, deleteReview, getAverageRating } = useReviews(contentId, contentType);
+  const { reviews, userReview, loading, addReview, updateReview, deleteReview, likeReview, hasUserLikedReview, getAverageRating } = useReviews(contentId, contentType);
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+
+  // Check initial like status for all reviews
+  useEffect(() => {
+    const checkLikedReviews = async () => {
+      if (!isAuthenticated || reviews.length === 0) return;
+      
+      const likedSet = new Set<string>();
+      for (const review of reviews) {
+        const isLiked = await hasUserLikedReview(review.id);
+        if (isLiked) {
+          likedSet.add(review.id);
+        }
+      }
+      setLikedReviews(likedSet);
+    };
+    
+    checkLikedReviews();
+  }, [reviews, isAuthenticated, hasUserLikedReview]);
+
+  const handleLikeReview = async (reviewId: string) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to like reviews",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLikingReviews(prev => new Set(prev).add(reviewId));
+    
+    try {
+      const isNowLiked = await likeReview(reviewId);
+      setLikedReviews(prev => {
+        const newSet = new Set(prev);
+        if (isNowLiked) {
+          newSet.add(reviewId);
+        } else {
+          newSet.delete(reviewId);
+        }
+        return newSet;
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to like review",
+        variant: "destructive"
+      });
+    } finally {
+      setLikingReviews(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reviewId);
+        return newSet;
+      });
+    }
+  };
 
   const handleSubmitReview = async () => {
     if (!rating) {
@@ -339,6 +413,10 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
                   isOwner={userReview?.id === review.id}
                   onEdit={handleEditReview}
                   onDelete={handleDeleteReview}
+                  onLike={() => handleLikeReview(review.id)}
+                  isLiked={likedReviews.has(review.id)}
+                  isLiking={likingReviews.has(review.id)}
+                  isAuthenticated={isAuthenticated}
                 />
               ))}
             </AnimatePresence>
