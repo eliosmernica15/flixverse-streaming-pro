@@ -90,47 +90,6 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
 
   const currentSource = streamingSources[currentServer];
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleClose();
-      }
-      if (e.key === 't' || e.key === 'T') setIsTheaterMode(prev => !prev);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose]);
-
-  // Reset loading state when server changes
-  useEffect(() => {
-    setIsLoading(true);
-    setHasError(false);
-    const timer = setTimeout(() => setIsLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, [currentServer]);
-
-  // Cleanup progress tracking on unmount
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-  }, []);
-
-  const handleRetry = () => {
-    setIsLoading(true);
-    setHasError(false);
-    // Clear progress tracking when switching servers
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-    startTimeRef.current = null;
-    // Try next server
-    setCurrentServer((prev) => (prev + 1) % streamingSources.length);
-  };
-
   const handleClose = useCallback(async () => {
     // Save progress before closing
     if (progressIntervalRef.current) {
@@ -162,8 +121,68 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
     onClose();
   }, [movieId, mediaType, title, posterPath, season, episode, totalDuration, resumePosition, isTrailer, updateProgress, onClose]);
 
+  const handleRetry = () => {
+    setIsLoading(true);
+    setHasError(false);
+    // Clear progress tracking when switching servers
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+    startTimeRef.current = null;
+    // Try next server
+    setCurrentServer((prev) => (prev + 1) % streamingSources.length);
+  };
+
+  // Handle keyboard shortcuts (must be after handleClose is defined)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+      if (e.key === 't' || e.key === 'T') setIsTheaterMode(prev => !prev);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleClose]);
+
+  // Reset loading state when server changes
+  useEffect(() => {
+    setIsLoading(true);
+    setHasError(false);
+    const timer = setTimeout(() => setIsLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, [currentServer]);
+
+  // Lock body scroll when player is open, restore on unmount
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  // Cleanup progress tracking on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 bg-black z-50 animate-fade-in overflow-hidden">
+    <div
+      className="fixed inset-0 bg-black z-50 overflow-hidden"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 50,
+        opacity: 1,
+      }}
+    >
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-30 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,0,0,0.1),transparent_70%)]" />
