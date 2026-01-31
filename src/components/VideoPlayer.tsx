@@ -283,12 +283,12 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
           </div>
         </div>
 
-        {/* Video Container */}
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8">
+        {/* Video Container - min-h-0 allows flex child to size correctly */}
+        <div className="flex-1 min-h-0 flex items-center justify-center p-4 sm:p-6 md:p-8">
           <div className="relative w-full max-w-6xl">
             {/* Video Wrapper */}
             <div 
-              className="relative bg-black overflow-hidden rounded-xl shadow-2xl shadow-black/80 border border-white/10"
+              className="relative w-full bg-black overflow-hidden rounded-xl shadow-2xl shadow-black/80 border border-white/10"
               style={{ aspectRatio: '16/9' }}
             >
               {/* Loading Overlay */}

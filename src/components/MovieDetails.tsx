@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
 import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
@@ -646,35 +647,38 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         />
       </div>
 
-      {/* Video Player */}
-      {showPlayer && content && (() => {
-        const watchProgress = getProgress(content.id, isTV ? selectedSeason : undefined, isTV ? selectedEpisode : undefined);
-        // For movies, use runtime. For TV shows, use default 45 minutes (2700 seconds) if runtime not available
-        let totalDuration: number | undefined;
-        if (isTV) {
-          // TV episodes typically run 40-50 minutes, use 45 as default
-          totalDuration = content.runtime ? content.runtime * 60 : 45 * 60; // Default to 45 minutes for TV episodes
-        } else {
-          totalDuration = content.runtime ? content.runtime * 60 : undefined; // Convert minutes to seconds
-        }
-        
-        return (
-          <div key={`player-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ''}`} className="fixed inset-0 z-[9999]">
-            <VideoPlayer 
-              movieId={content.id} 
-              title={contentTitle}
-              description={content.overview}
-              onClose={() => setShowPlayer(false)}
-              mediaType={isTV ? "tv" : "movie"}
-              season={isTV ? selectedSeason : undefined}
-              episode={isTV ? selectedEpisode : undefined}
-              posterPath={content.poster_path}
-              resumePosition={watchProgress?.progress_seconds}
-              totalDuration={totalDuration}
-            />
-          </div>
-        );
-      })()}
+      {/* Video Player - rendered in portal so it escapes PageTransition's transform and displays full viewport */}
+      {showPlayer && content && createPortal(
+        (() => {
+          const watchProgress = getProgress(content.id, isTV ? selectedSeason : undefined, isTV ? selectedEpisode : undefined);
+          // For movies, use runtime. For TV shows, use default 45 minutes (2700 seconds) if runtime not available
+          let totalDuration: number | undefined;
+          if (isTV) {
+            // TV episodes typically run 40-50 minutes, use 45 as default
+            totalDuration = content.runtime ? content.runtime * 60 : 45 * 60; // Default to 45 minutes for TV episodes
+          } else {
+            totalDuration = content.runtime ? content.runtime * 60 : undefined; // Convert minutes to seconds
+          }
+          
+          return (
+            <div key={`player-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ''}`} className="fixed inset-0 z-[9999]">
+              <VideoPlayer 
+                movieId={content.id} 
+                title={contentTitle}
+                description={content.overview}
+                onClose={() => setShowPlayer(false)}
+                mediaType={isTV ? "tv" : "movie"}
+                season={isTV ? selectedSeason : undefined}
+                episode={isTV ? selectedEpisode : undefined}
+                posterPath={content.poster_path}
+                resumePosition={watchProgress?.progress_seconds}
+                totalDuration={totalDuration}
+              />
+            </div>
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 };
