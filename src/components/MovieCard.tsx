@@ -139,7 +139,7 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
   const releaseDate = getContentReleaseDate(movie);
   const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
   const contentType = getContentType(movie);
-  const posterUrl = movie.poster_path ? getImageUrl(movie.poster_path, "small") : null;
+  const posterUrl = movie.poster_path ? getImageUrl(movie.poster_path, "medium") : null;
   const rating = typeof movie.vote_average === "number" ? movie.vote_average : 0;
   const hasValidRating = rating > 0;
   const finalPosterUrl = (!posterUrl || imageError) ? getPlaceholderImage() : posterUrl;

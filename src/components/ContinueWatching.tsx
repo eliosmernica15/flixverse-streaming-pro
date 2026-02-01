@@ -89,7 +89,7 @@ const ContinueWatching = () => {
                 >
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-800/80 border border-white/5 shadow-lg hover:border-white/10 transition-all duration-300 carousel-item">
                     <img
-                      src={item.content_poster_path ? getImageUrl(item.content_poster_path) : '/placeholder.svg'}
+                      src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
                       alt={item.content_title}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />

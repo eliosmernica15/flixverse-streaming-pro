@@ -1,6 +1,6 @@
 
 import { Play, Star, Plus, Info, Check } from "lucide-react";
-import { TMDBMovie, getImageUrl, getContentTitle } from "@/utils/tmdbApi";
+import { TMDBMovie, getBackdropUrl, getContentTitle } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +18,7 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
   const navigate = useNavigate();
 
   const title = getContentTitle(movie);
-  const backdropUrl = movie.backdrop_path ? getImageUrl(movie.backdrop_path, 'original') : '';
+  const backdropUrl = movie.backdrop_path ? getBackdropUrl(movie.backdrop_path, 'large') : '';
   const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : 
                      movie.first_air_date ? new Date(movie.first_air_date).getFullYear() : '';
   const isInMyList = isAuthenticated ? isInList(movie.id) : false;

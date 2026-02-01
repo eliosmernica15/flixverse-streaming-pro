@@ -100,7 +100,7 @@ const ActivityItem = ({ activity, index = 0 }: ActivityItemProps) => {
           whileHover={{ scale: 1.05 }}
         >
           <img
-            src={getImageUrl(activity.contentPosterPath, 'small')}
+            src={getImageUrl(activity.contentPosterPath, 'medium')}
             alt={activity.contentTitle || 'Content'}
             className="w-full h-full object-cover"
           />

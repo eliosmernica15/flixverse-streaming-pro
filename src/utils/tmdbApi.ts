@@ -5,9 +5,10 @@ const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_
 
 // TMDB image base URL - only use officially supported sizes to avoid 404s
 // Supported poster sizes: w92, w154, w185, w342, w500, w780, original
+// Use higher resolutions to avoid blurry posters on retina and larger cards
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 const TMDB_POSTER_SIZES = {
-  small: `${TMDB_IMAGE_BASE}/w185`,
+  small: `${TMDB_IMAGE_BASE}/w342`,
   medium: `${TMDB_IMAGE_BASE}/w500`,
   large: `${TMDB_IMAGE_BASE}/w780`,
   original: `${TMDB_IMAGE_BASE}/original`

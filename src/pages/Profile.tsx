@@ -297,7 +297,7 @@ const Profile = () => {
                     >
                       <div className="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 relative">
                         <img
-                          src={item.movie_poster_path ? getImageUrl(item.movie_poster_path) : '/placeholder.svg'}
+                          src={item.movie_poster_path ? getImageUrl(item.movie_poster_path, 'large') : '/placeholder.svg'}
                           alt={item.movie_title}
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
@@ -346,7 +346,7 @@ const Profile = () => {
                               }}
                             >
                               <img
-                                src={item.content_poster_path ? getImageUrl(item.content_poster_path) : '/placeholder.svg'}
+                                src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
                                 alt={item.content_title}
                                 className="w-12 h-18 object-cover rounded-lg"
                               />
@@ -395,7 +395,7 @@ const Profile = () => {
                             }}
                           >
                             <img
-                              src={item.content_poster_path ? getImageUrl(item.content_poster_path) : '/placeholder.svg'}
+                              src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
                               alt={item.content_title}
                               className="w-12 h-18 object-cover rounded-lg"
                             />
