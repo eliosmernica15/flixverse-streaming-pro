@@ -5,8 +5,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import SearchBar from "./SearchBar";
 import NotificationSettings from "./NotificationSettings";
 import NotificationBell from "./NotificationBell";
-import { TMDBMovie } from "@/utils/tmdbApi";
-import MovieDetails from "./MovieDetails";
+import { TMDBMovie, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +20,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 const Navigation = () => {
-  const [selectedMovie, setSelectedMovie] = useState<TMDBMovie | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
@@ -39,7 +37,8 @@ const Navigation = () => {
   }, []);
 
   const handleMovieSelect = (movie: TMDBMovie) => {
-    setSelectedMovie(movie);
+    const type = getContentType(movie);
+    navigate(`/movie/${movie.id}?type=${type}`);
   };
 
   const isActive = (path: string) => {
@@ -319,15 +318,6 @@ const Navigation = () => {
           </AnimatePresence>
         </div>
       </motion.nav>
-
-      {/* Search Results Modal */}
-      {selectedMovie && (
-        <MovieDetails 
-          movieId={selectedMovie.id}
-          mediaType={selectedMovie.media_type === 'tv' ? 'tv' : 'movie'}
-          onClose={() => setSelectedMovie(null)}
-        />
-      )}
     </>
   );
 };
