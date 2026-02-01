@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
 import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,8 @@ interface MovieDetailsProps {
 }
 
 const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePosition, initialSeason, initialEpisode }: MovieDetailsProps) => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [content, setContent] = useState<TMDBMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +103,19 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const handleClose = () => {
     setIsVisible(false);
     setTimeout(() => onClose(), 300);
+  };
+
+  // When user closes the video player (X or Escape), close and remove autoplay from URL
+  // so the autoplay effect doesn't reopen the player after 500ms.
+  const handleClosePlayer = () => {
+    setShowPlayer(false);
+    const params = new URLSearchParams(location.search);
+    if (params.has('autoplay') || params.has('resume')) {
+      params.delete('autoplay');
+      params.delete('resume');
+      const qs = params.toString();
+      navigate(`${location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+    }
   };
 
   const handleAddToList = async () => {
@@ -683,7 +699,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 movieId={content.id} 
                 title={contentTitle}
                 description={content.overview}
-                onClose={() => setShowPlayer(false)}
+                onClose={handleClosePlayer}
                 mediaType={isTV ? "tv" : "movie"}
                 season={isTV ? selectedSeason : undefined}
                 episode={isTV ? selectedEpisode : undefined}

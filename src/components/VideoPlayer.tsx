@@ -90,35 +90,33 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
 
   const currentSource = streamingSources[currentServer];
 
-  const handleClose = useCallback(async () => {
-    // Save progress before closing
+  const handleClose = useCallback(() => {
+    // Close UI immediately so user can always go back (no blocking on progress save)
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
     }
-    
+    onClose();
+
+    // Save progress in background (best-effort; don't block close)
     if (startTimeRef.current && totalDuration && !isTrailer) {
       const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
       const finalProgress = (resumePosition || 0) + elapsedSeconds;
-      
       if (finalProgress < totalDuration) {
-        try {
-          await updateProgress(
-            movieId,
-            mediaType,
-            title,
-            posterPath || null,
-            finalProgress,
-            totalDuration,
-            season,
-            episode
-          );
-        } catch (error) {
+        updateProgress(
+          movieId,
+          mediaType,
+          title,
+          posterPath || null,
+          finalProgress,
+          totalDuration,
+          season,
+          episode
+        ).catch((error) => {
           console.error('Error saving final watch progress:', error);
-        }
+        });
       }
     }
-    
-    onClose();
   }, [movieId, mediaType, title, posterPath, season, episode, totalDuration, resumePosition, isTrailer, updateProgress, onClose]);
 
   const handleRetry = () => {
@@ -289,11 +287,15 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
                   )}
                 </button>
 
-                {/* Close */}
+                {/* Close - type="button" prevents any form submit; close runs then onClose() */}
                 <button
-                  onClick={handleClose}
+                  type="button"
+                  onClick={() => {
+                    handleClose();
+                  }}
                   className="h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center bg-white/10 hover:bg-red-500 rounded-lg sm:rounded-xl transition-all duration-300 border border-white/5 backdrop-blur-sm group"
                   title="Close (Esc)"
+                  aria-label="Close video player"
                 >
                   <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </button>
