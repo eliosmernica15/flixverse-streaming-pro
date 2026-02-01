@@ -32,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import ImageCropper from '@/components/ImageCropper';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -50,8 +51,10 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState<string>('watchlist');
   const [uploading, setUploading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
@@ -65,13 +68,28 @@ const Profile = () => {
       return;
     }
 
-    setUploading(true);
-    try {
-      // Create a unique filename to prevent browser caching issues
-      const timestamp = Date.now();
-      const storageRef = ref(storage, `profile_images/${user.uid}/${timestamp}_${file.name}`);
+    // Read file as data URL for the cropper
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      setSelectedImage(reader.result?.toString() || null);
+      setCropperOpen(true);
+      // Reset input value to allow selecting same file again
+      event.target.value = '';
+    });
+    reader.readAsDataURL(file);
+  };
 
-      const snapshot = await uploadBytes(storageRef, file);
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    if (!user) return;
+    setCropperOpen(false);
+    setUploading(true);
+
+    try {
+      // Create a unique filename
+      const timestamp = Date.now();
+      const storageRef = ref(storage, `profile_images/${user.uid}/${timestamp}_avatar.jpg`);
+
+      const snapshot = await uploadBytes(storageRef, croppedBlob);
       const downloadURL = await getDownloadURL(snapshot.ref);
 
       await updateProfile({
@@ -91,8 +109,7 @@ const Profile = () => {
       });
     } finally {
       setUploading(false);
-      // Reset input value to allow selecting same file again
-      event.target.value = '';
+      setSelectedImage(null);
     }
   };
 
@@ -294,6 +311,14 @@ const Profile = () => {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+
+                  <ImageCropper
+                    open={cropperOpen}
+                    onOpenChange={setCropperOpen}
+                    imageSrc={selectedImage}
+                    onCropComplete={handleCropComplete}
+                    aspect={1}
+                  />
                 </div>
               </motion.div>
 
