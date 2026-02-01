@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  User, Settings, Film, Tv, Star, Heart, Clock, 
+import {
+  User, Settings, Film, Tv, Star, Heart, Clock,
   Calendar, Edit2, Camera, LogOut, ChevronRight,
   MessageCircle, TrendingUp, Award, Filter
 } from 'lucide-react';
@@ -20,6 +20,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl } from '@/utils/tmdbApi';
+import { storage } from '@/integrations/firebase/client';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -36,6 +38,89 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [activityFilter, setActivityFilter] = useState<ActivityType | 'all'>('all');
   const [activeTab, setActiveTab] = useState<string>('watchlist');
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file size (e.g., max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image under 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Create a unique filename to prevent browser caching issues
+      const timestamp = Date.now();
+      const storageRef = ref(storage, `profile_images/${user.uid}/${timestamp}_${file.name}`);
+
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      await updateProfile({
+        avatar_url: downloadURL
+      });
+
+      toast({
+        title: "Profile updated",
+        description: "Your profile picture has been updated successfully"
+      });
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload profile picture. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+      // Reset input value to allow selecting same file again
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!profile?.avatar_url || !user) return;
+
+    if (!confirm('Are you sure you want to remove your profile picture?')) return;
+
+    setUploading(true);
+    try {
+      // Try to delete from storage if it's a firebase storage url
+      if (profile.avatar_url.includes('firebasestorage')) {
+        try {
+          const imageRef = ref(storage, profile.avatar_url);
+          await deleteObject(imageRef);
+        } catch (error) {
+          console.warn('Could not delete file from storage, might be external or already deleted', error);
+        }
+      }
+
+      await updateProfile({
+        avatar_url: null
+      });
+
+      toast({
+        title: "Profile updated",
+        description: "Profile picture removed successfully"
+      });
+    } catch (error: any) {
+      console.error('Error removing image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove profile picture",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -113,7 +198,7 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navigation />
-      
+
       <main className="pt-20 pb-16">
         {/* Profile Header */}
         <div className="relative">
@@ -130,17 +215,55 @@ const Profile = () => {
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="relative"
+                className="relative group"
               >
-                <Avatar className="w-28 h-28 sm:w-36 sm:h-36 border-4 border-black shadow-2xl">
-                  <AvatarImage src={profile.avatar_url || undefined} />
+                <Avatar className="w-28 h-28 sm:w-36 sm:h-36 border-4 border-black shadow-2xl relative">
+                  <AvatarImage
+                    src={profile.avatar_url || undefined}
+                    className="object-cover w-full h-full"
+                  />
                   <AvatarFallback className="bg-gradient-to-br from-red-500 to-orange-500 text-3xl font-bold">
                     {profile.display_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
                   </AvatarFallback>
+
+                  {/* Upload Overlay */}
+                  {uploading && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-full z-10">
+                      <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    </div>
+                  )}
                 </Avatar>
-                <button className="absolute bottom-1 right-1 p-2 bg-gray-800 rounded-full border border-white/20 hover:bg-gray-700 transition-colors">
-                  <Camera className="w-4 h-4" />
-                </button>
+
+                <div className="absolute bottom-1 right-1 flex space-x-2 z-20">
+                  {profile.avatar_url && (
+                    <button
+                      onClick={handleRemoveAvatar}
+                      disabled={uploading}
+                      className={`p-2 bg-gray-800 rounded-full border border-white/20 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-900/80 hover:border-red-500 hover:scale-105'
+                        }`}
+                      title="Remove picture"
+                    >
+                      <LogOut className="w-4 h-4 text-white" />
+                    </button>
+                  )}
+
+                  <label
+                    htmlFor="avatar-upload"
+                    className={`p-2 bg-gray-800 rounded-full border border-white/20 transition-all cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-700 hover:scale-105'
+                      }`}
+                    title="Upload new picture"
+                  >
+                    <Camera className="w-4 h-4 text-white" />
+                    <input
+                      id="avatar-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
               </motion.div>
 
               {/* Name & Actions */}
@@ -358,7 +481,7 @@ const Profile = () => {
                                 )}
                                 <div className="mt-2">
                                   <div className="w-full bg-gray-700 rounded-full h-1.5">
-                                    <div 
+                                    <div
                                       className="bg-red-500 h-1.5 rounded-full transition-all"
                                       style={{ width: `${progressPercentage}%` }}
                                     />
@@ -429,11 +552,10 @@ const Profile = () => {
                   <motion.button
                     key={filter}
                     onClick={() => setActivityFilter(filter)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      activityFilter === filter
-                        ? 'bg-red-500 text-white'
-                        : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'
-                    }`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activityFilter === filter
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'
+                      }`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
@@ -443,7 +565,7 @@ const Profile = () => {
               </div>
 
               {/* Activity Stats */}
-              <motion.div 
+              <motion.div
                 className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -463,12 +585,12 @@ const Profile = () => {
               </motion.div>
 
               {/* Activity Feed */}
-              <ActivityFeed 
+              <ActivityFeed
                 activities={activityFilter === 'all' ? activities : getActivitiesByType(activityFilter)}
                 loading={activityLoading}
                 emptyMessage={
-                  activityFilter === 'all' 
-                    ? "Your activity feed will appear here" 
+                  activityFilter === 'all'
+                    ? "Your activity feed will appear here"
                     : `No ${activityFilter} activity yet`
                 }
               />
