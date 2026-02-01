@@ -20,8 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl } from '@/utils/tmdbApi';
-import { storage } from '@/integrations/firebase/client';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { uploadToCloudinary } from '@/utils/cloudinary';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,20 +80,32 @@ const Profile = () => {
 
   const handleCropComplete = async (croppedBlob: Blob) => {
     if (!user) return;
+
+    // Validate the blob
+    if (!croppedBlob || croppedBlob.size === 0) {
+      console.error('Invalid blob received');
+      toast({
+        title: "Processing failed",
+        description: "Could not process the image. Please try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setCropperOpen(false);
     setUploading(true);
 
     try {
-      // Create a unique filename
-      const timestamp = Date.now();
-      const storageRef = ref(storage, `profile_images/${user.uid}/${timestamp}_avatar.jpg`);
-
-      const snapshot = await uploadBytes(storageRef, croppedBlob);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      console.log('Uploading blob:', croppedBlob.size, 'bytes');
+      
+      // Upload to Cloudinary
+      const result = await uploadToCloudinary(croppedBlob, `profile_images/${user.uid}`);
+      console.log('Upload complete, URL:', result.secure_url);
 
       await updateProfile({
-        avatar_url: downloadURL
+        avatar_url: result.secure_url
       });
+      console.log('Profile updated successfully');
 
       toast({
         title: "Profile updated",
@@ -104,7 +115,7 @@ const Profile = () => {
       console.error('Error uploading image:', error);
       toast({
         title: "Upload failed",
-        description: "Failed to upload profile picture. Please try again.",
+        description: error.message || "Failed to upload profile picture. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -120,14 +131,10 @@ const Profile = () => {
     setDeleteDialogOpen(false);
     setUploading(true);
     try {
-      // Try to delete from storage if it's a firebase storage url
-      if (profile.avatar_url.includes('firebasestorage')) {
-        try {
-          const imageRef = ref(storage, profile.avatar_url);
-          await deleteObject(imageRef);
-        } catch (error) {
-          console.warn('Could not delete file from storage, might be external or already deleted', error);
-        }
+      // Note: Cloudinary deletion requires server-side implementation
+      // For now, we just remove the reference from the profile
+      if (profile.avatar_url.includes('cloudinary.com')) {
+        console.log('Cloudinary image will be orphaned (deletion requires server-side implementation)');
       }
 
       await updateProfile({

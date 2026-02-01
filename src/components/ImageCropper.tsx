@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '@/utils/canvasUtils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 
@@ -44,10 +44,13 @@ const ImageCropper = ({
         try {
             const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
             if (croppedBlob) {
+                console.log('Cropped blob size:', croppedBlob.size);
                 onCropComplete(croppedBlob);
+            } else {
+                console.error('getCroppedImg returned null');
             }
         } catch (e) {
-            console.error(e);
+            console.error('Error in getCroppedImg:', e);
         } finally {
             setLoading(false);
         }
@@ -58,6 +61,9 @@ const ImageCropper = ({
             <DialogContent className="sm:max-w-md bg-black/95 border-white/10 text-white">
                 <DialogHeader>
                     <DialogTitle>Edit Profile Picture</DialogTitle>
+                    <DialogDescription className="hidden">
+                        Adjust your profile picture by dragging and zooming.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="relative w-full h-80 bg-black/50 rounded-md overflow-hidden mt-4">
