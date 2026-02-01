@@ -3,12 +3,14 @@ const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces';
 
-// High quality image URLs
+// TMDB image base URL - only use officially supported sizes to avoid 404s
+// Supported poster sizes: w92, w154, w185, w342, w500, w780, original
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 const TMDB_POSTER_SIZES = {
-  small: 'https://image.tmdb.org/t/p/w300',
-  medium: 'https://image.tmdb.org/t/p/w500',
-  large: 'https://image.tmdb.org/t/p/w780',
-  original: 'https://image.tmdb.org/t/p/original'
+  small: `${TMDB_IMAGE_BASE}/w185`,
+  medium: `${TMDB_IMAGE_BASE}/w500`,
+  large: `${TMDB_IMAGE_BASE}/w780`,
+  original: `${TMDB_IMAGE_BASE}/original`
 };
 
 const options = {
@@ -531,33 +533,31 @@ export const getImageUrl = (path: string | null, size: 'small' | 'medium' | 'lar
 };
 
 export const getBackdropUrl = (path: string | null, size: 'small' | 'medium' | 'large' | 'original' = 'large'): string => {
-  if (!path) {
+  if (!path || typeof path !== 'string') {
     return getPlaceholderBackdrop();
   }
-  
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const backdropSizes = {
-    small: 'https://image.tmdb.org/t/p/w780',
-    medium: 'https://image.tmdb.org/t/p/w1280',
-    large: 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces',
-    original: 'https://image.tmdb.org/t/p/original'
+    small: `${TMDB_IMAGE_BASE}/w780`,
+    medium: `${TMDB_IMAGE_BASE}/w1280`,
+    large: `${TMDB_IMAGE_BASE}/w1920_and_h800_multi_faces`,
+    original: `${TMDB_IMAGE_BASE}/original`
   };
-  
-  return `${backdropSizes[size]}${path}`;
+  return `${backdropSizes[size]}${normalizedPath}`;
 };
 
 export const getProfileUrl = (path: string | null, size: 'small' | 'medium' | 'large' | 'original' = 'medium'): string => {
-  if (!path) {
+  if (!path || typeof path !== 'string') {
     return getPlaceholderProfile();
   }
-  
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const profileSizes = {
-    small: 'https://image.tmdb.org/t/p/w185',
-    medium: 'https://image.tmdb.org/t/p/w342',
-    large: 'https://image.tmdb.org/t/p/w500',
-    original: 'https://image.tmdb.org/t/p/original'
+    small: `${TMDB_IMAGE_BASE}/w185`,
+    medium: `${TMDB_IMAGE_BASE}/w342`,
+    large: `${TMDB_IMAGE_BASE}/w500`,
+    original: `${TMDB_IMAGE_BASE}/original`
   };
-  
-  return `${profileSizes[size]}${path}`;
+  return `${profileSizes[size]}${normalizedPath}`;
 };
 
 export const getPlaceholderImage = (): string => {
