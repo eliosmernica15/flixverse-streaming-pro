@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
-import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarMovies, fetchSimilarTVShows, fetchMovieRecommendations, fetchTVShowRecommendations } from "@/utils/tmdbApi";
+import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations } from "@/utils/tmdbApi";
+import { getSimilarMoviesForMovie } from "@/utils/movieSimilarity";
 import { useToast } from "@/hooks/use-toast";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useAuth } from "@/hooks/useAuth";
@@ -100,28 +101,34 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     }
   }, [autoplay, content, showPlayer]);
 
-  // Fetch 4 related/similar titles (same niche) when content is loaded
+  // Fetch related/similar titles: movies use similarity scoring; TV uses similar + recommendations
   useEffect(() => {
     if (!content) return;
-    const type = content.media_type === 'tv' || mediaType === 'tv' ? 'tv' : 'movie';
+    const isTV = content.media_type === 'tv' || mediaType === 'tv';
     const id = content.id;
     let cancelled = false;
     const run = async () => {
       try {
-        const [similar, recs] = type === 'movie'
-          ? await Promise.all([fetchSimilarMovies(id), fetchMovieRecommendations(id)])
-          : await Promise.all([fetchSimilarTVShows(id), fetchTVShowRecommendations(id)]);
-        if (cancelled) return;
-        const combined = [...(similar || []), ...(recs || [])]
-          .filter((m) => m && m.id && m.id !== id)
-          .map((m) => ({ ...m, media_type: type }));
-        const seen = new Set<number>();
-        const unique = combined.filter((m) => {
-          if (seen.has(m.id)) return false;
-          seen.add(m.id);
-          return true;
-        });
-        setRelatedContent(unique.slice(0, 4));
+        if (isTV) {
+          const [similar, recs] = await Promise.all([
+            fetchSimilarTVShows(id),
+            fetchTVShowRecommendations(id),
+          ]);
+          if (cancelled) return;
+          const combined = [...(similar || []), ...(recs || [])]
+            .filter((m) => m && m.id && m.id !== id)
+            .map((m) => ({ ...m, media_type: 'tv' as const }));
+          const seen = new Set<number>();
+          const unique = combined.filter((m) => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+          });
+          setRelatedContent(unique.slice(0, 4));
+        } else {
+          const similar = await getSimilarMoviesForMovie(content, { maxResults: 4 });
+          if (!cancelled) setRelatedContent(similar);
+        }
       } catch {
         if (!cancelled) setRelatedContent([]);
       }

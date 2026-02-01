@@ -390,6 +390,33 @@ export const fetchTVShowRecommendations = async (tvId: number): Promise<TMDBMovi
   }));
 };
 
+// Movie keywords (themes, topics) for similarity
+export interface TMDBKeyword {
+  id: number;
+  name: string;
+}
+
+export const fetchMovieKeywords = async (movieId: number): Promise<TMDBKeyword[]> => {
+  const data = await apiCall(`${TMDB_BASE_URL}/movie/${movieId}/keywords`);
+  return data.keywords || [];
+};
+
+// Discover movies by genres (OR) and optional keywords (AND) for candidate pool
+export const discoverMoviesWithGenresAndKeywords = async (
+  genreIds: number[],
+  keywordIds: number[] = [],
+  page: number = 1
+): Promise<TMDBMovie[]> => {
+  if (genreIds.length === 0) return [];
+  const genreParam = genreIds.join('|');
+  let url = `${TMDB_BASE_URL}/discover/movie?with_genres=${genreParam}&page=${page}&sort_by=popularity.desc`;
+  if (keywordIds.length > 0) {
+    url += `&with_keywords=${keywordIds.slice(0, 5).join(',')}`;
+  }
+  const data = await apiCall(url);
+  return data.results || [];
+};
+
 // Similar content
 export const fetchSimilarMovies = async (movieId: number): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/movie/${movieId}/similar`);
