@@ -217,6 +217,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                     <img
                       src={getResultImage(result)}
                       alt={result.title || result.name}
+                      loading="lazy"
                       className={`${result.media_type === 'person' ? 'w-12 h-12 rounded-full' : 'w-12 h-16 rounded'} object-cover shadow-lg`}
                       onError={(e) => {
                         e.currentTarget.src = getResultImage(result);

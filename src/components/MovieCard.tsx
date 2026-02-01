@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, memo } from "react";
 import { Play, Star, Heart, Film, Tv, Plus, Info, Clock } from "lucide-react";
 import { getImageUrl, getPlaceholderImage, TMDBMovie, getContentTitle, getContentReleaseDate, getContentType } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +49,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   // Shine effect position
   const shineX = useSpring(useTransform(mouseX, [-0.5, 0.5], [0, 100]), springConfig);
   const shineY = useSpring(useTransform(mouseY, [-0.5, 0.5], [0, 100]), springConfig);
-  
+
   const isInMyList = isAuthenticated ? isInList(movie.id) : (() => {
     const myList = JSON.parse(localStorage.getItem('myMovieList') || '[]');
     return myList.includes(movie.id);
@@ -58,14 +58,14 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   // Handle mouse move for 3D tilt
   const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
-    
+
     const rect = cardRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    
+
     const x = (event.clientX - centerX) / rect.width;
     const y = (event.clientY - centerY) / rect.height;
-    
+
     mouseX.set(x);
     mouseY.set(y);
   }, [mouseX, mouseY]);
@@ -85,7 +85,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
         }
       });
     }
-    
+
     const contentType = getContentType(movie);
     navigate(`/movie/${movie.id}?type=${contentType}`);
   };
@@ -98,7 +98,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
 
   const handleAddToListClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!isAuthenticated) {
       toast({
         title: "Sign in required",
@@ -109,7 +109,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
     }
 
     const movieTitle = movie.title || movie.name || 'Unknown';
-    
+
     try {
       if (isInMyList) {
         await removeFromList(movie.id);
@@ -147,8 +147,8 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   const finalPosterUrl = (!posterUrl || imageError) ? getPlaceholderImage() : posterUrl;
 
   // Get primary genre
-  const primaryGenre = movie.genre_ids && movie.genre_ids.length > 0 
-    ? genreNames[movie.genre_ids[0]] 
+  const primaryGenre = movie.genre_ids && movie.genre_ids.length > 0
+    ? genreNames[movie.genre_ids[0]]
     : null;
 
   // Rating color based on score
@@ -159,7 +159,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   };
 
   return (
-    <motion.div 
+    <motion.div
       ref={cardRef}
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
@@ -172,7 +172,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
       onClick={handleCardClick}
     >
       {/* Card Container with 3D Tilt */}
-      <motion.div 
+      <motion.div
         className="relative overflow-hidden rounded-2xl bg-gray-900/50"
         style={{
           rotateX: isHovered ? rotateX : 0,
@@ -192,7 +192,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
           animate={{ opacity: isHovered ? 1 : 0 }}
           transition={{ duration: 0.4 }}
         />
-        
+
         {/* Card border glow */}
         <motion.div
           className="absolute inset-0 rounded-2xl"
@@ -204,19 +204,21 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
           animate={{ opacity: isHovered ? 1 : 0 }}
           transition={{ duration: 0.3 }}
         />
-        
+
         {/* Poster Image */}
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl">
           {/* Skeleton loader */}
           {!imageLoaded && (
             <div className="absolute inset-0 bg-gray-800/80 skeleton-shimmer" />
           )}
-          
+
           <motion.img
             key={finalPosterUrl}
             src={finalPosterUrl}
             alt={displayTitle}
             className="w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
             onError={handleImageError}
             onLoad={() => setImageLoaded(true)}
             initial={{ scale: 1 }}
@@ -228,7 +230,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
           <motion.div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: isHovered 
+              background: isHovered
                 ? `radial-gradient(circle at ${shineX.get()}% ${shineY.get()}%, rgba(255,255,255,0.2) 0%, transparent 60%)`
                 : 'none',
             }}
@@ -259,9 +261,9 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
               </motion.div>
             )}
           </AnimatePresence>
-          
+
           {/* Content Type Badge */}
-          <motion.div 
+          <motion.div
             className="absolute top-3 left-3 flex items-center space-x-1.5 glass-premium text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
@@ -273,7 +275,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
 
           {/* Rating Badge - only show when we have a valid rating */}
           {hasValidRating && (
-            <motion.div 
+            <motion.div
               className={`absolute top-3 right-3 flex items-center space-x-1.5 bg-gradient-to-r ${getRatingColor(rating)} text-white text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-lg`}
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -298,15 +300,15 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
               </motion.div>
             )}
           </AnimatePresence>
-          
+
           {/* Gradient Overlay */}
-          <motion.div 
+          <motion.div
             className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"
             initial={{ opacity: 0.5 }}
             animate={{ opacity: isHovered ? 0.95 : 0.5 }}
             transition={{ duration: 0.3 }}
           />
-          
+
           {/* Hover Content */}
           <AnimatePresence>
             {isHovered && (
@@ -318,7 +320,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
                 className="absolute inset-0 flex flex-col justify-end p-4"
               >
                 {/* Title & Year */}
-                <motion.h3 
+                <motion.h3
                   className="text-white font-bold text-lg mb-1 line-clamp-2 drop-shadow-lg"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -327,7 +329,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
                   {displayTitle}
                 </motion.h3>
                 {year && (
-                  <motion.div 
+                  <motion.div
                     className="flex items-center space-x-2 text-gray-400 text-sm mb-4"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -337,23 +339,23 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
                     <span>{year}</span>
                   </motion.div>
                 )}
-                
+
                 {/* Action Buttons */}
-                <motion.div 
+                <motion.div
                   className="flex items-center space-x-2"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15 }}
                 >
                   {comingSoon ? (
-                    <motion.div 
+                    <motion.div
                       className="flex-1 flex items-center justify-center space-x-2 bg-amber-500/30 text-amber-400 py-3 rounded-xl font-bold text-sm border border-amber-500/40"
                     >
                       <Clock className="w-4 h-4" />
                       <span>Coming Soon</span>
                     </motion.div>
                   ) : (
-                    <motion.button 
+                    <motion.button
                       className="flex-1 flex items-center justify-center space-x-2 bg-white text-black py-3 rounded-xl font-bold text-sm shadow-lg"
                       onClick={handlePlayClick}
                       whileHover={{ scale: 1.02, backgroundColor: "#f3f4f6" }}
@@ -363,13 +365,12 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
                       <span>Play</span>
                     </motion.button>
                   )}
-                  
-                  <motion.button 
-                    className={`p-3 rounded-xl transition-colors ${
-                      isInMyList 
-                        ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white' 
+
+                  <motion.button
+                    className={`p-3 rounded-xl transition-colors ${isInMyList
+                        ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
                         : 'glass-card text-white hover:bg-white/20'
-                    }`}
+                      }`}
                     onClick={handleAddToListClick}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
@@ -398,7 +399,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
                     </AnimatePresence>
                   </motion.button>
 
-                  <motion.button 
+                  <motion.button
                     className="p-3 rounded-xl glass-card text-white hover:bg-white/20"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -416,9 +417,9 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
           </AnimatePresence>
         </div>
       </motion.div>
-      
+
       {/* Title below card (visible when not hovered) */}
-      <motion.div 
+      <motion.div
         className="mt-3 px-1"
         initial={{ opacity: 1 }}
         animate={{ opacity: isHovered ? 0 : 1 }}
@@ -445,4 +446,4 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   );
 };
 
-export default MovieCard;
+export default memo(MovieCard);

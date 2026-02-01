@@ -4,9 +4,10 @@ import HeroBanner from "@/components/HeroBanner";
 import MovieCarousel from "@/components/MovieCarousel";
 import PersonalizedWelcome from "@/components/PersonalizedWelcome";
 import ContinueWatching from "@/components/ContinueWatching";
-import { 
-  fetchTrendingMovies, 
-  fetchTopRatedMovies, 
+import Footer from "@/components/Footer";
+import {
+  fetchTrendingMovies,
+  fetchTopRatedMovies,
   fetchPopularMovies,
   fetchTrendingTVShows,
   fetchPopularTVShows,
@@ -14,7 +15,7 @@ import {
   fetchUpcomingMovies,
   fetchUpcomingTVShows,
   isNotReleasedYet,
-  TMDBMovie 
+  TMDBMovie
 } from "@/utils/tmdbApi";
 import { getHeroMovieOfTheWeek } from "@/utils/popularMoviesRotator";
 import { TrendingUp, Star, Play, Tv, Film, Sparkles, Calendar } from "lucide-react";
@@ -72,7 +73,7 @@ const Index = () => {
           return dateA.localeCompare(dateB);
         });
         setComingSoon(combined);
-        
+
       } catch (error) {
         console.error('Error loading content:', error);
       } finally {
@@ -86,7 +87,7 @@ const Index = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <motion.div 
+        <motion.div
           className="text-center"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -108,17 +109,17 @@ const Index = () => {
           <p className="text-gray-400 text-lg">Loading your entertainment...</p>
           <div className="mt-8 flex justify-center space-x-2">
             {[0, 1, 2].map((i) => (
-              <motion.div 
-                key={i} 
+              <motion.div
+                key={i}
                 className="w-3 h-3 bg-gradient-to-r from-red-500 to-orange-500 rounded-full"
-                animate={{ 
+                animate={{
                   y: [0, -12, 0],
                   scale: [1, 1.2, 1]
                 }}
-                transition={{ 
-                  duration: 0.6, 
+                transition={{
+                  duration: 0.6,
                   repeat: Infinity,
-                  delay: i * 0.15 
+                  delay: i * 0.15
                 }}
               />
             ))}
@@ -131,12 +132,12 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navigation />
-      
+
       <main>
         {featuredMovie && (
           <HeroBanner movie={featuredMovie} />
         )}
-        
+
         {/* Welcome banner positioned after hero */}
         <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8">
           <PersonalizedWelcome />
@@ -147,53 +148,53 @@ const Index = () => {
           {/* Background ambient effects */}
           <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-red-500/5 rounded-full blur-[200px] pointer-events-none" />
           <div className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[200px] pointer-events-none" />
-          
+
           <div className="space-y-14 lg:space-y-20 pb-20 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
             <ContinueWatching />
-            <MovieCarousel 
-              title="Trending Now" 
+            <MovieCarousel
+              title="Trending Now"
               movies={trendingMovies}
               icon={<TrendingUp className="w-5 h-5 text-red-500" />}
               exploreAllPath="/browse/trending-now"
             />
             <div className="section-divider-glow" aria-hidden />
-            <MovieCarousel 
-              title="Now Playing" 
+            <MovieCarousel
+              title="Now Playing"
               movies={nowPlayingMovies}
               icon={<Play className="w-5 h-5 text-green-500" />}
               exploreAllPath="/browse/now-playing"
             />
             <div className="section-divider" aria-hidden />
-            <MovieCarousel 
-              title="Top Rated" 
+            <MovieCarousel
+              title="Top Rated"
               movies={topRatedMovies}
               icon={<Star className="w-5 h-5 text-yellow-500" />}
               exploreAllPath="/browse/top-rated"
             />
             <div className="section-divider" aria-hidden />
-            <MovieCarousel 
-              title="Popular Movies" 
+            <MovieCarousel
+              title="Popular Movies"
               movies={popularMovies}
               icon={<Film className="w-5 h-5 text-blue-500" />}
               exploreAllPath="/browse/popular-movies"
             />
             <div className="section-divider" aria-hidden />
-            <MovieCarousel 
-              title="Trending TV Shows" 
+            <MovieCarousel
+              title="Trending TV Shows"
               movies={trendingTVShows}
               icon={<Tv className="w-5 h-5 text-purple-500" />}
               exploreAllPath="/browse/trending-tv"
             />
             <div className="section-divider" aria-hidden />
-            <MovieCarousel 
-              title="Popular TV Shows" 
+            <MovieCarousel
+              title="Popular TV Shows"
               movies={popularTVShows}
               icon={<Tv className="w-5 h-5 text-pink-500" />}
               exploreAllPath="/browse/popular-tv"
             />
             <div className="section-divider" aria-hidden />
-            <MovieCarousel 
-              title="Coming soon" 
+            <MovieCarousel
+              title="Coming soon"
               movies={comingSoon}
               icon={<Calendar className="w-5 h-5 text-amber-500" />}
               showWhenEmpty
@@ -203,6 +204,8 @@ const Index = () => {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 };

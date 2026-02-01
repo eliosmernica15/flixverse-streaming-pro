@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useMemo, memo } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import MovieCard from "./MovieCard";
@@ -27,10 +26,10 @@ interface MovieCarouselProps {
   comingSoon?: boolean;
 }
 
-const MovieCarousel = ({ title, movies, priority = false, loading = false, icon, showWhenEmpty = false, exploreAllPath, comingSoon = false }: MovieCarouselProps) => {
+const MovieCarousel = memo(({ title, movies, priority = false, loading = false, icon, showWhenEmpty = false, exploreAllPath, comingSoon = false }: MovieCarouselProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
-  const validMovies = movies.filter(movie => {
+  const validMovies = useMemo(() => movies.filter(movie => {
     if (!movie || !movie.id) return false;
     const hasTitle = movie.title || movie.name;
     if (!hasTitle) return false;
@@ -40,7 +39,7 @@ const MovieCarousel = ({ title, movies, priority = false, loading = false, icon,
     ...movie,
     title: movie.title || movie.name,
     release_date: movie.release_date || movie.first_air_date
-  }));
+  })), [movies]);
 
   if (loading) {
     return (
@@ -177,6 +176,8 @@ const MovieCarousel = ({ title, movies, priority = false, loading = false, icon,
       <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-black to-transparent pointer-events-none z-10 hidden lg:block" />
     </motion.section>
   );
-};
+});
+
+MovieCarousel.displayName = "MovieCarousel";
 
 export default MovieCarousel;

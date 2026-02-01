@@ -93,32 +93,109 @@ export interface TMDBGenre {
   name: string;
 }
 
-// Enhanced API calls with better error handling and retry logic
-const apiCall = async (url: string, retries: number = 2): Promise<any> => {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      console.log(`API Call attempt ${attempt + 1}: ${url}`);
-      const response = await fetch(url, options);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.warn(`Resource not found (404): ${url}`);
-          return { results: [], success: false, status_code: 404 };
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log(`API Call successful: ${url}`);
-      return { ...data, success: true };
-    } catch (error) {
-      console.error(`API call failed (attempt ${attempt + 1}):`, error);
-      if (attempt === retries) {
-        return { results: [], success: false, error: error.message };
-      }
-      // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+const isDev = import.meta.env.DEV;
+
+// In-memory cache for API responses
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+  expiresAt: number;
+}
+
+const apiCache = new Map<string, CacheEntry>();
+const pendingRequests = new Map<string, Promise<any>>();
+
+// Cache TTL in milliseconds
+const CACHE_TTL_LIST = 5 * 60 * 1000; // 5 minutes for list endpoints
+const CACHE_TTL_DETAILS = 15 * 60 * 1000; // 15 minutes for details
+
+const getCacheTTL = (url: string): number => {
+  // Longer TTL for detail pages, shorter for lists
+  if (url.includes('/movie/') || url.includes('/tv/')) {
+    if (!url.includes('trending') && !url.includes('popular') && !url.includes('top_rated')) {
+      return CACHE_TTL_DETAILS;
     }
+  }
+  return CACHE_TTL_LIST;
+};
+
+const getCachedResponse = (url: string): any | null => {
+  const cached = apiCache.get(url);
+  if (cached && Date.now() < cached.expiresAt) {
+    if (isDev) console.log(`Cache hit: ${url}`);
+    return cached.data;
+  }
+  if (cached) {
+    apiCache.delete(url); // Clean up expired entry
+  }
+  return null;
+};
+
+const setCachedResponse = (url: string, data: any): void => {
+  const ttl = getCacheTTL(url);
+  apiCache.set(url, {
+    data,
+    timestamp: Date.now(),
+    expiresAt: Date.now() + ttl
+  });
+};
+
+// Enhanced API calls with caching, deduplication, and retry logic
+const apiCall = async (url: string, retries: number = 2): Promise<any> => {
+  // Check cache first
+  const cached = getCachedResponse(url);
+  if (cached) {
+    return cached;
+  }
+
+  // Check for pending request to the same URL (deduplication)
+  if (pendingRequests.has(url)) {
+    if (isDev) console.log(`Request deduplication: ${url}`);
+    return pendingRequests.get(url);
+  }
+
+  // Create the request promise
+  const requestPromise = (async () => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        if (isDev) console.log(`API Call attempt ${attempt + 1}: ${url}`);
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            if (isDev) console.warn(`Resource not found (404): ${url}`);
+            const errorResult = { results: [], success: false, status_code: 404 };
+            return errorResult;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const result = { ...data, success: true };
+        
+        // Cache successful responses
+        setCachedResponse(url, result);
+        
+        if (isDev) console.log(`API Call successful: ${url}`);
+        return result;
+      } catch (error) {
+        if (isDev) console.error(`API call failed (attempt ${attempt + 1}):`, error);
+        if (attempt === retries) {
+          return { results: [], success: false, error: (error as Error).message };
+        }
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
+  })();
+
+  // Store pending request
+  pendingRequests.set(url, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    pendingRequests.delete(url);
   }
 };
 
@@ -319,7 +396,7 @@ export const fetchDocumentaryTVShows = async (): Promise<TMDBMovie[]> => {
 
 // Enhanced detail fetching with proper media type detection
 export const fetchContentDetails = async (contentId: number, mediaType?: string): Promise<TMDBMovie | null> => {
-  console.log(`Fetching content details for ID: ${contentId}, mediaType: ${mediaType}`);
+  if (isDev) console.log(`Fetching content details for ID: ${contentId}, mediaType: ${mediaType}`);
   
   // If media type is specified, use it directly
   if (mediaType === 'movie') {
@@ -332,7 +409,7 @@ export const fetchContentDetails = async (contentId: number, mediaType?: string)
   // First try as TV show (since the user clicked on a series)
   const tvResponse = await apiCall(`${TMDB_BASE_URL}/tv/${contentId}?append_to_response=videos,credits,seasons`);
   if (tvResponse.success && tvResponse.id) {
-    console.log('Successfully fetched as TV show');
+    if (isDev) console.log('Successfully fetched as TV show');
     return {
       ...tvResponse,
       title: tvResponse.name,
@@ -344,11 +421,11 @@ export const fetchContentDetails = async (contentId: number, mediaType?: string)
   // Then try as movie
   const movieResponse = await apiCall(`${TMDB_BASE_URL}/movie/${contentId}?append_to_response=videos,credits`);
   if (movieResponse.success && movieResponse.id) {
-    console.log('Successfully fetched as movie');
+    if (isDev) console.log('Successfully fetched as movie');
     return { ...movieResponse, media_type: 'movie' };
   }
   
-  console.error('Failed to fetch content as both TV show and movie');
+  if (isDev) console.error('Failed to fetch content as both TV show and movie');
   return null;
 };
 

@@ -189,6 +189,7 @@ const SearchResults = () => {
                           "medium"
                         )}
                         alt={person.name ?? "Person"}
+                        loading="lazy"
                         className="w-20 h-20 rounded-full object-cover border-2 border-white/20"
                       />
                       <span className="mt-2 text-sm font-medium text-center line-clamp-2">

@@ -2,11 +2,12 @@
 import { useState, useEffect } from "react";
 import Navigation from "@/components/Navigation";
 import MovieCarousel from "@/components/MovieCarousel";
+import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Tv, Flame, Trophy, Calendar, Radio, Zap, Laugh, Drama, Search, Rocket, FileText, AlertCircle } from "lucide-react";
-import { 
-  fetchTrendingTVShows, 
-  fetchPopularTVShows, 
+import {
+  fetchTrendingTVShows,
+  fetchPopularTVShows,
   fetchTopRatedTVShows,
   fetchAiringTodayTVShows,
   fetchOnTheAirTVShows,
@@ -16,7 +17,7 @@ import {
   fetchSciFiTVShows,
   fetchCrimeTVShows,
   fetchDocumentaryTVShows,
-  TMDBMovie 
+  TMDBMovie
 } from "@/utils/tmdbApi";
 
 const TVShows = () => {
@@ -39,14 +40,14 @@ const TVShows = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         console.log('Loading TV shows...');
-        
+
         const [
-          trending, 
-          popular, 
-          topRated, 
-          airingToday, 
+          trending,
+          popular,
+          topRated,
+          airingToday,
           onTheAir,
           action,
           comedy,
@@ -128,7 +129,7 @@ const TVShows = () => {
           </div>
           <h2 className="text-white text-xl font-bold mb-2">Something went wrong</h2>
           <p className="text-gray-400 mb-6">{error}</p>
-          <button 
+          <button
             onClick={retryLoading}
             className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105"
           >
@@ -142,13 +143,13 @@ const TVShows = () => {
   return (
     <div className="min-h-screen bg-black text-white animate-fade-in">
       <Navigation />
-      
+
       {/* Hero Header */}
       <div className="relative pt-20 pb-8 px-4 sm:px-6 lg:px-8 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-transparent to-transparent"></div>
         <div className="absolute top-20 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
         <div className="absolute top-32 right-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
-        
+
         <div className="relative z-10 max-w-7xl mx-auto">
           <div className="flex items-center space-x-4 mb-4">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -161,14 +162,14 @@ const TVShows = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Content */}
       <div className="px-4 sm:px-6 lg:px-8 pb-16">
         <div className="space-y-10">
           {trendingShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Trending TV Shows" 
+              <MovieCarousel
+                title="Trending TV Shows"
                 movies={trendingShows}
                 icon={<Flame className="w-5 h-5 text-orange-400" />}
                 exploreAllPath="/browse/trending-tv-shows"
@@ -176,11 +177,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {airingTodayShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Airing Today" 
+              <MovieCarousel
+                title="Airing Today"
                 movies={airingTodayShows}
                 icon={<Calendar className="w-5 h-5 text-green-400" />}
                 exploreAllPath="/browse/airing-today-shows"
@@ -188,11 +189,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {onTheAirShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="On The Air" 
+              <MovieCarousel
+                title="On The Air"
                 movies={onTheAirShows}
                 icon={<Radio className="w-5 h-5 text-red-400" />}
                 exploreAllPath="/browse/on-the-air-shows"
@@ -200,11 +201,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {popularShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Popular TV Shows" 
+              <MovieCarousel
+                title="Popular TV Shows"
                 movies={popularShows}
                 icon={<Flame className="w-5 h-5 text-pink-400" />}
                 exploreAllPath="/browse/popular-tv-shows"
@@ -212,11 +213,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {topRatedShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Top Rated TV Shows" 
+              <MovieCarousel
+                title="Top Rated TV Shows"
                 movies={topRatedShows}
                 icon={<Trophy className="w-5 h-5 text-yellow-400" />}
                 exploreAllPath="/browse/top-rated-tv"
@@ -224,11 +225,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {actionShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Action & Adventure" 
+              <MovieCarousel
+                title="Action & Adventure"
                 movies={actionShows}
                 icon={<Zap className="w-5 h-5 text-yellow-500" />}
                 exploreAllPath="/browse/action-adventure"
@@ -236,11 +237,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {dramaShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Drama Series" 
+              <MovieCarousel
+                title="Drama Series"
                 movies={dramaShows}
                 icon={<Drama className="w-5 h-5 text-blue-400" />}
                 exploreAllPath="/browse/drama-series"
@@ -248,11 +249,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {comedyShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Comedy Shows" 
+              <MovieCarousel
+                title="Comedy Shows"
                 movies={comedyShows}
                 icon={<Laugh className="w-5 h-5 text-pink-400" />}
                 exploreAllPath="/browse/comedy-shows"
@@ -260,11 +261,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {crimeShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Crime & Mystery" 
+              <MovieCarousel
+                title="Crime & Mystery"
                 movies={crimeShows}
                 icon={<Search className="w-5 h-5 text-gray-400" />}
                 exploreAllPath="/browse/crime-mystery"
@@ -272,11 +273,11 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {sciFiShows.length > 0 && (
             <>
-              <MovieCarousel 
-                title="Sci-Fi & Fantasy" 
+              <MovieCarousel
+                title="Sci-Fi & Fantasy"
                 movies={sciFiShows}
                 icon={<Rocket className="w-5 h-5 text-cyan-400" />}
                 exploreAllPath="/browse/sci-fi-fantasy"
@@ -284,44 +285,39 @@ const TVShows = () => {
               <div className="section-divider" />
             </>
           )}
-          
+
           {documentaryShows.length > 0 && (
-            <MovieCarousel 
-              title="Documentaries" 
+            <MovieCarousel
+              title="Documentaries"
               movies={documentaryShows}
               icon={<FileText className="w-5 h-5 text-emerald-400" />}
               exploreAllPath="/browse/documentaries"
             />
           )}
-          
+
           {/* No content message */}
-          {!trendingShows.length && !popularShows.length && !topRatedShows.length && 
-           !airingTodayShows.length && !onTheAirShows.length && !actionShows.length && 
-           !comedyShows.length && !dramaShows.length && !crimeShows.length && 
-           !sciFiShows.length && !documentaryShows.length && (
-            <div className="text-center py-12 glass-card rounded-2xl max-w-md mx-auto">
-              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Tv className="w-8 h-8 text-gray-500" />
+          {!trendingShows.length && !popularShows.length && !topRatedShows.length &&
+            !airingTodayShows.length && !onTheAirShows.length && !actionShows.length &&
+            !comedyShows.length && !dramaShows.length && !crimeShows.length &&
+            !sciFiShows.length && !documentaryShows.length && (
+              <div className="text-center py-12 glass-card rounded-2xl max-w-md mx-auto">
+                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Tv className="w-8 h-8 text-gray-500" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">No TV shows available</h3>
+                <p className="text-gray-400 mb-6">Please try again in a moment</p>
+                <button
+                  onClick={retryLoading}
+                  className="bg-gradient-to-r from-red-600 to-red-500 text-white px-6 py-2 rounded-full font-semibold hover:scale-105 transition-all"
+                >
+                  Reload
+                </button>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">No TV shows available</h3>
-              <p className="text-gray-400 mb-6">Please try again in a moment</p>
-              <button 
-                onClick={retryLoading}
-                className="bg-gradient-to-r from-red-600 to-red-500 text-white px-6 py-2 rounded-full font-semibold hover:scale-105 transition-all"
-              >
-                Reload
-              </button>
-            </div>
-          )}
+            )}
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center text-gray-500 text-sm">
-          <p>Explore popular series from around the world</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };

@@ -299,6 +299,7 @@ const Profile = () => {
                         <img
                           src={item.movie_poster_path ? getImageUrl(item.movie_poster_path, 'large') : '/placeholder.svg'}
                           alt={item.movie_title}
+                          loading="lazy"
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
@@ -397,6 +398,7 @@ const Profile = () => {
                             <img
                               src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
                               alt={item.content_title}
+                              loading="lazy"
                               className="w-12 h-18 object-cover rounded-lg"
                             />
                             <div className="flex-1 min-w-0">
