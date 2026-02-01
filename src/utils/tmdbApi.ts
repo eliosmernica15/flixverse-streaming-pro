@@ -137,8 +137,11 @@ export const fetchPopularMovies = async (): Promise<TMDBMovie[]> => {
   return data.results || [];
 };
 
-export const fetchUpcomingMovies = async (): Promise<TMDBMovie[]> => {
-  const data = await apiCall(`${TMDB_BASE_URL}/movie/upcoming`);
+/** Upcoming movies (Coming soon) - uses TMDB movie/upcoming with language and page. */
+export const fetchUpcomingMovies = async (page: number = 1): Promise<TMDBMovie[]> => {
+  const data = await apiCall(
+    `${TMDB_BASE_URL}/movie/upcoming?language=en-US&page=${page}`
+  );
   return data.results || [];
 };
 
