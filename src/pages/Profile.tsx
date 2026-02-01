@@ -22,6 +22,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { storage } from '@/integrations/firebase/client';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -39,6 +49,7 @@ const Profile = () => {
   const [activityFilter, setActivityFilter] = useState<ActivityType | 'all'>('all');
   const [activeTab, setActiveTab] = useState<string>('watchlist');
   const [uploading, setUploading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -88,8 +99,8 @@ const Profile = () => {
   const handleRemoveAvatar = async () => {
     if (!profile?.avatar_url || !user) return;
 
-    if (!confirm('Are you sure you want to remove your profile picture?')) return;
-
+    // Dialog handling moved to AlertDialogAction
+    setDeleteDialogOpen(false);
     setUploading(true);
     try {
       // Try to delete from storage if it's a firebase storage url
@@ -237,7 +248,7 @@ const Profile = () => {
                 <div className="absolute bottom-1 right-1 flex space-x-2 z-20">
                   {profile.avatar_url && (
                     <button
-                      onClick={handleRemoveAvatar}
+                      onClick={() => setDeleteDialogOpen(true)}
                       disabled={uploading}
                       className={`p-2 bg-gray-800 rounded-full border border-white/20 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-900/80 hover:border-red-500 hover:scale-105'
                         }`}
@@ -263,6 +274,26 @@ const Profile = () => {
                       disabled={uploading}
                     />
                   </label>
+
+                  <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <AlertDialogContent className="bg-black/95 border-white/10 text-white">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove profile picture?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-gray-400">
+                          This action cannot be undone. This will permanently delete your current profile picture.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-transparent border-white/10 text-white hover:bg-white/5 hover:text-white">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleRemoveAvatar}
+                          className="bg-red-600 hover:bg-red-700 text-white border-none"
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </motion.div>
 
