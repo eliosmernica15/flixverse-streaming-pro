@@ -148,6 +148,7 @@ const Movies = () => {
                 title="Trending Movies" 
                 movies={trendingMovies}
                 icon={<Flame className="w-5 h-5 text-orange-400" />}
+                exploreAllPath="/browse/trending-movies"
               />
               <div className="section-divider" />
             </>
@@ -159,6 +160,7 @@ const Movies = () => {
                 title="Now Playing" 
                 movies={nowPlayingMovies}
                 icon={<Clock className="w-5 h-5 text-green-400" />}
+                exploreAllPath="/browse/now-playing-movies"
               />
               <div className="section-divider" />
             </>
@@ -170,6 +172,7 @@ const Movies = () => {
                 title="Top Rated Movies" 
                 movies={topRatedMovies}
                 icon={<Trophy className="w-5 h-5 text-yellow-400" />}
+                exploreAllPath="/browse/top-rated-movies"
               />
               <div className="section-divider" />
             </>
@@ -181,6 +184,7 @@ const Movies = () => {
                 title="Popular Movies" 
                 movies={popularMovies}
                 icon={<Sparkles className="w-5 h-5 text-purple-400" />}
+                exploreAllPath="/browse/popular-movies"
               />
               <div className="section-divider" />
             </>
@@ -192,6 +196,7 @@ const Movies = () => {
                 title="Action" 
                 movies={actionMovies}
                 icon={<Zap className="w-5 h-5 text-yellow-500" />}
+                exploreAllPath="/browse/action"
               />
               <div className="section-divider" />
             </>
@@ -203,6 +208,7 @@ const Movies = () => {
                 title="Comedy" 
                 movies={comedyMovies}
                 icon={<Laugh className="w-5 h-5 text-pink-400" />}
+                exploreAllPath="/browse/comedy"
               />
               <div className="section-divider" />
             </>
@@ -214,6 +220,7 @@ const Movies = () => {
                 title="Drama" 
                 movies={dramaMovies}
                 icon={<Drama className="w-5 h-5 text-blue-400" />}
+                exploreAllPath="/browse/drama"
               />
               <div className="section-divider" />
             </>
@@ -225,6 +232,7 @@ const Movies = () => {
                 title="Thriller" 
                 movies={thrillerMovies}
                 icon={<Zap className="w-5 h-5 text-red-400" />}
+                exploreAllPath="/browse/thriller"
               />
               <div className="section-divider" />
             </>
@@ -236,6 +244,7 @@ const Movies = () => {
                 title="Horror" 
                 movies={horrorMovies}
                 icon={<Skull className="w-5 h-5 text-gray-400" />}
+                exploreAllPath="/browse/horror"
               />
               <div className="section-divider" />
             </>
@@ -247,6 +256,7 @@ const Movies = () => {
                 title="Sci-Fi" 
                 movies={sciFiMovies}
                 icon={<Rocket className="w-5 h-5 text-cyan-400" />}
+                exploreAllPath="/browse/sci-fi"
               />
               <div className="section-divider" />
             </>
@@ -258,6 +268,7 @@ const Movies = () => {
                 title="Fantasy" 
                 movies={fantasyMovies}
                 icon={<Wand2 className="w-5 h-5 text-violet-400" />}
+                exploreAllPath="/browse/fantasy"
               />
               <div className="section-divider" />
             </>
@@ -269,6 +280,7 @@ const Movies = () => {
                 title="Adventure" 
                 movies={adventureMovies}
                 icon={<Compass className="w-5 h-5 text-emerald-400" />}
+                exploreAllPath="/browse/adventure"
               />
               <div className="section-divider" />
             </>
@@ -280,6 +292,7 @@ const Movies = () => {
                 title="Animation" 
                 movies={animationMovies}
                 icon={<Sparkles className="w-5 h-5 text-amber-400" />}
+                exploreAllPath="/browse/animation"
               />
               <div className="section-divider" />
             </>
@@ -291,6 +304,7 @@ const Movies = () => {
                 title="Romance" 
                 movies={romanceMovies}
                 icon={<Heart className="w-5 h-5 text-rose-400" />}
+                exploreAllPath="/browse/romance"
               />
               <div className="section-divider" />
             </>
@@ -301,6 +315,7 @@ const Movies = () => {
               title="Coming Soon" 
               movies={upcomingMovies}
               icon={<Clock className="w-5 h-5 text-blue-400" />}
+              exploreAllPath="/browse/upcoming"
             />
           )}
         </div>

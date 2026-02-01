@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import MovieCard from "./MovieCard";
 import { TMDBMovie } from "@/utils/tmdbApi";
@@ -20,9 +21,11 @@ interface MovieCarouselProps {
   icon?: React.ReactNode;
   /** When true, section is always rendered (e.g. Coming soon) even with no items. */
   showWhenEmpty?: boolean;
+  /** Path for "Explore All" button (e.g. /browse/new-releases). When set, button navigates to this page. */
+  exploreAllPath?: string;
 }
 
-const MovieCarousel = ({ title, movies, priority = false, loading = false, icon, showWhenEmpty = false }: MovieCarouselProps) => {
+const MovieCarousel = ({ title, movies, priority = false, loading = false, icon, showWhenEmpty = false, exploreAllPath }: MovieCarouselProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const validMovies = movies.filter(movie => {
@@ -109,14 +112,18 @@ const MovieCarousel = ({ title, movies, priority = false, loading = false, icon,
         </div>
         
         {/* Explore All Link */}
-        <motion.button 
-          className="hidden sm:flex items-center space-x-2 text-sm text-gray-400 hover:text-white transition-all duration-300 group/btn glass-card px-4 py-2 rounded-xl"
-          whileHover={{ x: 5, scale: 1.02 }}
-        >
-          <Sparkles className="w-4 h-4 text-red-500" />
-          <span>Explore All</span>
-          <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-        </motion.button>
+        {exploreAllPath && (
+          <Link to={exploreAllPath}>
+            <motion.span 
+              className="hidden sm:flex items-center space-x-2 text-sm text-gray-400 hover:text-white transition-all duration-300 group/btn glass-card px-4 py-2 rounded-xl cursor-pointer"
+              whileHover={{ x: 5, scale: 1.02 }}
+            >
+              <Sparkles className="w-4 h-4 text-red-500" />
+              <span>Explore All</span>
+              <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+            </motion.span>
+          </Link>
+        )}
       </motion.div>
       
       {/* Carousel or empty state */}

@@ -156,6 +156,7 @@ const NewAndPopular = () => {
                   movies={upcomingMovies}
                   loading={loading}
                   icon={<Clock className="w-5 h-5 text-blue-400" />}
+                  exploreAllPath="/browse/coming-soon"
                 />
                 <div className="section-divider" />
               </>
@@ -168,6 +169,7 @@ const NewAndPopular = () => {
                   movies={newReleases}
                   loading={loading}
                   icon={<Star className="w-5 h-5 text-yellow-400" />}
+                  exploreAllPath="/browse/new-releases"
                 />
                 <div className="section-divider" />
               </>
@@ -180,6 +182,7 @@ const NewAndPopular = () => {
                   movies={nowPlaying}
                   loading={loading}
                   icon={<Star className="w-5 h-5 text-purple-400" />}
+                  exploreAllPath="/browse/now-playing-theaters"
                 />
                 <div className="section-divider" />
               </>
@@ -192,6 +195,7 @@ const NewAndPopular = () => {
                   movies={airingToday}
                   loading={loading}
                   icon={<Calendar className="w-5 h-5 text-green-400" />}
+                  exploreAllPath="/browse/airing-today"
                 />
                 <div className="section-divider" />
               </>
@@ -204,6 +208,7 @@ const NewAndPopular = () => {
                   movies={popularContent}
                   loading={loading}
                   icon={<Flame className="w-5 h-5 text-orange-400" />}
+                  exploreAllPath="/browse/popular-this-week"
                 />
                 <div className="section-divider" />
               </>
@@ -216,6 +221,7 @@ const NewAndPopular = () => {
                   movies={trendingShows}
                   loading={loading}
                   icon={<Tv className="w-5 h-5 text-cyan-400" />}
+                  exploreAllPath="/browse/trending-tv"
                 />
                 <div className="section-divider" />
               </>
@@ -227,6 +233,7 @@ const NewAndPopular = () => {
                 movies={onTheAir}
                 loading={loading}
                 icon={<Radio className="w-5 h-5 text-pink-400" />}
+                exploreAllPath="/browse/on-the-air"
               />
             )}
           </div>

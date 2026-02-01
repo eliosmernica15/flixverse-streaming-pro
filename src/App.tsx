@@ -16,6 +16,7 @@ import SearchResults from "./pages/SearchResults";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import Browse from "./pages/Browse";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const AnimatedRoutes = () => {
         <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
         <Route path="/movie/:id" element={<PageTransition><MovieDetailsPage /></PageTransition>} />
         <Route path="/search" element={<PageTransition><SearchResults /></PageTransition>} />
+        <Route path="/browse/:category" element={<PageTransition><Browse /></PageTransition>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
       </Routes>

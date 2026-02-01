@@ -171,6 +171,7 @@ const TVShows = () => {
                 title="Trending TV Shows" 
                 movies={trendingShows}
                 icon={<Flame className="w-5 h-5 text-orange-400" />}
+                exploreAllPath="/browse/trending-tv-shows"
               />
               <div className="section-divider" />
             </>
@@ -182,6 +183,7 @@ const TVShows = () => {
                 title="Airing Today" 
                 movies={airingTodayShows}
                 icon={<Calendar className="w-5 h-5 text-green-400" />}
+                exploreAllPath="/browse/airing-today-shows"
               />
               <div className="section-divider" />
             </>
@@ -193,6 +195,7 @@ const TVShows = () => {
                 title="On The Air" 
                 movies={onTheAirShows}
                 icon={<Radio className="w-5 h-5 text-red-400" />}
+                exploreAllPath="/browse/on-the-air-shows"
               />
               <div className="section-divider" />
             </>
@@ -204,6 +207,7 @@ const TVShows = () => {
                 title="Popular TV Shows" 
                 movies={popularShows}
                 icon={<Flame className="w-5 h-5 text-pink-400" />}
+                exploreAllPath="/browse/popular-tv-shows"
               />
               <div className="section-divider" />
             </>
@@ -215,6 +219,7 @@ const TVShows = () => {
                 title="Top Rated TV Shows" 
                 movies={topRatedShows}
                 icon={<Trophy className="w-5 h-5 text-yellow-400" />}
+                exploreAllPath="/browse/top-rated-tv"
               />
               <div className="section-divider" />
             </>
@@ -226,6 +231,7 @@ const TVShows = () => {
                 title="Action & Adventure" 
                 movies={actionShows}
                 icon={<Zap className="w-5 h-5 text-yellow-500" />}
+                exploreAllPath="/browse/action-adventure"
               />
               <div className="section-divider" />
             </>
@@ -237,6 +243,7 @@ const TVShows = () => {
                 title="Drama Series" 
                 movies={dramaShows}
                 icon={<Drama className="w-5 h-5 text-blue-400" />}
+                exploreAllPath="/browse/drama-series"
               />
               <div className="section-divider" />
             </>
@@ -248,6 +255,7 @@ const TVShows = () => {
                 title="Comedy Shows" 
                 movies={comedyShows}
                 icon={<Laugh className="w-5 h-5 text-pink-400" />}
+                exploreAllPath="/browse/comedy-shows"
               />
               <div className="section-divider" />
             </>
@@ -259,6 +267,7 @@ const TVShows = () => {
                 title="Crime & Mystery" 
                 movies={crimeShows}
                 icon={<Search className="w-5 h-5 text-gray-400" />}
+                exploreAllPath="/browse/crime-mystery"
               />
               <div className="section-divider" />
             </>
@@ -270,6 +279,7 @@ const TVShows = () => {
                 title="Sci-Fi & Fantasy" 
                 movies={sciFiShows}
                 icon={<Rocket className="w-5 h-5 text-cyan-400" />}
+                exploreAllPath="/browse/sci-fi-fantasy"
               />
               <div className="section-divider" />
             </>
@@ -280,6 +290,7 @@ const TVShows = () => {
               title="Documentaries" 
               movies={documentaryShows}
               icon={<FileText className="w-5 h-5 text-emerald-400" />}
+              exploreAllPath="/browse/documentaries"
             />
           )}
           
