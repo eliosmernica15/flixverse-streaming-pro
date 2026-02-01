@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Play, Star, Heart, Film, Tv, Plus, Info, Clock } from "lucide-react";
-import { getImageUrl, TMDBMovie, getContentTitle, getContentReleaseDate, getContentType } from "@/utils/tmdbApi";
+import { getImageUrl, getPlaceholderImage, TMDBMovie, getContentTitle, getContentReleaseDate, getContentType } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useAuth } from "@/hooks/useAuth";
@@ -139,10 +139,10 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
   const releaseDate = getContentReleaseDate(movie);
   const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
   const contentType = getContentType(movie);
-  const posterUrl = movie.poster_path ? getImageUrl(movie.poster_path) : null;
-  const rating = movie.vote_average || 0;
-  const defaultPoster = 'https://images.unsplash.com/photo-1489599735161-8f4b80604bb9?w=300&h=450&fit=crop';
-  const finalPosterUrl = (!posterUrl || imageError) ? defaultPoster : posterUrl;
+  const posterUrl = movie.poster_path ? getImageUrl(movie.poster_path, "small") : null;
+  const rating = typeof movie.vote_average === "number" ? movie.vote_average : 0;
+  const hasValidRating = rating > 0;
+  const finalPosterUrl = (!posterUrl || imageError) ? getPlaceholderImage() : posterUrl;
 
   // Get primary genre
   const primaryGenre = movie.genre_ids && movie.genre_ids.length > 0 
@@ -211,6 +211,7 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
           )}
           
           <motion.img
+            key={finalPosterUrl}
             src={finalPosterUrl}
             alt={displayTitle}
             className="w-full h-full object-cover"
@@ -268,16 +269,18 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
             <span>{contentType === 'tv' ? 'Series' : 'Movie'}</span>
           </motion.div>
 
-          {/* Rating Badge with dynamic color */}
-          <motion.div 
-            className={`absolute top-3 right-3 flex items-center space-x-1.5 bg-gradient-to-r ${getRatingColor(rating)} text-white text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-lg`}
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.15 }}
-          >
-            <Star className="w-3.5 h-3.5 fill-current" />
-            <span>{rating.toFixed(1)}</span>
-          </motion.div>
+          {/* Rating Badge - only show when we have a valid rating */}
+          {hasValidRating && (
+            <motion.div 
+              className={`absolute top-3 right-3 flex items-center space-x-1.5 bg-gradient-to-r ${getRatingColor(rating)} text-white text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-lg`}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.15 }}
+            >
+              <Star className="w-3.5 h-3.5 fill-current" />
+              <span>{rating.toFixed(1)}</span>
+            </motion.div>
+          )}
 
           {/* Genre Badge - Shows on hover */}
           <AnimatePresence>
@@ -416,8 +419,14 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
             <p className="text-gray-500 text-xs">{year}</p>
           )}
           <div className="flex items-center space-x-1">
-            <Star className="w-3 h-3 text-yellow-500 fill-current" />
-            <span className="text-gray-400 text-xs">{rating.toFixed(1)}</span>
+            {hasValidRating ? (
+              <>
+                <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                <span className="text-gray-400 text-xs">{rating.toFixed(1)}</span>
+              </>
+            ) : (
+              <span className="text-gray-500 text-xs">No rating</span>
+            )}
           </div>
         </div>
       </motion.div>

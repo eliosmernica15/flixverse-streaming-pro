@@ -523,10 +523,11 @@ export const fetchTrendingAll = async (timeWindow: 'day' | 'week' = 'week'): Pro
 
 // Enhanced image utilities with better fallbacks
 export const getImageUrl = (path: string | null, size: 'small' | 'medium' | 'large' | 'original' = 'medium'): string => {
-  if (!path) {
+  if (!path || typeof path !== 'string') {
     return getPlaceholderImage();
   }
-  return `${TMDB_POSTER_SIZES[size]}${path}`;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${TMDB_POSTER_SIZES[size]}${normalizedPath}`;
 };
 
 export const getBackdropUrl = (path: string | null, size: 'small' | 'medium' | 'large' | 'original' = 'large'): string => {
