@@ -20,7 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl } from '@/utils/tmdbApi';
-import { uploadToFirebase } from '@/utils/firebaseUpload';
+import { uploadToCloudinary } from '@/utils/cloudinary';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -98,15 +98,12 @@ const Profile = () => {
     try {
       console.log('Uploading blob:', croppedBlob.size, 'bytes');
 
-      // Upload to Firebase Storage
-      // Use a consistent extension like .jpg since we convert to jpeg in canvasUtils or it's a blob
-      const filePath = `profile_images/${user.uid}_${Date.now()}.jpg`;
-
-      const downloadURL = await uploadToFirebase(croppedBlob, filePath);
-      console.log('Upload complete, URL:', downloadURL);
+      // Upload to Cloudinary
+      const result = await uploadToCloudinary(croppedBlob, `profile_images/${user.uid}`);
+      console.log('Upload complete, URL:', result.secure_url);
 
       await updateProfile({
-        avatar_url: downloadURL
+        avatar_url: result.secure_url
       });
       console.log('Profile updated successfully');
 
