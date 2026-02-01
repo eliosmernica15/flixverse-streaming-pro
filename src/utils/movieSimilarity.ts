@@ -20,6 +20,7 @@ import {
   fetchMovieKeywords,
   discoverMoviesWithGenresAndKeywords,
   fetchSimilarMovies,
+  fetchMovieRecommendations,
 } from '@/utils/tmdbApi';
 
 /** Configurable weights (must sum to 100 for a 0–100 score). */
@@ -31,8 +32,8 @@ export const SIMILARITY_WEIGHTS = {
   voteQuality: 7,
 } as const;
 
-/** Minimum score (0–100) to include a candidate. */
-export const SIMILARITY_THRESHOLD = 25;
+/** Minimum score (0–100) to include a candidate. Kept low so we don't hide suggestions. */
+export const SIMILARITY_THRESHOLD = 15;
 
 /** Genres considered "generic" when they're the only match (require extra signal). */
 const GENERIC_GENRE_IDS = new Set([18, 35, 53]); // Drama, Comedy, Thriller
@@ -125,10 +126,15 @@ export interface SimilarityInput {
  * Compute similarity score 0–100 between current movie and a candidate.
  * Uses weights from SIMILARITY_WEIGHTS.
  */
+function getGenreIds(m: TMDBMovie): number[] {
+  if (m.genre_ids && m.genre_ids.length > 0) return m.genre_ids;
+  return (m.genres ?? []).map((g) => g.id);
+}
+
 export function computeSimilarityScore(input: SimilarityInput): number {
   const { current, candidate, currentKeywords = [] } = input;
-  const currentGenres = current.genre_ids?.length ? current.genre_ids : [];
-  const candidateGenres = candidate.genre_ids?.length ? candidate.genre_ids : [];
+  const currentGenres = getGenreIds(current);
+  const candidateGenres = getGenreIds(candidate);
 
   const { sharedCount, onlyGeneric } = genreMatchInfo(currentGenres, candidateGenres);
   if (sharedCount === 0) return 0;
@@ -169,20 +175,15 @@ export function computeSimilarityScore(input: SimilarityInput): number {
 }
 
 /**
- * Whether to exclude candidate: no genre match, or only single generic match with weak other signals.
+ * Exclude only when there is no genre match (keep suggestions; single generic match still shown, ranked lower).
  */
 export function shouldExcludeCandidate(
   current: TMDBMovie,
   candidate: TMDBMovie,
-  score: number
+  _score: number
 ): boolean {
-  const currentGenres = current.genre_ids ?? [];
-  const candidateGenres = candidate.genre_ids ?? [];
-  const { sharedCount, onlyGeneric } = genreMatchInfo(currentGenres, candidateGenres);
-
-  if (sharedCount === 0) return true;
-  if (onlyGeneric && score < SIMILARITY_THRESHOLD + 15) return true;
-  return false;
+  const { sharedCount } = genreMatchInfo(getGenreIds(current), getGenreIds(candidate));
+  return sharedCount === 0;
 }
 
 export interface ScoredMovie {
@@ -246,9 +247,10 @@ export async function getSimilarMoviesForMovie(
   const maxResults = options.maxResults ?? 4;
   const threshold = options.threshold ?? SIMILARITY_THRESHOLD;
 
-  const [keywords, similar] = await Promise.all([
+  const [keywords, similar, recommendations] = await Promise.all([
     fetchMovieKeywords(current.id),
     fetchSimilarMovies(current.id),
+    fetchMovieRecommendations(current.id),
   ]);
 
   const genreIds =
@@ -267,7 +269,7 @@ export async function getSimilarMoviesForMovie(
 
   const seen = new Set<number>([current.id]);
   const candidates: TMDBMovie[] = [];
-  for (const m of [...discoverCandidates, ...similar]) {
+  for (const m of [...discoverCandidates, ...similar, ...(recommendations || [])]) {
     if (m?.id && !seen.has(m.id)) {
       seen.add(m.id);
       candidates.push(m);
@@ -276,9 +278,20 @@ export async function getSimilarMoviesForMovie(
 
   const scored = scoreAndFilterCandidates(current, candidates, keywords, {
     threshold,
-    maxResults,
+    maxResults: 20,
     excludeId: current.id,
   });
 
-  return scored.map((s) => ({ ...s.movie, media_type: 'movie' }));
+  let result = scored.slice(0, maxResults).map((s) => ({ ...s.movie, media_type: 'movie' as const }));
+
+  if (result.length < maxResults && candidates.length > result.length) {
+    const usedIds = new Set(result.map((m) => m.id));
+    const fallback = candidates
+      .filter((m) => !usedIds.has(m.id))
+      .slice(0, maxResults - result.length)
+      .map((m) => ({ ...m, media_type: 'movie' as const }));
+    result = [...result, ...fallback];
+  }
+
+  return result;
 }
