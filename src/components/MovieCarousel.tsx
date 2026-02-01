@@ -18,9 +18,11 @@ interface MovieCarouselProps {
   priority?: boolean;
   loading?: boolean;
   icon?: React.ReactNode;
+  /** When true, section is always rendered (e.g. Coming soon) even with no items. */
+  showWhenEmpty?: boolean;
 }
 
-const MovieCarousel = ({ title, movies, priority = false, loading = false, icon }: MovieCarouselProps) => {
+const MovieCarousel = ({ title, movies, priority = false, loading = false, icon, showWhenEmpty = false }: MovieCarouselProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const validMovies = movies.filter(movie => {
@@ -60,7 +62,7 @@ const MovieCarousel = ({ title, movies, priority = false, loading = false, icon 
     );
   }
 
-  if (!validMovies.length) {
+  if (!validMovies.length && !showWhenEmpty) {
     return null;
   }
 
@@ -97,7 +99,9 @@ const MovieCarousel = ({ title, movies, priority = false, loading = false, icon 
               {title}
             </h2>
             <div className="flex items-center space-x-3 mt-1">
-              <span className="text-sm text-gray-500">{validMovies.length} titles</span>
+              <span className="text-sm text-gray-500">
+                {validMovies.length > 0 ? `${validMovies.length} titles` : "Upcoming releases"}
+              </span>
               <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
               <span className="text-sm text-gray-500">Updated daily</span>
             </div>
@@ -115,7 +119,8 @@ const MovieCarousel = ({ title, movies, priority = false, loading = false, icon 
         </motion.button>
       </motion.div>
       
-      {/* Carousel */}
+      {/* Carousel or empty state */}
+      {validMovies.length > 0 ? (
       <Carousel
         opts={{
           align: "start",
@@ -151,6 +156,12 @@ const MovieCarousel = ({ title, movies, priority = false, loading = false, icon 
           </>
         )}
       </Carousel>
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-white/5 py-16 px-8 text-center">
+          <p className="text-gray-400 text-lg">New movies and series will appear here before they’re released.</p>
+          <p className="text-gray-500 text-sm mt-2">Check back for upcoming releases.</p>
+        </div>
+      )}
 
       {/* Subtle gradient fade on edges */}
       <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-black to-transparent pointer-events-none z-10 hidden lg:block" />

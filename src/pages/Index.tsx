@@ -190,6 +190,7 @@ const Index = () => {
               title="Coming soon" 
               movies={comingSoon}
               icon={<Calendar className="w-5 h-5 text-amber-500" />}
+              showWhenEmpty
             />
           </div>
         </div>
