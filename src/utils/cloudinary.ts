@@ -2,7 +2,7 @@
 // Uses unsigned upload preset for client-side uploads
 
 const CLOUDINARY_CLOUD_NAME = 'da6fope8h';
-const CLOUDINARY_UPLOAD_PRESET = 'ASERwmI-XCZClmwf73ImwgImZV4';
+const CLOUDINARY_UPLOAD_PRESET = 'profile_uploads';
 
 export interface CloudinaryUploadResult {
   secure_url: string;
