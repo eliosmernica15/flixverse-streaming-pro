@@ -10,13 +10,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator 
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
 
 const Navigation = () => {
@@ -72,27 +73,25 @@ const Navigation = () => {
 
   return (
     <>
-      <motion.nav 
+      <motion.nav
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${
-          isScrolled 
-            ? 'glass-premium shadow-2xl shadow-black/40' 
-            : 'bg-gradient-to-b from-black/90 via-black/50 to-transparent'
-        }`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${isScrolled
+          ? 'glass-premium shadow-2xl shadow-black/40'
+          : 'bg-gradient-to-b from-black/90 via-black/50 to-transparent'
+          }`}
       >
         {/* Animated border glow when scrolled */}
-        <div className={`absolute bottom-0 left-0 right-0 h-[1px] transition-opacity duration-500 ${
-          isScrolled ? 'opacity-100' : 'opacity-0'
-        }`}>
+        <div className={`absolute bottom-0 left-0 right-0 h-[1px] transition-opacity duration-500 ${isScrolled ? 'opacity-100' : 'opacity-0'
+          }`}>
           <div className="h-full bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
         </div>
 
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             {/* Logo */}
-            <motion.div 
+            <motion.div
               className="flex items-center"
               whileHover={{ scale: 1.02 }}
               transition={{ type: "spring", stiffness: 400 }}
@@ -120,27 +119,25 @@ const Navigation = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 + 0.2 }}
                 >
-                  <Link 
-                    to={link.path} 
-                    className={`relative px-4 py-2.5 text-sm lg:text-base font-medium transition-all duration-300 rounded-xl group ${
-                      isActive(link.path) 
-                        ? 'text-white' 
-                        : 'text-gray-400 hover:text-white'
-                    }`}
+                  <Link
+                    to={link.path}
+                    className={`relative px-4 py-2.5 text-sm lg:text-base font-medium transition-all duration-300 rounded-xl group ${isActive(link.path)
+                      ? 'text-white'
+                      : 'text-gray-400 hover:text-white'
+                      }`}
                   >
                     {/* Background hover effect */}
-                    <span className={`absolute inset-0 rounded-xl transition-all duration-300 ${
-                      isActive(link.path)
-                        ? 'bg-white/10 backdrop-blur-sm'
-                        : 'bg-transparent group-hover:bg-white/5'
-                    }`} />
-                    
+                    <span className={`absolute inset-0 rounded-xl transition-all duration-300 ${isActive(link.path)
+                      ? 'bg-white/10 backdrop-blur-sm'
+                      : 'bg-transparent group-hover:bg-white/5'
+                      }`} />
+
                     {/* Label */}
                     <span className="relative z-10">{link.label}</span>
-                    
+
                     {/* Active indicator */}
                     {isActive(link.path) && (
-                      <motion.span 
+                      <motion.span
                         layoutId="activeNav"
                         className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-full"
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -154,7 +151,7 @@ const Navigation = () => {
             {/* Right Side Icons */}
             <div className="flex items-center space-x-2 sm:space-x-3">
               {/* Search Bar */}
-              <motion.div 
+              <motion.div
                 className="hidden sm:block"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -165,7 +162,7 @@ const Navigation = () => {
 
               {/* Notification Settings */}
               <NotificationSettings />
-              
+
               {/* Real-time Notifications */}
               <NotificationBell />
 
@@ -173,15 +170,21 @@ const Navigation = () => {
               {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <motion.button 
+                    <motion.button
                       className="flex items-center space-x-2 hover:bg-white/10 rounded-xl px-2 sm:px-3 py-2 transition-all duration-300 group"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
                       <div className="relative">
-                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-red-500 via-red-600 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/25 group-hover:shadow-red-500/40 transition-shadow">
-                          <User className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                        </div>
+                        <Avatar className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-white/10 shadow-lg shadow-red-500/25 group-hover:shadow-red-500/40 transition-shadow overflow-hidden">
+                          <AvatarImage
+                            src={profile?.avatar_url || undefined}
+                            className="object-cover w-full h-full"
+                          />
+                          <AvatarFallback className="bg-gradient-to-br from-red-500 via-red-600 to-orange-500 text-white text-xs font-bold">
+                            {profile?.display_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-black" />
                       </div>
                       <div className="hidden lg:flex items-center space-x-1">
@@ -192,8 +195,8 @@ const Navigation = () => {
                       </div>
                     </motion.button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent 
-                    align="end" 
+                  <DropdownMenuContent
+                    align="end"
                     className="w-60 glass-premium rounded-2xl p-2 border-white/10 mt-2"
                   >
                     {/* User info header */}
@@ -203,15 +206,15 @@ const Navigation = () => {
                       </p>
                       <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                     </div>
-                    
-                    <DropdownMenuItem 
+
+                    <DropdownMenuItem
                       onClick={() => navigate('/profile')}
                       className="text-gray-300 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer py-3"
                     >
                       <User className="w-4 h-4 mr-3" />
                       My Profile
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => navigate('/my-list')}
                       className="text-gray-300 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer py-3"
                     >
@@ -219,7 +222,7 @@ const Navigation = () => {
                       My Watchlist
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/10 my-2" />
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={handleSignOut}
                       className="text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl cursor-pointer py-3"
                     >
@@ -290,7 +293,7 @@ const Navigation = () => {
                   <div className="px-2 py-2">
                     <SearchBar onMovieSelect={handleMovieSelect} />
                   </div>
-                  
+
                   {/* Mobile Navigation Links */}
                   {navLinks.map((link, index) => (
                     <motion.div
@@ -302,11 +305,10 @@ const Navigation = () => {
                       <Link
                         to={link.path}
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-300 ${
-                          isActive(link.path) 
-                            ? 'text-white bg-gradient-to-r from-red-500/20 to-orange-500/10 border-l-2 border-red-500' 
-                            : 'text-gray-400 hover:text-white hover:bg-white/5'
-                        }`}
+                        className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-300 ${isActive(link.path)
+                          ? 'text-white bg-gradient-to-r from-red-500/20 to-orange-500/10 border-l-2 border-red-500'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
                       >
                         {link.label}
                       </Link>
