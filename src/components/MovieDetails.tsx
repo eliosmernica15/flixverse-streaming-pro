@@ -651,13 +651,16 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       {showPlayer && content && createPortal(
         (() => {
           const watchProgress = getProgress(content.id, isTV ? selectedSeason : undefined, isTV ? selectedEpisode : undefined);
-          // For movies, use runtime. For TV shows, use default 45 minutes (2700 seconds) if runtime not available
+          // Prefer URL resume position (from Continue Watching) when provided; fall back to Firestore progress
+          const effectiveResumePosition = resumePosition ?? watchProgress?.progress_seconds;
+          // Prefer stored total duration when available (from watch history), else derive from content
           let totalDuration: number | undefined;
-          if (isTV) {
-            // TV episodes typically run 40-50 minutes, use 45 as default
-            totalDuration = content.runtime ? content.runtime * 60 : 45 * 60; // Default to 45 minutes for TV episodes
+          if (watchProgress?.total_duration_seconds && watchProgress.total_duration_seconds > 0) {
+            totalDuration = watchProgress.total_duration_seconds;
+          } else if (isTV) {
+            totalDuration = content.runtime ? content.runtime * 60 : 45 * 60;
           } else {
-            totalDuration = content.runtime ? content.runtime * 60 : undefined; // Convert minutes to seconds
+            totalDuration = content.runtime ? content.runtime * 60 : undefined;
           }
           
           return (
@@ -685,7 +688,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 season={isTV ? selectedSeason : undefined}
                 episode={isTV ? selectedEpisode : undefined}
                 posterPath={content.poster_path}
-                resumePosition={watchProgress?.progress_seconds}
+                resumePosition={effectiveResumePosition}
                 totalDuration={totalDuration}
               />
             </div>

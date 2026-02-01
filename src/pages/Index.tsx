@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import HeroBanner from "@/components/HeroBanner";
 import MovieCarousel from "@/components/MovieCarousel";
@@ -121,7 +122,7 @@ const Index = () => {
         )}
         
         {/* Welcome banner positioned after hero */}
-        <div className="relative z-20 -mt-24 mb-8">
+        <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8">
           <PersonalizedWelcome />
         </div>
 
@@ -131,51 +132,38 @@ const Index = () => {
           <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-red-500/5 rounded-full blur-[200px] pointer-events-none" />
           <div className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[200px] pointer-events-none" />
           
-          <div className="space-y-16 lg:space-y-20 pb-24 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
-            
-            {/* Continue Watching Section */}
+          <div className="space-y-14 lg:space-y-20 pb-20 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
             <ContinueWatching />
-            
             <MovieCarousel 
               title="Trending Now" 
               movies={trendingMovies}
               icon={<TrendingUp className="w-5 h-5 text-red-500" />}
             />
-            
-            <div className="section-divider-glow"></div>
-            
+            <div className="section-divider-glow" aria-hidden />
             <MovieCarousel 
               title="Now Playing" 
               movies={nowPlayingMovies}
               icon={<Play className="w-5 h-5 text-green-500" />}
             />
-            
-            <div className="section-divider"></div>
-            
+            <div className="section-divider" aria-hidden />
             <MovieCarousel 
               title="Top Rated" 
               movies={topRatedMovies}
               icon={<Star className="w-5 h-5 text-yellow-500" />}
             />
-            
-            <div className="section-divider"></div>
-            
+            <div className="section-divider" aria-hidden />
             <MovieCarousel 
               title="Popular Movies" 
               movies={popularMovies}
               icon={<Film className="w-5 h-5 text-blue-500" />}
             />
-            
-            <div className="section-divider"></div>
-            
+            <div className="section-divider" aria-hidden />
             <MovieCarousel 
               title="Trending TV Shows" 
               movies={trendingTVShows}
               icon={<Tv className="w-5 h-5 text-purple-500" />}
             />
-            
-            <div className="section-divider"></div>
-            
+            <div className="section-divider" aria-hidden />
             <MovieCarousel 
               title="Popular TV Shows" 
               movies={popularTVShows}
@@ -226,11 +214,17 @@ const Index = () => {
               <div>
                 <h4 className="text-white font-semibold mb-5">Browse</h4>
                 <ul className="space-y-3">
-                  {['Home', 'Movies', 'TV Shows', 'New & Popular', 'My List'].map((link) => (
-                    <li key={link}>
-                      <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:pl-1">
-                        {link}
-                      </a>
+                  {[
+                    { to: '/', label: 'Home' },
+                    { to: '/movies', label: 'Movies' },
+                    { to: '/tv-shows', label: 'TV Shows' },
+                    { to: '/new-and-popular', label: 'New & Popular' },
+                    { to: '/my-list', label: 'My List' },
+                  ].map(({ to, label }) => (
+                    <li key={to}>
+                      <Link to={to} className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:pl-1 inline-block">
+                        {label}
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -269,7 +263,7 @@ const Index = () => {
             <div className="pt-8 border-t border-white/5">
               <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
                 <p className="text-sm text-gray-500 flex items-center space-x-1.5">
-                  <span>2024 FlixVerse. Made with</span>
+                  <span>© {new Date().getFullYear()} FlixVerse. Made with</span>
                   <Heart className="w-4 h-4 text-red-500 fill-current" />
                   <span>for movie lovers</span>
                 </p>

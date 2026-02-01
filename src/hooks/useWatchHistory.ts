@@ -115,9 +115,15 @@ export const useWatchHistory = () => {
     await Promise.all(promises);
   };
 
-  // Get continue watching items (not completed)
+  // Get continue watching items (not completed, with valid duration to avoid NaN/glitches)
   const getContinueWatching = () => {
-    return history.filter(h => !h.completed && h.progress_seconds > 60);
+    return history.filter(
+      (h) =>
+        !h.completed &&
+        h.progress_seconds > 60 &&
+        h.total_duration_seconds != null &&
+        h.total_duration_seconds > 0
+    );
   };
 
   // Get recently watched (completed)
