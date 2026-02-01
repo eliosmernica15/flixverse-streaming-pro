@@ -483,6 +483,34 @@ export const searchMulti = async (query: string, page: number = 1): Promise<any[
   }));
 };
 
+export interface SearchMultiResponse {
+  results: any[];
+  page: number;
+  total_pages: number;
+  total_results: number;
+}
+
+export const searchMultiWithPagination = async (
+  query: string,
+  page: number = 1
+): Promise<SearchMultiResponse> => {
+  const data = await apiCall(
+    `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=${page}`
+  );
+  const results = (data.results || []).map((item: any) => ({
+    ...item,
+    media_type: item.media_type || (item.title ? "movie" : "tv"),
+    title: item.title || item.name,
+    release_date: item.release_date || item.first_air_date,
+  }));
+  return {
+    results,
+    page: data.page ?? 1,
+    total_pages: Math.min(data.total_pages ?? 1, 500),
+    total_results: data.total_results ?? 0,
+  };
+};
+
 // Trending content by time window
 export const fetchTrendingAll = async (timeWindow: 'day' | 'week' = 'week'): Promise<any[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/trending/all/${timeWindow}`);

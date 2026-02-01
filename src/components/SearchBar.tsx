@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, X, User, Film, Tv } from "lucide-react";
 import { TMDBMovie, TMDBPerson, searchMulti, searchPeople, getContentImage } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +32,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
   const [loading, setLoading] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const searchContent = async () => {
@@ -167,6 +169,15 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && query.trim()) {
+              e.preventDefault();
+              navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+              setQuery("");
+              setResults([]);
+              setIsOpen(false);
+            }
+          }}
           placeholder="Search movies, TV shows & people..."
           className="w-full pl-10 pr-10 py-2 bg-black/60 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-red-500 focus:bg-black/80 transition-all"
         />

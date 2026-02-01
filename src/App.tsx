@@ -12,6 +12,7 @@ import Movies from "./pages/Movies";
 import NewAndPopular from "./pages/NewAndPopular";
 import MyList from "./pages/MyList";
 import MovieDetailsPage from "./pages/MovieDetailsPage";
+import SearchResults from "./pages/SearchResults";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -33,6 +34,7 @@ const AnimatedRoutes = () => {
         <Route path="/my-list" element={<PageTransition><MyList /></PageTransition>} />
         <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
         <Route path="/movie/:id" element={<PageTransition><MovieDetailsPage /></PageTransition>} />
+        <Route path="/search" element={<PageTransition><SearchResults /></PageTransition>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
       </Routes>
