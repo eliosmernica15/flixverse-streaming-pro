@@ -1,11 +1,10 @@
 
-import { Play, Star, Plus, Info, Check, Volume2, VolumeX } from "lucide-react";
+import { Play, Star, Plus, Info, Check } from "lucide-react";
 import { TMDBMovie, getImageUrl, getContentTitle } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 interface HeroBannerProps {
@@ -17,7 +16,6 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
   const { addToList, isInList } = useUserMovieList();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [isMuted, setIsMuted] = useState(true);
 
   const title = getContentTitle(movie);
   const backdropUrl = movie.backdrop_path ? getImageUrl(movie.backdrop_path, 'original') : '';
@@ -230,20 +228,6 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
                 title="More Info"
               >
                 <Info className="w-6 h-6 text-white" />
-              </motion.button>
-
-              <motion.button 
-                onClick={() => setIsMuted(!isMuted)}
-                className="group p-4 glass-card rounded-xl hover:bg-white/15 transition-all duration-300"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                title={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted ? (
-                  <VolumeX className="w-6 h-6 text-white" />
-                ) : (
-                  <Volume2 className="w-6 h-6 text-white" />
-                )}
               </motion.button>
             </motion.div>
           </div>
