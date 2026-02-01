@@ -244,6 +244,20 @@ export const fetchOnTheAirTVShows = async (): Promise<TMDBMovie[]> => {
   }));
 };
 
+/** TV shows that have not premiered yet (first_air_date >= today). */
+export const fetchUpcomingTVShows = async (): Promise<TMDBMovie[]> => {
+  const today = new Date().toISOString().slice(0, 10);
+  const data = await apiCall(
+    `${TMDB_BASE_URL}/discover/tv?first_air_date.gte=${today}&sort_by=first_air_date.asc`
+  );
+  return (data.results || []).map((show: any) => ({
+    ...show,
+    title: show.name,
+    release_date: show.first_air_date,
+    media_type: 'tv'
+  }));
+};
+
 // Genre-based TV show fetching
 export const fetchActionTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/discover/tv?with_genres=10759&sort_by=popularity.desc`);
@@ -634,6 +648,14 @@ export const getContentTitle = (item: TMDBMovie): string => {
 // Utility function to safely get content release date
 export const getContentReleaseDate = (item: TMDBMovie): string => {
   return item.release_date || item.first_air_date || '';
+};
+
+/** True if the movie/TV has a release/first_air date in the future (not yet released). */
+export const isNotReleasedYet = (item: TMDBMovie): boolean => {
+  const dateStr = item.release_date || item.first_air_date;
+  if (!dateStr) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return dateStr > today;
 };
 
 // Utility function to detect content type

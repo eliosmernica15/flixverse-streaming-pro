@@ -11,10 +11,13 @@ import {
   fetchTrendingTVShows,
   fetchPopularTVShows,
   fetchNowPlayingMovies,
+  fetchUpcomingMovies,
+  fetchUpcomingTVShows,
+  isNotReleasedYet,
   TMDBMovie 
 } from "@/utils/tmdbApi";
 import { getHeroMovieOfTheWeek } from "@/utils/popularMoviesRotator";
-import { TrendingUp, Star, Play, Tv, Film, Sparkles } from "lucide-react";
+import { TrendingUp, Star, Play, Tv, Film, Sparkles, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
@@ -24,6 +27,7 @@ const Index = () => {
   const [trendingTVShows, setTrendingTVShows] = useState<TMDBMovie[]>([]);
   const [popularTVShows, setPopularTVShows] = useState<TMDBMovie[]>([]);
   const [nowPlayingMovies, setNowPlayingMovies] = useState<TMDBMovie[]>([]);
+  const [comingSoon, setComingSoon] = useState<TMDBMovie[]>([]);
   const [featuredMovie, setFeaturedMovie] = useState<TMDBMovie | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,6 +41,8 @@ const Index = () => {
           trendingShows,
           popularShows,
           nowPlaying,
+          upcomingMoviesRaw,
+          upcomingTVRaw,
           heroMovie
         ] = await Promise.all([
           fetchTrendingMovies(),
@@ -45,6 +51,8 @@ const Index = () => {
           fetchTrendingTVShows(),
           fetchPopularTVShows(),
           fetchNowPlayingMovies(),
+          fetchUpcomingMovies(),
+          fetchUpcomingTVShows(),
           getHeroMovieOfTheWeek()
         ]);
 
@@ -55,6 +63,15 @@ const Index = () => {
         setPopularTVShows(popularShows);
         setNowPlayingMovies(nowPlaying);
         setFeaturedMovie(heroMovie || trending[0] || topRated[0]);
+
+        const notReleasedMovies = (upcomingMoviesRaw || []).filter((m) => isNotReleasedYet(m));
+        const notReleasedTV = (upcomingTVRaw || []).filter((m) => isNotReleasedYet(m));
+        const combined = [...notReleasedMovies, ...notReleasedTV].sort((a, b) => {
+          const dateA = a.release_date || a.first_air_date || "";
+          const dateB = b.release_date || b.first_air_date || "";
+          return dateA.localeCompare(dateB);
+        });
+        setComingSoon(combined);
         
       } catch (error) {
         console.error('Error loading content:', error);
@@ -167,6 +184,12 @@ const Index = () => {
               title="Popular TV Shows" 
               movies={popularTVShows}
               icon={<Tv className="w-5 h-5 text-pink-500" />}
+            />
+            <div className="section-divider" aria-hidden />
+            <MovieCarousel 
+              title="Coming soon" 
+              movies={comingSoon}
+              icon={<Calendar className="w-5 h-5 text-amber-500" />}
             />
           </div>
         </div>
