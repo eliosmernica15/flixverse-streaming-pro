@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
-import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason } from "@/utils/tmdbApi";
+import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarMovies, fetchSimilarTVShows, fetchMovieRecommendations, fetchTVShowRecommendations } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,7 @@ import VideoPlayer from "./VideoPlayer";
 import ReviewSection from "./ReviewSection";
 import CommentSection from "./CommentSection";
 import QuickRating from "./QuickRating";
+import MovieCard from "./MovieCard";
 
 interface MovieDetailsProps {
   movieId: number;
@@ -34,6 +35,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
   const [showSeasonDropdown, setShowSeasonDropdown] = useState(false);
+  const [relatedContent, setRelatedContent] = useState<TMDBMovie[]>([]);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
@@ -97,6 +99,36 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       return () => clearTimeout(timer);
     }
   }, [autoplay, content, showPlayer]);
+
+  // Fetch 4 related/similar titles (same niche) when content is loaded
+  useEffect(() => {
+    if (!content) return;
+    const type = content.media_type === 'tv' || mediaType === 'tv' ? 'tv' : 'movie';
+    const id = content.id;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const [similar, recs] = type === 'movie'
+          ? await Promise.all([fetchSimilarMovies(id), fetchMovieRecommendations(id)])
+          : await Promise.all([fetchSimilarTVShows(id), fetchTVShowRecommendations(id)]);
+        if (cancelled) return;
+        const combined = [...(similar || []), ...(recs || [])]
+          .filter((m) => m && m.id && m.id !== id)
+          .map((m) => ({ ...m, media_type: type }));
+        const seen = new Set<number>();
+        const unique = combined.filter((m) => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+        setRelatedContent(unique.slice(0, 4));
+      } catch {
+        if (!cancelled) setRelatedContent([]);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [content?.id, content?.media_type, mediaType]);
 
   // No body scroll lock needed - component has its own scroll container
 
@@ -661,6 +693,24 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           contentId={content.id}
           contentType={isTV ? 'tv' : 'movie'}
         />
+
+        {/* More like this - 4 related suggestions only */}
+        {relatedContent.length > 0 && (
+          <div className="w-full px-4 sm:px-6 md:px-16 py-10 md:py-14 bg-gradient-to-b from-gray-900/50 to-black border-t border-white/5">
+            <div className="max-w-7xl mx-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-6">More like this</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                {relatedContent.map((movie, index) => (
+                  <MovieCard
+                    key={`related-${movie.id}-${index}`}
+                    movie={movie}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Video Player - rendered in portal so it escapes PageTransition's transform and displays full viewport */}
