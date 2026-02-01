@@ -27,7 +27,7 @@ const Profile = () => {
   const { profile, loading: profileLoading, updateProfile } = useUserProfile();
   const { movieList, loading: listLoading } = useUserMovieList();
   const { history, getRecentlyWatched, getContinueWatching } = useWatchHistory();
-  const { activities, loading: activityLoading, getActivitiesByType, getStats } = useUserActivity();
+  const { activities, loading: activityLoading, refetch: refetchActivity, getActivitiesByType, getStats } = useUserActivity();
   const { toast } = useToast();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -35,6 +35,7 @@ const Profile = () => {
   const [editedBio, setEditedBio] = useState('');
   const [saving, setSaving] = useState(false);
   const [activityFilter, setActivityFilter] = useState<ActivityType | 'all'>('all');
+  const [activeTab, setActiveTab] = useState<string>('watchlist');
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -254,7 +255,7 @@ const Profile = () => {
 
         {/* Tabs Content */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-          <Tabs defaultValue="watchlist" className="w-full">
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === 'activity') refetchActivity(); }} className="w-full">
             <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl mb-6">
               <TabsTrigger value="watchlist" className="data-[state=active]:bg-red-500 rounded-lg">
                 <Heart className="w-4 h-4 mr-2" />

@@ -35,6 +35,14 @@
       ]
     },
     {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "likes",
       "queryScope": "COLLECTION",
       "fields": [
@@ -59,6 +67,14 @@
       ]
     },
     {
+      "collectionGroup": "content_ratings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "follows",
       "queryScope": "COLLECTION",
       "fields": [
@@ -79,6 +95,15 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "user_id", "order": "ASCENDING" },
+        { "fieldPath": "watched_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "watch_history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_id", "order": "ASCENDING" },
+        { "fieldPath": "completed", "order": "ASCENDING" },
         { "fieldPath": "watched_at", "order": "DESCENDING" }
       ]
     },

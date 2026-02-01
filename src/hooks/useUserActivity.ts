@@ -32,6 +32,7 @@ export interface UserActivity {
 export const useUserActivity = (userId?: string) => {
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { user } = useAuth();
 
   const targetUserId = userId || user?.uid;
@@ -48,16 +49,16 @@ export const useUserActivity = (userId?: string) => {
       setLoading(true);
       const allActivities: UserActivity[] = [];
 
-      try {
-        // Fetch reviews
+      // Fetch each activity type independently so one failing query (e.g. missing index) doesn't block others
+      const fetchReviews = async () => {
         const reviewsQuery = query(
           collection(db, 'reviews'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
           limit(20)
         );
-        const reviewsSnapshot = await getDocs(reviewsQuery);
-        reviewsSnapshot.forEach((doc) => {
+        const snapshot = await getDocs(reviewsQuery);
+        snapshot.forEach((doc) => {
           const review = doc.data() as Review;
           allActivities.push({
             id: `review-${doc.id}`,
@@ -71,22 +72,20 @@ export const useUserActivity = (userId?: string) => {
             reviewText: review.review_text,
           });
         });
+      };
 
-        // Fetch ratings (without reviews)
+      const fetchRatings = async () => {
         const ratingsQuery = query(
           collection(db, 'content_ratings'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
           limit(20)
         );
-        const ratingsSnapshot = await getDocs(ratingsQuery);
-        ratingsSnapshot.forEach((doc) => {
+        const snapshot = await getDocs(ratingsQuery);
+        snapshot.forEach((doc) => {
           const rating = doc.data() as ContentRating;
-          // Check if this rating already has a review (avoid duplicates)
           const hasReview = allActivities.some(
-            a => a.type === 'review' && 
-                 a.contentId === rating.content_id && 
-                 a.contentType === rating.content_type
+            a => a.type === 'review' && a.contentId === rating.content_id && a.contentType === rating.content_type
           );
           if (!hasReview) {
             allActivities.push({
@@ -99,16 +98,17 @@ export const useUserActivity = (userId?: string) => {
             });
           }
         });
+      };
 
-        // Fetch comments
+      const fetchComments = async () => {
         const commentsQuery = query(
           collection(db, 'comments'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
           limit(20)
         );
-        const commentsSnapshot = await getDocs(commentsQuery);
-        commentsSnapshot.forEach((doc) => {
+        const snapshot = await getDocs(commentsQuery);
+        snapshot.forEach((doc) => {
           const comment = doc.data() as Comment;
           allActivities.push({
             id: `comment-${doc.id}`,
@@ -119,16 +119,17 @@ export const useUserActivity = (userId?: string) => {
             commentText: comment.text,
           });
         });
+      };
 
-        // Fetch watchlist additions
+      const fetchWatchlist = async () => {
         const watchlistQuery = query(
           collection(db, 'user_movie_lists'),
           where('user_id', '==', targetUserId),
           orderBy('added_at', 'desc'),
           limit(20)
         );
-        const watchlistSnapshot = await getDocs(watchlistQuery);
-        watchlistSnapshot.forEach((doc) => {
+        const snapshot = await getDocs(watchlistQuery);
+        snapshot.forEach((doc) => {
           const item = doc.data() as UserMovieListItem;
           allActivities.push({
             id: `watchlist-${doc.id}`,
@@ -140,8 +141,9 @@ export const useUserActivity = (userId?: string) => {
             contentPosterPath: item.movie_poster_path,
           });
         });
+      };
 
-        // Fetch watch history (completed only)
+      const fetchWatched = async () => {
         const historyQuery = query(
           collection(db, 'watch_history'),
           where('user_id', '==', targetUserId),
@@ -149,8 +151,8 @@ export const useUserActivity = (userId?: string) => {
           orderBy('watched_at', 'desc'),
           limit(20)
         );
-        const historySnapshot = await getDocs(historyQuery);
-        historySnapshot.forEach((doc) => {
+        const snapshot = await getDocs(historyQuery);
+        snapshot.forEach((doc) => {
           const history = doc.data() as WatchHistory;
           allActivities.push({
             id: `watched-${doc.id}`,
@@ -162,13 +164,21 @@ export const useUserActivity = (userId?: string) => {
             contentPosterPath: history.content_poster_path,
           });
         });
+      };
 
-        // Sort all activities by timestamp (newest first)
-        allActivities.sort((a, b) => 
+      try {
+        await fetchReviews().catch((e) => console.warn('Activity: reviews fetch failed', e));
+        await Promise.all([
+          fetchRatings().catch((e) => console.warn('Activity: ratings fetch failed', e)),
+          fetchComments().catch((e) => console.warn('Activity: comments fetch failed', e)),
+          fetchWatchlist().catch((e) => console.warn('Activity: watchlist fetch failed', e)),
+          fetchWatched().catch((e) => console.warn('Activity: watched fetch failed', e)),
+        ]);
+
+        allActivities.sort((a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
-
-        setActivities(allActivities.slice(0, 50)); // Limit to 50 total
+        setActivities(allActivities.slice(0, 50));
       } catch (error) {
         console.error('Error fetching user activities:', error);
       } finally {
@@ -177,7 +187,9 @@ export const useUserActivity = (userId?: string) => {
     };
 
     fetchAllActivities();
-  }, [targetUserId]);
+  }, [targetUserId, refreshTrigger]);
+
+  const refetch = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
   // Filter activities by type
   const getActivitiesByType = useCallback((type: ActivityType) => {
@@ -216,6 +228,7 @@ export const useUserActivity = (userId?: string) => {
   return {
     activities,
     loading,
+    refetch,
     getActivitiesByType,
     getActivitiesGroupedByDate,
     getStats,
