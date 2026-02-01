@@ -157,6 +157,7 @@ const NewAndPopular = () => {
                   loading={loading}
                   icon={<Clock className="w-5 h-5 text-blue-400" />}
                   exploreAllPath="/browse/coming-soon"
+                  comingSoon
                 />
                 <div className="section-divider" />
               </>

@@ -1,4 +1,4 @@
-import { fetchTrendingMovies, fetchPopularMovies, fetchTrendingTVShows, TMDBMovie } from './tmdbApi';
+import { fetchTrendingMovies, fetchPopularMovies, fetchTrendingTVShows, TMDBMovie, isNotReleasedYet } from './tmdbApi';
 
 // Function to get the current week number
 const getWeekNumber = (date: Date): number => {
@@ -40,35 +40,31 @@ export const getHeroMovieOfTheWeek = async (): Promise<TMDBMovie | null> => {
   }
 };
 
-// Function to get truly upcoming movies (not yet released)
+// Function to get truly upcoming movies and TV (not yet released - cannot play)
 export const getUpcomingMoviesOnly = async (): Promise<TMDBMovie[]> => {
   try {
-    const { fetchUpcomingMovies } = await import('./tmdbApi');
-    const upcomingMovies = await fetchUpcomingMovies();
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { fetchUpcomingMovies, fetchUpcomingTVShows } = await import('./tmdbApi');
+    const [upcomingMovies, upcomingTV] = await Promise.all([
+      fetchUpcomingMovies(),
+      fetchUpcomingTVShows(),
+    ]);
 
-    // Filter for movies that haven't been released yet
-    const trulyUpcoming = upcomingMovies.filter(movie => {
-      if (!movie.release_date) return false;
-      
-      const releaseDate = new Date(movie.release_date);
-      releaseDate.setHours(0, 0, 0, 0);
-      
-      return releaseDate > today;
-    });
+    // Filter for content that hasn't been released yet (not showing to public)
+    const notReleasedMovies = (upcomingMovies || []).filter(isNotReleasedYet);
+    const notReleasedTV = (upcomingTV || []).filter(isNotReleasedYet);
+
+    const combined = [...notReleasedMovies, ...notReleasedTV];
 
     // Sort by release date (closest first)
-    trulyUpcoming.sort((a, b) => {
-      const dateA = new Date(a.release_date || '').getTime();
-      const dateB = new Date(b.release_date || '').getTime();
-      return dateA - dateB;
+    combined.sort((a, b) => {
+      const dateA = a.release_date || a.first_air_date || '';
+      const dateB = b.release_date || b.first_air_date || '';
+      return dateA.localeCompare(dateB);
     });
 
-    return trulyUpcoming;
+    return combined;
   } catch (error) {
-    console.error('Error fetching upcoming movies:', error);
+    console.error('Error fetching upcoming content:', error);
     return [];
   }
 };

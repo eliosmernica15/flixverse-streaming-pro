@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 interface MovieCardProps {
   movie: TMDBMovie;
   index?: number;
+  /** When true, show Coming Soon (no Play button) - content not yet released. */
+  comingSoon?: boolean;
 }
 
 // Genre ID to name mapping
@@ -24,7 +26,7 @@ const genreNames: { [key: number]: string } = {
   10766: 'Soap', 10767: 'Talk', 10768: 'War & Politics'
 };
 
-const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
+const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -343,15 +345,24 @@ const MovieCard = ({ movie, index = 0 }: MovieCardProps) => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15 }}
                 >
-                  <motion.button 
-                    className="flex-1 flex items-center justify-center space-x-2 bg-white text-black py-3 rounded-xl font-bold text-sm shadow-lg"
-                    onClick={handlePlayClick}
-                    whileHover={{ scale: 1.02, backgroundColor: "#f3f4f6" }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>Play</span>
-                  </motion.button>
+                  {comingSoon ? (
+                    <motion.div 
+                      className="flex-1 flex items-center justify-center space-x-2 bg-amber-500/30 text-amber-400 py-3 rounded-xl font-bold text-sm border border-amber-500/40"
+                    >
+                      <Clock className="w-4 h-4" />
+                      <span>Coming Soon</span>
+                    </motion.div>
+                  ) : (
+                    <motion.button 
+                      className="flex-1 flex items-center justify-center space-x-2 bg-white text-black py-3 rounded-xl font-bold text-sm shadow-lg"
+                      onClick={handlePlayClick}
+                      whileHover={{ scale: 1.02, backgroundColor: "#f3f4f6" }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Play</span>
+                    </motion.button>
+                  )}
                   
                   <motion.button 
                     className={`p-3 rounded-xl transition-colors ${

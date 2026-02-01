@@ -9,7 +9,6 @@ import {
   fetchTopRatedMovies,
   fetchPopularMovies,
   fetchNowPlayingMovies,
-  fetchUpcomingMovies,
   fetchTrendingTVShows,
   fetchPopularTVShows,
   fetchAiringTodayTVShows,
@@ -80,10 +79,7 @@ const BROWSE_CATEGORIES: Record<string, { title: string; fetch: FetchFn }> = {
   adventure: { title: "Adventure", fetch: fetchAdventureMovies },
   animation: { title: "Animation", fetch: fetchAnimationMovies },
   romance: { title: "Romance", fetch: fetchRomanceMovies },
-  upcoming: { title: "Coming Soon", fetch: async () => {
-    const data = await fetchUpcomingMovies();
-    return data.filter((m) => m && m.id);
-  }},
+  upcoming: { title: "Coming Soon", fetch: getUpcomingMoviesOnly },
   // TV page
   "trending-tv-shows": { title: "Trending TV Shows", fetch: fetchTrendingTVShows },
   "airing-today-shows": { title: "Airing Today", fetch: fetchAiringTodayTVShows },
@@ -226,7 +222,12 @@ const Browse = () => {
               transition={{ duration: 0.4 }}
             >
               {movies.map((movie, index) => (
-                <MovieCard key={`${movie.id}-${index}`} movie={movie} index={index} />
+                <MovieCard 
+                  key={`${movie.id}-${index}`} 
+                  movie={movie} 
+                  index={index} 
+                  comingSoon={category === 'coming-soon' || category === 'upcoming'} 
+                />
               ))}
             </motion.div>
           )}

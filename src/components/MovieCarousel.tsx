@@ -23,9 +23,11 @@ interface MovieCarouselProps {
   showWhenEmpty?: boolean;
   /** Path for "Explore All" button (e.g. /browse/new-releases). When set, button navigates to this page. */
   exploreAllPath?: string;
+  /** When true, cards show Coming Soon (no Play button) - content not yet released. */
+  comingSoon?: boolean;
 }
 
-const MovieCarousel = ({ title, movies, priority = false, loading = false, icon, showWhenEmpty = false, exploreAllPath }: MovieCarouselProps) => {
+const MovieCarousel = ({ title, movies, priority = false, loading = false, icon, showWhenEmpty = false, exploreAllPath, comingSoon = false }: MovieCarouselProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const validMovies = movies.filter(movie => {
@@ -143,7 +145,7 @@ const MovieCarousel = ({ title, movies, priority = false, loading = false, icon,
               key={`${movie.id}-${index}`} 
               className="pl-3 md:pl-5 basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
             >
-              <MovieCard movie={movie} index={index} />
+              <MovieCard movie={movie} index={index} comingSoon={comingSoon} />
             </CarouselItem>
           ))}
         </CarouselContent>

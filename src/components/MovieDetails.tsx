@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
-import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations } from "@/utils/tmdbApi";
+import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations, isNotReleasedYet } from "@/utils/tmdbApi";
 import { getSimilarMoviesForMovie } from "@/utils/movieSimilarity";
 import { useToast } from "@/hooks/use-toast";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
@@ -90,9 +90,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     };
   }, [movieId, mediaType]);
 
-  // Handle autoplay
+  // Handle autoplay (skip for unreleased content - cannot play)
   useEffect(() => {
-    if (autoplay && content && !showPlayer) {
+    if (autoplay && content && !showPlayer && !isNotReleasedYet(content)) {
       // Small delay to ensure content is fully loaded
       const timer = setTimeout(() => {
         setShowPlayer(true);
@@ -314,6 +314,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const contentTitle = content.title || content.name || 'Unknown';
   const releaseDate = content.release_date || content.first_air_date;
   const isTV = content.media_type === 'tv' || mediaType === 'tv';
+  const isUnreleased = isNotReleasedYet(content);
 
   return (
     <div 
@@ -358,9 +359,14 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   {isTV ? <Tv className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Film className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                   <span>{isTV ? 'TV Series' : 'Movie'}</span>
                 </span>
-                {content.vote_average > 7.5 && (
+                {content.vote_average > 7.5 && !isUnreleased && (
                   <span className="px-2 sm:px-3 py-1 sm:py-1.5 bg-yellow-500/20 text-yellow-400 text-[10px] sm:text-xs font-bold rounded-full">
                     ⭐ Top Rated
+                  </span>
+                )}
+                {isUnreleased && (
+                  <span className="px-2 sm:px-3 py-1 sm:py-1.5 bg-amber-500/30 text-amber-400 text-[10px] sm:text-xs font-bold rounded-full uppercase tracking-wider">
+                    Coming Soon
                   </span>
                 )}
               </div>
@@ -384,7 +390,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 {releaseDate && (
                   <span className="flex items-center space-x-1.5 px-3 py-1.5 bg-white/10 backdrop-blur-sm text-white text-sm font-medium rounded-full">
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>{new Date(releaseDate).getFullYear()}</span>
+                    <span>{isUnreleased ? `Releases ${new Date(releaseDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : new Date(releaseDate).getFullYear()}</span>
                   </span>
                 )}
                 {content.runtime && (
@@ -417,8 +423,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 {content.overview}
               </p>
 
-              {/* TV Show Season/Episode Selector - In Hero */}
-              {isTV && content.seasons && content.seasons.length > 0 && (
+              {/* TV Show Season/Episode Selector - In Hero (only for released content) */}
+              {isTV && !isUnreleased && content.seasons && content.seasons.length > 0 && (
                 <div className="mb-6 sm:mb-8 w-full max-w-2xl bg-black/40 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-white/10">
                   {/* Season & Episode Row */}
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -476,26 +482,30 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                         <p className="text-gray-400 text-xs sm:text-sm">Ready to stream</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleWatch()}
-                      className="bg-red-600 hover:bg-red-500 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-full font-semibold transition-all hover:scale-105 flex items-center space-x-1.5 sm:space-x-2 text-sm sm:text-base"
-                    >
-                      <Play className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
-                      <span>Play</span>
-                    </button>
+                    {!isUnreleased && (
+                      <button
+                        onClick={() => handleWatch()}
+                        className="bg-red-600 hover:bg-red-500 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-full font-semibold transition-all hover:scale-105 flex items-center space-x-1.5 sm:space-x-2 text-sm sm:text-base"
+                      >
+                        <Play className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
+                        <span>Play</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                <button 
-                  onClick={() => handleWatch()}
-                  className="group flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition-all duration-300 hover:scale-105 shadow-2xl shadow-white/20"
-                >
-                  <Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
-                  <span>{isTV ? `Play S${selectedSeason}E${selectedEpisode}` : 'Play Now'}</span>
-                </button>
+                {!isUnreleased && (
+                  <button 
+                    onClick={() => handleWatch()}
+                    className="group flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition-all duration-300 hover:scale-105 shadow-2xl shadow-white/20"
+                  >
+                    <Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
+                    <span>{isTV ? `Play S${selectedSeason}E${selectedEpisode}` : 'Play Now'}</span>
+                  </button>
+                )}
 
                 <button 
                   onClick={handleWatchTrailer}
@@ -529,8 +539,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           </div>
         </div>
 
-        {/* Seasons & Episodes Section for TV Shows */}
-        {isTV && content.seasons && content.seasons.length > 0 && (
+        {/* Seasons & Episodes Section for TV Shows (only for released content) */}
+        {isTV && !isUnreleased && content.seasons && content.seasons.length > 0 && (
           <div className="w-full px-4 md:px-16 py-12 md:py-20 bg-gradient-to-b from-gray-900 to-black">
             <div className="max-w-7xl mx-auto">
               {/* Season Selector */}

@@ -198,6 +198,7 @@ const Index = () => {
               icon={<Calendar className="w-5 h-5 text-amber-500" />}
               showWhenEmpty
               exploreAllPath="/browse/coming-soon"
+              comingSoon
             />
           </div>
         </div>

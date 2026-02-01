@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import Navigation from "@/components/Navigation";
 import MovieCarousel from "@/components/MovieCarousel";
 import { Film, Flame, Trophy, Clock, Zap, Laugh, Drama, Skull, Heart, Rocket, Sparkles, Compass, Wand2 } from "lucide-react";
+import { getUpcomingMoviesOnly } from "@/utils/popularMoviesRotator";
 import { 
   fetchTrendingMovies, 
   fetchTopRatedMovies, 
   fetchPopularMovies,
-  fetchUpcomingMovies,
   fetchNowPlayingMovies,
   fetchActionMovies,
   fetchComedyMovies,
@@ -47,7 +47,7 @@ const Movies = () => {
           trending, 
           topRated, 
           popular, 
-          upcoming, 
+          upcoming,
           nowPlaying,
           action,
           comedy,
@@ -63,7 +63,7 @@ const Movies = () => {
           fetchTrendingMovies(),
           fetchTopRatedMovies(),
           fetchPopularMovies(),
-          fetchUpcomingMovies(),
+          getUpcomingMoviesOnly(),
           fetchNowPlayingMovies(),
           fetchActionMovies(),
           fetchComedyMovies(),
@@ -316,6 +316,7 @@ const Movies = () => {
               movies={upcomingMovies}
               icon={<Clock className="w-5 h-5 text-blue-400" />}
               exploreAllPath="/browse/upcoming"
+              comingSoon
             />
           )}
         </div>
