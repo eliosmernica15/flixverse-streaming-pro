@@ -1,8 +1,8 @@
 // Cloudinary upload utility for profile images
 // Uses unsigned upload preset for client-side uploads
 
-const CLOUDINARY_CLOUD_NAME = 'da6fope8h';
-const CLOUDINARY_UPLOAD_PRESET = 'profile_uploads';
+const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
 export interface CloudinaryUploadResult {
     secure_url: string;

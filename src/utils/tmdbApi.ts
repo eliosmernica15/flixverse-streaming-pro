@@ -1,4 +1,4 @@
-const TMDB_API_KEY = 'ee85a0945f4e5241324aed45e3f9c544';
+const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces';
@@ -18,7 +18,7 @@ const options = {
   method: 'GET',
   headers: {
     accept: 'application/json',
-    Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlZTg1YTA5NDVmNGU1MjQxMzI0YWVkNDVlM2Y5YzU0NCIsIm5iZiI6MTc1MDkzOTE5Ni4xMzQsInN1YiI6IjY4NWQzNjNjYWJjNjdlZTE1YTc0NDY5YSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.CU6hTLpFqLBKtx-GVPiby0UquV_iFWqAuiGGJn78m-o'
+    Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN}`
   }
 };
 
