@@ -93,7 +93,7 @@ const Navigation = () => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 will-animate-transform ${isScrolled
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 will-animate-transform ${isScrolled || isMobileMenuOpen
           ? 'glass-premium shadow-2xl shadow-black/40'
           : 'bg-gradient-to-b from-black/90 via-black/50 to-transparent'
           }`}
@@ -302,9 +302,9 @@ const Navigation = () => {
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="md:hidden overflow-hidden"
+                className="md:hidden overflow-hidden bg-black/95 backdrop-blur-3xl border-t border-white/10 absolute top-full left-0 right-0 shadow-2xl shadow-black/80"
               >
-                <div className="py-4 space-y-2 border-t border-white/10">
+                <div className="py-4 space-y-2">
                   {/* Mobile Search */}
                   <div className="px-2 py-2">
                     <SearchBar onMovieSelect={handleMovieSelect} />
