@@ -124,7 +124,6 @@ const getCacheTTL = (url: string): number => {
 const getCachedResponse = (url: string): unknown | null => {
   const cached = apiCache.get(url);
   if (cached && Date.now() < cached.expiresAt) {
-    if (isDev) console.log(`Cache hit: ${url}`);
     return cached.data;
   }
   if (cached) {
@@ -161,14 +160,11 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
   const requestPromise = (async () => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        if (isDev) console.log(`API Call attempt ${attempt + 1}: ${url}`);
         const response = await fetch(url, options);
 
         if (!response.ok) {
           if (response.status === 404) {
-            if (isDev) console.warn(`Resource not found (404): ${url}`);
-            const errorResult = { results: [], success: false, status_code: 404 };
-            return errorResult;
+            return { results: [], success: false, status_code: 404 };
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -176,17 +172,15 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
         const data = await response.json();
         const result = { ...data, success: true };
 
-        // Cache successful responses
         setCachedResponse(url, result);
-
-        if (isDev) console.log(`API Call successful: ${url}`);
         return result;
       } catch (error) {
-        if (isDev) console.error(`API call failed (attempt ${attempt + 1}):`, error);
+        // ALWAYS log errors in production for debugging if possible, or at least provide better context
+        console.error(`TMDB API call failed (attempt ${attempt + 1}) for ${url}:`, error);
+
         if (attempt === retries) {
           return { results: [], success: false, error: (error as Error).message };
         }
-        // Wait before retry
         await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
       }
     }
@@ -658,7 +652,7 @@ export const getProfileUrl = (path: string | null, size: 'small' | 'medium' | 'l
   return `${profileSizes[size]}${normalizedPath}`;
 };
 
-export const getPlaceholderImage = (): string => {
+export const getPlaceholderImage = (id?: number): string => {
   const placeholders = [
     'https://images.unsplash.com/photo-1489599735161-8f4b80604bb9?w=300&h=450&fit=crop',
     'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=300&h=450&fit=crop',
@@ -669,7 +663,8 @@ export const getPlaceholderImage = (): string => {
     'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=300&h=450&fit=crop',
     'https://images.unsplash.com/photo-1586899028174-e7098604235b?w=300&h=450&fit=crop'
   ];
-  return placeholders[Math.floor(Math.random() * placeholders.length)];
+  if (id) return placeholders[id % placeholders.length];
+  return placeholders[0];
 };
 
 export const getPlaceholderBackdrop = (): string => {
@@ -716,12 +711,8 @@ export const getContentImage = (item: TMDBMovie | any, imageType: 'poster' | 'ba
 
   // Return appropriate placeholder
   switch (imageType) {
-    case 'backdrop':
-      return getPlaceholderBackdrop();
-    case 'profile':
-      return getPlaceholderProfile();
     default:
-      return getPlaceholderImage();
+      return getPlaceholderImage(item.id);
   }
 };
 

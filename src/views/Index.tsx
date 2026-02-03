@@ -24,48 +24,52 @@ import { TrendingUp, Star, Play, Tv, Film, Sparkles, Calendar } from "lucide-rea
 import { motion } from "framer-motion";
 
 const Index = () => {
-  const [trendingMovies, setTrendingMovies] = useState<TMDBMovie[]>([]);
-  const [topRatedMovies, setTopRatedMovies] = useState<TMDBMovie[]>([]);
-  const [popularMovies, setPopularMovies] = useState<TMDBMovie[]>([]);
-  const [trendingTVShows, setTrendingTVShows] = useState<TMDBMovie[]>([]);
-  const [popularTVShows, setPopularTVShows] = useState<TMDBMovie[]>([]);
-  const [nowPlayingMovies, setNowPlayingMovies] = useState<TMDBMovie[]>([]);
+  const [moviesData, setMoviesData] = useState<{ [key: string]: TMDBMovie[] }>({});
   const [comingSoon, setComingSoon] = useState<TMDBMovie[]>([]);
   const [featuredMovie, setFeaturedMovie] = useState<TMDBMovie | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadContent = async () => {
-      try {
-        const [
-          trending,
-          topRated,
-          popular,
-          trendingShows,
-          popularShows,
-          nowPlaying,
-          upcomingMoviesRaw,
-          upcomingTVRaw,
-          heroMovie
-        ] = await Promise.all([
-          fetchTrendingMovies(),
-          fetchTopRatedMovies(),
-          fetchPopularMovies(),
-          fetchTrendingTVShows(),
-          fetchPopularTVShows(),
-          fetchNowPlayingMovies(),
-          fetchUpcomingMovies(),
-          fetchUpcomingTVShows(),
-          getHeroMovieOfTheWeek()
-        ]);
+      setLoading(true);
 
-        setTrendingMovies(trending);
-        setTopRatedMovies(topRated);
-        setPopularMovies(popular);
-        setTrendingTVShows(trendingShows);
-        setPopularTVShows(popularShows);
-        setNowPlayingMovies(nowPlaying);
-        setFeaturedMovie(heroMovie || trending[0] || topRated[0]);
+      const sections = [
+        { id: 'trendingMovies', fetch: fetchTrendingMovies },
+        { id: 'topRatedMovies', fetch: fetchTopRatedMovies },
+        { id: 'popularMovies', fetch: fetchPopularMovies },
+        { id: 'trendingTVShows', fetch: fetchTrendingTVShows },
+        { id: 'popularTVShows', fetch: fetchPopularTVShows },
+        { id: 'nowPlayingMovies', fetch: fetchNowPlayingMovies },
+        { id: 'heroMovie', fetch: getHeroMovieOfTheWeek }
+      ];
+
+      // Step 1: Sequential fetch for core content to avoid initial saturation
+      for (const section of sections) {
+        try {
+          const data = await section.fetch();
+          if (data) {
+            setMoviesData(prev => ({ ...prev, [section.id]: Array.isArray(data) ? data : [data] }));
+
+            // Set featured movie from hero or first trending
+            if (section.id === 'heroMovie' && !Array.isArray(data)) {
+              setFeaturedMovie(data);
+            } else if (section.id === 'trendingMovies' && Array.isArray(data) && !featuredMovie) {
+              setFeaturedMovie(data[0]);
+            }
+          }
+        } catch (err) {
+          console.error(`Index failed to load ${section.id}:`, err);
+        }
+        // Small delay
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      // Step 2: Load upcoming content (can be parallel as it's separate)
+      try {
+        const [upcomingMoviesRaw, upcomingTVRaw] = await Promise.all([
+          fetchUpcomingMovies(),
+          fetchUpcomingTVShows()
+        ]);
 
         const notReleasedMovies = (upcomingMoviesRaw || []).filter((m) => isNotReleasedYet(m));
         const notReleasedTV = (upcomingTVRaw || []).filter((m) => isNotReleasedYet(m));
@@ -75,18 +79,17 @@ const Index = () => {
           return dateA.localeCompare(dateB);
         });
         setComingSoon(combined);
-
-      } catch (error) {
-        console.error('Error loading content:', error);
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        console.error('Index upcoming fetch failed:', err);
       }
+
+      setLoading(false);
     };
 
     loadContent();
   }, []);
 
-  if (loading) {
+  if (loading && Object.keys(moviesData).length === 0) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <motion.div
@@ -153,47 +156,59 @@ const Index = () => {
 
           <div className="space-y-14 lg:space-y-20 pb-20 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
             <ContinueWatching />
-            <MovieCarousel
-              title="Trending Now"
-              movies={trendingMovies}
-              icon={<TrendingUp className="w-5 h-5 text-red-500" />}
-              exploreAllPath="/browse/trending-now"
-            />
+            {moviesData['trendingMovies'] && (
+              <MovieCarousel
+                title="Trending Now"
+                movies={moviesData['trendingMovies']}
+                icon={<TrendingUp className="w-5 h-5 text-red-500" />}
+                exploreAllPath="/browse/trending-now"
+              />
+            )}
             <div className="section-divider-glow" aria-hidden />
-            <MovieCarousel
-              title="Now Playing"
-              movies={nowPlayingMovies}
-              icon={<Play className="w-5 h-5 text-green-500" />}
-              exploreAllPath="/browse/now-playing"
-            />
+            {moviesData['nowPlayingMovies'] && (
+              <MovieCarousel
+                title="Now Playing"
+                movies={moviesData['nowPlayingMovies']}
+                icon={<Play className="w-5 h-5 text-green-500" />}
+                exploreAllPath="/browse/now-playing"
+              />
+            )}
             <div className="section-divider" aria-hidden />
-            <MovieCarousel
-              title="Top Rated"
-              movies={topRatedMovies}
-              icon={<Star className="w-5 h-5 text-yellow-500" />}
-              exploreAllPath="/browse/top-rated"
-            />
+            {moviesData['topRatedMovies'] && (
+              <MovieCarousel
+                title="Top Rated"
+                movies={moviesData['topRatedMovies']}
+                icon={<Star className="w-5 h-5 text-yellow-500" />}
+                exploreAllPath="/browse/top-rated"
+              />
+            )}
             <div className="section-divider" aria-hidden />
-            <MovieCarousel
-              title="Popular Movies"
-              movies={popularMovies}
-              icon={<Film className="w-5 h-5 text-blue-500" />}
-              exploreAllPath="/browse/popular-movies"
-            />
+            {moviesData['popularMovies'] && (
+              <MovieCarousel
+                title="Popular Movies"
+                movies={moviesData['popularMovies']}
+                icon={<Film className="w-5 h-5 text-blue-500" />}
+                exploreAllPath="/browse/popular-movies"
+              />
+            )}
             <div className="section-divider" aria-hidden />
-            <MovieCarousel
-              title="Trending TV Shows"
-              movies={trendingTVShows}
-              icon={<Tv className="w-5 h-5 text-purple-500" />}
-              exploreAllPath="/browse/trending-tv"
-            />
+            {moviesData['trendingTVShows'] && (
+              <MovieCarousel
+                title="Trending TV Shows"
+                movies={moviesData['trendingTVShows']}
+                icon={<Tv className="w-5 h-5 text-purple-500" />}
+                exploreAllPath="/browse/trending-tv"
+              />
+            )}
             <div className="section-divider" aria-hidden />
-            <MovieCarousel
-              title="Popular TV Shows"
-              movies={popularTVShows}
-              icon={<Tv className="w-5 h-5 text-pink-500" />}
-              exploreAllPath="/browse/popular-tv"
-            />
+            {moviesData['popularTVShows'] && (
+              <MovieCarousel
+                title="Popular TV Shows"
+                movies={moviesData['popularTVShows']}
+                icon={<Tv className="w-5 h-5 text-pink-500" />}
+                exploreAllPath="/browse/popular-tv"
+              />
+            )}
             <div className="section-divider" aria-hidden />
             <MovieCarousel
               title="Coming soon"

@@ -23,120 +23,72 @@ import {
 } from "@/utils/tmdbApi";
 
 const TVShows = () => {
-  const [trendingShows, setTrendingShows] = useState<TMDBMovie[]>([]);
-  const [popularShows, setPopularShows] = useState<TMDBMovie[]>([]);
-  const [topRatedShows, setTopRatedShows] = useState<TMDBMovie[]>([]);
-  const [airingTodayShows, setAiringTodayShows] = useState<TMDBMovie[]>([]);
-  const [onTheAirShows, setOnTheAirShows] = useState<TMDBMovie[]>([]);
-  const [actionShows, setActionShows] = useState<TMDBMovie[]>([]);
-  const [comedyShows, setComedyShows] = useState<TMDBMovie[]>([]);
-  const [dramaShows, setDramaShows] = useState<TMDBMovie[]>([]);
-  const [sciFiShows, setSciFiShows] = useState<TMDBMovie[]>([]);
-  const [crimeShows, setCrimeShows] = useState<TMDBMovie[]>([]);
-  const [documentaryShows, setDocumentaryShows] = useState<TMDBMovie[]>([]);
+  const [showsData, setShowsData] = useState<{ [key: string]: TMDBMovie[] }>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorCount, setErrorCount] = useState(0);
 
   useEffect(() => {
     const loadTVShows = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+      setLoading(true);
+      setErrorCount(0);
 
-        console.log('Loading TV shows...');
+      const sections = [
+        { id: 'trending', fetch: fetchTrendingTVShows },
+        { id: 'popular', fetch: fetchPopularTVShows },
+        { id: 'topRated', fetch: fetchTopRatedTVShows },
+        { id: 'airingToday', fetch: fetchAiringTodayTVShows },
+        { id: 'onTheAir', fetch: fetchOnTheAirTVShows },
+        { id: 'action', fetch: fetchActionTVShows },
+        { id: 'comedy', fetch: fetchComedyTVShows },
+        { id: 'drama', fetch: fetchDramaTVShows },
+        { id: 'sciFi', fetch: fetchSciFiTVShows },
+        { id: 'crime', fetch: fetchCrimeTVShows },
+        { id: 'documentary', fetch: fetchDocumentaryTVShows }
+      ];
 
-        const [
-          trending,
-          popular,
-          topRated,
-          airingToday,
-          onTheAir,
-          action,
-          comedy,
-          drama,
-          sciFi,
-          crime,
-          documentary
-        ] = await Promise.all([
-          fetchTrendingTVShows(),
-          fetchPopularTVShows(),
-          fetchTopRatedTVShows(),
-          fetchAiringTodayTVShows(),
-          fetchOnTheAirTVShows(),
-          fetchActionTVShows(),
-          fetchComedyTVShows(),
-          fetchDramaTVShows(),
-          fetchSciFiTVShows(),
-          fetchCrimeTVShows(),
-          fetchDocumentaryTVShows()
-        ]);
+      // Batching for mobile stability
+      const batchSize = 3;
+      for (let i = 0; i < sections.length; i += batchSize) {
+        const batch = sections.slice(i, i + batchSize);
+        try {
+          const results = await Promise.all(
+            batch.map(async (s) => ({ id: s.id, data: await s.fetch() }))
+          );
 
-        console.log('TV shows loaded:', {
-          trending: trending?.length || 0,
-          popular: popular?.length || 0,
-          topRated: topRated?.length || 0,
-          airingToday: airingToday?.length || 0,
-          onTheAir: onTheAir?.length || 0
-        });
+          setShowsData(prev => {
+            const next = { ...prev };
+            results.forEach(r => {
+              if (r.data && r.data.length > 0) {
+                next[r.id] = r.data;
+              }
+            });
+            return next;
+          });
+        } catch (err) {
+          console.error(`TV Batch ${i / batchSize} failed:`, err);
+          setErrorCount(prev => prev + 1);
+        }
 
-        setTrendingShows(trending || []);
-        setPopularShows(popular || []);
-        setTopRatedShows(topRated || []);
-        setAiringTodayShows(airingToday || []);
-        setOnTheAirShows(onTheAir || []);
-        setActionShows(action || []);
-        setComedyShows(comedy || []);
-        setDramaShows(drama || []);
-        setSciFiShows(sciFi || []);
-        setCrimeShows(crime || []);
-        setDocumentaryShows(documentary || []);
-      } catch (error) {
-        console.error('Error loading TV shows:', error);
-        setError('Failed to load TV shows. Please try again.');
-      } finally {
-        setLoading(false);
+        if (i + batchSize < sections.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
+
+      setLoading(false);
     };
 
     loadTVShows();
   }, []);
 
-  const retryLoading = () => {
-    setError(null);
-    setLoading(true);
-    // Re-trigger the useEffect
-    window.location.reload();
-  };
-
-  if (loading) {
+  if (loading && Object.keys(showsData).length === 0) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
           <div className="relative mb-6">
-            <div className="w-16 h-16 border-4 border-red-500/30 border-t-red-500 rounded-full animate-spin"></div>
-            <Tv className="w-6 h-6 text-red-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+            <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+            <Tv className="w-6 h-6 text-purple-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
           </div>
-          <p className="text-gray-400">Loading TV Shows...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center glass-card p-8 rounded-2xl max-w-md mx-4">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-          </div>
-          <h2 className="text-white text-xl font-bold mb-2">Something went wrong</h2>
-          <p className="text-gray-400 mb-6">{error}</p>
-          <button
-            onClick={retryLoading}
-            className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105"
-          >
-            Try Again
-          </button>
+          <p className="text-gray-400">Discovering TV Shows...</p>
         </div>
       </div>
     );
@@ -168,11 +120,11 @@ const TVShows = () => {
       {/* Content */}
       <div className="px-4 sm:px-6 lg:px-8 pb-16">
         <div className="space-y-10">
-          {trendingShows.length > 0 && (
+          {showsData['trending'] && (
             <>
               <MovieCarousel
                 title="Trending TV Shows"
-                movies={trendingShows}
+                movies={showsData['trending']}
                 icon={<Flame className="w-5 h-5 text-orange-400" />}
                 exploreAllPath="/browse/trending-tv-shows"
               />
@@ -180,11 +132,11 @@ const TVShows = () => {
             </>
           )}
 
-          {airingTodayShows.length > 0 && (
+          {showsData['airingToday'] && (
             <>
               <MovieCarousel
                 title="Airing Today"
-                movies={airingTodayShows}
+                movies={showsData['airingToday']}
                 icon={<Calendar className="w-5 h-5 text-green-400" />}
                 exploreAllPath="/browse/airing-today-shows"
               />
@@ -192,11 +144,11 @@ const TVShows = () => {
             </>
           )}
 
-          {onTheAirShows.length > 0 && (
+          {showsData['onTheAir'] && (
             <>
               <MovieCarousel
                 title="On The Air"
-                movies={onTheAirShows}
+                movies={showsData['onTheAir']}
                 icon={<Radio className="w-5 h-5 text-red-400" />}
                 exploreAllPath="/browse/on-the-air-shows"
               />
@@ -204,11 +156,11 @@ const TVShows = () => {
             </>
           )}
 
-          {popularShows.length > 0 && (
+          {showsData['popular'] && (
             <>
               <MovieCarousel
                 title="Popular TV Shows"
-                movies={popularShows}
+                movies={showsData['popular']}
                 icon={<Flame className="w-5 h-5 text-pink-400" />}
                 exploreAllPath="/browse/popular-tv-shows"
               />
@@ -216,11 +168,11 @@ const TVShows = () => {
             </>
           )}
 
-          {topRatedShows.length > 0 && (
+          {showsData['topRated'] && (
             <>
               <MovieCarousel
                 title="Top Rated TV Shows"
-                movies={topRatedShows}
+                movies={showsData['topRated']}
                 icon={<Trophy className="w-5 h-5 text-yellow-400" />}
                 exploreAllPath="/browse/top-rated-tv"
               />
@@ -228,11 +180,11 @@ const TVShows = () => {
             </>
           )}
 
-          {actionShows.length > 0 && (
+          {showsData['action'] && (
             <>
               <MovieCarousel
                 title="Action & Adventure"
-                movies={actionShows}
+                movies={showsData['action']}
                 icon={<Zap className="w-5 h-5 text-yellow-500" />}
                 exploreAllPath="/browse/action-adventure"
               />
@@ -240,11 +192,11 @@ const TVShows = () => {
             </>
           )}
 
-          {dramaShows.length > 0 && (
+          {showsData['drama'] && (
             <>
               <MovieCarousel
                 title="Drama Series"
-                movies={dramaShows}
+                movies={showsData['drama']}
                 icon={<Drama className="w-5 h-5 text-blue-400" />}
                 exploreAllPath="/browse/drama-series"
               />
@@ -252,11 +204,11 @@ const TVShows = () => {
             </>
           )}
 
-          {comedyShows.length > 0 && (
+          {showsData['comedy'] && (
             <>
               <MovieCarousel
                 title="Comedy Shows"
-                movies={comedyShows}
+                movies={showsData['comedy']}
                 icon={<Laugh className="w-5 h-5 text-pink-400" />}
                 exploreAllPath="/browse/comedy-shows"
               />
@@ -264,11 +216,11 @@ const TVShows = () => {
             </>
           )}
 
-          {crimeShows.length > 0 && (
+          {showsData['crime'] && (
             <>
               <MovieCarousel
                 title="Crime & Mystery"
-                movies={crimeShows}
+                movies={showsData['crime']}
                 icon={<Search className="w-5 h-5 text-gray-400" />}
                 exploreAllPath="/browse/crime-mystery"
               />
@@ -276,11 +228,11 @@ const TVShows = () => {
             </>
           )}
 
-          {sciFiShows.length > 0 && (
+          {showsData['sciFi'] && (
             <>
               <MovieCarousel
                 title="Sci-Fi & Fantasy"
-                movies={sciFiShows}
+                movies={showsData['sciFi']}
                 icon={<Rocket className="w-5 h-5 text-cyan-400" />}
                 exploreAllPath="/browse/sci-fi-fantasy"
               />
@@ -288,34 +240,31 @@ const TVShows = () => {
             </>
           )}
 
-          {documentaryShows.length > 0 && (
+          {showsData['documentary'] && (
             <MovieCarousel
               title="Documentaries"
-              movies={documentaryShows}
+              movies={showsData['documentary']}
               icon={<FileText className="w-5 h-5 text-emerald-400" />}
               exploreAllPath="/browse/documentaries"
             />
           )}
 
           {/* No content message */}
-          {!trendingShows.length && !popularShows.length && !topRatedShows.length &&
-            !airingTodayShows.length && !onTheAirShows.length && !actionShows.length &&
-            !comedyShows.length && !dramaShows.length && !crimeShows.length &&
-            !sciFiShows.length && !documentaryShows.length && (
-              <div className="text-center py-12 glass-card rounded-2xl max-w-md mx-auto">
-                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Tv className="w-8 h-8 text-gray-500" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">No TV shows available</h3>
-                <p className="text-gray-400 mb-6">Please try again in a moment</p>
-                <button
-                  onClick={retryLoading}
-                  className="bg-gradient-to-r from-red-600 to-red-500 text-white px-6 py-2 rounded-full font-semibold hover:scale-105 transition-all"
-                >
-                  Reload
-                </button>
+          {!loading && Object.keys(showsData).length === 0 && (
+            <div className="text-center py-12 glass-card rounded-2xl max-w-md mx-auto">
+              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Tv className="w-8 h-8 text-gray-500" />
               </div>
-            )}
+              <h3 className="text-xl font-bold text-white mb-2">No TV shows available</h3>
+              <p className="text-gray-400 mb-6">Please try again in a moment</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-gradient-to-r from-red-600 to-red-500 text-white px-6 py-2 rounded-full font-semibold hover:scale-105 transition-all"
+              >
+                Reload
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

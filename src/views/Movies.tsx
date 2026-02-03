@@ -26,80 +26,63 @@ import {
 } from "@/utils/tmdbApi";
 
 const Movies = () => {
-  const [trendingMovies, setTrendingMovies] = useState<TMDBMovie[]>([]);
-  const [topRatedMovies, setTopRatedMovies] = useState<TMDBMovie[]>([]);
-  const [popularMovies, setPopularMovies] = useState<TMDBMovie[]>([]);
-  const [upcomingMovies, setUpcomingMovies] = useState<TMDBMovie[]>([]);
-  const [nowPlayingMovies, setNowPlayingMovies] = useState<TMDBMovie[]>([]);
-  const [actionMovies, setActionMovies] = useState<TMDBMovie[]>([]);
-  const [comedyMovies, setComedyMovies] = useState<TMDBMovie[]>([]);
-  const [horrorMovies, setHorrorMovies] = useState<TMDBMovie[]>([]);
-  const [romanceMovies, setRomanceMovies] = useState<TMDBMovie[]>([]);
-  const [sciFiMovies, setSciFiMovies] = useState<TMDBMovie[]>([]);
-  const [dramaMovies, setDramaMovies] = useState<TMDBMovie[]>([]);
-  const [thrillerMovies, setThrillerMovies] = useState<TMDBMovie[]>([]);
-  const [animationMovies, setAnimationMovies] = useState<TMDBMovie[]>([]);
-  const [fantasyMovies, setFantasyMovies] = useState<TMDBMovie[]>([]);
-  const [adventureMovies, setAdventureMovies] = useState<TMDBMovie[]>([]);
+  const [moviesData, setMoviesData] = useState<{ [key: string]: TMDBMovie[] }>({});
   const [loading, setLoading] = useState(true);
+  const [errorCount, setErrorCount] = useState(0);
 
   useEffect(() => {
     const loadMovies = async () => {
-      try {
-        const [
-          trending,
-          topRated,
-          popular,
-          upcoming,
-          nowPlaying,
-          action,
-          comedy,
-          horror,
-          romance,
-          sciFi,
-          drama,
-          thriller,
-          animation,
-          fantasy,
-          adventure
-        ] = await Promise.all([
-          fetchTrendingMovies(),
-          fetchTopRatedMovies(),
-          fetchPopularMovies(),
-          getUpcomingMoviesOnly(),
-          fetchNowPlayingMovies(),
-          fetchActionMovies(),
-          fetchComedyMovies(),
-          fetchHorrorMovies(),
-          fetchRomanceMovies(),
-          fetchSciFiMovies(),
-          fetchDramaMovies(),
-          fetchThrillerMovies(),
-          fetchAnimationMovies(),
-          fetchFantasyMovies(),
-          fetchAdventureMovies()
-        ]);
+      setLoading(true);
 
-        setTrendingMovies(trending);
-        setTopRatedMovies(topRated);
-        setPopularMovies(popular);
-        setUpcomingMovies(upcoming);
-        setNowPlayingMovies(nowPlaying);
-        setActionMovies(action);
-        setComedyMovies(comedy);
-        setHorrorMovies(horror);
-        setRomanceMovies(romance);
-        setSciFiMovies(sciFi);
-        setDramaMovies(drama);
-        setThrillerMovies(thriller);
-        setAnimationMovies(animation);
-        setFantasyMovies(fantasy);
-        setAdventureMovies(adventure);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error loading movies:', error);
-        setLoading(false);
+      const sections = [
+        { id: 'trending', fetch: fetchTrendingMovies },
+        { id: 'topRated', fetch: fetchTopRatedMovies },
+        { id: 'popular', fetch: fetchPopularMovies },
+        { id: 'upcoming', fetch: getUpcomingMoviesOnly },
+        { id: 'nowPlaying', fetch: fetchNowPlayingMovies },
+        { id: 'action', fetch: fetchActionMovies },
+        { id: 'comedy', fetch: fetchComedyMovies },
+        { id: 'horror', fetch: fetchHorrorMovies },
+        { id: 'romance', fetch: fetchRomanceMovies },
+        { id: 'sciFi', fetch: fetchSciFiMovies },
+        { id: 'drama', fetch: fetchDramaMovies },
+        { id: 'thriller', fetch: fetchThrillerMovies },
+        { id: 'animation', fetch: fetchAnimationMovies },
+        { id: 'fantasy', fetch: fetchFantasyMovies },
+        { id: 'adventure', fetch: fetchAdventureMovies }
+      ];
+
+      // Load in batches of 3 to avoid saturating mobile connection limits (usually 6)
+      const batchSize = 3;
+      for (let i = 0; i < sections.length; i += batchSize) {
+        const batch = sections.slice(i, i + batchSize);
+        try {
+          const results = await Promise.all(
+            batch.map(async (s) => ({ id: s.id, data: await s.fetch() }))
+          );
+
+          setMoviesData(prev => {
+            const next = { ...prev };
+            results.forEach(r => {
+              if (r.data && r.data.length > 0) {
+                next[r.id] = r.data;
+              }
+            });
+            return next;
+          });
+        } catch (err) {
+          console.error(`Batch ${i / batchSize} failed:`, err);
+          setErrorCount(prev => prev + 1);
+        }
+
+        // Brief pause between batches to let the event loop breathe, 
+        // especially important for mobile browsers
+        if (i + batchSize < sections.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
+
+      setLoading(false);
     };
 
     loadMovies();
@@ -145,11 +128,11 @@ const Movies = () => {
       {/* Content */}
       <div className="px-4 sm:px-6 lg:px-8 pb-16">
         <div className="space-y-10">
-          {trendingMovies.length > 0 && (
+          {moviesData['trending'] && (
             <>
               <MovieCarousel
                 title="Trending Movies"
-                movies={trendingMovies}
+                movies={moviesData['trending']}
                 icon={<Flame className="w-5 h-5 text-orange-400" />}
                 exploreAllPath="/browse/trending-movies"
               />
@@ -157,11 +140,11 @@ const Movies = () => {
             </>
           )}
 
-          {nowPlayingMovies.length > 0 && (
+          {moviesData['nowPlaying'] && (
             <>
               <MovieCarousel
                 title="Now Playing"
-                movies={nowPlayingMovies}
+                movies={moviesData['nowPlaying']}
                 icon={<Clock className="w-5 h-5 text-green-400" />}
                 exploreAllPath="/browse/now-playing-movies"
               />
@@ -169,11 +152,11 @@ const Movies = () => {
             </>
           )}
 
-          {topRatedMovies.length > 0 && (
+          {moviesData['topRated'] && (
             <>
               <MovieCarousel
                 title="Top Rated Movies"
-                movies={topRatedMovies}
+                movies={moviesData['topRated']}
                 icon={<Trophy className="w-5 h-5 text-yellow-400" />}
                 exploreAllPath="/browse/top-rated-movies"
               />
@@ -181,11 +164,11 @@ const Movies = () => {
             </>
           )}
 
-          {popularMovies.length > 0 && (
+          {moviesData['popular'] && (
             <>
               <MovieCarousel
                 title="Popular Movies"
-                movies={popularMovies}
+                movies={moviesData['popular']}
                 icon={<Sparkles className="w-5 h-5 text-purple-400" />}
                 exploreAllPath="/browse/popular-movies"
               />
@@ -193,11 +176,11 @@ const Movies = () => {
             </>
           )}
 
-          {actionMovies.length > 0 && (
+          {moviesData['action'] && (
             <>
               <MovieCarousel
                 title="Action"
-                movies={actionMovies}
+                movies={moviesData['action']}
                 icon={<Zap className="w-5 h-5 text-yellow-500" />}
                 exploreAllPath="/browse/action"
               />
@@ -205,11 +188,11 @@ const Movies = () => {
             </>
           )}
 
-          {comedyMovies.length > 0 && (
+          {moviesData['comedy'] && (
             <>
               <MovieCarousel
                 title="Comedy"
-                movies={comedyMovies}
+                movies={moviesData['comedy']}
                 icon={<Laugh className="w-5 h-5 text-pink-400" />}
                 exploreAllPath="/browse/comedy"
               />
@@ -217,11 +200,11 @@ const Movies = () => {
             </>
           )}
 
-          {dramaMovies.length > 0 && (
+          {moviesData['drama'] && (
             <>
               <MovieCarousel
                 title="Drama"
-                movies={dramaMovies}
+                movies={moviesData['drama']}
                 icon={<Drama className="w-5 h-5 text-blue-400" />}
                 exploreAllPath="/browse/drama"
               />
@@ -229,11 +212,11 @@ const Movies = () => {
             </>
           )}
 
-          {thrillerMovies.length > 0 && (
+          {moviesData['thriller'] && (
             <>
               <MovieCarousel
                 title="Thriller"
-                movies={thrillerMovies}
+                movies={moviesData['thriller']}
                 icon={<Zap className="w-5 h-5 text-red-400" />}
                 exploreAllPath="/browse/thriller"
               />
@@ -241,11 +224,11 @@ const Movies = () => {
             </>
           )}
 
-          {horrorMovies.length > 0 && (
+          {moviesData['horror'] && (
             <>
               <MovieCarousel
                 title="Horror"
-                movies={horrorMovies}
+                movies={moviesData['horror']}
                 icon={<Skull className="w-5 h-5 text-gray-400" />}
                 exploreAllPath="/browse/horror"
               />
@@ -253,11 +236,11 @@ const Movies = () => {
             </>
           )}
 
-          {sciFiMovies.length > 0 && (
+          {moviesData['sciFi'] && (
             <>
               <MovieCarousel
                 title="Sci-Fi"
-                movies={sciFiMovies}
+                movies={moviesData['sciFi']}
                 icon={<Rocket className="w-5 h-5 text-cyan-400" />}
                 exploreAllPath="/browse/sci-fi"
               />
@@ -265,11 +248,11 @@ const Movies = () => {
             </>
           )}
 
-          {fantasyMovies.length > 0 && (
+          {moviesData['fantasy'] && (
             <>
               <MovieCarousel
                 title="Fantasy"
-                movies={fantasyMovies}
+                movies={moviesData['fantasy']}
                 icon={<Wand2 className="w-5 h-5 text-violet-400" />}
                 exploreAllPath="/browse/fantasy"
               />
@@ -277,11 +260,11 @@ const Movies = () => {
             </>
           )}
 
-          {adventureMovies.length > 0 && (
+          {moviesData['adventure'] && (
             <>
               <MovieCarousel
                 title="Adventure"
-                movies={adventureMovies}
+                movies={moviesData['adventure']}
                 icon={<Compass className="w-5 h-5 text-emerald-400" />}
                 exploreAllPath="/browse/adventure"
               />
@@ -289,11 +272,11 @@ const Movies = () => {
             </>
           )}
 
-          {animationMovies.length > 0 && (
+          {moviesData['animation'] && (
             <>
               <MovieCarousel
                 title="Animation"
-                movies={animationMovies}
+                movies={moviesData['animation']}
                 icon={<Sparkles className="w-5 h-5 text-amber-400" />}
                 exploreAllPath="/browse/animation"
               />
@@ -301,11 +284,11 @@ const Movies = () => {
             </>
           )}
 
-          {romanceMovies.length > 0 && (
+          {moviesData['romance'] && (
             <>
               <MovieCarousel
                 title="Romance"
-                movies={romanceMovies}
+                movies={moviesData['romance']}
                 icon={<Heart className="w-5 h-5 text-rose-400" />}
                 exploreAllPath="/browse/romance"
               />
@@ -313,14 +296,28 @@ const Movies = () => {
             </>
           )}
 
-          {upcomingMovies.length > 0 && (
+          {moviesData['upcoming'] && (
             <MovieCarousel
               title="Coming Soon"
-              movies={upcomingMovies}
+              movies={moviesData['upcoming']}
               icon={<Clock className="w-5 h-5 text-blue-400" />}
               exploreAllPath="/browse/upcoming"
               comingSoon
             />
+          )}
+
+          {!loading && Object.keys(moviesData).length === 0 && (
+            <div className="text-center py-20 bg-gray-900/50 rounded-3xl border border-white/5">
+              <Film className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">Could not load movies</h3>
+              <p className="text-gray-400 mb-6">There was a connection issue. Please try again.</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-red-500 hover:bg-red-600 px-8 py-3 rounded-xl font-bold transition-all"
+              >
+                Retry
+              </button>
+            </div>
           )}
         </div>
       </div>
