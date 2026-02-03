@@ -14,6 +14,13 @@ const firebaseConfig = {
   appId: getEnv("NEXT_PUBLIC_FIREBASE_APP_ID")
 };
 
+// DEBUG: Check what the app is actually seeing
+console.log("DEBUG: Firebase Config Check");
+console.log("DEBUG: API Key length:", firebaseConfig.apiKey ? firebaseConfig.apiKey.length : 0);
+console.log("DEBUG: API Key start:", firebaseConfig.apiKey ? firebaseConfig.apiKey.substring(0, 5) + "..." : "MISSING");
+console.log("DEBUG: Project ID:", firebaseConfig.projectId);
+
+
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
