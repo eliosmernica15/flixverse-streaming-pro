@@ -6,7 +6,7 @@ import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -35,7 +35,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   const { addToHistory, addFavoriteGenre } = useUserPreferences();
   const { isAuthenticated } = useAuth();
   const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // 3D Tilt effect values
   const mouseX = useMotionValue(0);
@@ -87,13 +87,13 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
     }
 
     const contentType = getContentType(movie);
-    navigate(`/movie/${movie.id}?type=${contentType}`);
+    router.push(`/movie/${movie.id}?type=${contentType}`);
   };
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     const contentType = getContentType(movie);
-    navigate(`/movie/${movie.id}?type=${contentType}`);
+    router.push(`/movie/${movie.id}?type=${contentType}`);
   };
 
   const handleAddToListClick = async (e: React.MouseEvent) => {
@@ -368,8 +368,8 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
 
                   <motion.button
                     className={`p-3 rounded-xl transition-colors ${isInMyList
-                        ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
-                        : 'glass-card text-white hover:bg-white/20'
+                      ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
+                      : 'glass-card text-white hover:bg-white/20'
                       }`}
                     onClick={handleAddToListClick}
                     whileHover={{ scale: 1.1 }}

@@ -1,5 +1,7 @@
+"use client";
+
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "next/navigation";
 import Navigation from "@/components/Navigation";
 import MovieCard from "@/components/MovieCard";
 import {
@@ -28,7 +30,7 @@ interface SearchResultItem {
 }
 
 const SearchResults = () => {
-  const [searchParams] = useSearchParams();
+  const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [people, setPeople] = useState<SearchResultItem[]>([]);

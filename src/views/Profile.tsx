@@ -1,5 +1,7 @@
+"use client";
+
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import {
   User, Settings, Film, Tv, Star, Heart, Clock,
   Calendar, Edit2, Camera, LogOut, ChevronRight,
@@ -34,7 +36,7 @@ import {
 import ImageCropper from '@/components/ImageCropper';
 
 const Profile = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, signOut } = useAuth();
   const { profile, loading: profileLoading, updateProfile } = useUserProfile();
   const { movieList, loading: listLoading } = useUserMovieList();
@@ -159,9 +161,9 @@ const Profile = () => {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      navigate('/auth');
+      router.push('/auth');
     }
-  }, [authLoading, isAuthenticated, navigate]);
+  }, [authLoading, isAuthenticated, router]);
 
   useEffect(() => {
     if (profile) {
@@ -196,7 +198,7 @@ const Profile = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      navigate('/');
+      router.push('/');
     } catch (error) {
       toast({
         title: "Error",
@@ -464,7 +466,7 @@ const Profile = () => {
                   <Heart className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                   <p className="text-gray-400">Your watchlist is empty</p>
                   <Button
-                    onClick={() => navigate('/')}
+                    onClick={() => router.push('/')}
                     className="mt-4 bg-red-500 hover:bg-red-600"
                   >
                     Browse Content
@@ -479,7 +481,7 @@ const Profile = () => {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: index * 0.03 }}
                       className="group cursor-pointer"
-                      onClick={() => navigate(`/movie/${item.movie_id}?type=${item.media_type || 'movie'}`)}
+                      onClick={() => router.push(`/movie/${item.movie_id}?type=${item.media_type || 'movie'}`)}
                     >
                       <div className="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 relative">
                         <img
@@ -529,7 +531,7 @@ const Profile = () => {
                                 const url = item.content_type === 'tv' && item.season && item.episode
                                   ? `/movie/${item.content_id}?type=${item.content_type}&autoplay=true&season=${item.season}&episode=${item.episode}${resumeParam}`
                                   : `/movie/${item.content_id}?type=${item.content_type}&autoplay=true${resumeParam}`;
-                                navigate(url);
+                                router.push(url);
                               }}
                             >
                               <img
@@ -578,7 +580,7 @@ const Profile = () => {
                               const url = item.content_type === 'tv' && item.season && item.episode
                                 ? `/movie/${item.content_id}?type=${item.content_type}&season=${item.season}&episode=${item.episode}`
                                 : `/movie/${item.content_id}?type=${item.content_type}`;
-                              navigate(url);
+                              router.push(url);
                             }}
                           >
                             <img

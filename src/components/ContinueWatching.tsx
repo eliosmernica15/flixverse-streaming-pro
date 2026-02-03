@@ -3,7 +3,7 @@ import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useAuth } from '@/hooks/useAuth';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import {
   Carousel,
   CarouselContent,
@@ -15,7 +15,7 @@ import {
 const ContinueWatching = () => {
   const { getContinueWatching, removeFromHistory, loading } = useWatchHistory();
   const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const continueWatchingItems = getContinueWatching();
 
@@ -42,7 +42,7 @@ const ContinueWatching = () => {
     const url = item.content_type === 'tv' && item.season && item.episode
       ? `/movie/${item.content_id}?type=${item.content_type}&autoplay=true&season=${item.season}&episode=${item.episode}${resumeParam}`
       : `/movie/${item.content_id}?type=${item.content_type}&autoplay=true${resumeParam}`;
-    navigate(url);
+    router.push(url);
   };
 
   const items = continueWatchingItems.slice(0, 12);

@@ -1,6 +1,8 @@
+"use client";
+
 import { useState, useEffect } from 'react';
-import { 
-  signInWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   updateProfile,
@@ -9,7 +11,8 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/integrations/firebase/client';
-import { useNavigate, Link } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,17 +29,17 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
-  const navigate = useNavigate();
+  const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        navigate('/');
+        router.push('/');
       }
     });
     return () => unsubscribe();
-  }, [navigate]);
+  }, [router]);
 
   const signUp = async () => {
     if (!email || !password) {
@@ -49,7 +52,7 @@ const Auth = () => {
     }
 
     setLoading(true);
-    
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -71,7 +74,7 @@ const Auth = () => {
         title: "Welcome to FlixVerse!",
         description: "Your account has been created successfully",
       });
-      navigate('/');
+      router.push('/');
     } catch (error: any) {
       toast({
         title: "Sign up failed",
@@ -99,7 +102,7 @@ const Auth = () => {
         title: "Welcome back!",
         description: "You have been signed in successfully",
       });
-      navigate('/');
+      router.push('/');
     } catch (error: any) {
       toast({
         title: "Sign in failed",
@@ -131,7 +134,7 @@ const Auth = () => {
         title: "Welcome to FlixVerse!",
         description: "You have been signed in successfully with Google",
       });
-      navigate('/');
+      router.push('/');
     } catch (error: any) {
       toast({
         title: "Google sign in failed",
@@ -155,40 +158,40 @@ const Auth = () => {
       {/* Animated Background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-red-950/30 via-black to-purple-950/30" />
-        
+
         {/* Animated gradient orbs */}
-        <motion.div 
+        <motion.div
           className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-red-500/10 rounded-full blur-[150px]"
-          animate={{ 
+          animate={{
             scale: [1, 1.2, 1],
             opacity: [0.1, 0.15, 0.1],
             x: [0, 50, 0]
           }}
           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
         />
-        <motion.div 
+        <motion.div
           className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-[150px]"
-          animate={{ 
+          animate={{
             scale: [1, 1.3, 1],
             opacity: [0.1, 0.2, 0.1],
             y: [0, -50, 0]
           }}
           transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
         />
-        
+
         {/* Floating icons */}
         {floatingIcons.map((item, index) => (
           <motion.div
             key={index}
             className="absolute text-white/5"
             style={{ left: item.x, top: item.y }}
-            animate={{ 
+            animate={{
               y: [0, -20, 0],
               rotate: [0, 10, -10, 0]
             }}
-            transition={{ 
-              duration: 5, 
-              repeat: Infinity, 
+            transition={{
+              duration: 5,
+              repeat: Infinity,
               delay: item.delay,
               ease: "easeInOut"
             }}
@@ -196,11 +199,11 @@ const Auth = () => {
             <item.icon className="w-12 h-12" />
           </motion.div>
         ))}
-        
+
         {/* Grid pattern overlay */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:100px_100px]" />
       </div>
-      
+
       <div className="w-full max-w-md relative z-10">
         {/* Back to home link */}
         <motion.div
@@ -208,8 +211,8 @@ const Auth = () => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Link 
-            to="/" 
+          <Link
+            href="/"
             className="inline-flex items-center space-x-2 text-gray-400 hover:text-white mb-8 transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -218,14 +221,14 @@ const Auth = () => {
         </motion.div>
 
         {/* Logo and welcome text */}
-        <motion.div 
+        <motion.div
           className="text-center mb-10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
           <div className="flex items-center justify-center mb-6">
-            <motion.div 
+            <motion.div
               className="relative"
               whileHover={{ scale: 1.05, rotate: 5 }}
               transition={{ type: "spring", stiffness: 300 }}
@@ -253,8 +256,8 @@ const Auth = () => {
                 {activeTab === 'signin' ? 'Welcome Back' : 'Join FlixVerse'}
               </CardTitle>
               <CardDescription className="text-gray-400 text-center">
-                {activeTab === 'signin' 
-                  ? 'Sign in to continue your journey' 
+                {activeTab === 'signin'
+                  ? 'Sign in to continue your journey'
                   : 'Create an account to get started'
                 }
               </CardDescription>
@@ -262,20 +265,20 @@ const Auth = () => {
             <CardContent className="p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 glass-card rounded-2xl p-1.5 mb-8">
-                  <TabsTrigger 
-                    value="signin" 
+                  <TabsTrigger
+                    value="signin"
                     className="text-gray-400 data-[state=active]:text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-red-500 rounded-xl transition-all duration-300 py-3 font-semibold"
                   >
                     Sign In
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="signup" 
+                  <TabsTrigger
+                    value="signup"
                     className="text-gray-400 data-[state=active]:text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-red-500 rounded-xl transition-all duration-300 py-3 font-semibold"
                   >
                     Sign Up
                   </TabsTrigger>
                 </TabsList>
-                
+
                 <AnimatePresence mode="wait">
                   <TabsContent value="signin" className="space-y-5 mt-0">
                     <motion.div
@@ -322,18 +325,18 @@ const Auth = () => {
                           </button>
                         </div>
                       </div>
-                      <Button 
-                        onClick={signIn} 
+                      <Button
+                        onClick={signIn}
                         disabled={loading}
                         className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
                       >
                         {loading ? (
-                          <motion.div 
+                          <motion.div
                             className="flex items-center space-x-2"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                           >
-                            <motion.div 
+                            <motion.div
                               className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                               animate={{ rotate: 360 }}
                               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -342,7 +345,7 @@ const Auth = () => {
                           </motion.div>
                         ) : "Sign In"}
                       </Button>
-                      
+
                       {/* Divider */}
                       <div className="relative my-4">
                         <div className="absolute inset-0 flex items-center">
@@ -382,7 +385,7 @@ const Auth = () => {
                       </Button>
                     </motion.div>
                   </TabsContent>
-                  
+
                   <TabsContent value="signup" className="space-y-5 mt-0">
                     <motion.div
                       initial={{ opacity: 0, x: 20 }}
@@ -442,18 +445,18 @@ const Auth = () => {
                           </button>
                         </div>
                       </div>
-                      <Button 
-                        onClick={signUp} 
+                      <Button
+                        onClick={signUp}
                         disabled={loading}
                         className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
                       >
                         {loading ? (
-                          <motion.div 
+                          <motion.div
                             className="flex items-center space-x-2"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                           >
-                            <motion.div 
+                            <motion.div
                               className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                               animate={{ rotate: 360 }}
                               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -462,7 +465,7 @@ const Auth = () => {
                           </motion.div>
                         ) : "Create Account"}
                       </Button>
-                      
+
                       {/* Divider */}
                       <div className="relative my-4">
                         <div className="absolute inset-0 flex items-center">
@@ -504,7 +507,7 @@ const Auth = () => {
                   </TabsContent>
                 </AnimatePresence>
               </Tabs>
-              
+
               {/* Terms */}
               <p className="text-xs text-gray-500 text-center mt-6">
                 By continuing, you agree to FlixVerse's{' '}

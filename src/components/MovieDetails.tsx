@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useRouter } from 'next/navigation';
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
 import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations, isNotReleasedYet } from "@/utils/tmdbApi";
 import { getSimilarMoviesForMovie } from "@/utils/movieSimilarity";
@@ -26,8 +26,7 @@ interface MovieDetailsProps {
 }
 
 const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePosition, initialSeason, initialEpisode }: MovieDetailsProps) => {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [content, setContent] = useState<TMDBMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,13 +48,13 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       try {
         setLoading(true);
         setError(null);
-        
-        console.log(`Loading content details for ID: ${movieId}, Type: ${mediaType}`);
-        
+
+        console.log(`Loading content details for ID: ${movieId}, Type: ${mediaType} `);
+
         const contentData = await fetchContentDetails(movieId, mediaType);
-        
+
         if (!isMounted) return;
-        
+
         if (!contentData) {
           setError('Content not found');
           setLoading(false);
@@ -64,7 +63,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
         console.log('Content loaded successfully:', contentData);
         setContent(contentData);
-        
+
       } catch (err) {
         console.error('Error loading content details:', err);
         if (isMounted) {
@@ -78,7 +77,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     };
 
     loadContentDetails();
-    
+
     // Trigger animation after component mounts
     const timer = setTimeout(() => {
       if (isMounted) setIsVisible(true);
@@ -148,20 +147,20 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   // so the autoplay effect doesn't reopen the player after 500ms.
   const handleClosePlayer = () => {
     setShowPlayer(false);
-    const params = new URLSearchParams(location.search);
-    if (params.has('autoplay') || params.has('resume')) {
-      params.delete('autoplay');
-      params.delete('resume');
-      const qs = params.toString();
-      navigate(`${location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+    const currentParams = new URLSearchParams(router.asPath.split('?')[1] || '');
+    if (currentParams.has('autoplay') || currentParams.has('resume')) {
+      currentParams.delete('autoplay');
+      currentParams.delete('resume');
+      const newQs = currentParams.toString();
+      router.replace(`${router.pathname}${newQs ? `?${newQs}` : ''} `);
     }
   };
 
   const handleAddToList = async () => {
     if (!content) return;
-    
+
     const contentTitle = content?.title || content?.name || 'Unknown';
-    
+
     if (!isAuthenticated) {
       toast({
         title: "Sign in required",
@@ -172,7 +171,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     }
 
     const isCurrentlyInList = isInList(movieId);
-    
+
     try {
       if (isCurrentlyInList) {
         await removeFromList(movieId);
@@ -219,29 +218,29 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     const contentTitle = content?.title || content?.name || 'Unknown';
     const isTVShow = content?.media_type === 'tv' || mediaType === 'tv';
     const episodeToPlay = episode || selectedEpisode;
-    
+
     if (isTVShow) {
-      console.log(`Starting to watch: ${contentTitle} S${selectedSeason}E${episodeToPlay}`);
+      console.log(`Starting to watch: ${contentTitle} S${selectedSeason}E${episodeToPlay} `);
       setSelectedEpisode(episodeToPlay);
     } else {
       console.log('Starting to watch:', contentTitle);
     }
-    
+
     setShowPlayer(true);
     toast({
       title: "Now Playing",
-      description: isTVShow 
+      description: isTVShow
         ? `Loading ${contentTitle} - Season ${selectedSeason}, Episode ${episodeToPlay}...`
         : `Loading ${contentTitle}...`,
     });
   };
 
   const handleWatchTrailer = () => {
-    const trailer = content?.videos?.results.find(video => 
+    const trailer = content?.videos?.results.find(video =>
       video.type === 'Trailer' && video.site === 'YouTube'
     );
     const contentTitle = content?.title || content?.name || 'Unknown';
-    
+
     if (trailer) {
       window.open(`https://www.youtube.com/watch?v=${trailer.key}`, '_blank');
       toast({
@@ -260,12 +259,12 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const handleDownload = () => {
     const contentTitle = content?.title || content?.name || 'Unknown';
     console.log('Starting download for:', contentTitle);
-    
+
     toast({
       title: "Download Started",
       description: `${contentTitle} download has been initiated. (Demo mode)`,
     });
-    
+
     setTimeout(() => {
       toast({
         title: "Download Complete",
@@ -296,7 +295,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           </div>
           <h2 className="text-white text-xl font-bold mb-2">{error || 'Content not found'}</h2>
           <p className="text-gray-400 mb-6">We couldn't load this content. Please try again.</p>
-          <button 
+          <button
             onClick={handleClose}
             className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105"
           >
@@ -307,7 +306,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     );
   }
 
-  const trailer = content.videos?.results.find(video => 
+  const trailer = content.videos?.results.find(video =>
     video.type === 'Trailer' && video.site === 'YouTube'
   );
 
@@ -317,10 +316,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const isUnreleased = isNotReleasedYet(content);
 
   return (
-    <div 
-      className={`min-h-screen w-full bg-black transition-all duration-500 ease-out overflow-x-hidden ${
-        isVisible ? 'opacity-100' : 'opacity-0'
-      }`}
+    <div
+      className={`min-h-screen w-full bg-black transition-all duration-500 ease-out overflow-x-hidden ${isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
     >
       <div className="relative w-full">
         {/* Back Button */}
@@ -336,9 +334,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         {/* Hero Section */}
         <div className="relative min-h-screen w-full flex flex-col">
           {/* Background with Ken Burns effect */}
-          <div 
+          <div
             className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
-            style={{ 
+            style={{
               backgroundImage: `url(${getBackdropUrl(content.backdrop_path)})`,
               animation: 'kenburns 25s ease-in-out infinite alternate'
             }}
@@ -349,9 +347,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           </div>
 
           {/* Content */}
-          <div className={`relative z-10 flex flex-col justify-center min-h-screen w-full px-4 sm:px-6 md:px-12 lg:px-20 py-20 sm:py-24 transition-all duration-700 delay-200 ${
-            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}>
+          <div className={`relative z-10 flex flex-col justify-center min-h-screen w-full px-4 sm:px-6 md:px-12 lg:px-20 py-20 sm:py-24 transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            }`}>
             <div className="max-w-4xl w-full">
               {/* Content Type Badge */}
               <div className="flex items-center space-x-3 mb-4 sm:mb-6">
@@ -375,12 +372,12 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-black mb-3 sm:mb-4 text-white leading-[1.1] tracking-tight">
                 {contentTitle}
               </h1>
-              
+
               {/* Tagline */}
               {content.tagline && (
                 <p className="text-lg md:text-xl text-gray-400 mb-6 italic font-light">{content.tagline}</p>
               )}
-              
+
               {/* Meta Info */}
               <div className="flex flex-wrap items-center gap-3 mb-6">
                 <div className="flex items-center space-x-1.5 bg-yellow-500/20 backdrop-blur-sm px-3 py-1.5 rounded-full">
@@ -498,7 +495,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                 {!isUnreleased && (
-                  <button 
+                  <button
                     onClick={() => handleWatch()}
                     className="group flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition-all duration-300 hover:scale-105 shadow-2xl shadow-white/20"
                   >
@@ -507,28 +504,27 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   </button>
                 )}
 
-                <button 
+                <button
                   onClick={handleWatchTrailer}
                   className="group flex items-center space-x-3 bg-white/15 backdrop-blur-md text-white px-6 py-4 rounded-full font-semibold hover:bg-white/25 transition-all duration-300 hover:scale-105 border border-white/20"
                 >
                   <Play className="w-5 h-5" />
                   <span>Trailer</span>
                 </button>
-                
-                <button 
+
+                <button
                   onClick={handleAddToList}
                   disabled={isOperating(movieId)}
-                  className={`group p-4 rounded-full transition-all duration-300 hover:scale-110 border ${
-                    isInList(movieId) 
-                      ? 'bg-red-500 border-red-500 text-white' 
-                      : 'bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20'
-                  } ${isOperating(movieId) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`group p-4 rounded-full transition-all duration-300 hover:scale-110 border ${isInList(movieId)
+                    ? 'bg-red-500 border-red-500 text-white'
+                    : 'bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20'
+                    } ${isOperating(movieId) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title={isInList(movieId) ? 'Remove from List' : 'Add to List'}
                 >
                   <Heart className={`w-6 h-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
                 </button>
               </div>
-           </div>
+            </div>
           </div>
 
           {/* Scroll indicator */}
@@ -546,7 +542,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               {/* Season Selector */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <h2 className="text-2xl md:text-3xl font-bold text-white">Episodes</h2>
-                
+
                 {/* Season Dropdown */}
                 <div className="relative z-30">
                   <button
@@ -558,7 +554,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     </span>
                     <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showSeasonDropdown ? 'rotate-180' : ''}`} />
                   </button>
-                  
+
                   {showSeasonDropdown && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowSeasonDropdown(false)} />
@@ -574,11 +570,10 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                                 setSelectedEpisode(1);
                                 setShowSeasonDropdown(false);
                               }}
-                              className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-all ${
-                                selectedSeason === season.season_number 
-                                  ? 'bg-red-600 text-white' 
-                                  : 'text-gray-300 hover:bg-white/10'
-                              }`}
+                              className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-all ${selectedSeason === season.season_number
+                                ? 'bg-red-600 text-white'
+                                : 'text-gray-300 hover:bg-white/10'
+                                }`}
                             >
                               <span className="font-medium">{season.name}</span>
                               <span className="text-sm opacity-70">({season.episode_count} eps)</span>
@@ -594,7 +589,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               {(() => {
                 const currentSeason = content.seasons.find(s => s.season_number === selectedSeason);
                 const episodeCount = currentSeason?.episode_count || 10;
-                
+
                 return (
                   <div className="grid grid-cols-4 xs:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 sm:gap-3">
                     {Array.from({ length: episodeCount }, (_, i) => i + 1).map((episodeNum) => (
@@ -602,11 +597,10 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                         key={episodeNum}
                         onClick={() => setSelectedEpisode(episodeNum)}
                         onDoubleClick={() => handleWatch(episodeNum)}
-                        className={`group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all duration-200 hover:scale-105 ${
-                          selectedEpisode === episodeNum
-                            ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20'
-                            : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
-                        }`}
+                        className={`group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all duration-200 hover:scale-105 ${selectedEpisode === episodeNum
+                          ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20'
+                          : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
+                          }`}
                       >
                         <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-white' : 'text-red-500 group-hover:text-red-400'}`} />
                         <span className="font-bold text-xs sm:text-sm">{episodeNum}</span>
@@ -688,9 +682,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           <div className="max-w-4xl mx-auto">
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
               <h3 className="text-lg font-semibold text-white mb-4">Rate this {isTV ? 'Series' : 'Movie'}</h3>
-              <QuickRating 
-                contentId={content.id} 
-                contentType={isTV ? 'tv' : 'movie'} 
+              <QuickRating
+                contentId={content.id}
+                contentType={isTV ? 'tv' : 'movie'}
                 size="lg"
               />
             </div>
@@ -745,7 +739,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           } else {
             totalDuration = content.runtime ? content.runtime * 60 : undefined;
           }
-          
+
           return (
             <div
               key={`player-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ''}`}
@@ -762,8 +756,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 backgroundColor: '#000',
               }}
             >
-              <VideoPlayer 
-                movieId={content.id} 
+              <VideoPlayer
+                movieId={content.id}
                 title={contentTitle}
                 description={content.overview}
                 onClose={handleClosePlayer}

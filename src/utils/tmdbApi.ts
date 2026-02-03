@@ -93,7 +93,7 @@ export interface TMDBGenre {
   name: string;
 }
 
-const isDev = import.meta.env.DEV;
+const isDev = process.env.NODE_ENV === 'development';
 
 // In-memory cache for API responses
 interface CacheEntry {
@@ -160,7 +160,7 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
       try {
         if (isDev) console.log(`API Call attempt ${attempt + 1}: ${url}`);
         const response = await fetch(url, options);
-        
+
         if (!response.ok) {
           if (response.status === 404) {
             if (isDev) console.warn(`Resource not found (404): ${url}`);
@@ -169,13 +169,13 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
         const result = { ...data, success: true };
-        
+
         // Cache successful responses
         setCachedResponse(url, result);
-        
+
         if (isDev) console.log(`API Call successful: ${url}`);
         return result;
       } catch (error) {
@@ -397,14 +397,14 @@ export const fetchDocumentaryTVShows = async (): Promise<TMDBMovie[]> => {
 // Enhanced detail fetching with proper media type detection
 export const fetchContentDetails = async (contentId: number, mediaType?: string): Promise<TMDBMovie | null> => {
   if (isDev) console.log(`Fetching content details for ID: ${contentId}, mediaType: ${mediaType}`);
-  
+
   // If media type is specified, use it directly
   if (mediaType === 'movie') {
     return fetchMovieDetails(contentId);
   } else if (mediaType === 'tv') {
     return fetchTVShowDetails(contentId);
   }
-  
+
   // Try to determine media type if not provided
   // First try as TV show (since the user clicked on a series)
   const tvResponse = await apiCall(`${TMDB_BASE_URL}/tv/${contentId}?append_to_response=videos,credits,seasons`);
@@ -417,14 +417,14 @@ export const fetchContentDetails = async (contentId: number, mediaType?: string)
       media_type: 'tv'
     };
   }
-  
+
   // Then try as movie
   const movieResponse = await apiCall(`${TMDB_BASE_URL}/movie/${contentId}?append_to_response=videos,credits`);
   if (movieResponse.success && movieResponse.id) {
     if (isDev) console.log('Successfully fetched as movie');
     return { ...movieResponse, media_type: 'movie' };
   }
-  
+
   if (isDev) console.error('Failed to fetch content as both TV show and movie');
   return null;
 };
@@ -704,12 +704,12 @@ export const getContentImage = (item: any, imageType: 'poster' | 'backdrop' | 'p
   if (imageType === 'profile' && item.profile_path) {
     return getProfileUrl(item.profile_path, size);
   }
-  
+
   // Fallback to any available image
   if (item.poster_path) return getImageUrl(item.poster_path, size);
   if (item.backdrop_path) return getBackdropUrl(item.backdrop_path, size);
   if (item.profile_path) return getProfileUrl(item.profile_path, size);
-  
+
   // Return appropriate placeholder
   switch (imageType) {
     case 'backdrop':

@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { Bell, User, LogOut, Menu, X, Sparkles, ChevronDown } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import SearchBar from "./SearchBar";
 import NotificationSettings from "./NotificationSettings";
 import NotificationBell from "./NotificationBell";
@@ -23,8 +24,8 @@ import { motion, AnimatePresence } from "framer-motion";
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const pathname = usePathname();
+  const router = useRouter();
   const { user, isAuthenticated, signOut } = useAuth();
   const { profile } = useUserProfile();
   const { toast } = useToast();
@@ -39,11 +40,11 @@ const Navigation = () => {
 
   const handleMovieSelect = (movie: TMDBMovie) => {
     const type = getContentType(movie);
-    navigate(`/movie/${movie.id}?type=${type}`);
+    router.push(`/movie/${movie.id}?type=${type}`);
   };
 
   const isActive = (path: string) => {
-    return location.pathname === path;
+    return pathname === path;
   };
 
   const handleSignOut = async () => {
@@ -53,7 +54,7 @@ const Navigation = () => {
         title: "Signed out successfully",
         description: "You have been signed out of your account",
       });
-      navigate('/');
+      router.push('/');
     } catch (error) {
       toast({
         title: "Error signing out",
@@ -96,7 +97,7 @@ const Navigation = () => {
               whileHover={{ scale: 1.02 }}
               transition={{ type: "spring", stiffness: 400 }}
             >
-              <Link to="/" className="flex-shrink-0 group">
+              <Link href="/" className="flex-shrink-0 group">
                 <div className="flex items-center space-x-2.5">
                   <div className="relative">
                     <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-red-500 group-hover:text-red-400 transition-all duration-300 group-hover:rotate-12" />
@@ -120,7 +121,7 @@ const Navigation = () => {
                   transition={{ delay: index * 0.05 + 0.2 }}
                 >
                   <Link
-                    to={link.path}
+                    href={link.path}
                     className={`relative px-4 py-2.5 text-sm lg:text-base font-medium transition-all duration-300 rounded-xl group ${isActive(link.path)
                       ? 'text-white'
                       : 'text-gray-400 hover:text-white'
@@ -208,14 +209,14 @@ const Navigation = () => {
                     </div>
 
                     <DropdownMenuItem
-                      onClick={() => navigate('/profile')}
+                      onClick={() => router.push('/profile')}
                       className="text-gray-300 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer py-3"
                     >
                       <User className="w-4 h-4 mr-3" />
                       My Profile
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => navigate('/my-list')}
+                      onClick={() => router.push('/my-list')}
                       className="text-gray-300 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer py-3"
                     >
                       <Sparkles className="w-4 h-4 mr-3" />
@@ -237,7 +238,7 @@ const Navigation = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.5 }}
                 >
-                  <Link to="/auth">
+                  <Link href="/auth">
                     <Button className="relative overflow-hidden bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-105 btn-shine">
                       Sign In
                     </Button>
@@ -303,7 +304,7 @@ const Navigation = () => {
                       transition={{ delay: index * 0.05 }}
                     >
                       <Link
-                        to={link.path}
+                        href={link.path}
                         onClick={() => setIsMobileMenuOpen(false)}
                         className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-300 ${isActive(link.path)
                           ? 'text-white bg-gradient-to-r from-red-500/20 to-orange-500/10 border-l-2 border-red-500'

@@ -1,14 +1,16 @@
+"use client";
+
 
 import { useEffect, useRef } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import MovieDetails from "@/components/MovieDetails";
 import { useToast } from "@/hooks/use-toast";
 
 const MovieDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const movieId = id ? parseInt(id) : 0;
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const movieId = id ? parseInt(Array.isArray(id) ? id[0] : id) : 0;
   const mediaType = searchParams.get('type') as "movie" | "tv" || "movie";
   const autoplay = searchParams.get('autoplay') === 'true';
   const resumePosition = searchParams.get('resume') ? parseInt(searchParams.get('resume')!) : undefined;
@@ -38,7 +40,7 @@ const MovieDetailsPage = () => {
   const handleClose = () => {
     // Always navigate to home page for reliable behavior
     // This ensures the back button works even when navigating directly to the page
-    navigate('/');
+    router.push('/');
   };
 
   if (!movieId) {
@@ -50,7 +52,7 @@ const MovieDetailsPage = () => {
   }
 
   return (
-    <MovieDetails 
+    <MovieDetails
       movieId={movieId}
       mediaType={mediaType}
       onClose={handleClose}

@@ -1,5 +1,7 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useRouter } from "next/navigation";
 import Navigation from "@/components/Navigation";
 import MovieCard from "@/components/MovieCard";
 import { TMDBMovie } from "@/utils/tmdbApi";
@@ -101,7 +103,7 @@ const normalizeMovie = (movie: TMDBMovie): TMDBMovie & { title: string; release_
 
 const Browse = () => {
   const { category } = useParams<{ category: string }>();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [movies, setMovies] = useState<TMDBMovie[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +149,7 @@ const Browse = () => {
         <div className="pt-24 px-4 flex flex-col items-center justify-center min-h-[60vh]">
           <p className="text-gray-400 mb-4">No category specified.</p>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => router.push("/")}
             className="text-red-500 hover:text-red-400 font-medium"
           >
             Go home
@@ -165,7 +167,7 @@ const Browse = () => {
           <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
           <p className="text-gray-400 mb-4">Category not found.</p>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => router.push("/")}
             className="text-red-500 hover:text-red-400 font-medium"
           >
             Go home
@@ -222,11 +224,11 @@ const Browse = () => {
               transition={{ duration: 0.4 }}
             >
               {movies.map((movie, index) => (
-                <MovieCard 
-                  key={`${movie.id}-${index}`} 
-                  movie={movie} 
-                  index={index} 
-                  comingSoon={category === 'coming-soon' || category === 'upcoming'} 
+                <MovieCard
+                  key={`${movie.id}-${index}`}
+                  movie={movie}
+                  index={index}
+                  comingSoon={category === 'coming-soon' || category === 'upcoming'}
                 />
               ))}
             </motion.div>

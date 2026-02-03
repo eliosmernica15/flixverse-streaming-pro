@@ -1,6 +1,8 @@
+"use client";
+
 
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import Navigation from "@/components/Navigation";
 import MovieCarousel from "@/components/MovieCarousel";
 import { fetchMovieDetails, fetchTVShowDetails, TMDBMovie } from "@/utils/tmdbApi";
@@ -31,7 +33,7 @@ const MyList = () => {
         });
         const movies = await Promise.all(moviePromises);
         const validMovies = movies.filter(movie => movie !== null) as TMDBMovie[];
-        
+
         setMyMovies(validMovies);
       } catch (error) {
         console.error('Error loading movie details:', error);
@@ -63,7 +65,7 @@ const MyList = () => {
     return (
       <div className="min-h-screen bg-black text-white animate-fade-in">
         <Navigation />
-        
+
         <div className="min-h-[80vh] flex items-center justify-center px-4">
           <div className="text-center max-w-md">
             <div className="w-24 h-24 bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
@@ -73,7 +75,7 @@ const MyList = () => {
             <p className="text-gray-400 mb-8 leading-relaxed">
               Create an account or sign in to save your favorite movies and TV shows to your personal list.
             </p>
-            <Link to="/auth">
+            <Link href="/auth">
               <button className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 hover:scale-105 shadow-xl shadow-red-500/20">
                 Sign In / Sign Up
               </button>
@@ -87,13 +89,13 @@ const MyList = () => {
   return (
     <div className="min-h-screen bg-black text-white animate-fade-in">
       <Navigation />
-      
+
       {/* Hero Header */}
       <div className="relative pt-20 pb-8 px-4 sm:px-6 lg:px-8 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-rose-900/20 via-transparent to-transparent"></div>
         <div className="absolute top-20 left-1/4 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl"></div>
         <div className="absolute top-32 right-1/4 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl"></div>
-        
+
         <div className="relative z-10 max-w-7xl mx-auto">
           <div className="flex items-center space-x-4 mb-4">
             <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-red-600 rounded-xl flex items-center justify-center">
@@ -102,7 +104,7 @@ const MyList = () => {
             <div>
               <h1 className="text-4xl md:text-5xl font-black text-white">My List</h1>
               <p className="text-gray-400 text-sm">
-                {myMovies.length > 0 
+                {myMovies.length > 0
                   ? `${myMovies.length} title${myMovies.length > 1 ? 's' : ''} saved`
                   : 'Your personal watchlist'
                 }
@@ -111,12 +113,12 @@ const MyList = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Content */}
       <div className="px-4 sm:px-6 lg:px-8 pb-16">
         {myMovies.length > 0 ? (
-          <MovieCarousel 
-            title="Your Saved Titles" 
+          <MovieCarousel
+            title="Your Saved Titles"
             movies={myMovies}
             icon={<Sparkles className="w-5 h-5 text-yellow-400" />}
           />
@@ -130,7 +132,7 @@ const MyList = () => {
               <p className="text-gray-400 mb-8 leading-relaxed">
                 Start building your personal watchlist by adding movies and TV shows you want to watch later.
               </p>
-              <Link to="/">
+              <Link href="/">
                 <button className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105">
                   <Plus className="w-5 h-5" />
                   <span>Discover Movies</span>

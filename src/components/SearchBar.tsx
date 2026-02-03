@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { Search, X, User, Film, Tv } from "lucide-react";
 import { TMDBMovie, TMDBPerson, searchMulti, searchPeople, getContentImage } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
@@ -32,7 +32,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
   const [loading, setLoading] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
     const searchContent = async () => {
@@ -71,7 +71,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
             // Prioritize movies and TV shows over people
             if (a.media_type === 'person' && b.media_type !== 'person') return 1;
             if (b.media_type === 'person' && a.media_type !== 'person') return -1;
-            
+
             // Then sort by vote average
             return (b.vote_average || 0) - (a.vote_average || 0);
           })
@@ -172,7 +172,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
           onKeyDown={(e) => {
             if (e.key === "Enter" && query.trim()) {
               e.preventDefault();
-              navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+              router.push(`/search?q=${encodeURIComponent(query.trim())}`);
               setQuery("");
               setResults([]);
               setIsOpen(false);
@@ -198,13 +198,13 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
               <div className="animate-pulse">Searching...</div>
             </div>
           )}
-          
+
           {!loading && results.length === 0 && query.length >= 2 && (
             <div className="p-4 text-center text-gray-400">
               No content found for "{query}"
             </div>
           )}
-          
+
           {!loading && results.length > 0 && (
             <div className="py-2">
               {results.map((result) => (
@@ -237,8 +237,8 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                       ) : (
                         <>
                           <span>
-                            {result.release_date || result.first_air_date 
-                              ? new Date(result.release_date || result.first_air_date).getFullYear() 
+                            {result.release_date || result.first_air_date
+                              ? new Date(result.release_date || result.first_air_date).getFullYear()
                               : 'N/A'}
                           </span>
                           {result.vote_average && result.vote_average > 0 && (

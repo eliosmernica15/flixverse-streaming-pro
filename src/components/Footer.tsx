@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import Link from 'next/link';
 import { Sparkles, Film, Tv, Heart, TrendingUp, Github, Twitter, Instagram, Youtube } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -40,7 +40,7 @@ const Footer = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-12">
                     {/* Brand column */}
                     <div className="lg:col-span-1">
-                        <Link to="/" className="inline-flex items-center space-x-2.5 group mb-4">
+                        <Link href="/" className="inline-flex items-center space-x-2.5 group mb-4">
                             <div className="relative">
                                 <Sparkles className="w-7 h-7 text-red-500 group-hover:text-red-400 transition-colors" />
                                 <div className="absolute inset-0 blur-lg bg-red-500/30 group-hover:bg-red-400/40 transition-colors" />
@@ -62,7 +62,7 @@ const Footer = () => {
                             {navLinks.map((link) => (
                                 <li key={link.path}>
                                     <Link
-                                        to={link.path}
+                                        href={link.path}
                                         className="group flex items-center space-x-2 text-gray-400 hover:text-white transition-colors"
                                     >
                                         <link.icon className="w-4 h-4 text-gray-500 group-hover:text-red-500 transition-colors" />

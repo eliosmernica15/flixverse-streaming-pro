@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 
 interface HeroBannerProps {
   movie: TMDBMovie;
@@ -15,12 +15,12 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
   const { isAuthenticated } = useAuth();
   const { addToList, isInList } = useUserMovieList();
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const title = getContentTitle(movie);
   const backdropUrl = movie.backdrop_path ? getBackdropUrl(movie.backdrop_path, 'large') : '';
-  const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : 
-                     movie.first_air_date ? new Date(movie.first_air_date).getFullYear() : '';
+  const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() :
+    movie.first_air_date ? new Date(movie.first_air_date).getFullYear() : '';
   const isInMyList = isAuthenticated ? isInList(movie.id) : false;
 
   const handlePlayClick = () => {
@@ -31,17 +31,17 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
         variant: "destructive",
       });
       setTimeout(() => {
-        navigate('/auth');
+        router.push('/auth');
       }, 1500);
       return;
     }
     const contentType = movie.media_type === 'tv' ? 'tv' : 'movie';
-    navigate(`/movie/${movie.id}?type=${contentType}&autoplay=true`);
+    router.push(`/movie/${movie.id}?type=${contentType}&autoplay=true`);
   };
 
   const handleMoreInfo = () => {
     const contentType = movie.media_type === 'tv' ? 'tv' : 'movie';
-    navigate(`/movie/${movie.id}?type=${contentType}`);
+    router.push(`/movie/${movie.id}?type=${contentType}`);
   };
 
   const handleAddToList = async () => {
@@ -72,15 +72,15 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
   return (
     <div className="relative h-[95vh] lg:h-screen overflow-hidden">
       {/* Background Image with parallax effect */}
-      <motion.div 
+      <motion.div
         className="absolute inset-0"
         initial={{ scale: 1.1 }}
         animate={{ scale: 1 }}
         transition={{ duration: 1.5, ease: "easeOut" }}
       >
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ 
+          style={{
             backgroundImage: `url(${backdropUrl})`,
           }}
         >
@@ -88,37 +88,37 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/20" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/50" />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black" />
-          
+
           {/* Vignette effect */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,transparent,rgba(0,0,0,0.5))]" />
-          
+
           {/* Noise texture for cinematic feel */}
           <div className="absolute inset-0 opacity-[0.015] noise-overlay" />
-          
+
           {/* Animated ambient glow */}
-          <motion.div 
+          <motion.div
             className="absolute -bottom-20 -left-20 w-96 h-96 bg-red-500/20 rounded-full blur-[120px]"
-            animate={{ 
+            animate={{
               scale: [1, 1.2, 1],
-              opacity: [0.2, 0.3, 0.2] 
+              opacity: [0.2, 0.3, 0.2]
             }}
-            transition={{ 
-              duration: 8, 
+            transition={{
+              duration: 8,
               repeat: Infinity,
-              ease: "easeInOut" 
+              ease: "easeInOut"
             }}
           />
-          <motion.div 
+          <motion.div
             className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[150px]"
-            animate={{ 
+            animate={{
               scale: [1, 1.3, 1],
-              opacity: [0.1, 0.2, 0.1] 
+              opacity: [0.1, 0.2, 0.1]
             }}
-            transition={{ 
-              duration: 10, 
+            transition={{
+              duration: 10,
               repeat: Infinity,
               ease: "easeInOut",
-              delay: 2 
+              delay: 2
             }}
           />
         </div>
@@ -129,7 +129,7 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="max-w-3xl">
             {/* Badges */}
-            <motion.div 
+            <motion.div
               className="flex flex-wrap items-center gap-3 mb-5"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -148,9 +148,9 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
                 </span>
               )}
             </motion.div>
-            
+
             {/* Title */}
-            <motion.h1 
+            <motion.h1
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-5 text-white leading-[1.05] tracking-tight"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -158,9 +158,9 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
             >
               {title}
             </motion.h1>
-            
+
             {/* Meta info */}
-            <motion.div 
+            <motion.div
               className="flex flex-wrap items-center gap-4 mb-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -179,7 +179,7 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
             </motion.div>
 
             {/* Overview */}
-            <motion.p 
+            <motion.p
               className="text-base sm:text-lg md:text-xl mb-8 text-gray-300 leading-relaxed line-clamp-3 max-w-2xl"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -189,13 +189,13 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
             </motion.p>
 
             {/* Action Buttons */}
-            <motion.div 
+            <motion.div
               className="flex flex-wrap items-center gap-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
             >
-              <motion.button 
+              <motion.button
                 onClick={handlePlayClick}
                 className="group flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all duration-300 shadow-2xl shadow-white/20 hover:shadow-white/30 btn-shine"
                 whileHover={{ scale: 1.03 }}
@@ -204,8 +204,8 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
                 <Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
                 <span>Play Now</span>
               </motion.button>
-              
-              <motion.button 
+
+              <motion.button
                 onClick={handleAddToList}
                 disabled={!isAuthenticated && isInMyList}
                 className="group flex items-center space-x-3 glass-premium text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white/20 transition-all duration-300"
@@ -220,7 +220,7 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
                 <span>{isInMyList ? 'In My List' : 'Add to List'}</span>
               </motion.button>
 
-              <motion.button 
+              <motion.button
                 onClick={handleMoreInfo}
                 className="group p-4 glass-card rounded-xl hover:bg-white/15 transition-all duration-300"
                 whileHover={{ scale: 1.1 }}
@@ -236,21 +236,21 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
 
       {/* Bottom gradient for smooth content transition */}
       <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
-      
+
       {/* Scroll indicator */}
-      <motion.div 
+      <motion.div
         className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden lg:flex flex-col items-center space-y-2"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5 }}
       >
         <span className="text-xs text-gray-500 uppercase tracking-widest">Scroll to explore</span>
-        <motion.div 
+        <motion.div
           className="w-6 h-10 border-2 border-gray-600 rounded-full flex justify-center"
           animate={{ y: [0, 5, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
         >
-          <motion.div 
+          <motion.div
             className="w-1.5 h-3 bg-red-500 rounded-full mt-2"
             animate={{ y: [0, 8, 0], opacity: [1, 0.5, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
