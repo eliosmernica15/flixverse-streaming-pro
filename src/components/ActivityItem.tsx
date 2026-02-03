@@ -1,6 +1,61 @@
+import { motion, AnimatePresence } from 'framer-motion';
+import { Star, Tv, Film, ChevronRight, Clock, MessageCircle, Plus, Heart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { getImageUrl } from '@/utils/tmdbApi';
+import { UserActivity, ActivityType } from '@/hooks/useUserActivity';
 
-// ... imports remain the same
+interface ActivityItemProps {
+  activity: UserActivity;
+  index: number;
+}
+
+const getActivityColor = (type: ActivityType) => {
+  switch (type) {
+    case 'review': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+    case 'rating': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+    case 'comment': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    case 'watchlist': return 'bg-pink-500/10 text-pink-400 border-pink-500/20';
+    case 'watched': return 'bg-green-500/10 text-green-400 border-green-500/20';
+    default: return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
+  }
+};
+
+const getActivityIcon = (type: ActivityType) => {
+  switch (type) {
+    case 'review': return <MessageCircle className="w-3 h-3" />;
+    case 'rating': return <Star className="w-3 h-3" />;
+    case 'comment': return <MessageCircle className="w-3 h-3" />;
+    case 'watchlist': return <Plus className="w-3 h-3" />;
+    case 'watched': return <Plus className="w-3 h-3" />;
+    default: return null;
+  }
+};
+
+const getActivityLabel = (type: ActivityType) => {
+  switch (type) {
+    case 'review': return 'Reviewed';
+    case 'rating': return 'Rated';
+    case 'comment': return 'Commented';
+    case 'watchlist': return 'Added to Watchlist';
+    case 'watched': return 'Watched';
+    default: return type;
+  }
+};
+
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString();
+};
 
 const ActivityItem = ({ activity, index = 0 }: ActivityItemProps) => {
   const router = useRouter();
