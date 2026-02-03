@@ -50,7 +50,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
         ]);
 
         // Combine results and prioritize by relevance
-        const combined = [
+        const allResults: any[] = [
           ...multiResults.map(item => ({
             ...item,
             media_type: item.media_type || (item.title ? 'movie' : 'tv')
@@ -59,13 +59,15 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
             ...person,
             media_type: 'person'
           }))
-        ]
+        ];
+
+        const combined = allResults
           .filter(item => {
             // Filter out items without essential information
             if (item.media_type === 'person') {
               return item.name && (item.profile_path || item.known_for_department);
             }
-            return (item.title || item.name) && (item.poster_path || item.backdrop_path || item.vote_average > 0);
+            return (item.title || item.name) && (item.poster_path || item.backdrop_path || (item.vote_average ?? 0) > 0);
           })
           .sort((a, b) => {
             // Prioritize movies and TV shows over people
@@ -75,7 +77,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
             // Then sort by vote average
             return (b.vote_average || 0) - (a.vote_average || 0);
           })
-          .slice(0, 12);
+          .slice(0, 12) as SearchResult[];
 
         setResults(combined);
       } catch (error) {
