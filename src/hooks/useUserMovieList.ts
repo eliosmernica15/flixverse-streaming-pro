@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  deleteDoc, 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  deleteDoc,
   doc,
   getDocs
 } from 'firebase/firestore';
@@ -82,13 +82,14 @@ export const useUserMovieList = () => {
 
     const exists = movieList.some(item => item.movie_id === movie.id);
     if (exists) {
-      throw new Error('Movie is already in your list');
+      console.log('Movie already in list, skipping add');
+      return;
     }
 
     setOperatingMovies(prev => new Set(prev).add(movie.id));
 
     const mediaType: 'movie' | 'tv' = (movie.media_type === 'tv' || movie.first_air_date) ? 'tv' : 'movie';
-    
+
     const optimisticItem: UserMovieListItem = {
       id: `temp-${movie.id}`,
       user_id: user.uid,
@@ -141,6 +142,9 @@ export const useUserMovieList = () => {
     try {
       if (itemToRemove && !itemToRemove.id.startsWith('temp-')) {
         await deleteDoc(doc(db, 'user_movie_lists', itemToRemove.id));
+      } else if (!itemToRemove) {
+        console.log('Movie not found in list, skipping remove');
+        return;
       }
     } catch (error) {
       setMovieList(originalList);

@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
 import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations, isNotReleasedYet } from "@/utils/tmdbApi";
 import { getSimilarMoviesForMovie } from "@/utils/movieSimilarity";
@@ -38,7 +38,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const [relatedContent, setRelatedContent] = useState<TMDBMovie[]>([]);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
-  const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
+  const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieList();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { getProgress } = useWatchHistory();
 
   useEffect(() => {
@@ -147,12 +149,12 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   // so the autoplay effect doesn't reopen the player after 500ms.
   const handleClosePlayer = () => {
     setShowPlayer(false);
-    const currentParams = new URLSearchParams(router.asPath.split('?')[1] || '');
+    const currentParams = new URLSearchParams(searchParams.toString());
     if (currentParams.has('autoplay') || currentParams.has('resume')) {
       currentParams.delete('autoplay');
       currentParams.delete('resume');
       const newQs = currentParams.toString();
-      router.replace(`${router.pathname}${newQs ? `?${newQs}` : ''} `);
+      router.replace(`${pathname}${newQs ? `?${newQs}` : ''} `);
     }
   };
 
@@ -514,11 +516,11 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
                 <button
                   onClick={handleAddToList}
-                  disabled={isOperating(movieId)}
+                  disabled={isOperating(movieId) || loadingList}
                   className={`group p-4 rounded-full transition-all duration-300 hover:scale-110 border ${isInList(movieId)
                     ? 'bg-red-500 border-red-500 text-white'
                     : 'bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20'
-                    } ${isOperating(movieId) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${(isOperating(movieId) || loadingList) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title={isInList(movieId) ? 'Remove from List' : 'Add to List'}
                 >
                   <Heart className={`w-6 h-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
