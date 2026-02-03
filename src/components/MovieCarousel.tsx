@@ -72,11 +72,11 @@ const MovieCarousel = memo(({ title, movies, priority = false, loading = false, 
 
   return (
     <motion.section
-      className="relative group/section"
-      initial={{ opacity: 0, y: 50 }}
+      className="relative group/section transform-gpu"
+      initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

@@ -40,20 +40,6 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
   const router = useRouter();
 
-  // Motion values for 3D effect
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  const rotateXSpring = useSpring(mouseY, { stiffness: 300, damping: 30 });
-  const rotateYSpring = useSpring(mouseX, { stiffness: 300, damping: 30 });
-
-  const rotateX = useTransform(rotateXSpring, [-0.5, 0.5], [10, -10]);
-  const rotateY = useTransform(rotateYSpring, [-0.5, 0.5], [-10, 10]);
-
-  const shineX = useTransform(mouseX, [-0.5, 0.5], [0, 100]);
-  const shineY = useTransform(mouseY, [-0.5, 0.5], [0, 100]);
-  const shineBackground = useMotionTemplate`radial-gradient(circle at ${shineX}% ${shineY}%, rgba(255,255,255,0.2) 0%, transparent 60%)`;
-
   useEffect(() => {
     if (!isAuthenticated) {
       try {
@@ -66,27 +52,6 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   }, [isAuthenticated, movie.id]);
 
   const isInMyList = isAuthenticated ? isInList(movie.id) : isInLocalList;
-
-  // 3D Tilt effect values
-  const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-
-    const rect = cardRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    const x = (event.clientX - centerX) / rect.width;
-    const y = (event.clientY - centerY) / rect.height;
-
-    mouseX.set(x);
-    mouseY.set(y);
-  }, [mouseX, mouseY]);
-
-  const handleMouseLeave = useCallback(() => {
-    setIsHovered(false);
-    mouseX.set(0);
-    mouseY.set(0);
-  }, [mouseX, mouseY]);
 
   const handleCardClick = () => {
     addToHistory(movie.id);
@@ -145,10 +110,6 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
     }
   };
 
-  const handleImageError = () => {
-    setImageError(true);
-  };
-
   const displayTitle = getContentTitle(movie);
   const releaseDate = getContentReleaseDate(movie);
   const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
@@ -158,12 +119,10 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   const hasValidRating = rating > 0;
   const finalPosterUrl = (!posterUrl || imageError) ? getPlaceholderImage() : posterUrl;
 
-  // Get primary genre
   const primaryGenre = movie.genre_ids && movie.genre_ids.length > 0
     ? genreNames[movie.genre_ids[0]]
     : null;
 
-  // Rating color based on score
   const getRatingColor = (rating: number) => {
     if (rating >= 7.5) return 'from-green-500 to-emerald-500';
     if (rating >= 6) return 'from-yellow-500 to-amber-500';
@@ -175,285 +134,121 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
       ref={cardRef}
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.04, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="relative group cursor-pointer"
-      style={{ perspective: 1200 }}
+      transition={{ duration: 0.5, delay: index * 0.03, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="relative group cursor-pointer will-change-transform transform-gpu"
       onMouseEnter={() => setIsHovered(true)}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
+      onMouseLeave={() => setIsHovered(false)}
       onClick={handleCardClick}
     >
-      {/* Card Container with 3D Tilt */}
       <motion.div
-        className="relative overflow-hidden rounded-2xl bg-gray-900/50"
-        style={{
-          rotateX: isHovered ? rotateX : 0,
-          rotateY: isHovered ? rotateY : 0,
-          transformStyle: 'preserve-3d',
-        }}
-        whileHover={{ scale: 1.04, zIndex: 20 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className="relative overflow-hidden rounded-2xl bg-gray-900/50 transform-gpu"
+        whileHover={{ scale: 1.05, zIndex: 20 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
       >
-        {/* Dynamic glow effect */}
-        <motion.div
-          className="absolute -inset-2 rounded-2xl blur-xl"
-          style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(168, 85, 247, 0.3), rgba(59, 130, 246, 0.4))',
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isHovered ? 1 : 0 }}
-          transition={{ duration: 0.4 }}
-        />
-
-        {/* Card border glow */}
-        <motion.div
-          className="absolute inset-0 rounded-2xl"
-          style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.5), transparent 50%, rgba(168, 85, 247, 0.5))',
-            padding: '1px',
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isHovered ? 1 : 0 }}
-          transition={{ duration: 0.3 }}
+        {/* Simplified Glow */}
+        <div
+          className={`absolute -inset-1 rounded-2xl blur-lg bg-gradient-to-r from-red-600/30 to-purple-600/30 opacity-0 transition-opacity duration-300 ${isHovered ? 'opacity-100' : ''}`}
         />
 
         {/* Poster Image */}
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl">
-          {/* Skeleton loader */}
           {!imageLoaded && (
             <div className="absolute inset-0 bg-gray-800/80 skeleton-shimmer" />
           )}
 
           <motion.img
-            key={finalPosterUrl}
             src={finalPosterUrl}
             alt={displayTitle}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover will-change-transform"
             loading="lazy"
             decoding="async"
-            onError={handleImageError}
+            onError={() => setImageError(true)}
             onLoad={() => setImageLoaded(true)}
-            initial={{ scale: 1 }}
-            animate={{ scale: isHovered ? 1.12 : 1 }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
+            animate={{ scale: isHovered ? 1.1 : 1 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
           />
 
-          {/* Shine effect overlay */}
-          <motion.div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: shineBackground,
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: isHovered ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
-          />
+          {/* Simple Hover Overlay */}
+          <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent transition-opacity duration-300 ${isHovered ? 'opacity-90' : 'opacity-60'}`} />
 
-          {/* Sweep shine animation */}
-          <AnimatePresence>
-            {isHovered && (
-              <motion.div
-                className="absolute inset-0 pointer-events-none overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <motion.div
-                  className="absolute w-[200%] h-full"
-                  style={{
-                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
-                    transform: 'skewX(-20deg)',
-                  }}
-                  initial={{ x: '-100%' }}
-                  animate={{ x: '100%' }}
-                  transition={{ duration: 0.8, ease: 'easeInOut' }}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Type Badge */}
+          <div className="absolute top-3 left-3 flex items-center space-x-1.5 glass-premium text-white text-[10px] font-bold px-2 py-1 rounded-md">
+            {contentType === 'tv' ? <Tv className="w-3 h-3" /> : <Film className="w-3 h-3" />}
+            <span>{contentType === 'tv' ? 'SERIES' : 'MOVIE'}</span>
+          </div>
 
-          {/* Content Type Badge */}
-          <motion.div
-            className="absolute top-3 left-3 flex items-center space-x-1.5 glass-premium text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            {contentType === 'tv' ? <Tv className="w-3.5 h-3.5" /> : <Film className="w-3.5 h-3.5" />}
-            <span>{contentType === 'tv' ? 'Series' : 'Movie'}</span>
-          </motion.div>
-
-          {/* Rating Badge - only show when we have a valid rating */}
+          {/* Rating */}
           {hasValidRating && (
-            <motion.div
-              className={`absolute top-3 right-3 flex items-center space-x-1.5 bg-gradient-to-r ${getRatingColor(rating)} text-white text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-lg`}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.15 }}
-            >
-              <Star className="w-3.5 h-3.5 fill-current" />
+            <div className={`absolute top-3 right-3 flex items-center space-x-1 bg-gradient-to-r ${getRatingColor(rating)} text-white text-[10px] font-black px-2 py-1 rounded-md shadow-lg`}>
+              <Star className="w-3 h-3 fill-current" />
               <span>{rating.toFixed(1)}</span>
-            </motion.div>
+            </div>
           )}
 
-          {/* Genre Badge - Shows on hover */}
-          <AnimatePresence>
-            {isHovered && primaryGenre && (
-              <motion.div
-                className="absolute top-14 left-3 glass-card text-white text-xs font-medium px-3 py-1.5 rounded-lg"
-                initial={{ opacity: 0, y: -10, scale: 0.8 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.8 }}
-                transition={{ duration: 0.25 }}
-              >
-                {primaryGenre}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Gradient Overlay */}
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"
-            initial={{ opacity: 0.5 }}
-            animate={{ opacity: isHovered ? 0.95 : 0.5 }}
-            transition={{ duration: 0.3 }}
-          />
-
-          {/* Hover Content */}
+          {/* Hover Details */}
           <AnimatePresence>
             {isHovered && (
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="absolute inset-0 flex flex-col justify-end p-4"
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.2 }}
+                className="absolute inset-x-0 bottom-0 p-4 z-10"
               >
-                {/* Title & Year */}
-                <motion.h3
-                  className="text-white font-bold text-lg mb-1 line-clamp-2 drop-shadow-lg"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.05 }}
-                >
+                <h3 className="text-white font-black text-base mb-1 line-clamp-1 drop-shadow-md">
                   {displayTitle}
-                </motion.h3>
-                {year && (
-                  <motion.div
-                    className="flex items-center space-x-2 text-gray-400 text-sm mb-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.1 }}
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{year}</span>
-                  </motion.div>
-                )}
+                </h3>
 
-                {/* Action Buttons */}
-                <motion.div
-                  className="flex items-center space-x-2"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15 }}
-                >
+                <div className="flex items-center space-x-2 mb-3">
+                  {year && <span className="text-gray-300 text-xs font-medium">{year}</span>}
+                  {primaryGenre && (
+                    <span className="text-red-500 text-[10px] font-bold uppercase tracking-wider">
+                      {primaryGenre}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
                   {comingSoon ? (
-                    <motion.div
-                      className="flex-1 flex items-center justify-center space-x-2 bg-amber-500/30 text-amber-400 py-3 rounded-xl font-bold text-sm border border-amber-500/40"
-                    >
-                      <Clock className="w-4 h-4" />
-                      <span>Coming Soon</span>
-                    </motion.div>
+                    <div className="flex-1 bg-amber-500/20 text-amber-400 py-2 rounded-lg font-bold text-[10px] text-center border border-amber-500/30">
+                      COMING SOON
+                    </div>
                   ) : (
-                    <motion.button
-                      className="flex-1 flex items-center justify-center space-x-2 bg-white text-black py-3 rounded-xl font-bold text-sm shadow-lg"
+                    <button
+                      className="flex-1 flex items-center justify-center space-x-2 bg-white text-black py-2 rounded-lg font-bold text-xs"
                       onClick={handlePlayClick}
-                      whileHover={{ scale: 1.02, backgroundColor: "#f3f4f6" }}
-                      whileTap={{ scale: 0.98 }}
                     >
-                      <Play className="w-4 h-4 fill-current" />
-                      <span>Play</span>
-                    </motion.button>
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>PLAY</span>
+                    </button>
                   )}
 
-                  <motion.button
-                    className={`p-3 rounded-xl transition-colors ${isInMyList
-                      ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
-                      : 'glass-card text-white hover:bg-white/20'
-                      }`}
-                    onClick={handleAddToListClick}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    title={isInMyList ? "Remove from My List" : "Add to My List"}
-                  >
-                    <AnimatePresence mode="wait">
-                      {isInMyList ? (
-                        <motion.div
-                          key="heart"
-                          initial={{ scale: 0, rotate: -180 }}
-                          animate={{ scale: 1, rotate: 0 }}
-                          exit={{ scale: 0, rotate: 180 }}
-                        >
-                          <Heart className="w-4 h-4 fill-current" />
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="plus"
-                          initial={{ scale: 0, rotate: 180 }}
-                          animate={{ scale: 1, rotate: 0 }}
-                          exit={{ scale: 0, rotate: -180 }}
-                        >
-                          <Plus className="w-4 h-4" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.button>
-
-                  <motion.button
-                    className="p-3 rounded-xl glass-card text-white hover:bg-white/20"
+                  <button
+                    className={`p-2 rounded-lg transition-colors ${isInMyList ? 'bg-red-500 text-white' : 'glass-card text-white'}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleCardClick();
+                      handleAddToListClick(e);
                     }}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    title="More Info"
                   >
-                    <Info className="w-4 h-4" />
-                  </motion.button>
-                </motion.div>
+                    {isInMyList ? <Heart className="w-3.5 h-3.5 fill-current" /> : <Plus className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </motion.div>
 
-      {/* Title below card (visible when not hovered) */}
-      <motion.div
-        className="mt-3 px-1"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: isHovered ? 0 : 1 }}
-        transition={{ duration: 0.2 }}
-      >
-        <h3 className="text-white text-sm font-semibold truncate">{displayTitle}</h3>
-        <div className="flex items-center justify-between mt-1">
-          {year && (
-            <p className="text-gray-500 text-xs">{year}</p>
-          )}
-          <div className="flex items-center space-x-1">
-            {hasValidRating ? (
-              <>
-                <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                <span className="text-gray-400 text-xs">{rating.toFixed(1)}</span>
-              </>
-            ) : (
-              <span className="text-gray-500 text-xs">No rating</span>
-            )}
-          </div>
-        </div>
-      </motion.div>
+      {/* Static Footer */}
+      <div className={`mt-2 transition-opacity duration-300 ${isHovered ? 'opacity-0' : 'opacity-100'}`}>
+        <p className="text-white text-xs font-bold truncate">{displayTitle}</p>
+        <p className="text-gray-500 text-[10px] uppercase font-bold tracking-tighter mt-0.5">
+          {year} • {hasValidRating ? `${rating.toFixed(1)} Rating` : 'New'}
+        </p>
+      </div>
     </motion.div>
   );
 };
+
 
 export default memo(MovieCard);

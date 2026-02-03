@@ -31,26 +31,23 @@ const Index = () => {
 
   useEffect(() => {
     const loadContent = async () => {
-      setLoading(true);
-
+      // Step 1: Sequential fetch for core content
       const sections = [
+        { id: 'heroMovie', fetch: getHeroMovieOfTheWeek },
         { id: 'trendingMovies', fetch: fetchTrendingMovies },
         { id: 'topRatedMovies', fetch: fetchTopRatedMovies },
         { id: 'popularMovies', fetch: fetchPopularMovies },
         { id: 'trendingTVShows', fetch: fetchTrendingTVShows },
         { id: 'popularTVShows', fetch: fetchPopularTVShows },
         { id: 'nowPlayingMovies', fetch: fetchNowPlayingMovies },
-        { id: 'heroMovie', fetch: getHeroMovieOfTheWeek }
       ];
 
-      // Step 1: Sequential fetch for core content to avoid initial saturation
       for (const section of sections) {
         try {
           const data = await section.fetch();
           if (data) {
             setMoviesData(prev => ({ ...prev, [section.id]: Array.isArray(data) ? data : [data] }));
 
-            // Set featured movie from hero or first trending
             if (section.id === 'heroMovie' && !Array.isArray(data)) {
               setFeaturedMovie(data);
             } else if (section.id === 'trendingMovies' && Array.isArray(data) && !featuredMovie) {
@@ -60,11 +57,14 @@ const Index = () => {
         } catch (err) {
           console.error(`Index failed to load ${section.id}:`, err);
         }
-        // Small delay
-        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Hide global loader as soon as we have enough to show the hero section
+        if (Object.keys(moviesData).length >= 1 || section.id === 'heroMovie') {
+          setLoading(false);
+        }
       }
 
-      // Step 2: Load upcoming content (can be parallel as it's separate)
+      // Step 2: Load upcoming content
       try {
         const [upcomingMoviesRaw, upcomingTVRaw] = await Promise.all([
           fetchUpcomingMovies(),
@@ -87,7 +87,7 @@ const Index = () => {
     };
 
     loadContent();
-  }, []);
+  }, [featuredMovie]);
 
   if (loading && Object.keys(moviesData).length === 0) {
     return (
@@ -112,23 +112,6 @@ const Index = () => {
             <span className="text-white">Verse</span>
           </h2>
           <p className="text-gray-400 text-lg">Loading your entertainment...</p>
-          <div className="mt-8 flex justify-center space-x-2">
-            {[0, 1, 2].map((i) => (
-              <motion.div
-                key={i}
-                className="w-3 h-3 bg-gradient-to-r from-red-500 to-orange-500 rounded-full"
-                animate={{
-                  y: [0, -12, 0],
-                  scale: [1, 1.2, 1]
-                }}
-                transition={{
-                  duration: 0.6,
-                  repeat: Infinity,
-                  delay: i * 0.15
-                }}
-              />
-            ))}
-          </div>
         </motion.div>
       </div>
     );
@@ -143,76 +126,78 @@ const Index = () => {
           <HeroBanner movie={featuredMovie} />
         )}
 
-        {/* Welcome banner positioned after hero */}
         <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8">
           <PersonalizedWelcome />
         </div>
 
-        {/* Content Sections */}
         <div className="relative z-10">
-          {/* Background ambient effects */}
-          <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-red-500/5 rounded-full blur-[200px] pointer-events-none" />
-          <div className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[200px] pointer-events-none" />
-
           <div className="space-y-14 lg:space-y-20 pb-20 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
             <ContinueWatching />
-            {moviesData['trendingMovies'] && (
-              <MovieCarousel
-                title="Trending Now"
-                movies={moviesData['trendingMovies']}
-                icon={<TrendingUp className="w-5 h-5 text-red-500" />}
-                exploreAllPath="/browse/trending-now"
-              />
-            )}
+
+            <MovieCarousel
+              title="Trending Now"
+              movies={moviesData['trendingMovies'] || []}
+              loading={!moviesData['trendingMovies']}
+              icon={<TrendingUp className="w-5 h-5 text-red-500" />}
+              exploreAllPath="/browse/trending-now"
+            />
+
             <div className="section-divider-glow" aria-hidden />
-            {moviesData['nowPlayingMovies'] && (
-              <MovieCarousel
-                title="Now Playing"
-                movies={moviesData['nowPlayingMovies']}
-                icon={<Play className="w-5 h-5 text-green-500" />}
-                exploreAllPath="/browse/now-playing"
-              />
-            )}
+
+            <MovieCarousel
+              title="Now Playing"
+              movies={moviesData['nowPlayingMovies'] || []}
+              loading={!moviesData['nowPlayingMovies']}
+              icon={<Play className="w-5 h-5 text-green-500" />}
+              exploreAllPath="/browse/now-playing"
+            />
+
             <div className="section-divider" aria-hidden />
-            {moviesData['topRatedMovies'] && (
-              <MovieCarousel
-                title="Top Rated"
-                movies={moviesData['topRatedMovies']}
-                icon={<Star className="w-5 h-5 text-yellow-500" />}
-                exploreAllPath="/browse/top-rated"
-              />
-            )}
+
+            <MovieCarousel
+              title="Top Rated"
+              movies={moviesData['topRatedMovies'] || []}
+              loading={!moviesData['topRatedMovies']}
+              icon={<Star className="w-5 h-5 text-yellow-500" />}
+              exploreAllPath="/browse/top-rated"
+            />
+
             <div className="section-divider" aria-hidden />
-            {moviesData['popularMovies'] && (
-              <MovieCarousel
-                title="Popular Movies"
-                movies={moviesData['popularMovies']}
-                icon={<Film className="w-5 h-5 text-blue-500" />}
-                exploreAllPath="/browse/popular-movies"
-              />
-            )}
+
+            <MovieCarousel
+              title="Popular Movies"
+              movies={moviesData['popularMovies'] || []}
+              loading={!moviesData['popularMovies']}
+              icon={<Film className="w-5 h-5 text-blue-500" />}
+              exploreAllPath="/browse/popular-movies"
+            />
+
             <div className="section-divider" aria-hidden />
-            {moviesData['trendingTVShows'] && (
-              <MovieCarousel
-                title="Trending TV Shows"
-                movies={moviesData['trendingTVShows']}
-                icon={<Tv className="w-5 h-5 text-purple-500" />}
-                exploreAllPath="/browse/trending-tv"
-              />
-            )}
+
+            <MovieCarousel
+              title="Trending TV Shows"
+              movies={moviesData['trendingTVShows'] || []}
+              loading={!moviesData['trendingTVShows']}
+              icon={<Tv className="w-5 h-5 text-purple-500" />}
+              exploreAllPath="/browse/trending-tv"
+            />
+
             <div className="section-divider" aria-hidden />
-            {moviesData['popularTVShows'] && (
-              <MovieCarousel
-                title="Popular TV Shows"
-                movies={moviesData['popularTVShows']}
-                icon={<Tv className="w-5 h-5 text-pink-500" />}
-                exploreAllPath="/browse/popular-tv"
-              />
-            )}
+
+            <MovieCarousel
+              title="Popular TV Shows"
+              movies={moviesData['popularTVShows'] || []}
+              loading={!moviesData['popularTVShows']}
+              icon={<Tv className="w-5 h-5 text-pink-500" />}
+              exploreAllPath="/browse/popular-tv"
+            />
+
             <div className="section-divider" aria-hidden />
+
             <MovieCarousel
               title="Coming soon"
               movies={comingSoon}
+              loading={comingSoon.length === 0 && loading}
               icon={<Calendar className="w-5 h-5 text-amber-500" />}
               showWhenEmpty
               exploreAllPath="/browse/coming-soon"
