@@ -75,10 +75,10 @@ const Auth = () => {
         description: "Your account has been created successfully",
       });
       router.push('/');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Sign up failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     }
@@ -103,10 +103,10 @@ const Auth = () => {
         description: "You have been signed in successfully",
       });
       router.push('/');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Sign in failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     }
@@ -135,10 +135,10 @@ const Auth = () => {
         description: "You have been signed in successfully with Google",
       });
       router.push('/');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Google sign in failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     }

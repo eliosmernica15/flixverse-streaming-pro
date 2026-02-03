@@ -159,10 +159,10 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
         title: "Comment posted",
         description: "Your comment has been added"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to post comment",
+        description: error instanceof Error ? error.message : "Failed to post comment",
         variant: "destructive"
       });
     } finally {
@@ -177,10 +177,10 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
         title: "Comment deleted",
         description: "Your comment has been removed"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete comment",
+        description: error instanceof Error ? error.message : "Failed to delete comment",
         variant: "destructive"
       });
     }

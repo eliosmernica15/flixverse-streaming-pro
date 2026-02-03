@@ -124,10 +124,10 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
           description: `${movieTitle} has been added to your list.`,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Something went wrong",
+        description: error instanceof Error ? error.message : "Something went wrong",
         variant: "destructive",
       });
     }

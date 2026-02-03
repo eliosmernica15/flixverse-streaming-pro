@@ -193,10 +193,10 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           description: `${contentTitle} has been added to your list.`,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to update your list.",
+        description: error instanceof Error ? error.message : "Failed to update your list.",
         variant: "destructive",
       });
     }

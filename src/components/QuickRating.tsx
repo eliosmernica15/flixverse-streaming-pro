@@ -55,10 +55,10 @@ const QuickRating = ({
           description: `You rated this ${rating}/10`
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to rate",
+        description: error instanceof Error ? error.message : "Failed to rate",
         variant: "destructive"
       });
     }
@@ -98,13 +98,12 @@ const QuickRating = ({
               title={`Rate ${starRating}/10`}
             >
               <Star
-                className={`${sizeConfig[size].star} transition-colors duration-150 ${
-                  isFilled
+                className={`${sizeConfig[size].star} transition-colors duration-150 ${isFilled
                     ? isUserRated
                       ? 'text-yellow-400 fill-yellow-400 drop-shadow-[0_0_4px_rgba(250,204,21,0.5)]'
                       : 'text-yellow-400 fill-yellow-400'
                     : 'text-gray-500 hover:text-yellow-400/50'
-                }`}
+                  }`}
               />
             </motion.button>
           );

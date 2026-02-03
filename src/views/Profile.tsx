@@ -113,11 +113,11 @@ const Profile = () => {
         title: "Profile updated",
         description: "Your profile picture has been updated successfully"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error uploading image:', error);
       toast({
         title: "Upload failed",
-        description: error.message || "Failed to upload profile picture. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload profile picture. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -147,7 +147,7 @@ const Profile = () => {
         title: "Profile updated",
         description: "Profile picture removed successfully"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error removing image:', error);
       toast({
         title: "Error",
@@ -184,10 +184,10 @@ const Profile = () => {
         title: "Profile updated",
         description: "Your profile has been saved successfully"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to update profile",
+        description: error instanceof Error ? error.message : "Failed to update profile",
         variant: "destructive"
       });
     } finally {

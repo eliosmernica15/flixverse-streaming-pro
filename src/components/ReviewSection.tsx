@@ -16,19 +16,19 @@ interface ReviewSectionProps {
   contentPosterPath: string | null;
 }
 
-const StarRating = ({ 
-  rating, 
-  onRate, 
+const StarRating = ({
+  rating,
+  onRate,
   editable = false,
   size = 'md'
-}: { 
-  rating: number; 
+}: {
+  rating: number;
   onRate?: (rating: number) => void;
   editable?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }) => {
   const [hoverRating, setHoverRating] = useState(0);
-  
+
   const sizeClasses = {
     sm: 'w-4 h-4',
     md: 'w-5 h-5',
@@ -40,7 +40,7 @@ const StarRating = ({
       {[1, 2, 3, 4, 5].map((star) => {
         const displayRating = Math.ceil((hoverRating || rating) / 2);
         const isFilled = star <= displayRating;
-        
+
         return (
           <button
             key={star}
@@ -51,12 +51,11 @@ const StarRating = ({
             onMouseLeave={() => editable && setHoverRating(0)}
             disabled={!editable}
           >
-            <Star 
-              className={`${sizeClasses[size]} ${
-                isFilled 
-                  ? 'text-yellow-400 fill-yellow-400' 
+            <Star
+              className={`${sizeClasses[size]} ${isFilled
+                  ? 'text-yellow-400 fill-yellow-400'
                   : 'text-gray-500'
-              }`} 
+                }`}
             />
           </button>
         );
@@ -66,8 +65,8 @@ const StarRating = ({
   );
 };
 
-const ReviewCard = ({ 
-  review, 
+const ReviewCard = ({
+  review,
   isOwner,
   onEdit,
   onDelete,
@@ -75,8 +74,8 @@ const ReviewCard = ({
   isLiked,
   isLiking,
   isAuthenticated
-}: { 
-  review: Review; 
+}: {
+  review: Review;
   isOwner: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -89,7 +88,7 @@ const ReviewCard = ({
     const date = new Date(dateString);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
+
     if (seconds < 60) return 'just now';
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -111,7 +110,7 @@ const ReviewCard = ({
             <User className="w-5 h-5 text-white" />
           </AvatarFallback>
         </Avatar>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center space-x-2">
@@ -135,22 +134,21 @@ const ReviewCard = ({
               </div>
             )}
           </div>
-          
+
           <StarRating rating={review.rating} size="sm" />
-          
+
           <p className="text-gray-300 mt-2 text-sm leading-relaxed">
             {review.review_text}
           </p>
-          
+
           <div className="flex items-center space-x-4 mt-3">
-            <button 
+            <button
               onClick={onLike}
               disabled={isLiking || !isAuthenticated}
-              className={`flex items-center space-x-1 transition-colors text-sm ${
-                isLiked 
-                  ? 'text-red-400 hover:text-red-300' 
+              className={`flex items-center space-x-1 transition-colors text-sm ${isLiked
+                  ? 'text-red-400 hover:text-red-300'
                   : 'text-gray-400 hover:text-white'
-              } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''} ${isLiking ? 'opacity-50' : ''}`}
+                } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''} ${isLiking ? 'opacity-50' : ''}`}
             >
               <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
               <span>{review.likes_count}</span>
@@ -174,7 +172,7 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
   const [submitting, setSubmitting] = useState(false);
   const [likedReviews, setLikedReviews] = useState<Set<string>>(new Set());
   const [likingReviews, setLikingReviews] = useState<Set<string>>(new Set());
-  
+
   const { reviews, userReview, loading, addReview, updateReview, deleteReview, likeReview, hasUserLikedReview, getAverageRating } = useReviews(contentId, contentType);
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -183,7 +181,7 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
   useEffect(() => {
     const checkLikedReviews = async () => {
       if (!isAuthenticated || reviews.length === 0) return;
-      
+
       const likedSet = new Set<string>();
       for (const review of reviews) {
         const isLiked = await hasUserLikedReview(review.id);
@@ -193,7 +191,7 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
       }
       setLikedReviews(likedSet);
     };
-    
+
     checkLikedReviews();
   }, [reviews, isAuthenticated, hasUserLikedReview]);
 
@@ -208,7 +206,7 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
     }
 
     setLikingReviews(prev => new Set(prev).add(reviewId));
-    
+
     try {
       const isNowLiked = await likeReview(reviewId);
       setLikedReviews(prev => {
@@ -220,10 +218,10 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
         }
         return newSet;
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to like review",
+        description: error instanceof Error ? error.message : "Failed to like review",
         variant: "destructive"
       });
     } finally {
@@ -273,10 +271,10 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
       setIsEditing(false);
       setRating(0);
       setReviewText('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to submit review",
+        description: error instanceof Error ? error.message : "Failed to submit review",
         variant: "destructive"
       });
     } finally {
@@ -286,17 +284,17 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
 
   const handleDeleteReview = async () => {
     if (!userReview) return;
-    
+
     try {
       await deleteReview(userReview.id);
       toast({
         title: "Review deleted",
         description: "Your review has been removed"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete review",
+        description: error instanceof Error ? error.message : "Failed to delete review",
         variant: "destructive"
       });
     }
@@ -325,7 +323,7 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
               <span className="text-gray-400">({reviews.length} reviews)</span>
             </div>
           </div>
-          
+
           {isAuthenticated && !userReview && !showWriteReview && (
             <Button
               onClick={() => setShowWriteReview(true)}
@@ -350,12 +348,12 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
                 <h3 className="text-lg font-semibold text-white mb-4">
                   {isEditing ? 'Edit Your Review' : 'Write a Review'}
                 </h3>
-                
+
                 <div className="mb-4">
                   <label className="text-sm text-gray-400 mb-2 block">Your Rating</label>
                   <StarRating rating={rating} onRate={setRating} editable size="lg" />
                 </div>
-                
+
                 <div className="mb-4">
                   <label className="text-sm text-gray-400 mb-2 block">Your Review</label>
                   <Textarea
@@ -365,7 +363,7 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
                     className="bg-white/5 border-white/10 text-white min-h-[120px] resize-none"
                   />
                 </div>
-                
+
                 <div className="flex items-center space-x-3">
                   <Button
                     onClick={handleSubmitReview}

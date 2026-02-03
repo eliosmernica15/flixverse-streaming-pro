@@ -13,6 +13,13 @@ interface ImageCropperProps {
     aspect?: number;
 }
 
+interface Area {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 const ImageCropper = ({
     imageSrc,
     open,
@@ -22,7 +29,7 @@ const ImageCropper = ({
 }: ImageCropperProps) => {
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
     const [loading, setLoading] = useState(false);
 
     const onCropChange = (crop: { x: number; y: number }) => {
@@ -33,7 +40,7 @@ const ImageCropper = ({
         setZoom(zoom);
     };
 
-    const onCropCompleteCallback = useCallback((croppedArea: any, croppedAreaPixels: any) => {
+    const onCropCompleteCallback = useCallback((croppedArea: Area, croppedAreaPixels: Area) => {
         setCroppedAreaPixels(croppedAreaPixels);
     }, []);
 

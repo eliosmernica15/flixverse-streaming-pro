@@ -60,10 +60,10 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
         title: "Added to list",
         description: `${title} has been added to your list`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Something went wrong",
+        description: error instanceof Error ? error.message : "Something went wrong",
         variant: "destructive",
       });
     }

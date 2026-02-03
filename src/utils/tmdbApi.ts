@@ -97,13 +97,13 @@ const isDev = process.env.NODE_ENV === 'development';
 
 // In-memory cache for API responses
 interface CacheEntry {
-  data: any;
+  data: unknown;
   timestamp: number;
   expiresAt: number;
 }
 
 const apiCache = new Map<string, CacheEntry>();
-const pendingRequests = new Map<string, Promise<any>>();
+const pendingRequests = new Map<string, Promise<unknown>>();
 
 // Cache TTL in milliseconds
 const CACHE_TTL_LIST = 5 * 60 * 1000; // 5 minutes for list endpoints
@@ -119,7 +119,7 @@ const getCacheTTL = (url: string): number => {
   return CACHE_TTL_LIST;
 };
 
-const getCachedResponse = (url: string): any | null => {
+const getCachedResponse = (url: string): unknown | null => {
   const cached = apiCache.get(url);
   if (cached && Date.now() < cached.expiresAt) {
     if (isDev) console.log(`Cache hit: ${url}`);
@@ -131,7 +131,7 @@ const getCachedResponse = (url: string): any | null => {
   return null;
 };
 
-const setCachedResponse = (url: string, data: any): void => {
+const setCachedResponse = (url: string, data: unknown): void => {
   const ttl = getCacheTTL(url);
   apiCache.set(url, {
     data,
@@ -282,7 +282,7 @@ export const fetchAdventureMovies = async (): Promise<TMDBMovie[]> => {
 // TV Show endpoints
 export const fetchTrendingTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/trending/tv/week`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -291,7 +291,7 @@ export const fetchTrendingTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchPopularTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/tv/popular`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -300,7 +300,7 @@ export const fetchPopularTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchTopRatedTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/tv/top_rated`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -309,7 +309,7 @@ export const fetchTopRatedTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchAiringTodayTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/tv/airing_today`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -318,7 +318,7 @@ export const fetchAiringTodayTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchOnTheAirTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/tv/on_the_air`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -331,7 +331,7 @@ export const fetchUpcomingTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(
     `${TMDB_BASE_URL}/discover/tv?first_air_date.gte=${today}&sort_by=first_air_date.asc`
   );
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date,
@@ -342,7 +342,7 @@ export const fetchUpcomingTVShows = async (): Promise<TMDBMovie[]> => {
 // Genre-based TV show fetching
 export const fetchActionTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/discover/tv?with_genres=10759&sort_by=popularity.desc`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -351,7 +351,7 @@ export const fetchActionTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchComedyTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/discover/tv?with_genres=35&sort_by=popularity.desc`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -360,7 +360,7 @@ export const fetchComedyTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchDramaTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/discover/tv?with_genres=18&sort_by=popularity.desc`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -369,7 +369,7 @@ export const fetchDramaTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchSciFiTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/discover/tv?with_genres=10765&sort_by=popularity.desc`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -378,7 +378,7 @@ export const fetchSciFiTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchCrimeTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/discover/tv?with_genres=80&sort_by=popularity.desc`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -387,7 +387,7 @@ export const fetchCrimeTVShows = async (): Promise<TMDBMovie[]> => {
 
 export const fetchDocumentaryTVShows = async (): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/discover/tv?with_genres=99&sort_by=popularity.desc`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -480,7 +480,7 @@ export const fetchMovieRecommendations = async (movieId: number): Promise<TMDBMo
 
 export const fetchTVShowRecommendations = async (tvId: number): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/tv/${tvId}/recommendations`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -522,7 +522,7 @@ export const fetchSimilarMovies = async (movieId: number): Promise<TMDBMovie[]> 
 
 export const fetchSimilarTVShows = async (tvId: number): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/tv/${tvId}/similar`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -548,7 +548,7 @@ export const discoverMoviesByGenre = async (genreId: number, page: number = 1): 
 
 export const discoverTVShowsByGenre = async (genreId: number, page: number = 1): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/discover/tv?with_genres=${genreId}&page=${page}&sort_by=popularity.desc`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date
@@ -563,7 +563,7 @@ export const searchMovies = async (query: string, page: number = 1): Promise<TMD
 
 export const searchTVShows = async (query: string, page: number = 1): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(query)}&page=${page}`);
-  return (data.results || []).map((show: any) => ({
+  return (data.results || []).map((show: TMDBMovie) => ({
     ...show,
     title: show.name,
     release_date: show.first_air_date,
@@ -571,9 +571,9 @@ export const searchTVShows = async (query: string, page: number = 1): Promise<TM
   }));
 };
 
-export const searchMulti = async (query: string, page: number = 1): Promise<any[]> => {
+export const searchMulti = async (query: string, page: number = 1): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=${page}`);
-  return (data.results || []).map((item: any) => ({
+  return (data.results || []).map((item: TMDBMovie) => ({
     ...item,
     title: item.title || item.name,
     release_date: item.release_date || item.first_air_date
@@ -581,7 +581,7 @@ export const searchMulti = async (query: string, page: number = 1): Promise<any[
 };
 
 export interface SearchMultiResponse {
-  results: any[];
+  results: TMDBMovie[];
   page: number;
   total_pages: number;
   total_results: number;
@@ -594,7 +594,7 @@ export const searchMultiWithPagination = async (
   const data = await apiCall(
     `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=${page}`
   );
-  const results = (data.results || []).map((item: any) => ({
+  const results = (data.results || []).map((item: TMDBMovie) => ({
     ...item,
     media_type: item.media_type || (item.title ? "movie" : "tv"),
     title: item.title || item.name,
@@ -609,9 +609,9 @@ export const searchMultiWithPagination = async (
 };
 
 // Trending content by time window
-export const fetchTrendingAll = async (timeWindow: 'day' | 'week' = 'week'): Promise<any[]> => {
+export const fetchTrendingAll = async (timeWindow: 'day' | 'week' = 'week'): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/trending/all/${timeWindow}`);
-  return (data.results || []).map((item: any) => ({
+  return (data.results || []).map((item: TMDBMovie) => ({
     ...item,
     title: item.title || item.name,
     release_date: item.release_date || item.first_air_date
@@ -694,7 +694,7 @@ export const getPlaceholderProfile = (): string => {
 };
 
 // Utility function to get the appropriate image for any content type
-export const getContentImage = (item: any, imageType: 'poster' | 'backdrop' | 'profile' = 'poster', size: 'small' | 'medium' | 'large' | 'original' = 'medium'): string => {
+export const getContentImage = (item: TMDBMovie | any, imageType: 'poster' | 'backdrop' | 'profile' = 'poster', size: 'small' | 'medium' | 'large' | 'original' = 'medium'): string => {
   if (imageType === 'poster' && item.poster_path) {
     return getImageUrl(item.poster_path, size);
   }
