@@ -1,11 +1,13 @@
-import { useState, useRef, useCallback, memo } from "react";
+"use client";
+
+import { useState, useRef, useCallback, memo, useEffect } from "react";
 import { Play, Star, Heart, Film, Tv, Plus, Info, Clock } from "lucide-react";
 import { getImageUrl, getPlaceholderImage, TMDBMovie, getContentTitle, getContentReleaseDate, getContentType } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, useMotionTemplate } from "framer-motion";
 import { useRouter } from "next/navigation";
 
 interface MovieCardProps {
@@ -37,6 +39,20 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   const [isInLocalList, setIsInLocalList] = useState(false);
   const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
   const router = useRouter();
+
+  // Motion values for 3D effect
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  const rotateXSpring = useSpring(mouseY, { stiffness: 300, damping: 30 });
+  const rotateYSpring = useSpring(mouseX, { stiffness: 300, damping: 30 });
+
+  const rotateX = useTransform(rotateXSpring, [-0.5, 0.5], [10, -10]);
+  const rotateY = useTransform(rotateYSpring, [-0.5, 0.5], [-10, 10]);
+
+  const shineX = useTransform(mouseX, [-0.5, 0.5], [0, 100]);
+  const shineY = useTransform(mouseY, [-0.5, 0.5], [0, 100]);
+  const shineBackground = useMotionTemplate`radial-gradient(circle at ${shineX}% ${shineY}%, rgba(255,255,255,0.2) 0%, transparent 60%)`;
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -226,9 +242,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
           <motion.div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: isHovered
-                ? `radial-gradient(circle at ${shineX.get()}% ${shineY.get()}%, rgba(255,255,255,0.2) 0%, transparent 60%)`
-                : 'none',
+              background: shineBackground,
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: isHovered ? 1 : 0 }}
