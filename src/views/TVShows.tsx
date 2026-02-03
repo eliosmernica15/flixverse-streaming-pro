@@ -111,7 +111,6 @@ const TVShows = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <Navigation />
         <div className="text-center">
           <div className="relative mb-6">
             <div className="w-16 h-16 border-4 border-red-500/30 border-t-red-500 rounded-full animate-spin"></div>

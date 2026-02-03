@@ -114,62 +114,33 @@ export const useNotifications = () => {
 
   const sendNotification = (title: string, options?: NotificationOptions) => {
     if (!hasPermission) {
-      console.warn('Notification permission not granted');
+      console.log('Notification permission not granted');
       return;
     }
 
     if (!preferences.allNotifications) {
-      console.log('All notifications are disabled by user preference');
+      console.log('All notifications are disabled');
       return;
     }
 
     try {
-      // Check if service worker registration is available (for mobile support)
-      if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
-        navigator.serviceWorker.ready.then(registration => {
-          registration.showNotification(title, {
-            icon: '/favicon.ico',
-            badge: '/favicon.ico',
-            tag: 'flixverse-notification',
-            requireInteraction: false,
-            data: { url: window.location.href },
-            ...options,
-          });
-        }).catch(e => {
-          // Fallback to standard API
-          createStandardNotification(title, options);
-        });
-      } else {
-        createStandardNotification(title, options);
-      }
+      const notification = new Notification(title, {
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: 'flixverse-notification',
+        requireInteraction: false,
+        ...options,
+      });
+
+      // Auto close after 5 seconds
+      setTimeout(() => {
+        notification.close();
+      }, 5000);
+
+      console.log('Notification sent:', title);
     } catch (error) {
       console.error('Error sending notification:', error);
-      toast({
-        title: "Notification Error",
-        description: "Failed to send notification",
-        variant: "destructive",
-      });
     }
-  };
-
-  const createStandardNotification = (title: string, options?: NotificationOptions) => {
-    const notification = new Notification(title, {
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
-      tag: 'flixverse-notification',
-      requireInteraction: false,
-      ...options,
-    });
-
-    // Auto close after 5 seconds
-    setTimeout(() => {
-      notification.close();
-    }, 5000);
-
-    notification.onclick = function () {
-      window.focus();
-      notification.close();
-    };
   };
 
   // Test notification function

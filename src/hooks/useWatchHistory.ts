@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -14,35 +14,10 @@ import { db } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { WatchHistory } from '@/integrations/firebase/types';
 
-// Debounce helper for progress updates
-const createDebouncer = (delay: number) => {
-  let timeoutId: NodeJS.Timeout | null = null;
-  return (fn: () => void) => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(fn, delay);
-  };
-};
-
 export const useWatchHistory = () => {
   const [history, setHistory] = useState<WatchHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
-
-  // Debounce ref for progress updates (5 second delay to reduce writes)
-  const progressDebouncer = useRef(createDebouncer(5000));
-  const pendingUpdates = useRef<Map<string, () => Promise<void>>>(new Map());
-
-  // Memoized map for O(1) history lookup
-  const historyMap = useMemo(() => {
-    const map = new Map<string, WatchHistory>();
-    history.forEach(h => {
-      const key = h.season && h.episode
-        ? `${h.content_id}_s${h.season}e${h.episode}`
-        : `${h.content_id}`;
-      map.set(key, h);
-    });
-    return map;
-  }, [history]);
 
   // Fetch watch history for the current user
   useEffect(() => {
@@ -74,8 +49,8 @@ export const useWatchHistory = () => {
     return () => unsubscribe();
   }, [user]);
 
-  // Debounced progress update to reduce Firebase writes
-  const updateProgress = useCallback(async (
+  // Update or add watch progress
+  const updateProgress = async (
     contentId: number,
     contentType: 'movie' | 'tv',
     contentTitle: string,
@@ -94,52 +69,35 @@ export const useWatchHistory = () => {
       ? `${user.uid}_${contentId}_s${season}e${episode}`
       : `${user.uid}_${contentId}`;
 
+    const historyRef = doc(db, 'watch_history', historyId);
+
     const completed = progressSeconds >= totalDurationSeconds * 0.9; // 90% watched = completed
 
-    const updateFn = async () => {
-      const historyRef = doc(db, 'watch_history', historyId);
-      await setDoc(historyRef, {
-        id: historyId,
-        user_id: user.uid,
-        content_id: contentId,
-        content_type: contentType,
-        content_title: contentTitle,
-        content_poster_path: contentPosterPath,
-        season: season || null,
-        episode: episode || null,
-        progress_seconds: progressSeconds,
-        total_duration_seconds: totalDurationSeconds,
-        completed,
-        watched_at: new Date().toISOString()
-      }, { merge: true });
-    };
+    await setDoc(historyRef, {
+      id: historyId,
+      user_id: user.uid,
+      content_id: contentId,
+      content_type: contentType,
+      content_title: contentTitle,
+      content_poster_path: contentPosterPath,
+      season: season || null,
+      episode: episode || null,
+      progress_seconds: progressSeconds,
+      total_duration_seconds: totalDurationSeconds,
+      completed,
+      watched_at: new Date().toISOString()
+    }, { merge: true });
+  };
 
-    // Store pending update
-    pendingUpdates.current.set(historyId, updateFn);
-
-    // If completed, update immediately
-    if (completed) {
-      await updateFn();
-      pendingUpdates.current.delete(historyId);
-    } else {
-      // Otherwise debounce the update
-      progressDebouncer.current(() => {
-        const pending = pendingUpdates.current.get(historyId);
-        if (pending) {
-          pending().catch(console.error);
-          pendingUpdates.current.delete(historyId);
-        }
-      });
+  // Get progress for a specific content
+  const getProgress = (contentId: number, season?: number, episode?: number): WatchHistory | undefined => {
+    if (season && episode) {
+      return history.find(
+        h => h.content_id === contentId && h.season === season && h.episode === episode
+      );
     }
-  }, [user]);
-
-  // Optimized progress lookup using memoized map - O(1)
-  const getProgress = useCallback((contentId: number, season?: number, episode?: number): WatchHistory | undefined => {
-    const key = season && episode
-      ? `${contentId}_s${season}e${episode}`
-      : `${contentId}`;
-    return historyMap.get(key);
-  }, [historyMap]);
+    return history.find(h => h.content_id === contentId && !h.season);
+  };
 
   // Remove from history
   const removeFromHistory = async (historyId: string) => {

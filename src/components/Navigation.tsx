@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Bell, User, LogOut, Menu, X, Sparkles, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -24,34 +24,19 @@ import { motion, AnimatePresence } from "framer-motion";
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const scrollRAF = useRef<number | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, signOut } = useAuth();
   const { profile } = useUserProfile();
   const { toast } = useToast();
 
-  // Optimized scroll handler with requestAnimationFrame throttling
-  const handleScroll = useCallback(() => {
-    if (scrollRAF.current) return;
-
-    scrollRAF.current = requestAnimationFrame(() => {
-      setIsScrolled(window.scrollY > 20);
-      scrollRAF.current = null;
-    });
-  }, []);
-
   useEffect(() => {
-    // Use passive event listener for better scroll performance
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (scrollRAF.current) {
-        cancelAnimationFrame(scrollRAF.current);
-      }
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
     };
-  }, [handleScroll]);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleMovieSelect = (movie: TMDBMovie) => {
     const type = getContentType(movie);
@@ -93,7 +78,7 @@ const Navigation = () => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 will-animate-transform ${isScrolled || isMobileMenuOpen
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${isScrolled
           ? 'glass-premium shadow-2xl shadow-black/40'
           : 'bg-gradient-to-b from-black/90 via-black/50 to-transparent'
           }`}
@@ -302,9 +287,9 @@ const Navigation = () => {
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="md:hidden overflow-hidden bg-black/95 backdrop-blur-3xl border-t border-white/10 absolute top-full left-0 right-0 shadow-2xl shadow-black/80"
+                className="md:hidden overflow-hidden"
               >
-                <div className="py-4 space-y-2">
+                <div className="py-4 space-y-2 border-t border-white/10">
                   {/* Mobile Search */}
                   <div className="px-2 py-2">
                     <SearchBar onMovieSelect={handleMovieSelect} />
@@ -320,12 +305,8 @@ const Navigation = () => {
                     >
                       <Link
                         href={link.path}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setIsMobileMenuOpen(false);
-                          router.push(link.path);
-                        }}
-                        className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-300 cursor-pointer ${isActive(link.path)
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-300 ${isActive(link.path)
                           ? 'text-white bg-gradient-to-r from-red-500/20 to-orange-500/10 border-l-2 border-red-500'
                           : 'text-gray-400 hover:text-white hover:bg-white/5'
                           }`}

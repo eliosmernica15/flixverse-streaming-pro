@@ -95,16 +95,13 @@ export interface TMDBGenre {
 
 const isDev = process.env.NODE_ENV === 'development';
 
-// In-memory cache for API responses with LRU eviction
+// In-memory cache for API responses
 interface CacheEntry {
   data: unknown;
   timestamp: number;
   expiresAt: number;
-  accessCount: number;
 }
 
-// Maximum cache entries to prevent memory bloat
-const MAX_CACHE_SIZE = 100;
 const apiCache = new Map<string, CacheEntry>();
 const pendingRequests = new Map<string, Promise<unknown>>();
 
@@ -122,43 +119,9 @@ const getCacheTTL = (url: string): number => {
   return CACHE_TTL_LIST;
 };
 
-// LRU eviction - remove least accessed entries when cache is full
-const evictLRU = (): void => {
-  if (apiCache.size <= MAX_CACHE_SIZE) return;
-
-  // Find entries to remove (oldest or least accessed)
-  const entries = Array.from(apiCache.entries());
-  entries.sort((a, b) => {
-    // Prioritize removing expired entries
-    const now = Date.now();
-    const aExpired = a[1].expiresAt < now;
-    const bExpired = b[1].expiresAt < now;
-    if (aExpired && !bExpired) return -1;
-    if (!aExpired && bExpired) return 1;
-
-    // Then by access count (ascending)
-    if (a[1].accessCount !== b[1].accessCount) {
-      return a[1].accessCount - b[1].accessCount;
-    }
-
-    // Finally by timestamp (oldest first)
-    return a[1].timestamp - b[1].timestamp;
-  });
-
-  // Remove bottom 20% of entries
-  const removeCount = Math.ceil(MAX_CACHE_SIZE * 0.2);
-  for (let i = 0; i < removeCount && i < entries.length; i++) {
-    apiCache.delete(entries[i][0]);
-  }
-
-  if (isDev) console.log(`Cache eviction: removed ${removeCount} entries, size now ${apiCache.size}`);
-};
-
 const getCachedResponse = (url: string): unknown | null => {
   const cached = apiCache.get(url);
   if (cached && Date.now() < cached.expiresAt) {
-    // Increment access count for LRU tracking
-    cached.accessCount++;
     if (isDev) console.log(`Cache hit: ${url}`);
     return cached.data;
   }
@@ -169,15 +132,11 @@ const getCachedResponse = (url: string): unknown | null => {
 };
 
 const setCachedResponse = (url: string, data: unknown): void => {
-  // Evict old entries if cache is too large
-  evictLRU();
-
   const ttl = getCacheTTL(url);
   apiCache.set(url, {
     data,
     timestamp: Date.now(),
-    expiresAt: Date.now() + ttl,
-    accessCount: 1
+    expiresAt: Date.now() + ttl
   });
 };
 

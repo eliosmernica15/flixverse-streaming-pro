@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, memo, useEffect, useMemo } from "react";
+import { useState, useRef, useCallback, memo, useEffect } from "react";
 import { Play, Star, Heart, Film, Tv, Plus, Info, Clock } from "lucide-react";
 import { getImageUrl, getPlaceholderImage, TMDBMovie, getContentTitle, getContentReleaseDate, getContentType } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
@@ -9,24 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, useMotionTemplate } from "framer-motion";
 import { useRouter } from "next/navigation";
-
-// Detect if reduced motion is preferred or on mobile
-const useReducedMotion = () => {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setPrefersReducedMotion(mediaQuery.matches);
-    setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
-
-    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, []);
-
-  return prefersReducedMotion || isMobile;
-};
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -58,24 +40,19 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
   const router = useRouter();
 
-  const shouldReduceMotion = useReducedMotion();
-
-  // Motion values for 3D effect - only compute if not reducing motion
+  // Motion values for 3D effect
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  // Use lighter spring settings for better performance
-  const springConfig = useMemo(() => ({ stiffness: 200, damping: 25 }), []);
-  const rotateXSpring = useSpring(mouseY, springConfig);
-  const rotateYSpring = useSpring(mouseX, springConfig);
+  const rotateXSpring = useSpring(mouseY, { stiffness: 300, damping: 30 });
+  const rotateYSpring = useSpring(mouseX, { stiffness: 300, damping: 30 });
 
-  // Reduced rotation angles for subtler, smoother effect
-  const rotateX = useTransform(rotateXSpring, [-0.5, 0.5], [6, -6]);
-  const rotateY = useTransform(rotateYSpring, [-0.5, 0.5], [-6, 6]);
+  const rotateX = useTransform(rotateXSpring, [-0.5, 0.5], [10, -10]);
+  const rotateY = useTransform(rotateYSpring, [-0.5, 0.5], [-10, 10]);
 
   const shineX = useTransform(mouseX, [-0.5, 0.5], [0, 100]);
   const shineY = useTransform(mouseY, [-0.5, 0.5], [0, 100]);
-  const shineBackground = useMotionTemplate`radial-gradient(circle at ${shineX}% ${shineY}%, rgba(255,255,255,0.15) 0%, transparent 50%)`;
+  const shineBackground = useMotionTemplate`radial-gradient(circle at ${shineX}% ${shineY}%, rgba(255,255,255,0.2) 0%, transparent 60%)`;
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -193,51 +170,42 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
     return 'from-red-500 to-orange-500';
   };
 
-  // Animation delay capped for performance
-  const animationDelay = Math.min(index * 0.03, 0.3);
-
   return (
     <motion.div
       ref={cardRef}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.4,
-        delay: animationDelay,
-        ease: [0.25, 0.46, 0.45, 0.94]
-      }}
-      className={`relative group cursor-pointer ${!shouldReduceMotion ? 'gpu-accelerated' : ''}`}
-      style={{ perspective: shouldReduceMotion ? undefined : 1000 }}
-      onMouseEnter={() => !shouldReduceMotion && setIsHovered(true)}
-      onMouseMove={shouldReduceMotion ? undefined : handleMouseMove}
+      transition={{ duration: 0.5, delay: index * 0.04, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="relative group cursor-pointer"
+      style={{ perspective: 1200 }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={handleCardClick}
     >
-      {/* Card Container with 3D Tilt - disabled on mobile for performance */}
+      {/* Card Container with 3D Tilt */}
       <motion.div
-        className="relative overflow-hidden rounded-2xl bg-gray-900/50 will-animate-transform"
+        className="relative overflow-hidden rounded-2xl bg-gray-900/50"
         style={{
-          rotateX: !shouldReduceMotion && isHovered ? rotateX : 0,
-          rotateY: !shouldReduceMotion && isHovered ? rotateY : 0,
-          transformStyle: shouldReduceMotion ? undefined : 'preserve-3d',
+          rotateX: isHovered ? rotateX : 0,
+          rotateY: isHovered ? rotateY : 0,
+          transformStyle: 'preserve-3d',
         }}
-        whileHover={shouldReduceMotion ? { scale: 1.02 } : { scale: 1.04, zIndex: 20 }}
-        transition={{ type: "spring", stiffness: 250, damping: 25 }}
+        whileHover={{ scale: 1.04, zIndex: 20 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
-        {/* Dynamic glow effect - Only visible on desktop/hover */}
-        {!shouldReduceMotion && (
-          <motion.div
-            className="absolute -inset-2 rounded-2xl blur-xl"
-            style={{
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(168, 85, 247, 0.3), rgba(59, 130, 246, 0.4))',
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: isHovered ? 1 : 0 }}
-            transition={{ duration: 0.4 }}
-          />
-        )}
+        {/* Dynamic glow effect */}
+        <motion.div
+          className="absolute -inset-2 rounded-2xl blur-xl"
+          style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(168, 85, 247, 0.3), rgba(59, 130, 246, 0.4))',
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isHovered ? 1 : 0 }}
+          transition={{ duration: 0.4 }}
+        />
 
-        {/* Card border glow - Optimized */}
+        {/* Card border glow */}
         <motion.div
           className="absolute inset-0 rounded-2xl"
           style={{
@@ -266,26 +234,24 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
             onError={handleImageError}
             onLoad={() => setImageLoaded(true)}
             initial={{ scale: 1 }}
-            animate={{ scale: isHovered && !shouldReduceMotion ? 1.08 : 1 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            animate={{ scale: isHovered ? 1.12 : 1 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
           />
 
-          {/* Shine effect overlay - Desktop only */}
-          {!shouldReduceMotion && (
-            <motion.div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: shineBackground,
-              }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: isHovered ? 1 : 0 }}
-              transition={{ duration: 0.3 }}
-            />
-          )}
+          {/* Shine effect overlay */}
+          <motion.div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: shineBackground,
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: isHovered ? 1 : 0 }}
+            transition={{ duration: 0.3 }}
+          />
 
-          {/* Sweep shine animation - Desktop only */}
+          {/* Sweep shine animation */}
           <AnimatePresence>
-            {!shouldReduceMotion && isHovered && (
+            {isHovered && (
               <motion.div
                 className="absolute inset-0 pointer-events-none overflow-hidden"
                 initial={{ opacity: 0 }}

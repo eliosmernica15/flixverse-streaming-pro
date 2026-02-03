@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Server, ArrowLeft, Maximize2, Minimize2, MonitorPlay, Tv, Film, RefreshCw, AlertTriangle } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,8 +28,8 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
   const { updateProgress } = useWatchHistory();
   const { toast } = useToast();
 
-  // Build streaming sources with proper TMDB ID format - Memoized to prevent recreation
-  const streamingSources = useMemo(() => [
+  // Build streaming sources with proper TMDB ID format
+  const streamingSources = [
     {
       name: "VidSrc Pro",
       icon: "🎬",
@@ -87,7 +86,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
         ? `https://player.smashy.stream/tv/${movieId}?s=${season}&e=${episode}`
         : `https://player.smashy.stream/movie/${movieId}`
     },
-  ], [movieId, mediaType, season, episode]);
+  ];
 
   const currentSource = streamingSources[currentServer];
 
@@ -235,51 +234,43 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
                     <span className="text-base sm:text-lg">{currentSource.icon}</span>
                   </button>
 
-                  <AnimatePresence>
-                    {showServerSelector && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setShowServerSelector(false)} />
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                          transition={{ duration: 0.2 }}
-                          className="absolute top-full right-0 mt-2 w-56 sm:w-72 max-h-[70vh] overflow-y-auto bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl z-20 shadow-2xl shadow-black/50"
-                        >
-                          <div className="p-2 sm:p-3 bg-gradient-to-r from-red-500/10 to-transparent border-b border-white/5 sticky top-0 bg-gray-900/98">
-                            <div className="flex items-center space-x-2">
-                              <MonitorPlay className="w-4 h-4 text-red-400" />
-                              <span className="text-xs sm:text-sm font-semibold text-white">Select Server</span>
-                            </div>
+                  {showServerSelector && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowServerSelector(false)} />
+                      <div className="absolute top-full right-0 mt-2 w-56 sm:w-72 max-h-[70vh] overflow-y-auto bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl z-20 shadow-2xl shadow-black/50 animate-scale-in">
+                        <div className="p-2 sm:p-3 bg-gradient-to-r from-red-500/10 to-transparent border-b border-white/5 sticky top-0 bg-gray-900/98">
+                          <div className="flex items-center space-x-2">
+                            <MonitorPlay className="w-4 h-4 text-red-400" />
+                            <span className="text-xs sm:text-sm font-semibold text-white">Select Server</span>
                           </div>
-                          <div className="p-1 sm:p-2">
-                            {streamingSources.map((source, index) => (
-                              <button
-                                key={index}
-                                onClick={() => {
-                                  setCurrentServer(index);
-                                  setShowServerSelector(false);
-                                }}
-                                className={`w-full flex items-center space-x-2 sm:space-x-3 px-2 sm:px-3 py-2 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all ${currentServer === index
+                        </div>
+                        <div className="p-1 sm:p-2">
+                          {streamingSources.map((source, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                setCurrentServer(index);
+                                setShowServerSelector(false);
+                              }}
+                              className={`w-full flex items-center space-x-2 sm:space-x-3 px-2 sm:px-3 py-2 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all ${currentServer === index
                                   ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20'
                                   : 'text-gray-300 hover:bg-white/10'
-                                  }`}
-                              >
-                                <span className="text-lg sm:text-xl">{source.icon}</span>
-                                <span className="font-medium flex-1 text-left">{source.name}</span>
-                                {currentServer === index && (
-                                  <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="p-2 sm:p-3 bg-black/30 border-t border-white/5 sticky bottom-0">
-                            <p className="text-[10px] sm:text-xs text-gray-500 text-center">Switch server if video doesn't load</p>
-                          </div>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
+                                }`}
+                            >
+                              <span className="text-lg sm:text-xl">{source.icon}</span>
+                              <span className="font-medium flex-1 text-left">{source.name}</span>
+                              {currentServer === index && (
+                                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="p-2 sm:p-3 bg-black/30 border-t border-white/5 sticky bottom-0">
+                          <p className="text-[10px] sm:text-xs text-gray-500 text-center">Switch server if video doesn't load</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Theater Mode Toggle */}

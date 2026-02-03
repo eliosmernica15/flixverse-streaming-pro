@@ -19,31 +19,8 @@ const ContinueWatching = () => {
 
   const continueWatchingItems = getContinueWatching();
 
-  if (!isAuthenticated || continueWatchingItems.length === 0 && !loading) {
+  if (!isAuthenticated || loading || continueWatchingItems.length === 0) {
     return null;
-  }
-
-  if (loading) {
-    return (
-      <div className="mb-10 content-lazy">
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="p-2.5 bg-white/5 rounded-xl border border-white/5">
-            <div className="w-5 h-5 rounded-full skeleton-shimmer-gpu" />
-          </div>
-          <div>
-            <div className="h-8 w-48 rounded-lg skeleton-shimmer-gpu mb-2" />
-            <div className="h-4 w-32 rounded skeleton-shimmer-gpu" />
-          </div>
-        </div>
-        <div className="flex space-x-4 overflow-hidden">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6 flex-shrink-0">
-              <div className="aspect-video rounded-xl bg-white/5 skeleton-shimmer-gpu border border-white/5" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
   }
 
   const formatProgress = (progress: number, total: number) => {
