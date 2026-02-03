@@ -206,7 +206,7 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
         delay: animationDelay,
         ease: [0.25, 0.46, 0.45, 0.94]
       }}
-      className="relative group cursor-pointer gpu-accelerated"
+      className={`relative group cursor-pointer ${!shouldReduceMotion ? 'gpu-accelerated' : ''}`}
       style={{ perspective: shouldReduceMotion ? undefined : 1000 }}
       onMouseEnter={() => !shouldReduceMotion && setIsHovered(true)}
       onMouseMove={shouldReduceMotion ? undefined : handleMouseMove}
@@ -224,18 +224,20 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
         whileHover={shouldReduceMotion ? { scale: 1.02 } : { scale: 1.04, zIndex: 20 }}
         transition={{ type: "spring", stiffness: 250, damping: 25 }}
       >
-        {/* Dynamic glow effect */}
-        <motion.div
-          className="absolute -inset-2 rounded-2xl blur-xl"
-          style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(168, 85, 247, 0.3), rgba(59, 130, 246, 0.4))',
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isHovered ? 1 : 0 }}
-          transition={{ duration: 0.4 }}
-        />
+        {/* Dynamic glow effect - Only visible on desktop/hover */}
+        {!shouldReduceMotion && (
+          <motion.div
+            className="absolute -inset-2 rounded-2xl blur-xl"
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(168, 85, 247, 0.3), rgba(59, 130, 246, 0.4))',
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: isHovered ? 1 : 0 }}
+            transition={{ duration: 0.4 }}
+          />
+        )}
 
-        {/* Card border glow */}
+        {/* Card border glow - Optimized */}
         <motion.div
           className="absolute inset-0 rounded-2xl"
           style={{
@@ -268,20 +270,22 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
             transition={{ duration: 0.5, ease: "easeOut" }}
           />
 
-          {/* Shine effect overlay */}
-          <motion.div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: shineBackground,
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: isHovered ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
-          />
+          {/* Shine effect overlay - Desktop only */}
+          {!shouldReduceMotion && (
+            <motion.div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: shineBackground,
+              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: isHovered ? 1 : 0 }}
+              transition={{ duration: 0.3 }}
+            />
+          )}
 
-          {/* Sweep shine animation */}
+          {/* Sweep shine animation - Desktop only */}
           <AnimatePresence>
-            {isHovered && (
+            {!shouldReduceMotion && isHovered && (
               <motion.div
                 className="absolute inset-0 pointer-events-none overflow-hidden"
                 initial={{ opacity: 0 }}
