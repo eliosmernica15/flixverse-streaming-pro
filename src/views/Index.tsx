@@ -89,6 +89,7 @@ const Index = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <Navigation />
         <motion.div
           className="text-center"
           initial={{ opacity: 0, scale: 0.9 }}
