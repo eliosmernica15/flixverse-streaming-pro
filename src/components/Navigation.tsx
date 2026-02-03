@@ -320,8 +320,12 @@ const Navigation = () => {
                     >
                       <Link
                         href={link.path}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-300 ${isActive(link.path)
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setIsMobileMenuOpen(false);
+                          router.push(link.path);
+                        }}
+                        className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-300 cursor-pointer ${isActive(link.path)
                           ? 'text-white bg-gradient-to-r from-red-500/20 to-orange-500/10 border-l-2 border-red-500'
                           : 'text-gray-400 hover:text-white hover:bg-white/5'
                           }`}
