@@ -141,6 +141,7 @@ const setCachedResponse = (url: string, data: unknown): void => {
 };
 
 // Enhanced API calls with caching, deduplication, and retry logic
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const apiCall = async (url: string, retries: number = 2): Promise<any> => {
   // Check cache first
   const cached = getCachedResponse(url);
@@ -694,6 +695,7 @@ export const getPlaceholderProfile = (): string => {
 };
 
 // Utility function to get the appropriate image for any content type
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getContentImage = (item: TMDBMovie | any, imageType: 'poster' | 'backdrop' | 'profile' = 'poster', size: 'small' | 'medium' | 'large' | 'original' = 'medium'): string => {
   if (imageType === 'poster' && item.poster_path) {
     return getImageUrl(item.poster_path, size);

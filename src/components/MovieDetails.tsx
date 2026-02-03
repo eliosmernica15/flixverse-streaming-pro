@@ -136,7 +136,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     };
     run();
     return () => { cancelled = true; };
-  }, [content?.id, content?.media_type, mediaType]);
+  }, [content, mediaType]);
 
   // No body scroll lock needed - component has its own scroll container
 
