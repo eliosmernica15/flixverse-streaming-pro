@@ -1,4 +1,6 @@
-const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+import { getEnv } from './env';
+
+const TMDB_API_KEY = getEnv('NEXT_PUBLIC_TMDB_API_KEY');
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces';
@@ -18,7 +20,7 @@ const options = {
   method: 'GET',
   headers: {
     accept: 'application/json',
-    Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN}`
+    Authorization: `Bearer ${getEnv('NEXT_PUBLIC_TMDB_ACCESS_TOKEN')}`
   }
 };
 
