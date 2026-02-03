@@ -34,28 +34,24 @@ const MovieCard = ({ movie, index = 0, comingSoon = false }: MovieCardProps) => 
   const { toast } = useToast();
   const { addToHistory, addFavoriteGenre } = useUserPreferences();
   const { isAuthenticated } = useAuth();
+  const [isInLocalList, setIsInLocalList] = useState(false);
   const { addToList, removeFromList, isInList, isOperating } = useUserMovieList();
   const router = useRouter();
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      try {
+        const myList = JSON.parse(localStorage.getItem('myMovieList') || '[]');
+        setIsInLocalList(myList.includes(movie.id));
+      } catch (e) {
+        console.error("Error reading local list:", e);
+      }
+    }
+  }, [isAuthenticated, movie.id]);
+
+  const isInMyList = isAuthenticated ? isInList(movie.id) : isInLocalList;
+
   // 3D Tilt effect values
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  // Spring config for smooth animation
-  const springConfig = { damping: 20, stiffness: 250 };
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [10, -10]), springConfig);
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-10, 10]), springConfig);
-
-  // Shine effect position
-  const shineX = useSpring(useTransform(mouseX, [-0.5, 0.5], [0, 100]), springConfig);
-  const shineY = useSpring(useTransform(mouseY, [-0.5, 0.5], [0, 100]), springConfig);
-
-  const isInMyList = isAuthenticated ? isInList(movie.id) : (() => {
-    const myList = JSON.parse(localStorage.getItem('myMovieList') || '[]');
-    return myList.includes(movie.id);
-  })();
-
-  // Handle mouse move for 3D tilt
   const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
 
