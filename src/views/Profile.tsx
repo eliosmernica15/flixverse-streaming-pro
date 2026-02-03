@@ -636,10 +636,10 @@ const Profile = () => {
                 animate={{ opacity: 1, y: 0 }}
               >
                 {[
-                  { label: 'Reviews', value: getStats().totalReviews, icon: MessageCircle, color: 'text-purple-400' },
-                  { label: 'Ratings', value: getStats().totalRatings, icon: Star, color: 'text-yellow-400' },
-                  { label: 'Comments', value: getStats().totalComments, icon: MessageCircle, color: 'text-blue-400' },
-                  { label: 'Watched', value: getStats().totalWatched, icon: Award, color: 'text-green-400' },
+                  { label: 'Reviews', value: getStats.totalReviews, icon: MessageCircle, color: 'text-purple-400' },
+                  { label: 'Ratings', value: getStats.totalRatings, icon: Star, color: 'text-yellow-400' },
+                  { label: 'Comments', value: getStats.totalComments, icon: MessageCircle, color: 'text-blue-400' },
+                  { label: 'Watched', value: getStats.totalWatched, icon: Award, color: 'text-green-400' },
                 ].map((stat) => (
                   <div key={stat.label} className="bg-white/5 rounded-lg p-3 border border-white/10 text-center">
                     <stat.icon className={`w-5 h-5 mx-auto mb-1 ${stat.color}`} />
