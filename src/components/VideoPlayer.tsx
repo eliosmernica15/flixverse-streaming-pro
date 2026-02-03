@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { X, Server, ArrowLeft, Maximize2, Minimize2, MonitorPlay, Tv, Film, RefreshCw, AlertTriangle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,65 +29,65 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
   const { updateProgress } = useWatchHistory();
   const { toast } = useToast();
 
-  // Build streaming sources with proper TMDB ID format
-  const streamingSources = [
-    { 
-      name: "VidSrc Pro", 
+  // Build streaming sources with proper TMDB ID format - Memoized to prevent recreation
+  const streamingSources = useMemo(() => [
+    {
+      name: "VidSrc Pro",
       icon: "🎬",
-      url: mediaType === "tv" && season && episode 
+      url: mediaType === "tv" && season && episode
         ? `https://vidsrc.xyz/embed/tv?tmdb=${movieId}&season=${season}&episode=${episode}`
-        : `https://vidsrc.xyz/embed/movie?tmdb=${movieId}` 
+        : `https://vidsrc.xyz/embed/movie?tmdb=${movieId}`
     },
-    { 
-      name: "VidLink", 
+    {
+      name: "VidLink",
       icon: "🔗",
-      url: mediaType === "tv" && season && episode 
+      url: mediaType === "tv" && season && episode
         ? `https://vidlink.pro/tv/${movieId}/${season}/${episode}`
-        : `https://vidlink.pro/movie/${movieId}` 
+        : `https://vidlink.pro/movie/${movieId}`
     },
-    { 
-      name: "VidSrc ICU", 
+    {
+      name: "VidSrc ICU",
       icon: "🎥",
-      url: mediaType === "tv" && season && episode 
+      url: mediaType === "tv" && season && episode
         ? `https://vidsrc.icu/embed/tv/${movieId}/${season}/${episode}`
-        : `https://vidsrc.icu/embed/movie/${movieId}` 
+        : `https://vidsrc.icu/embed/movie/${movieId}`
     },
-    { 
-      name: "VidSrc CC", 
+    {
+      name: "VidSrc CC",
       icon: "📺",
       url: mediaType === "tv" && season && episode
         ? `https://vidsrc.cc/v2/embed/tv/${movieId}/${season}/${episode}`
-        : `https://vidsrc.cc/v2/embed/movie/${movieId}` 
+        : `https://vidsrc.cc/v2/embed/movie/${movieId}`
     },
-    { 
-      name: "Embed SU", 
+    {
+      name: "Embed SU",
       icon: "🎞️",
       url: mediaType === "tv" && season && episode
         ? `https://embed.su/embed/tv/${movieId}/${season}/${episode}`
-        : `https://embed.su/embed/movie/${movieId}` 
+        : `https://embed.su/embed/movie/${movieId}`
     },
-    { 
-      name: "SuperEmbed", 
+    {
+      name: "SuperEmbed",
       icon: "📽️",
       url: mediaType === "tv" && season && episode
         ? `https://multiembed.mov/?video_id=${movieId}&tmdb=1&s=${season}&e=${episode}`
-        : `https://multiembed.mov/?video_id=${movieId}&tmdb=1` 
+        : `https://multiembed.mov/?video_id=${movieId}&tmdb=1`
     },
-    { 
-      name: "AutoEmbed", 
+    {
+      name: "AutoEmbed",
       icon: "⚡",
       url: mediaType === "tv" && season && episode
         ? `https://player.autoembed.cc/embed/tv/${movieId}/${season}/${episode}`
-        : `https://player.autoembed.cc/embed/movie/${movieId}` 
+        : `https://player.autoembed.cc/embed/movie/${movieId}`
     },
-    { 
-      name: "SmashyStream", 
+    {
+      name: "SmashyStream",
       icon: "💥",
       url: mediaType === "tv" && season && episode
         ? `https://player.smashy.stream/tv/${movieId}?s=${season}&e=${episode}`
-        : `https://player.smashy.stream/movie/${movieId}` 
+        : `https://player.smashy.stream/movie/${movieId}`
     },
-  ];
+  ], [movieId, mediaType, season, episode]);
 
   const currentSource = streamingSources[currentServer];
 
@@ -201,7 +202,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
                   <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-x-1 transition-transform" />
                   <span className="text-white text-xs sm:text-sm font-medium hidden xs:inline">Back</span>
                 </button>
-                
+
                 <div className="min-w-0 flex-1 hidden sm:block">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0">
@@ -220,7 +221,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
                   </div>
                 </div>
               </div>
-              
+
               {/* Right: Controls */}
               <div className="flex items-center space-x-1 sm:space-x-2">
                 {/* Server Selector */}
@@ -233,45 +234,52 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
                     <span className="text-xs sm:text-sm font-medium hidden md:inline">{currentSource.name}</span>
                     <span className="text-base sm:text-lg">{currentSource.icon}</span>
                   </button>
-                  
-                  {showServerSelector && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setShowServerSelector(false)} />
-                      <div className="absolute top-full right-0 mt-2 w-56 sm:w-72 max-h-[70vh] overflow-y-auto bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl z-20 shadow-2xl shadow-black/50 animate-scale-in">
-                        <div className="p-2 sm:p-3 bg-gradient-to-r from-red-500/10 to-transparent border-b border-white/5 sticky top-0 bg-gray-900/98">
-                          <div className="flex items-center space-x-2">
-                            <MonitorPlay className="w-4 h-4 text-red-400" />
-                            <span className="text-xs sm:text-sm font-semibold text-white">Select Server</span>
+
+                  <AnimatePresence>
+                    {showServerSelector && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowServerSelector(false)} />
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                          transition={{ duration: 0.2 }}
+                          className="absolute top-full right-0 mt-2 w-56 sm:w-72 max-h-[70vh] overflow-y-auto bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl z-20 shadow-2xl shadow-black/50"
+                        >
+                          <div className="p-2 sm:p-3 bg-gradient-to-r from-red-500/10 to-transparent border-b border-white/5 sticky top-0 bg-gray-900/98">
+                            <div className="flex items-center space-x-2">
+                              <MonitorPlay className="w-4 h-4 text-red-400" />
+                              <span className="text-xs sm:text-sm font-semibold text-white">Select Server</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="p-1 sm:p-2">
-                          {streamingSources.map((source, index) => (
-                            <button
-                              key={index}
-                              onClick={() => {
-                                setCurrentServer(index);
-                                setShowServerSelector(false);
-                              }}
-                              className={`w-full flex items-center space-x-2 sm:space-x-3 px-2 sm:px-3 py-2 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all ${
-                                currentServer === index 
-                                  ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20' 
+                          <div className="p-1 sm:p-2">
+                            {streamingSources.map((source, index) => (
+                              <button
+                                key={index}
+                                onClick={() => {
+                                  setCurrentServer(index);
+                                  setShowServerSelector(false);
+                                }}
+                                className={`w-full flex items-center space-x-2 sm:space-x-3 px-2 sm:px-3 py-2 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all ${currentServer === index
+                                  ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20'
                                   : 'text-gray-300 hover:bg-white/10'
-                              }`}
-                            >
-                              <span className="text-lg sm:text-xl">{source.icon}</span>
-                              <span className="font-medium flex-1 text-left">{source.name}</span>
-                              {currentServer === index && (
-                                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="p-2 sm:p-3 bg-black/30 border-t border-white/5 sticky bottom-0">
-                          <p className="text-[10px] sm:text-xs text-gray-500 text-center">Switch server if video doesn't load</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                                  }`}
+                              >
+                                <span className="text-lg sm:text-xl">{source.icon}</span>
+                                <span className="font-medium flex-1 text-left">{source.name}</span>
+                                {currentServer === index && (
+                                  <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="p-2 sm:p-3 bg-black/30 border-t border-white/5 sticky bottom-0">
+                            <p className="text-[10px] sm:text-xs text-gray-500 text-center">Switch server if video doesn't load</p>
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Theater Mode Toggle */}
@@ -308,7 +316,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
         <div className="flex-1 min-h-0 flex items-center justify-center p-4 sm:p-6 md:p-8">
           <div className="relative w-full max-w-6xl">
             {/* Video Wrapper */}
-            <div 
+            <div
               className="relative w-full bg-black overflow-hidden rounded-xl shadow-2xl shadow-black/80 border border-white/10"
               style={{ aspectRatio: '16/9' }}
             >
@@ -356,7 +364,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
                   // Start tracking progress when iframe loads
                   if (!isTrailer && totalDuration) {
                     startTimeRef.current = Date.now();
-                    
+
                     // Show resume notification if resuming
                     if (resumePosition && resumePosition > 60) {
                       const minutes = Math.floor(resumePosition / 60);
@@ -374,7 +382,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
                       if (startTimeRef.current) {
                         const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
                         const currentProgress = (resumePosition || 0) + elapsedSeconds;
-                        
+
                         // Only update if we have valid data
                         if (currentProgress < totalDuration) {
                           try {

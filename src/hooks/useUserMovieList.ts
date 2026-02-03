@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   collection,
   query,
@@ -15,11 +15,34 @@ import { useAuth } from './useAuth';
 import { TMDBMovie } from '@/utils/tmdbApi';
 import { UserMovieListItem } from '@/integrations/firebase/types';
 
+// Local cache key for faster initial load
+const CACHE_KEY = 'flixverse_movie_list_cache';
+
 export const useUserMovieList = () => {
   const [movieList, setMovieList] = useState<UserMovieListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [operatingMovies, setOperatingMovies] = useState<Set<number>>(new Set());
   const { user, isAuthenticated } = useAuth();
+
+  // Memoized set of movie IDs for O(1) lookup
+  const movieIdSet = useMemo(() => new Set(movieList.map(item => item.movie_id)), [movieList]);
+
+  // Load from local cache first for faster initial render
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      try {
+        const cached = localStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMovieList(parsed);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load movie list cache:', e);
+      }
+    }
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -41,6 +64,13 @@ export const useUserMovieList = () => {
       });
       setMovieList(movies);
       setLoading(false);
+
+      // Update local cache
+      try {
+        localStorage.setItem(`${CACHE_KEY}_${user.uid}`, JSON.stringify(movies));
+      } catch (e) {
+        console.warn('Failed to cache movie list:', e);
+      }
     }, (error) => {
       console.error('Error fetching movie list:', error);
       setLoading(false);
@@ -159,13 +189,14 @@ export const useUserMovieList = () => {
     }
   };
 
-  const isInList = (movieId: number) => {
-    return movieList.some(item => item.movie_id === movieId);
-  };
+  // Optimized lookup using memoized Set - O(1) instead of O(n)
+  const isInList = useCallback((movieId: number) => {
+    return movieIdSet.has(movieId);
+  }, [movieIdSet]);
 
-  const isOperating = (movieId: number) => {
+  const isOperating = useCallback((movieId: number) => {
     return operatingMovies.has(movieId);
-  };
+  }, [operatingMovies]);
 
   return {
     movieList,

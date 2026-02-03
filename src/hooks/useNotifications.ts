@@ -26,7 +26,7 @@ export const useNotifications = () => {
     if ('Notification' in window) {
       const permission = Notification.permission;
       setHasPermission(permission === 'granted');
-      
+
       // Load preferences from localStorage
       const savedPreferences = localStorage.getItem('notificationPreferences');
       if (savedPreferences) {
@@ -69,7 +69,7 @@ export const useNotifications = () => {
       const permission = await Notification.requestPermission();
       const granted = permission === 'granted';
       setHasPermission(granted);
-      
+
       if (granted) {
         toast({
           title: "Notifications enabled",
@@ -82,7 +82,7 @@ export const useNotifications = () => {
           variant: "destructive",
         });
       }
-      
+
       return granted;
     } catch (error) {
       console.error('Error requesting notification permission:', error);
@@ -97,7 +97,7 @@ export const useNotifications = () => {
 
   const updatePreferences = (newPreferences: Partial<NotificationPreferences>) => {
     const updated = { ...preferences, ...newPreferences };
-    
+
     // If turning off all notifications, turn off individual preferences too
     if (newPreferences.allNotifications === false) {
       updated.newMovies = false;
@@ -105,42 +105,71 @@ export const useNotifications = () => {
       updated.popularTVShows = false;
       updated.upcomingContent = false;
     }
-    
+
     setPreferences(updated);
     localStorage.setItem('notificationPreferences', JSON.stringify(updated));
-    
+
     console.log('Updated notification preferences:', updated);
   };
 
   const sendNotification = (title: string, options?: NotificationOptions) => {
     if (!hasPermission) {
-      console.log('Notification permission not granted');
+      console.warn('Notification permission not granted');
       return;
     }
 
     if (!preferences.allNotifications) {
-      console.log('All notifications are disabled');
+      console.log('All notifications are disabled by user preference');
       return;
     }
 
     try {
-      const notification = new Notification(title, {
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
-        tag: 'flixverse-notification',
-        requireInteraction: false,
-        ...options,
-      });
-
-      // Auto close after 5 seconds
-      setTimeout(() => {
-        notification.close();
-      }, 5000);
-
-      console.log('Notification sent:', title);
+      // Check if service worker registration is available (for mobile support)
+      if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.showNotification(title, {
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: 'flixverse-notification',
+            requireInteraction: false,
+            data: { url: window.location.href },
+            ...options,
+          });
+        }).catch(e => {
+          // Fallback to standard API
+          createStandardNotification(title, options);
+        });
+      } else {
+        createStandardNotification(title, options);
+      }
     } catch (error) {
       console.error('Error sending notification:', error);
+      toast({
+        title: "Notification Error",
+        description: "Failed to send notification",
+        variant: "destructive",
+      });
     }
+  };
+
+  const createStandardNotification = (title: string, options?: NotificationOptions) => {
+    const notification = new Notification(title, {
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'flixverse-notification',
+      requireInteraction: false,
+      ...options,
+    });
+
+    // Auto close after 5 seconds
+    setTimeout(() => {
+      notification.close();
+    }, 5000);
+
+    notification.onclick = function () {
+      window.focus();
+      notification.close();
+    };
   };
 
   // Test notification function

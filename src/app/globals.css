@@ -701,3 +701,192 @@
     transition: none !important;
   }
 }
+
+/* ========================================
+   GPU Acceleration & Performance Utilities
+   ======================================== */
+
+/* GPU layer promotion for smooth animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Content visibility for scroll performance - lazy render off-screen content */
+.content-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+.content-lazy-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 200px 300px;
+}
+
+.content-lazy-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
+}
+
+/* Optimized will-change hints for common animations */
+.will-animate-transform {
+  will-change: transform;
+}
+
+.will-animate-opacity {
+  will-change: opacity;
+}
+
+.will-animate-all {
+  will-change: transform, opacity;
+}
+
+/* Remove will-change after animation completes (use with JS) */
+.animation-complete {
+  will-change: auto;
+}
+
+/* Smooth scrolling container optimization */
+.smooth-scroll-container {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Prevent layout thrashing during scroll */
+.scroll-stable {
+  contain: layout style;
+}
+
+/* Optimized card container for carousels */
+.carousel-container-optimized {
+  transform: translateZ(0);
+  will-change: scroll-position;
+  scroll-snap-type: x mandatory;
+}
+
+.carousel-item-optimized {
+  scroll-snap-align: start;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Hardware-accelerated skeleton shimmer */
+.skeleton-shimmer-gpu {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
+  transform: translateZ(0);
+}
+
+.skeleton-shimmer-gpu::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.06) 20%,
+    rgba(255,255,255,0.1) 50%,
+    rgba(255,255,255,0.06) 80%,
+    transparent 100%
+  );
+  transform: translateX(-100%) translateZ(0);
+  animation: skeleton-sweep-gpu 1.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes skeleton-sweep-gpu {
+  0% {
+    transform: translateX(-100%) translateZ(0);
+  }
+  100% {
+    transform: translateX(100%) translateZ(0);
+  }
+}
+
+/* Optimized hover transitions */
+.hover-optimized {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+}
+
+.hover-optimized:hover {
+  transform: translateY(-4px) translateZ(0);
+}
+
+/* Smooth page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(10px) translateZ(0);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0) translateZ(0);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateY(0) translateZ(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-10px) translateZ(0);
+  transition: opacity 0.2s ease-in, transform 0.2s ease-in;
+}
+
+/* Optimized blur effects - use sparingly */
+.blur-optimized {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transform: translateZ(0);
+}
+
+/* Reduce blur on lower-end devices */
+@media (prefers-reduced-motion: reduce), (max-width: 768px) {
+  .blur-optimized {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
+  .glass-premium {
+    backdrop-filter: blur(20px) saturate(150%);
+  }
+}
+
+/* Image loading optimization */
+.img-loading {
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  transition: opacity 0.3s ease-out;
+}
+
+.img-loaded {
+  opacity: 1;
+}
+
+/* Intersection observer animation triggers */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(20px) translateZ(0);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0) translateZ(0);
+}
+
+/* Staggered animation delays for lists */
+.stagger-1 { transition-delay: 0.05s; }
+.stagger-2 { transition-delay: 0.1s; }
+.stagger-3 { transition-delay: 0.15s; }
+.stagger-4 { transition-delay: 0.2s; }
+.stagger-5 { transition-delay: 0.25s; }
+.stagger-6 { transition-delay: 0.3s; }

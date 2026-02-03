@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X, User, Film, Tv } from "lucide-react";
 import { TMDBMovie, TMDBPerson, searchMulti, searchPeople, getContentImage } from "@/utils/tmdbApi";
@@ -31,56 +31,64 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
-  useEffect(() => {
-    const searchContent = async () => {
-      if (query.trim().length < 2) {
-        setResults([]);
-        return;
-      }
+  // Memoized search function to prevent recreation
+  const searchContent = useCallback(async (searchQuery: string) => {
+    if (searchQuery.trim().length < 2) {
+      setResults([]);
+      return;
+    }
 
-      setLoading(true);
-      try {
-        // Search for movies, TV shows, and people
-        const [multiResults, peopleResults] = await Promise.all([
-          searchMulti(query),
-          searchPeople(query)
-        ]);
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
-        // Combine results and prioritize by relevance
-        const allResults: any[] = [
-          ...multiResults.map(item => ({
-            ...item,
-            media_type: item.media_type || (item.title ? 'movie' : 'tv')
-          })),
-          ...peopleResults.map(person => ({
-            ...person,
-            media_type: 'person'
-          }))
-        ];
+    setLoading(true);
+    try {
+      // Search for movies, TV shows, and people
+      const [multiResults, peopleResults] = await Promise.all([
+        searchMulti(searchQuery),
+        searchPeople(searchQuery)
+      ]);
 
-        const combined = allResults
-          .filter(item => {
-            // Filter out items without essential information
-            if (item.media_type === 'person') {
-              return item.name && (item.profile_path || item.known_for_department);
-            }
-            return (item.title || item.name) && (item.poster_path || item.backdrop_path || (item.vote_average ?? 0) > 0);
-          })
-          .sort((a, b) => {
-            // Prioritize movies and TV shows over people
-            if (a.media_type === 'person' && b.media_type !== 'person') return 1;
-            if (b.media_type === 'person' && a.media_type !== 'person') return -1;
+      // Combine results and prioritize by relevance
+      const allResults: SearchResult[] = [
+        ...multiResults.map(item => ({
+          ...item,
+          media_type: item.media_type || (item.title ? 'movie' : 'tv')
+        })),
+        ...peopleResults.map(person => ({
+          ...person,
+          media_type: 'person'
+        }))
+      ];
 
-            // Then sort by vote average
-            return (b.vote_average || 0) - (a.vote_average || 0);
-          })
-          .slice(0, 12) as SearchResult[];
+      const combined = allResults
+        .filter(item => {
+          // Filter out items without essential information
+          if (item.media_type === 'person') {
+            return item.name && (item.profile_path || item.known_for_department);
+          }
+          return (item.title || item.name) && (item.poster_path || item.backdrop_path || (item.vote_average ?? 0) > 0);
+        })
+        .sort((a, b) => {
+          // Prioritize movies and TV shows over people
+          if (a.media_type === 'person' && b.media_type !== 'person') return 1;
+          if (b.media_type === 'person' && a.media_type !== 'person') return -1;
 
-        setResults(combined);
-      } catch (error) {
+          // Then sort by vote average
+          return (b.vote_average || 0) - (a.vote_average || 0);
+        })
+        .slice(0, 12);
+
+      setResults(combined);
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
         console.error('Search error:', error);
         toast({
           title: "Search Error",
@@ -88,12 +96,15 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
           variant: "destructive"
         });
       }
-      setLoading(false);
-    };
+    }
+    setLoading(false);
+  }, [toast]);
 
-    const debounceTimer = setTimeout(searchContent, 300);
+  useEffect(() => {
+    // Increased debounce time for better performance
+    const debounceTimer = setTimeout(() => searchContent(query), 400);
     return () => clearTimeout(debounceTimer);
-  }, [query, toast]);
+  }, [query, searchContent]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   collection,
   query,
@@ -11,6 +11,10 @@ import {
 import { db } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { Review, Comment, ContentRating, UserMovieListItem, WatchHistory } from '@/integrations/firebase/types';
+
+// Cache to prevent redundant fetches
+const activityCache = new Map<string, { data: UserActivity[], timestamp: number }>();
+const CACHE_TTL = 30000; // 30 seconds
 
 export type ActivityType = 'review' | 'rating' | 'comment' | 'watchlist' | 'watched';
 
@@ -29,13 +33,16 @@ export interface UserActivity {
   commentText?: string;
 }
 
-export const useUserActivity = (userId?: string) => {
+export const useUserActivity = (userId?: string, limitCount: number = 20) => {
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { user } = useAuth();
 
   const targetUserId = userId || user?.uid;
+
+  // Memoize cache key
+  const cacheKey = useMemo(() => `${targetUserId}_${limitCount}`, [targetUserId, limitCount]);
 
   // Fetch all user activities
   useEffect(() => {
@@ -46,21 +53,29 @@ export const useUserActivity = (userId?: string) => {
     }
 
     const fetchAllActivities = async () => {
+      // Check cache first
+      const cached = activityCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL && refreshTrigger === 0) {
+        setActivities(cached.data);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       const allActivities: UserActivity[] = [];
 
-      // Fetch each activity type independently so one failing query (e.g. missing index) doesn't block others
+      // Fetch each activity type independently
       const fetchReviews = async () => {
         const reviewsQuery = query(
           collection(db, 'reviews'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
-          limit(20)
+          limit(limitCount)
         );
         const snapshot = await getDocs(reviewsQuery);
-        snapshot.forEach((doc) => {
+        return snapshot.docs.map(doc => {
           const review = doc.data() as Review;
-          allActivities.push({
+          return {
             id: `review-${doc.id}`,
             type: 'review',
             timestamp: review.created_at,
@@ -70,7 +85,7 @@ export const useUserActivity = (userId?: string) => {
             contentPosterPath: review.content_poster_path,
             rating: review.rating,
             reviewText: review.review_text,
-          });
+          } as UserActivity;
         });
       };
 
@@ -79,24 +94,19 @@ export const useUserActivity = (userId?: string) => {
           collection(db, 'content_ratings'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
-          limit(20)
+          limit(limitCount)
         );
         const snapshot = await getDocs(ratingsQuery);
-        snapshot.forEach((doc) => {
+        return snapshot.docs.map(doc => {
           const rating = doc.data() as ContentRating;
-          const hasReview = allActivities.some(
-            a => a.type === 'review' && a.contentId === rating.content_id && a.contentType === rating.content_type
-          );
-          if (!hasReview) {
-            allActivities.push({
-              id: `rating-${doc.id}`,
-              type: 'rating',
-              timestamp: rating.created_at,
-              contentId: rating.content_id,
-              contentType: rating.content_type,
-              rating: rating.rating,
-            });
-          }
+          return {
+            id: `rating-${doc.id}`,
+            type: 'rating',
+            timestamp: rating.created_at,
+            contentId: rating.content_id,
+            contentType: rating.content_type,
+            rating: rating.rating,
+          } as UserActivity;
         });
       };
 
@@ -105,19 +115,19 @@ export const useUserActivity = (userId?: string) => {
           collection(db, 'comments'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
-          limit(20)
+          limit(limitCount)
         );
         const snapshot = await getDocs(commentsQuery);
-        snapshot.forEach((doc) => {
+        return snapshot.docs.map(doc => {
           const comment = doc.data() as Comment;
-          allActivities.push({
+          return {
             id: `comment-${doc.id}`,
             type: 'comment',
             timestamp: comment.created_at,
             contentId: comment.content_id,
             contentType: comment.content_type,
             commentText: comment.text,
-          });
+          } as UserActivity;
         });
       };
 
@@ -126,12 +136,12 @@ export const useUserActivity = (userId?: string) => {
           collection(db, 'user_movie_lists'),
           where('user_id', '==', targetUserId),
           orderBy('added_at', 'desc'),
-          limit(20)
+          limit(limitCount)
         );
         const snapshot = await getDocs(watchlistQuery);
-        snapshot.forEach((doc) => {
+        return snapshot.docs.map(doc => {
           const item = doc.data() as UserMovieListItem;
-          allActivities.push({
+          return {
             id: `watchlist-${doc.id}`,
             type: 'watchlist',
             timestamp: item.added_at,
@@ -139,7 +149,7 @@ export const useUserActivity = (userId?: string) => {
             contentType: item.media_type || 'movie',
             contentTitle: item.movie_title,
             contentPosterPath: item.movie_poster_path,
-          });
+          } as UserActivity;
         });
       };
 
@@ -149,12 +159,12 @@ export const useUserActivity = (userId?: string) => {
           where('user_id', '==', targetUserId),
           where('completed', '==', true),
           orderBy('watched_at', 'desc'),
-          limit(20)
+          limit(limitCount)
         );
         const snapshot = await getDocs(historyQuery);
-        snapshot.forEach((doc) => {
+        return snapshot.docs.map(doc => {
           const history = doc.data() as WatchHistory;
-          allActivities.push({
+          return {
             id: `watched-${doc.id}`,
             type: 'watched',
             timestamp: history.watched_at,
@@ -162,23 +172,53 @@ export const useUserActivity = (userId?: string) => {
             contentType: history.content_type,
             contentTitle: history.content_title,
             contentPosterPath: history.content_poster_path,
-          });
+          } as UserActivity;
         });
       };
 
       try {
-        await fetchReviews().catch((e) => console.warn('Activity: reviews fetch failed', e));
-        await Promise.all([
-          fetchRatings().catch((e) => console.warn('Activity: ratings fetch failed', e)),
-          fetchComments().catch((e) => console.warn('Activity: comments fetch failed', e)),
-          fetchWatchlist().catch((e) => console.warn('Activity: watchlist fetch failed', e)),
-          fetchWatched().catch((e) => console.warn('Activity: watched fetch failed', e)),
+        // Use Promise.allSettled for better fault tolerance
+        const results = await Promise.allSettled([
+          fetchReviews(),
+          fetchRatings(),
+          fetchComments(),
+          fetchWatchlist(),
+          fetchWatched()
         ]);
 
-        allActivities.sort((a, b) =>
+        const fetchedActivities: UserActivity[] = [];
+
+        results.forEach(result => {
+          if (result.status === 'fulfilled') {
+            fetchedActivities.push(...result.value);
+          } else {
+            console.warn('Activity fetch failed:', result.reason);
+          }
+        });
+
+        // Deduplicate ratings that have reviews
+        const reviewMap = new Set(
+          fetchedActivities
+            .filter(a => a.type === 'review')
+            .map(a => `${a.contentId}-${a.contentType}`)
+        );
+
+        const filteredActivities = fetchedActivities.filter(a => {
+          if (a.type === 'rating') {
+            return !reviewMap.has(`${a.contentId}-${a.contentType}`);
+          }
+          return true;
+        });
+
+        filteredActivities.sort((a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
-        setActivities(allActivities.slice(0, 50));
+
+        // Cache the results
+        const finalActivities = filteredActivities.slice(0, limitCount * 2);
+        activityCache.set(cacheKey, { data: finalActivities, timestamp: Date.now() });
+        setActivities(finalActivities);
+
       } catch (error) {
         console.error('Error fetching user activities:', error);
       } finally {
@@ -187,7 +227,7 @@ export const useUserActivity = (userId?: string) => {
     };
 
     fetchAllActivities();
-  }, [targetUserId, refreshTrigger]);
+  }, [targetUserId, refreshTrigger, limitCount, cacheKey]);
 
   const refetch = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
@@ -199,7 +239,7 @@ export const useUserActivity = (userId?: string) => {
   // Group activities by date
   const getActivitiesGroupedByDate = useCallback(() => {
     const groups: { [date: string]: UserActivity[] } = {};
-    
+
     activities.forEach(activity => {
       const date = new Date(activity.timestamp).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -216,7 +256,8 @@ export const useUserActivity = (userId?: string) => {
   }, [activities]);
 
   // Get activity stats
-  const getStats = useCallback(() => {
+  // Get activity stats - memoized to prevent re-calc
+  const getStats = useMemo(() => {
     return {
       totalReviews: activities.filter(a => a.type === 'review').length,
       totalRatings: activities.filter(a => a.type === 'rating' || a.type === 'review').length,
@@ -235,3 +276,5 @@ export const useUserActivity = (userId?: string) => {
     activityCount: activities.length,
   };
 };
+
+

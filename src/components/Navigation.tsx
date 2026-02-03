@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Bell, User, LogOut, Menu, X, Sparkles, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -24,19 +24,34 @@ import { motion, AnimatePresence } from "framer-motion";
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const scrollRAF = useRef<number | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, signOut } = useAuth();
   const { profile } = useUserProfile();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const handleScroll = () => {
+  // Optimized scroll handler with requestAnimationFrame throttling
+  const handleScroll = useCallback(() => {
+    if (scrollRAF.current) return;
+
+    scrollRAF.current = requestAnimationFrame(() => {
       setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+      scrollRAF.current = null;
+    });
   }, []);
+
+  useEffect(() => {
+    // Use passive event listener for better scroll performance
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollRAF.current) {
+        cancelAnimationFrame(scrollRAF.current);
+      }
+    };
+  }, [handleScroll]);
 
   const handleMovieSelect = (movie: TMDBMovie) => {
     const type = getContentType(movie);
@@ -78,7 +93,7 @@ const Navigation = () => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${isScrolled
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 will-animate-transform ${isScrolled
           ? 'glass-premium shadow-2xl shadow-black/40'
           : 'bg-gradient-to-b from-black/90 via-black/50 to-transparent'
           }`}

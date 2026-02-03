@@ -43,22 +43,22 @@ const MovieCarousel = memo(({ title, movies, priority = false, loading = false, 
 
   if (loading) {
     return (
-      <div className="relative">
+      <div className="relative content-lazy-row">
         <div className="flex items-center space-x-3 mb-8">
-          <div className="h-8 bg-white/5 rounded-xl w-48 skeleton-shimmer"></div>
+          <div className="h-8 bg-white/5 rounded-xl w-48 skeleton-shimmer-gpu"></div>
         </div>
         <div className="flex space-x-4 overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
             <motion.div
               key={i}
               className="w-48 flex-shrink-0"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08, duration: 0.5 }}
+              transition={{ delay: i * 0.05, duration: 0.4 }}
             >
-              <div className="aspect-[2/3] bg-white/5 rounded-2xl skeleton-shimmer skeleton-glow"></div>
-              <div className="mt-3 h-4 bg-white/5 rounded-lg skeleton-shimmer w-4/5"></div>
-              <div className="mt-2 h-3 bg-white/5 rounded-lg skeleton-shimmer w-1/2"></div>
+              <div className="aspect-[2/3] bg-white/5 rounded-2xl skeleton-shimmer-gpu"></div>
+              <div className="mt-3 h-4 bg-white/5 rounded-lg skeleton-shimmer-gpu w-4/5"></div>
+              <div className="mt-2 h-3 bg-white/5 rounded-lg skeleton-shimmer-gpu w-1/2"></div>
             </motion.div>
           ))}
         </div>
@@ -72,21 +72,21 @@ const MovieCarousel = memo(({ title, movies, priority = false, loading = false, 
 
   return (
     <motion.section
-      className="relative group/section"
-      initial={{ opacity: 0, y: 50 }}
+      className="relative group/section content-lazy-row"
+      initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Section Header */}
       <motion.div
         className="flex items-center justify-between mb-8"
-        initial={{ opacity: 0, x: -30 }}
+        initial={{ opacity: 0, x: -20 }}
         whileInView={{ opacity: 1, x: 0 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.6, delay: 0.1 }}
+        transition={{ duration: 0.4, delay: 0.05 }}
       >
         <div className="flex items-center space-x-4">
           {icon && (

@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from "react";
 import { Play, Star, Plus, Info, Check } from "lucide-react";
 import { TMDBMovie, getBackdropUrl, getContentTitle } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +7,19 @@ import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+
+// Check if device prefers reduced motion or is mobile
+const useOptimizedAnimations = () => {
+  const [shouldOptimize, setShouldOptimize] = useState(false);
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isMobile = window.innerWidth < 768 || 'ontouchstart' in window;
+    setShouldOptimize(prefersReducedMotion || isMobile);
+  }, []);
+
+  return shouldOptimize;
+};
 
 interface HeroBannerProps {
   movie: TMDBMovie;
@@ -16,12 +30,27 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
   const { addToList, isInList } = useUserMovieList();
   const { toast } = useToast();
   const router = useRouter();
+  const optimizeAnimations = useOptimizedAnimations();
 
   const title = getContentTitle(movie);
   const backdropUrl = movie.backdrop_path ? getBackdropUrl(movie.backdrop_path, 'large') : '';
   const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() :
     movie.first_air_date ? new Date(movie.first_air_date).getFullYear() : '';
   const isInMyList = isAuthenticated ? isInList(movie.id) : false;
+
+  // Preload backdrop image for smoother experience
+  useEffect(() => {
+    if (backdropUrl) {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = backdropUrl;
+      document.head.appendChild(link);
+      return () => {
+        document.head.removeChild(link);
+      };
+    }
+  }, [backdropUrl]);
 
   const handlePlayClick = () => {
     if (!isAuthenticated) {
@@ -73,10 +102,10 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
     <div className="relative h-[95vh] lg:h-screen overflow-hidden">
       {/* Background Image with parallax effect */}
       <motion.div
-        className="absolute inset-0"
+        className="absolute inset-0 gpu-accelerated"
         initial={{ scale: 1.1 }}
         animate={{ scale: 1 }}
-        transition={{ duration: 1.5, ease: "easeOut" }}
+        transition={{ duration: 1.2, ease: "easeOut" }}
       >
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -92,35 +121,39 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
           {/* Vignette effect */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,transparent,rgba(0,0,0,0.5))]" />
 
-          {/* Noise texture for cinematic feel */}
-          <div className="absolute inset-0 opacity-[0.015] noise-overlay" />
+          {/* Noise texture for cinematic feel - reduced on mobile */}
+          <div className={`absolute inset-0 noise-overlay ${optimizeAnimations ? 'opacity-[0.01]' : 'opacity-[0.015]'}`} />
 
-          {/* Animated ambient glow */}
-          <motion.div
-            className="absolute -bottom-20 -left-20 w-96 h-96 bg-red-500/20 rounded-full blur-[120px]"
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.2, 0.3, 0.2]
-            }}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-          <motion.div
-            className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[150px]"
-            animate={{
-              scale: [1, 1.3, 1],
-              opacity: [0.1, 0.2, 0.1]
-            }}
-            transition={{
-              duration: 10,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 2
-            }}
-          />
+          {/* Animated ambient glow - simplified on mobile */}
+          {!optimizeAnimations && (
+            <>
+              <motion.div
+                className="absolute -bottom-20 -left-20 w-96 h-96 bg-red-500/20 rounded-full blur-[100px] will-animate-opacity"
+                animate={{
+                  scale: [1, 1.15, 1],
+                  opacity: [0.15, 0.25, 0.15]
+                }}
+                transition={{
+                  duration: 10,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+              <motion.div
+                className="absolute top-1/3 right-0 w-[400px] h-[400px] bg-purple-500/10 rounded-full blur-[120px] will-animate-opacity"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.08, 0.15, 0.08]
+                }}
+                transition={{
+                  duration: 12,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 2
+                }}
+              />
+            </>
+          )}
         </div>
       </motion.div>
 
