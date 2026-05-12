@@ -31,6 +31,13 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
   // Build streaming sources with proper TMDB ID format
   const streamingSources = [
     {
+      name: "VidSrc CC",
+      icon: "📺",
+      url: mediaType === "tv" && season && episode
+        ? `https://vidsrc.cc/v2/embed/tv/${movieId}/${season}/${episode}`
+        : `https://vidsrc.cc/v2/embed/movie/${movieId}`
+    },
+    {
       name: "VidSrc Pro",
       icon: "🎬",
       url: mediaType === "tv" && season && episode
@@ -50,13 +57,6 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
       url: mediaType === "tv" && season && episode
         ? `https://vidsrc.icu/embed/tv/${movieId}/${season}/${episode}`
         : `https://vidsrc.icu/embed/movie/${movieId}`
-    },
-    {
-      name: "VidSrc CC",
-      icon: "📺",
-      url: mediaType === "tv" && season && episode
-        ? `https://vidsrc.cc/v2/embed/tv/${movieId}/${season}/${episode}`
-        : `https://vidsrc.cc/v2/embed/movie/${movieId}`
     },
     {
       name: "Embed SU",
