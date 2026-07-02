@@ -1,13 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import HeroBanner from "@/components/HeroBanner";
 import MovieCarousel from "@/components/MovieCarousel";
 import PersonalizedWelcome from "@/components/PersonalizedWelcome";
-import ContinueWatching from "@/components/ContinueWatching";
+import { useAuth } from "@/hooks/useAuth";
 import { useHomeContent } from "@/hooks/queries/useHomeContent";
 import { TrendingUp, Star, Play, Tv, Film, Calendar } from "lucide-react";
 
+const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), {
+  ssr: false,
+  loading: () => null,
+});
+
 const Index = () => {
+  const { isAuthenticated } = useAuth();
   const { data, isLoading, isFetching } = useHomeContent();
 
   return (
@@ -24,7 +31,7 @@ const Index = () => {
 
       <div className="relative z-10">
         <div className="space-y-14 lg:space-y-20 pb-20 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
-          <ContinueWatching />
+          {isAuthenticated && <ContinueWatching />}
 
           <MovieCarousel
             title="Trending Now"

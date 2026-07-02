@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   User, Settings, Film, Tv, Star, Heart, Clock,
@@ -31,7 +32,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import ImageCropper from '@/components/ImageCropper';
+
+const ImageCropper = dynamic(() => import('@/components/ImageCropper'), { ssr: false });
 
 const Profile = () => {
   const router = useRouter();
