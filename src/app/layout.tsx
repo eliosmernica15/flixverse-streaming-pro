@@ -1,5 +1,6 @@
 import "./globals.css";
 import Providers from "@/components/Providers";
+import AppShell from "@/components/AppShell";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
@@ -37,7 +38,9 @@ export default function RootLayout({
     return (
         <html lang="en" className={inter.variable}>
             <body className={`${inter.className} antialiased`}>
-                <Providers>{children}</Providers>
+                <Providers>
+                    <AppShell>{children}</AppShell>
+                </Providers>
             </body>
         </html>
     );

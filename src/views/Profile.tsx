@@ -13,7 +13,6 @@ import { useUserMovieList } from '@/hooks/useUserMovieList';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useUserActivity, ActivityType } from '@/hooks/useUserActivity';
 import { useToast } from '@/hooks/use-toast';
-import Navigation from '@/components/Navigation';
 import { ActivityFeed } from '@/components/ActivityItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -234,8 +233,6 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navigation />
-
       <main className="pt-20 pb-16">
         {/* Profile Header */}
         <div className="relative">

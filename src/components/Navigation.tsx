@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { User, LogOut, Menu, X, Sparkles, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import SearchBar from "./SearchBar";
 import NotificationSettings from "./NotificationSettings";
 import NotificationBell from "./NotificationBell";
 import { TMDBMovie, getContentType } from "@/utils/tmdbApi";
@@ -21,6 +21,11 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const SearchBar = dynamic(() => import("./SearchBar"), {
+  ssr: false,
+  loading: () => <div className="hidden sm:block w-48 lg:w-64 h-9 rounded-lg bg-white/5 animate-pulse" />,
+});
 
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

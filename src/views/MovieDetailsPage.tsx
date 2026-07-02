@@ -1,21 +1,29 @@
 "use client";
 
-
+import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import MovieDetails from "@/components/MovieDetails";
 import { useToast } from "@/hooks/use-toast";
+
+const MovieDetails = dynamic(() => import("@/components/MovieDetails"), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="w-10 h-10 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+    </div>
+  ),
+});
 
 const MovieDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
   const movieId = id ? parseInt(Array.isArray(id) ? id[0] : id) : 0;
-  const mediaType = searchParams.get('type') as "movie" | "tv" || "movie";
-  const autoplay = searchParams.get('autoplay') === 'true';
-  const resumePosition = searchParams.get('resume') ? parseInt(searchParams.get('resume')!) : undefined;
-  const season = searchParams.get('season') ? parseInt(searchParams.get('season')!) : undefined;
-  const episode = searchParams.get('episode') ? parseInt(searchParams.get('episode')!) : undefined;
+  const mediaType = (searchParams.get("type") as "movie" | "tv") || "movie";
+  const autoplay = searchParams.get("autoplay") === "true";
+  const resumePosition = searchParams.get("resume") ? parseInt(searchParams.get("resume")!) : undefined;
+  const season = searchParams.get("season") ? parseInt(searchParams.get("season")!) : undefined;
+  const episode = searchParams.get("episode") ? parseInt(searchParams.get("episode")!) : undefined;
   const { toast } = useToast();
   const autoplayTriggered = useRef(false);
 
@@ -26,22 +34,11 @@ const MovieDetailsPage = () => {
         const minutes = Math.floor(resumePosition / 60);
         toast({
           title: "Resuming playback",
-          description: `Continuing from ${minutes} minute${minutes > 1 ? 's' : ''} in`,
-        });
-      } else {
-        toast({
-          title: "Auto-playing content",
-          description: "Starting playback automatically...",
+          description: `Continuing from ${minutes} minute${minutes > 1 ? "s" : ""} in`,
         });
       }
     }
   }, [autoplay, resumePosition, toast]);
-
-  const handleClose = () => {
-    // Always navigate to home page for reliable behavior
-    // This ensures the back button works even when navigating directly to the page
-    router.push('/');
-  };
 
   if (!movieId) {
     return (
@@ -55,7 +52,7 @@ const MovieDetailsPage = () => {
     <MovieDetails
       movieId={movieId}
       mediaType={mediaType}
-      onClose={handleClose}
+      onClose={() => router.push("/")}
       autoplay={autoplay}
       resumePosition={resumePosition}
       initialSeason={season}

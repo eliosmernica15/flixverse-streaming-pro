@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
 import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations, isNotReleasedYet } from "@/utils/tmdbApi";
@@ -9,11 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserMovieList } from "@/hooks/useUserMovieList";
 import { useAuth } from "@/hooks/useAuth";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
-import VideoPlayer from "./VideoPlayer";
-import ReviewSection from "./ReviewSection";
-import CommentSection from "./CommentSection";
 import QuickRating from "./QuickRating";
 import MovieCard from "./MovieCard";
+
+const VideoPlayer = dynamic(() => import("./VideoPlayer"), { ssr: false });
+const ReviewSection = dynamic(() => import("./ReviewSection"), { ssr: false });
+const CommentSection = dynamic(() => import("./CommentSection"), { ssr: false });
 
 interface MovieDetailsProps {
   movieId: number;

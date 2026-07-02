@@ -1,9 +1,10 @@
+"use client";
+
 import { useState } from 'react';
-import { Bell, Check, Trash2, X, MessageCircle, Heart, UserPlus, Star, Tv } from 'lucide-react';
+import { Bell, Check, Trash2, MessageCircle, Heart, UserPlus, Star, Tv } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotificationsFirebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Notification } from '@/integrations/firebase/types';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Popover,
   PopoverContent,
@@ -13,21 +14,19 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const NotificationIcon = ({ type }: { type: Notification['type'] }) => {
-  const iconProps = { className: 'w-4 h-4' };
-  
   switch (type) {
     case 'like':
-      return <Heart {...iconProps} className="w-4 h-4 text-red-400" />;
+      return <Heart className="w-4 h-4 text-red-400" />;
     case 'comment':
-      return <MessageCircle {...iconProps} className="w-4 h-4 text-blue-400" />;
+      return <MessageCircle className="w-4 h-4 text-blue-400" />;
     case 'follow':
-      return <UserPlus {...iconProps} className="w-4 h-4 text-green-400" />;
+      return <UserPlus className="w-4 h-4 text-green-400" />;
     case 'review':
-      return <Star {...iconProps} className="w-4 h-4 text-yellow-400" />;
+      return <Star className="w-4 h-4 text-yellow-400" />;
     case 'new_episode':
-      return <Tv {...iconProps} className="w-4 h-4 text-purple-400" />;
+      return <Tv className="w-4 h-4 text-purple-400" />;
     default:
-      return <Bell {...iconProps} className="w-4 h-4 text-gray-400" />;
+      return <Bell className="w-4 h-4 text-gray-400" />;
   }
 };
 
@@ -53,33 +52,24 @@ const NotificationItem = ({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
+    <div
       className={`p-3 rounded-lg transition-colors ${
-        notification.read 
-          ? 'bg-transparent hover:bg-white/5' 
+        notification.read
+          ? 'bg-transparent hover:bg-white/5'
           : 'bg-white/5 hover:bg-white/10'
       }`}
     >
       <div className="flex items-start space-x-3">
-        <div className={`mt-0.5 p-2 rounded-full ${
-          notification.read ? 'bg-gray-800' : 'bg-white/10'
-        }`}>
+        <div className={`mt-0.5 p-2 rounded-full ${notification.read ? 'bg-gray-800' : 'bg-white/10'}`}>
           <NotificationIcon type={notification.type} />
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <p className={`text-sm ${notification.read ? 'text-gray-400' : 'text-white'} font-medium`}>
             {notification.title}
           </p>
-          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-            {notification.message}
-          </p>
-          <p className="text-[10px] text-gray-600 mt-1">
-            {timeAgo(notification.created_at)}
-          </p>
+          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notification.message}</p>
+          <p className="text-[10px] text-gray-600 mt-1">{timeAgo(notification.created_at)}</p>
         </div>
 
         <div className="flex items-center space-x-1">
@@ -107,7 +97,7 @@ const NotificationItem = ({
           </button>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -126,22 +116,17 @@ const NotificationBell = () => {
         <button className="relative p-2 hover:bg-white/10 rounded-full transition-colors">
           <Bell className="w-5 h-5 text-white" />
           {unreadCount > 0 && (
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-            >
+            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
-            </motion.span>
+            </span>
           )}
         </button>
       </PopoverTrigger>
 
-      <PopoverContent 
-        align="end" 
+      <PopoverContent
+        align="end"
         className="w-80 p-0 bg-gray-900/95 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl"
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h3 className="font-semibold text-white">Notifications</h3>
           <div className="flex items-center space-x-2">
@@ -170,7 +155,6 @@ const NotificationBell = () => {
           </div>
         </div>
 
-        {/* Notifications List */}
         <ScrollArea className="h-80">
           {loading ? (
             <div className="flex items-center justify-center h-32">
@@ -183,16 +167,14 @@ const NotificationBell = () => {
             </div>
           ) : (
             <div className="p-2 space-y-1">
-              <AnimatePresence>
-                {notifications.map((notification) => (
-                  <NotificationItem
-                    key={notification.id}
-                    notification={notification}
-                    onRead={() => markAsRead(notification.id)}
-                    onDelete={() => deleteNotification(notification.id)}
-                  />
-                ))}
-              </AnimatePresence>
+              {notifications.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onRead={() => markAsRead(notification.id)}
+                  onDelete={() => deleteNotification(notification.id)}
+                />
+              ))}
             </div>
           )}
         </ScrollArea>

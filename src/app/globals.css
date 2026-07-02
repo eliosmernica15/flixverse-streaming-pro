@@ -542,6 +542,15 @@
     50% { transform: translateY(6px); }
   }
 
+  .route-progress-bar {
+    animation: route-progress 0.4s ease-out forwards;
+  }
+
+  @keyframes route-progress {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(350%); }
+  }
+
   /* Text gradients */
   .text-gradient {
     background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.7) 100%);
