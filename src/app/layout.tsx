@@ -19,6 +19,13 @@ export const metadata: Metadata = {
     authors: [{ name: "FlixVerse" }],
     icons: {
         icon: "/favicon.svg",
+        apple: "/favicon.svg",
+    },
+    manifest: "/manifest.json",
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: "black-translucent",
+        title: "FlixVerse",
     },
     openGraph: {
         title: "FlixVerse",

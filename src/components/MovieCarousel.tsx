@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Sparkles } from "lucide-react";
 import MovieCard from "./MovieCard";
 import { TMDBMovie } from "@/utils/tmdbApi";
+import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
 import {
   Carousel,
   CarouselContent,
@@ -35,6 +36,7 @@ const MovieCarousel = memo(
     comingSoon = false,
   }: MovieCarouselProps) => {
     const [isHovered, setIsHovered] = useState(false);
+    const prefetchRoute = useRoutePrefetch();
 
     const validMovies = useMemo(
       () =>
@@ -103,6 +105,9 @@ const MovieCarousel = memo(
           {exploreAllPath && (
             <Link
               href={exploreAllPath}
+              prefetch
+              onMouseEnter={() => prefetchRoute(exploreAllPath)}
+              onFocus={() => prefetchRoute(exploreAllPath)}
               className="hidden sm:flex items-center space-x-2 text-sm text-gray-400 hover:text-white transition-all duration-200 group/btn glass-card px-4 py-2 rounded-xl hover:translate-x-0.5"
             >
               <Sparkles className="w-4 h-4 text-red-500" />
