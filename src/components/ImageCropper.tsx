@@ -51,7 +51,6 @@ const ImageCropper = ({
         try {
             const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
             if (croppedBlob) {
-                console.log('Cropped blob size:', croppedBlob.size);
                 onCropComplete(croppedBlob);
             } else {
                 console.error('getCroppedImg returned null');

@@ -96,16 +96,11 @@ const Profile = () => {
     setUploading(true);
 
     try {
-      console.log('Uploading blob:', croppedBlob.size, 'bytes');
-
-      // Upload to Cloudinary
       const result = await uploadToCloudinary(croppedBlob, `profile_images/${user.uid}`);
-      console.log('Upload complete, URL:', result.secure_url);
 
       await updateProfile({
         avatar_url: result.secure_url
       });
-      console.log('Profile updated successfully');
 
       toast({
         title: "Profile updated",
@@ -134,7 +129,7 @@ const Profile = () => {
       // Note: Cloudinary deletion requires server-side implementation
       // For now, we just remove the reference from the profile
       if (profile.avatar_url.includes('cloudinary.com')) {
-        console.log('Cloudinary image will be orphaned (deletion requires server-side implementation)');
+        // Cloudinary deletion requires server-side implementation.
       }
 
       await updateProfile({

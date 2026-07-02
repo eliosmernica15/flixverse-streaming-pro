@@ -53,8 +53,6 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         setLoading(true);
         setError(null);
 
-        console.log(`Loading content details for ID: ${movieId}, Type: ${mediaType} `);
-
         const contentData = await fetchContentDetails(movieId, mediaType);
 
         if (!isMounted) return;
@@ -65,7 +63,6 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           return;
         }
 
-        console.log('Content loaded successfully:', contentData);
         setContent(contentData);
 
       } catch (err) {
@@ -224,10 +221,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     const episodeToPlay = episode || selectedEpisode;
 
     if (isTVShow) {
-      console.log(`Starting to watch: ${contentTitle} S${selectedSeason}E${episodeToPlay} `);
       setSelectedEpisode(episodeToPlay);
-    } else {
-      console.log('Starting to watch:', contentTitle);
     }
 
     setShowPlayer(true);
@@ -262,7 +256,6 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
   const handleDownload = () => {
     const contentTitle = content?.title || content?.name || 'Unknown';
-    console.log('Starting download for:', contentTitle);
 
     toast({
       title: "Download Started",
@@ -728,7 +721,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         )}
       </div>
 
-      {/* Video Player - rendered in portal so it escapes PageTransition's transform and displays full viewport */}
+      {/* Video Player - rendered in portal for full-viewport playback */}
       {showPlayer && content && createPortal(
         (() => {
           const watchProgress = getProgress(content.id, isTV ? selectedSeason : undefined, isTV ? selectedEpisode : undefined);

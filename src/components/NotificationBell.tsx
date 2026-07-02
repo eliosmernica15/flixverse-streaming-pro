@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Bell, Check, Trash2, MessageCircle, Heart, UserPlus, Star, Tv } from 'lucide-react';
-import { useNotifications } from '@/hooks/useNotificationsFirebase';
+import { useFirebaseNotifications } from '@/hooks/useNotificationsFirebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Notification } from '@/integrations/firebase/types';
 import {
@@ -103,7 +103,7 @@ const NotificationItem = ({
 
 const NotificationBell = () => {
   const [open, setOpen] = useState(false);
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotifications();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, clearAll } = useFirebaseNotifications();
   const { isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {

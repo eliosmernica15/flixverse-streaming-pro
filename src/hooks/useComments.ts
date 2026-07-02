@@ -12,14 +12,14 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
-import { useUserProfile } from './useUserProfile';
+import { useUserProfileContext } from '@/contexts/UserProfileContext';
 import { Comment } from '@/integrations/firebase/types';
 
 export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
-  const { profile } = useUserProfile();
+  const { profile } = useUserProfileContext();
 
   // Fetch comments for a specific content
   useEffect(() => {

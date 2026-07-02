@@ -108,18 +108,14 @@ export const useNotifications = () => {
 
     setPreferences(updated);
     localStorage.setItem('notificationPreferences', JSON.stringify(updated));
-
-    console.log('Updated notification preferences:', updated);
   };
 
   const sendNotification = (title: string, options?: NotificationOptions) => {
     if (!hasPermission) {
-      console.log('Notification permission not granted');
       return;
     }
 
     if (!preferences.allNotifications) {
-      console.log('All notifications are disabled');
       return;
     }
 
@@ -136,8 +132,6 @@ export const useNotifications = () => {
       setTimeout(() => {
         notification.close();
       }, 5000);
-
-      console.log('Notification sent:', title);
     } catch (error) {
       console.error('Error sending notification:', error);
     }

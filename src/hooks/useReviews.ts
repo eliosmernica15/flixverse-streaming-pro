@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
-import { useUserProfile } from './useUserProfile';
+import { useUserProfileContext } from '@/contexts/UserProfileContext';
 import { Review } from '@/integrations/firebase/types';
 
 export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => {
@@ -23,7 +23,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
-  const { profile } = useUserProfile();
+  const { profile } = useUserProfileContext();
 
   // Fetch reviews for a specific content
   useEffect(() => {
@@ -63,7 +63,6 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     }, (error) => {
       console.error('Error fetching reviews:', error);
       if (error.code === 'failed-precondition') {
-        console.log('Composite index may be building. Reviews will appear once ready.');
       }
       setLoading(false);
     });

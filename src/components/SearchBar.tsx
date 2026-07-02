@@ -108,8 +108,6 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
 
   const handleResultSelect = (result: SearchResult) => {
     if (result.media_type === 'person') {
-      // Handle person selection - could show their filmography
-      console.log('Selected person:', result.name);
       toast({
         title: "Person Selected",
         description: `Viewing ${result.name}'s profile`,

@@ -89,7 +89,6 @@ export const useUserMovieList = () => {
 
     const exists = movieList.some(item => item.movie_id === movie.id);
     if (exists) {
-      console.log('Movie already in list, skipping add');
       return;
     }
 
@@ -150,7 +149,6 @@ export const useUserMovieList = () => {
       if (itemToRemove && !itemToRemove.id.startsWith('temp-')) {
         await deleteDoc(doc(requireFirebaseDb(), 'user_movie_lists', itemToRemove.id));
       } else if (!itemToRemove) {
-        console.log('Movie not found in list, skipping remove');
         return;
       }
     } catch (error) {
