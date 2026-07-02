@@ -1,8 +1,8 @@
 import { Play, Clock, X } from 'lucide-react';
+import Image from 'next/image';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useAuth } from '@/hooks/useAuth';
 import { getImageUrl } from '@/utils/tmdbApi';
-import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
   Carousel,
@@ -48,12 +48,7 @@ const ContinueWatching = () => {
   const items = continueWatchingItems.slice(0, 12);
 
   return (
-    <motion.section
-      className="relative mb-10"
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-    >
+    <section className="relative mb-10 content-auto animate-fade-in-up">
       <div className="flex items-center space-x-4 mb-6">
         <div className="p-2.5 bg-gradient-to-br from-red-500/20 to-orange-500/10 rounded-xl border border-white/5">
           <Clock className="w-5 h-5 text-red-500" />
@@ -80,19 +75,17 @@ const ContinueWatching = () => {
                 key={item.id}
                 className="pl-3 md:pl-5 basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
               >
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.04 }}
+                <div
                   className="relative group cursor-pointer"
                   onClick={() => handleContinue(item)}
                 >
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-800/80 border border-white/5 shadow-lg hover:border-white/10 transition-all duration-300 carousel-item">
-                    <img
+                  <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-800/80 border border-white/5 shadow-lg hover:border-white/10 transition-all duration-300 movie-card-inner">
+                    <Image
                       src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
                       alt={item.content_title}
-                      loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      fill
+                      sizes="(max-width: 640px) 45vw, 20vw"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -129,7 +122,7 @@ const ContinueWatching = () => {
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               </CarouselItem>
             );
           })}
@@ -141,7 +134,7 @@ const ContinueWatching = () => {
           </>
         )}
       </Carousel>
-    </motion.section>
+    </section>
   );
 };
 

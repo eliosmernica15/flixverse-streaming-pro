@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    turbopack: {
+        root: process.cwd(),
+    },
     images: {
         remotePatterns: [
             {
@@ -19,6 +22,8 @@ const nextConfig = {
                 hostname: 'firebasestorage.googleapis.com',
             },
         ],
+        formats: ['image/avif', 'image/webp'],
+        minimumCacheTTL: 60 * 60 * 24,
     },
 };
 

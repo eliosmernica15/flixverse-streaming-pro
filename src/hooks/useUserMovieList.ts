@@ -10,7 +10,7 @@ import {
   doc,
   getDocs
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { TMDBMovie } from '@/utils/tmdbApi';
 import { UserMovieListItem } from '@/integrations/firebase/types';
@@ -24,6 +24,12 @@ export const useUserMovieList = () => {
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setMovieList([]);
+      setLoading(false);
+      return;
+    }
+
+    const db = getFirebaseDb();
+    if (!db) {
       setLoading(false);
       return;
     }
@@ -53,6 +59,7 @@ export const useUserMovieList = () => {
     if (!user) return;
 
     try {
+      const db = requireFirebaseDb();
       const q = query(
         collection(db, 'user_movie_lists'),
         where('user_id', '==', user.uid),
@@ -103,7 +110,7 @@ export const useUserMovieList = () => {
     setMovieList(prev => [optimisticItem, ...prev]);
 
     try {
-      await addDoc(collection(db, 'user_movie_lists'), {
+      await addDoc(collection(requireFirebaseDb(), 'user_movie_lists'), {
         user_id: user.uid,
         movie_id: movie.id,
         movie_title: movie.title || movie.name || 'Unknown Title',
@@ -141,7 +148,7 @@ export const useUserMovieList = () => {
 
     try {
       if (itemToRemove && !itemToRemove.id.startsWith('temp-')) {
-        await deleteDoc(doc(db, 'user_movie_lists', itemToRemove.id));
+        await deleteDoc(doc(requireFirebaseDb(), 'user_movie_lists', itemToRemove.id));
       } else if (!itemToRemove) {
         console.log('Movie not found in list, skipping remove');
         return;

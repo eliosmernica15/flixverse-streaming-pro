@@ -13,7 +13,7 @@ import {
   limit,
   increment
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
 import { Review } from '@/integrations/firebase/types';
@@ -40,7 +40,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
 
     // Use simpler query without orderBy to avoid composite index issues
     const q = query(
-      collection(db, 'reviews'),
+      collection(requireFirebaseDb(), 'reviews'),
       where('content_id', '==', contentId),
       where('content_type', '==', contentType),
       limit(50)
@@ -86,7 +86,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
 
     // Check if user already has a review for this content
     const existingQuery = query(
-      collection(db, 'reviews'),
+      collection(requireFirebaseDb(), 'reviews'),
       where('user_id', '==', user.uid),
       where('content_id', '==', contentId),
       where('content_type', '==', contentType)
@@ -112,7 +112,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
       updated_at: new Date().toISOString()
     };
 
-    const docRef = await addDoc(collection(db, 'reviews'), newReview);
+    const docRef = await addDoc(collection(requireFirebaseDb(), 'reviews'), newReview);
     return { id: docRef.id, ...newReview } as Review;
   };
 
@@ -123,7 +123,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     }
 
     // Verify ownership
-    const reviewRef = doc(db, 'reviews', reviewId);
+    const reviewRef = doc(requireFirebaseDb(), 'reviews', reviewId);
     const reviewDoc = await getDoc(reviewRef);
     
     if (!reviewDoc.exists()) {
@@ -149,7 +149,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     }
 
     // Verify ownership
-    const reviewRef = doc(db, 'reviews', reviewId);
+    const reviewRef = doc(requireFirebaseDb(), 'reviews', reviewId);
     const reviewDoc = await getDoc(reviewRef);
     
     if (!reviewDoc.exists()) {
@@ -174,25 +174,25 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     try {
       // Check if user already liked this review
       const likesQuery = query(
-        collection(db, 'review_likes'),
+        collection(requireFirebaseDb(), 'review_likes'),
         where('review_id', '==', reviewId),
         where('user_id', '==', user.uid)
       );
       const existingLikes = await getDocs(likesQuery);
       
-      const reviewRef = doc(db, 'reviews', reviewId);
+      const reviewRef = doc(requireFirebaseDb(), 'reviews', reviewId);
       
       if (!existingLikes.empty) {
         // Unlike - remove the like
         const likeDoc = existingLikes.docs[0];
-        await deleteDoc(doc(db, 'review_likes', likeDoc.id));
+        await deleteDoc(doc(requireFirebaseDb(), 'review_likes', likeDoc.id));
         await updateDoc(reviewRef, {
           likes_count: increment(-1)
         });
         return false; // Returns false to indicate unliked
       } else {
         // Like - add new like
-        await addDoc(collection(db, 'review_likes'), {
+        await addDoc(collection(requireFirebaseDb(), 'review_likes'), {
           review_id: reviewId,
           user_id: user.uid,
           created_at: new Date().toISOString()
@@ -214,7 +214,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     
     try {
       const likesQuery = query(
-        collection(db, 'review_likes'),
+        collection(requireFirebaseDb(), 'review_likes'),
         where('review_id', '==', reviewId),
         where('user_id', '==', user.uid)
       );

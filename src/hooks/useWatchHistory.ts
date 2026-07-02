@@ -10,7 +10,7 @@ import {
   doc,
   limit
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { WatchHistory } from '@/integrations/firebase/types';
 
@@ -23,6 +23,12 @@ export const useWatchHistory = () => {
   useEffect(() => {
     if (!user) {
       setHistory([]);
+      setLoading(false);
+      return;
+    }
+
+    const db = getFirebaseDb();
+    if (!db) {
       setLoading(false);
       return;
     }
@@ -69,6 +75,7 @@ export const useWatchHistory = () => {
       ? `${user.uid}_${contentId}_s${season}e${episode}`
       : `${user.uid}_${contentId}`;
 
+    const db = requireFirebaseDb();
     const historyRef = doc(db, 'watch_history', historyId);
 
     const completed = progressSeconds >= totalDurationSeconds * 0.9; // 90% watched = completed
@@ -102,6 +109,7 @@ export const useWatchHistory = () => {
   // Remove from history
   const removeFromHistory = async (historyId: string) => {
     if (!user) return;
+    const db = requireFirebaseDb();
     await deleteDoc(doc(db, 'watch_history', historyId));
   };
 
@@ -109,6 +117,7 @@ export const useWatchHistory = () => {
   const clearHistory = async () => {
     if (!user || history.length === 0) return;
 
+    const db = requireFirebaseDb();
     const promises = history.map(item =>
       deleteDoc(doc(db, 'watch_history', item.id))
     );

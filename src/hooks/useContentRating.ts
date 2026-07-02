@@ -9,7 +9,7 @@ import {
   doc,
   getDocs
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { ContentRating } from '@/integrations/firebase/types';
 
@@ -28,7 +28,7 @@ export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv
     }
 
     const q = query(
-      collection(db, 'content_ratings'),
+      collection(requireFirebaseDb(), 'content_ratings'),
       where('content_id', '==', contentId),
       where('content_type', '==', contentType)
     );
@@ -72,7 +72,7 @@ export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv
 
     // Use a deterministic ID based on user and content
     const ratingId = `${user.uid}_${contentId}_${contentType}`;
-    const ratingRef = doc(db, 'content_ratings', ratingId);
+    const ratingRef = doc(requireFirebaseDb(), 'content_ratings', ratingId);
 
     await setDoc(ratingRef, {
       id: ratingId,
@@ -94,7 +94,7 @@ export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv
     }
 
     const ratingId = `${user.uid}_${contentId}_${contentType}`;
-    await deleteDoc(doc(db, 'content_ratings', ratingId));
+    await deleteDoc(doc(requireFirebaseDb(), 'content_ratings', ratingId));
     setUserRating(null);
   };
 

@@ -11,7 +11,7 @@ import {
   writeBatch,
   limit
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { Notification } from '@/integrations/firebase/types';
 
@@ -31,7 +31,7 @@ export const useNotifications = () => {
     }
 
     const q = query(
-      collection(db, 'notifications'),
+      collection(requireFirebaseDb(), 'notifications'),
       where('user_id', '==', user.uid),
       orderBy('created_at', 'desc'),
       limit(50)
@@ -65,7 +65,7 @@ export const useNotifications = () => {
     if (!user) return;
 
     try {
-      const notificationRef = doc(db, 'notifications', notificationId);
+      const notificationRef = doc(requireFirebaseDb(), 'notifications', notificationId);
       await updateDoc(notificationRef, { read: true });
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -78,12 +78,12 @@ export const useNotifications = () => {
     if (!user || notifications.length === 0) return;
 
     try {
-      const batch = writeBatch(db);
+      const batch = writeBatch(requireFirebaseDb());
       
       notifications
         .filter(n => !n.read)
         .forEach(notification => {
-          const ref = doc(db, 'notifications', notification.id);
+          const ref = doc(requireFirebaseDb(), 'notifications', notification.id);
           batch.update(ref, { read: true });
         });
 
@@ -99,7 +99,7 @@ export const useNotifications = () => {
     if (!user) return;
 
     try {
-      await deleteDoc(doc(db, 'notifications', notificationId));
+      await deleteDoc(doc(requireFirebaseDb(), 'notifications', notificationId));
     } catch (error) {
       console.error('Error deleting notification:', error);
       throw error;
@@ -111,10 +111,10 @@ export const useNotifications = () => {
     if (!user || notifications.length === 0) return;
 
     try {
-      const batch = writeBatch(db);
+      const batch = writeBatch(requireFirebaseDb());
       
       notifications.forEach(notification => {
-        const ref = doc(db, 'notifications', notification.id);
+        const ref = doc(requireFirebaseDb(), 'notifications', notification.id);
         batch.delete(ref);
       });
 

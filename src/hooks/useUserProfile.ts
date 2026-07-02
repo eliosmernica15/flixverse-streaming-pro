@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { UserProfile } from '@/integrations/firebase/types';
 
@@ -12,6 +12,12 @@ export const useUserProfile = () => {
   useEffect(() => {
     if (!user) {
       setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    const db = getFirebaseDb();
+    if (!db) {
       setLoading(false);
       return;
     }
@@ -51,6 +57,7 @@ export const useUserProfile = () => {
     if (!user) return;
 
     try {
+      const db = requireFirebaseDb();
       const profileRef = doc(db, 'profiles', user.uid);
       await updateDoc(profileRef, {
         ...updates,
@@ -66,6 +73,7 @@ export const useUserProfile = () => {
     if (!user) return;
 
     try {
+      const db = requireFirebaseDb();
       const profileRef = doc(db, 'profiles', user.uid);
       const docSnap = await getDoc(profileRef);
       if (docSnap.exists()) {

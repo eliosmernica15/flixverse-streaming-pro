@@ -8,7 +8,7 @@ import {
   limit,
   getDocs
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { Review, Comment, ContentRating, UserMovieListItem, WatchHistory } from '@/integrations/firebase/types';
 
@@ -52,7 +52,7 @@ export const useUserActivity = (userId?: string) => {
       // Fetch each activity type independently so one failing query (e.g. missing index) doesn't block others
       const fetchReviews = async () => {
         const reviewsQuery = query(
-          collection(db, 'reviews'),
+          collection(requireFirebaseDb(), 'reviews'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
           limit(20)
@@ -76,7 +76,7 @@ export const useUserActivity = (userId?: string) => {
 
       const fetchRatings = async () => {
         const ratingsQuery = query(
-          collection(db, 'content_ratings'),
+          collection(requireFirebaseDb(), 'content_ratings'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
           limit(20)
@@ -102,7 +102,7 @@ export const useUserActivity = (userId?: string) => {
 
       const fetchComments = async () => {
         const commentsQuery = query(
-          collection(db, 'comments'),
+          collection(requireFirebaseDb(), 'comments'),
           where('user_id', '==', targetUserId),
           orderBy('created_at', 'desc'),
           limit(20)
@@ -123,7 +123,7 @@ export const useUserActivity = (userId?: string) => {
 
       const fetchWatchlist = async () => {
         const watchlistQuery = query(
-          collection(db, 'user_movie_lists'),
+          collection(requireFirebaseDb(), 'user_movie_lists'),
           where('user_id', '==', targetUserId),
           orderBy('added_at', 'desc'),
           limit(20)
@@ -145,7 +145,7 @@ export const useUserActivity = (userId?: string) => {
 
       const fetchWatched = async () => {
         const historyQuery = query(
-          collection(db, 'watch_history'),
+          collection(requireFirebaseDb(), 'watch_history'),
           where('user_id', '==', targetUserId),
           where('completed', '==', true),
           orderBy('watched_at', 'desc'),

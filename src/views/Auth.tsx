@@ -10,7 +10,7 @@ import {
   signInWithPopup
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/integrations/firebase/client';
+import { getFirebaseAuth, requireFirebaseDb } from '@/integrations/firebase/client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,9 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    const auth = getFirebaseAuth();
+    if (!auth) return;
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         router.push('/');
@@ -54,6 +57,9 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      const auth = getFirebaseAuth();
+      if (!auth) throw new Error("Firebase is not configured");
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
@@ -62,6 +68,7 @@ const Auth = () => {
       await updateProfile(user, { displayName: name });
 
       // Create user profile in Firestore
+      const db = requireFirebaseDb();
       await setDoc(doc(db, 'profiles', user.uid), {
         id: user.uid,
         display_name: name,
@@ -97,6 +104,9 @@ const Auth = () => {
 
     setLoading(true);
     try {
+      const auth = getFirebaseAuth();
+      if (!auth) throw new Error("Firebase is not configured");
+
       await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Welcome back!",
@@ -116,12 +126,16 @@ const Auth = () => {
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
+      const auth = getFirebaseAuth();
+      if (!auth) throw new Error("Firebase is not configured");
+
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
       // Create user profile in Firestore if it doesn't exist
       const name = user.displayName || user.email?.split('@')[0] || 'User';
+      const db = requireFirebaseDb();
       await setDoc(doc(db, 'profiles', user.uid), {
         id: user.uid,
         display_name: name,

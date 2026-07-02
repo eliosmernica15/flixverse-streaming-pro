@@ -10,7 +10,7 @@ import {
   doc,
   limit
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
 import { Comment } from '@/integrations/firebase/types';
@@ -30,6 +30,12 @@ export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') =>
     }
 
     setLoading(true);
+
+    const db = getFirebaseDb();
+    if (!db) {
+      setLoading(false);
+      return;
+    }
 
     const q = query(
       collection(db, 'comments'),
@@ -79,7 +85,7 @@ export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') =>
       updated_at: new Date().toISOString()
     };
 
-    const docRef = await addDoc(collection(db, 'comments'), newComment);
+    const docRef = await addDoc(collection(requireFirebaseDb(), 'comments'), newComment);
     return { id: docRef.id, ...newComment } as Comment;
   };
 
@@ -89,7 +95,7 @@ export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') =>
       throw new Error('User must be logged in to update a comment');
     }
 
-    const commentRef = doc(db, 'comments', commentId);
+    const commentRef = doc(requireFirebaseDb(), 'comments', commentId);
     await updateDoc(commentRef, {
       text,
       updated_at: new Date().toISOString()
@@ -102,7 +108,7 @@ export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') =>
       throw new Error('User must be logged in to delete a comment');
     }
 
-    await deleteDoc(doc(db, 'comments', commentId));
+    await deleteDoc(doc(requireFirebaseDb(), 'comments', commentId));
   };
 
   // Get replies to a specific comment
