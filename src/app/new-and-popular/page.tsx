@@ -1,5 +1,5 @@
-import NewAndPopular from '@/views/NewAndPopular';
+import { LazyNewAndPopular } from "@/lib/lazy-views";
 
 export default function NewAndPopularPage() {
-    return <NewAndPopular />;
+    return <LazyNewAndPopular />;
 }

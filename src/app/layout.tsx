@@ -1,7 +1,7 @@
 import "./globals.css";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 const inter = Inter({
@@ -31,6 +31,11 @@ export const metadata: Metadata = {
         site: "@flixverse",
         images: ["https://lovable.dev/opengraph-image-p98pqg.png"],
     },
+};
+
+export const viewport: Viewport = {
+    themeColor: "#000000",
+    colorScheme: "dark",
 };
 
 export default function RootLayout({

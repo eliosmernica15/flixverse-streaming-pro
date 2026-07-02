@@ -1,4 +1,4 @@
-/** Security headers applied via Next.js config and middleware. */
+/** Security headers applied via Next.js config and proxy. */
 export const securityHeaders = [
   {
     key: "Strict-Transport-Security",
@@ -37,7 +37,7 @@ export const securityHeaders = [
       "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev",
       "font-src 'self' data:",
       "connect-src 'self' https://api.themoviedb.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://*.firebaseio.com",
-      "frame-src 'self' https://vidsrc.cc https://*.vidsrc.cc https://vidsrc.xyz https://vidlink.pro https://vidsrc.icu https://embed.su https://multiembed.mov https://player.autoembed.cc",
+      "frame-src 'self' https://vidsrc.cc https://*.vidsrc.cc https://vidsrc.xyz https://*.vidsrc.xyz https://vidlink.pro https://*.vidlink.pro https://vidsrc.icu https://*.vidsrc.icu https://embed.su https://*.embed.su https://multiembed.mov https://*.multiembed.mov https://player.autoembed.cc https://*.autoembed.cc",
       "upgrade-insecure-requests",
     ].join("; "),
   },

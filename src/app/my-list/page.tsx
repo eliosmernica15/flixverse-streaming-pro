@@ -1,5 +1,5 @@
-import MyList from '@/views/MyList';
+import { LazyMyList } from "@/lib/lazy-views";
 
 export default function MyListPage() {
-    return <MyList />;
+    return <LazyMyList />;
 }

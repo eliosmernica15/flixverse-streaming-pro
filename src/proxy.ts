@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { securityHeaders } from "@/lib/security-headers";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const proto = request.headers.get("x-forwarded-proto");
   const host = request.headers.get("host") ?? "";
   const isLocal = host.includes("localhost") || host.startsWith("127.0.0.1");

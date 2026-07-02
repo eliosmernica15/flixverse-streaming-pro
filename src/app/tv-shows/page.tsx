@@ -1,5 +1,5 @@
-import TVShows from '@/views/TVShows';
+import { LazyTVShows } from "@/lib/lazy-views";
 
 export default function TVShowsPage() {
-    return <TVShows />;
+    return <LazyTVShows />;
 }

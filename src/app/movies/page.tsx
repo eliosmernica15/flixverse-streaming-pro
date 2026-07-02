@@ -1,5 +1,5 @@
-import Movies from '@/views/Movies';
+import { LazyMovies } from "@/lib/lazy-views";
 
 export default function MoviesPage() {
-    return <Movies />;
+    return <LazyMovies />;
 }

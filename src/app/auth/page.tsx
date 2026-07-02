@@ -1,5 +1,5 @@
-import Auth from '@/views/Auth';
+import { LazyAuth } from "@/lib/lazy-views";
 
 export default function AuthPage() {
-    return <Auth />;
+    return <LazyAuth />;
 }

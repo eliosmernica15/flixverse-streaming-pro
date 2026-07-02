@@ -1,10 +1,10 @@
-import { Suspense } from 'react';
-import MovieDetailsPage from '@/views/MovieDetailsPage';
+import { Suspense } from "react";
+import { LazyMovieDetailsPage } from "@/lib/lazy-views";
 
 export default function MoviePage() {
     return (
         <Suspense fallback={<div className="min-h-screen bg-black" />}>
-            <MovieDetailsPage />
+            <LazyMovieDetailsPage />
         </Suspense>
     );
 }

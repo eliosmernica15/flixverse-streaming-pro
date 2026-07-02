@@ -1,5 +1,5 @@
-import Browse from '@/views/Browse';
+import { LazyBrowse } from "@/lib/lazy-views";
 
 export default function BrowsePage() {
-    return <Browse />;
+    return <LazyBrowse />;
 }
