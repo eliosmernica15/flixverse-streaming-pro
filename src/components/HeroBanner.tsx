@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Play, Star, Plus, Info, Check } from "lucide-react";
 import { TMDBMovie, getBackdropUrl, getContentTitle } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserMovieList } from "@/hooks/useUserMovieList";
+import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useToast } from "@/hooks/use-toast";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ interface HeroBannerProps {
 
 const HeroBanner = ({ movie }: HeroBannerProps) => {
   const { isAuthenticated } = useAuth();
-  const { addToList, isInList } = useUserMovieList();
+  const { addToList, isInList } = useUserMovieListContext();
   const { toast } = useToast();
   const router = useRouter();
   const reducedMotion = useReducedMotion();

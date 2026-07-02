@@ -8,12 +8,12 @@ import PageContainer from "@/components/PageContainer";
 import EmptyState from "@/components/EmptyState";
 import { fetchMovieDetails, fetchTVShowDetails, TMDBMovie } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserMovieList } from "@/hooks/useUserMovieList";
+import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { Heart, LogIn, Film, Sparkles } from "lucide-react";
 
 const MyList = () => {
   const { isAuthenticated } = useAuth();
-  const { movieList, loading: listLoading } = useUserMovieList();
+  const { movieList, loading: listLoading } = useUserMovieListContext();
 
   const listKey = movieList.map((item) => `${item.media_type}-${item.movie_id}`).join(",");
 

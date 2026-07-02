@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UserProfileProvider } from "@/contexts/UserProfileContext";
+import { UserMovieListProvider } from "@/contexts/UserMovieListContext";
 import RouteProgress from "@/components/RouteProgress";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -29,12 +30,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
                 <UserProfileProvider>
+                <UserMovieListProvider>
                 <TooltipProvider>
                     <RouteProgress />
                     {children}
                     <Toaster />
                     <Sonner />
                 </TooltipProvider>
+                </UserMovieListProvider>
                 </UserProfileProvider>
             </AuthProvider>
         </QueryClientProvider>

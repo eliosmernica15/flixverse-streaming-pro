@@ -14,7 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserMovieList } from "@/hooks/useUserMovieList";
+import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useRouter } from "next/navigation";
 
 interface MovieCardProps {
@@ -62,7 +62,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const { addToHistory, addFavoriteGenre } = useUserPreferences();
   const { isAuthenticated } = useAuth();
   const [isInLocalList, setIsInLocalList] = useState(false);
-  const { addToList, removeFromList, isInList } = useUserMovieList();
+  const { addToList, removeFromList, isInList } = useUserMovieListContext();
   const router = useRouter();
 
   useEffect(() => {
@@ -88,6 +88,11 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
     const contentType = getContentType(movie);
     router.push(`/movie/${movie.id}?type=${contentType}`);
   }, [addFavoriteGenre, addToHistory, movie, router]);
+
+  const prefetchMovie = useCallback(() => {
+    const contentType = getContentType(movie);
+    router.prefetch(`/movie/${movie.id}?type=${contentType}`);
+  }, [movie, router]);
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -154,7 +159,10 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
     <div
       ref={cardRef}
       className="relative group cursor-pointer movie-card"
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        prefetchMovie();
+      }}
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleCardClick}
     >

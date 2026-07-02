@@ -7,7 +7,7 @@ import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, Chev
 import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations, isNotReleasedYet } from "@/utils/tmdbApi";
 import { getSimilarMoviesForMovie } from "@/utils/movieSimilarity";
 import { useToast } from "@/hooks/use-toast";
-import { useUserMovieList } from "@/hooks/useUserMovieList";
+import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
 import QuickRating from "./QuickRating";
@@ -40,7 +40,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const [relatedContent, setRelatedContent] = useState<TMDBMovie[]>([]);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
-  const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieList();
+  const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieListContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { getProgress } = useWatchHistory();

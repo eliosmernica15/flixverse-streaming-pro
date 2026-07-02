@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
-import { useUserMovieList } from '@/hooks/useUserMovieList';
+import { useUserMovieListContext } from '@/contexts/UserMovieListContext';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useUserActivity, ActivityType } from '@/hooks/useUserActivity';
 import { useToast } from '@/hooks/use-toast';
@@ -39,7 +39,7 @@ const Profile = () => {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, signOut } = useAuth();
   const { profile, loading: profileLoading, updateProfile } = useUserProfileContext();
-  const { movieList, loading: listLoading } = useUserMovieList();
+  const { movieList, loading: listLoading } = useUserMovieListContext();
   const { history, getRecentlyWatched, getContinueWatching } = useWatchHistory();
   const { activities, loading: activityLoading, refetch: refetchActivity, getActivitiesByType, getStats } = useUserActivity();
   const { toast } = useToast();
