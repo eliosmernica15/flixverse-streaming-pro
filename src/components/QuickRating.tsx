@@ -3,7 +3,6 @@ import { Star } from 'lucide-react';
 import { useContentRating } from '@/hooks/useContentRating';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { motion } from 'framer-motion';
 
 interface QuickRatingProps {
   contentId: number;
@@ -87,14 +86,13 @@ const QuickRating = ({
           const isUserRated = userRating && star <= Math.ceil(userRating / 2);
 
           return (
-            <motion.button
+            <button
               key={star}
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.9 }}
+              type="button"
               onClick={() => handleRate(starRating)}
               onMouseEnter={() => setHoverRating(starRating)}
               onMouseLeave={() => setHoverRating(0)}
-              className="transition-all duration-150 focus:outline-none"
+              className="transition-transform duration-150 hover:scale-110 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/50 rounded"
               title={`Rate ${starRating}/10`}
             >
               <Star
@@ -105,7 +103,7 @@ const QuickRating = ({
                     : 'text-gray-500 hover:text-yellow-400/50'
                   }`}
               />
-            </motion.button>
+            </button>
           );
         })}
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageCircle, Send, User, ThumbsUp, Reply, Trash2, MoreHorizontal } from 'lucide-react';
+import { MessageCircle, Send, User, ThumbsUp, Reply, Trash2 } from 'lucide-react';
 import { useComments } from '@/hooks/useComments';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Comment } from '@/integrations/firebase/types';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface CommentSectionProps {
   contentId: number;
@@ -44,12 +43,7 @@ const CommentCard = ({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className={`${depth > 0 ? 'ml-8 border-l-2 border-white/10 pl-4' : ''}`}
-    >
+    <div className={`animate-fade-in ${depth > 0 ? 'ml-8 border-l-2 border-white/10 pl-4' : ''}`}>
       <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
         <div className="flex items-start space-x-3">
           <Avatar className="w-8 h-8">
@@ -67,6 +61,7 @@ const CommentCard = ({
               </div>
               {isOwner && (
                 <button
+                  type="button"
                   onClick={() => onDelete(comment.id)}
                   className="p-1 hover:bg-red-500/20 rounded transition-colors"
                 >
@@ -78,12 +73,13 @@ const CommentCard = ({
             <p className="text-gray-300 text-sm leading-relaxed">{comment.text}</p>
 
             <div className="flex items-center space-x-4 mt-2">
-              <button className="flex items-center space-x-1 text-gray-500 hover:text-white transition-colors text-xs">
+              <button type="button" className="flex items-center space-x-1 text-gray-500 hover:text-white transition-colors text-xs">
                 <ThumbsUp className="w-3.5 h-3.5" />
                 <span>{comment.likes_count}</span>
               </button>
               {depth < 2 && (
                 <button
+                  type="button"
                   onClick={() => onReply(comment.id)}
                   className="flex items-center space-x-1 text-gray-500 hover:text-white transition-colors text-xs"
                 >
@@ -93,8 +89,9 @@ const CommentCard = ({
               )}
               {replies.length > 0 && (
                 <button
+                  type="button"
                   onClick={() => setShowReplies(!showReplies)}
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  className="text-xs text-blue-400 hover:text-blue-400 transition-colors"
                 >
                   {showReplies ? 'Hide' : 'Show'} {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
                 </button>
@@ -104,30 +101,22 @@ const CommentCard = ({
         </div>
       </div>
 
-      {/* Nested Replies */}
-      <AnimatePresence>
-        {showReplies && replies.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-2 space-y-2"
-          >
-            {replies.map((reply) => (
-              <CommentCard
-                key={reply.id}
-                comment={reply}
-                isOwner={isOwner}
-                onReply={onReply}
-                onDelete={onDelete}
-                replies={[]}
-                depth={depth + 1}
-              />
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+      {showReplies && replies.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {replies.map((reply) => (
+            <CommentCard
+              key={reply.id}
+              comment={reply}
+              isOwner={isOwner}
+              onReply={onReply}
+              onDelete={onDelete}
+              replies={[]}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -191,7 +180,6 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
   return (
     <div className="w-full px-4 md:px-16 py-12 md:py-16 bg-black">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex items-center space-x-2 mb-6">
           <MessageCircle className="w-6 h-6 text-white" />
           <h2 className="text-xl md:text-2xl font-bold text-white">
@@ -199,7 +187,6 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
           </h2>
         </div>
 
-        {/* Comment Input */}
         {isAuthenticated ? (
           <div className="mb-8">
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
@@ -207,6 +194,7 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
                 <div className="flex items-center justify-between mb-2 px-3 py-2 bg-blue-500/10 rounded-lg">
                   <span className="text-sm text-blue-400">Replying to a comment</span>
                   <button
+                    type="button"
                     onClick={() => setReplyingTo(null)}
                     className="text-xs text-gray-400 hover:text-white"
                   >
@@ -255,7 +243,6 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
           </div>
         )}
 
-        {/* Comments List */}
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="w-6 h-6 border-4 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
@@ -267,18 +254,16 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
           </div>
         ) : (
           <div className="space-y-3">
-            <AnimatePresence>
-              {topLevelComments.map((comment) => (
-                <CommentCard
-                  key={comment.id}
-                  comment={comment}
-                  isOwner={user?.uid === comment.user_id}
-                  onReply={(parentId) => setReplyingTo(parentId)}
-                  onDelete={handleDeleteComment}
-                  replies={getReplies(comment.id)}
-                />
-              ))}
-            </AnimatePresence>
+            {topLevelComments.map((comment) => (
+              <CommentCard
+                key={comment.id}
+                comment={comment}
+                isOwner={user?.uid === comment.user_id}
+                onReply={(parentId) => setReplyingTo(parentId)}
+                onDelete={handleDeleteComment}
+                replies={getReplies(comment.id)}
+              />
+            ))}
           </div>
         )}
       </div>

@@ -8,7 +8,7 @@ import {
   MessageCircle, TrendingUp, Award, Filter
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { useUserProfileContext } from '@/contexts/UserProfileContext';
 import { useUserMovieList } from '@/hooks/useUserMovieList';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useUserActivity, ActivityType } from '@/hooks/useUserActivity';
@@ -19,7 +19,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { uploadToCloudinary } from '@/utils/cloudinary';
 import {
@@ -37,7 +36,7 @@ import ImageCropper from '@/components/ImageCropper';
 const Profile = () => {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, signOut } = useAuth();
-  const { profile, loading: profileLoading, updateProfile } = useUserProfile();
+  const { profile, loading: profileLoading, updateProfile } = useUserProfileContext();
   const { movieList, loading: listLoading } = useUserMovieList();
   const { history, getRecentlyWatched, getContinueWatching } = useWatchHistory();
   const { activities, loading: activityLoading, refetch: refetchActivity, getActivitiesByType, getStats } = useUserActivity();
@@ -246,9 +245,7 @@ const Profile = () => {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="relative -mt-16 sm:-mt-20 flex flex-col sm:flex-row items-center sm:items-end space-y-4 sm:space-y-0 sm:space-x-6">
               {/* Avatar */}
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
+              <div
                 className="relative group"
               >
                 <Avatar className="w-28 h-28 sm:w-36 sm:h-36 border-4 border-black shadow-2xl relative">
@@ -326,17 +323,14 @@ const Profile = () => {
                     aspect={1}
                   />
                 </div>
-              </motion.div>
+              </div>
 
               {/* Name & Actions */}
               <div className="flex-1 text-center sm:text-left pb-4">
-                <AnimatePresence mode="wait">
+                
                   {isEditing ? (
-                    <motion.div
+                    <div
                       key="editing"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
                       className="space-y-3"
                     >
                       <Input
@@ -370,13 +364,10 @@ const Profile = () => {
                           Cancel
                         </Button>
                       </div>
-                    </motion.div>
+                    </div>
                   ) : (
-                    <motion.div
+                    <div
                       key="display"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
                     >
                       <h1 className="text-2xl sm:text-3xl font-bold mb-1">
                         {profile.display_name || user?.email?.split('@')[0]}
@@ -389,9 +380,9 @@ const Profile = () => {
                         <Calendar className="w-3 h-3" />
                         <span>Joined {new Date(profile.created_at).toLocaleDateString()}</span>
                       </p>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
+                
               </div>
 
               {/* Action Buttons */}
@@ -422,17 +413,14 @@ const Profile = () => {
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8">
               {stats.map((stat, index) => (
-                <motion.div
+                <div
                   key={stat.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
                   className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-center"
                 >
                   <stat.icon className={`w-6 h-6 mx-auto mb-2 ${stat.color}`} />
                   <p className="text-2xl font-bold text-white">{stat.value}</p>
                   <p className="text-sm text-gray-400">{stat.label}</p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
@@ -472,11 +460,8 @@ const Profile = () => {
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                   {movieList.map((item, index) => (
-                    <motion.div
+                    <div
                       key={item.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.03 }}
                       className="group cursor-pointer"
                       onClick={() => router.push(`/movie/${item.movie_id}?type=${item.media_type || 'movie'}`)}
                     >
@@ -491,7 +476,7 @@ const Profile = () => {
                           <p className="text-white text-xs font-medium truncate">{item.movie_title}</p>
                         </div>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -517,11 +502,8 @@ const Profile = () => {
                         {continueWatching.map((item, index) => {
                           const progressPercentage = Math.round((item.progress_seconds / item.total_duration_seconds) * 100);
                           return (
-                            <motion.div
+                            <div
                               key={item.id}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: index * 0.05 }}
                               className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
                               onClick={() => {
                                 const resumeParam = item.progress_seconds > 0 ? `&resume=${item.progress_seconds}` : '';
@@ -554,7 +536,7 @@ const Profile = () => {
                                 </div>
                               </div>
                               <ChevronRight className="w-5 h-5 text-gray-500" />
-                            </motion.div>
+                            </div>
                           );
                         })}
                       </div>
@@ -567,11 +549,8 @@ const Profile = () => {
                       <h3 className="text-lg font-semibold text-white mb-3">Recently Watched</h3>
                       <div className="space-y-3">
                         {recentlyWatched.map((item, index) => (
-                          <motion.div
+                          <div
                             key={item.id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.05 }}
                             className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
                             onClick={() => {
                               const url = item.content_type === 'tv' && item.season && item.episode
@@ -596,7 +575,7 @@ const Profile = () => {
                               </p>
                             </div>
                             <ChevronRight className="w-5 h-5 text-gray-500" />
-                          </motion.div>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -611,26 +590,22 @@ const Profile = () => {
               <div className="flex flex-wrap items-center gap-2 mb-6">
                 <span className="text-sm text-gray-400 mr-2">Filter:</span>
                 {(['all', 'review', 'rating', 'comment', 'watchlist', 'watched'] as const).map((filter) => (
-                  <motion.button
+                  <button
                     key={filter}
                     onClick={() => setActivityFilter(filter)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activityFilter === filter
                       ? 'bg-red-500 text-white'
                       : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'
                       }`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                   >
                     {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
-                  </motion.button>
+                  </button>
                 ))}
               </div>
 
               {/* Activity Stats */}
-              <motion.div
+              <div
                 className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
               >
                 {[
                   { label: 'Reviews', value: getStats().totalReviews, icon: MessageCircle, color: 'text-purple-400' },
@@ -644,7 +619,7 @@ const Profile = () => {
                     <p className="text-xs text-gray-500">{stat.label}</p>
                   </div>
                 ))}
-              </motion.div>
+              </div>
 
               {/* Activity Feed */}
               <ActivityFeed

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { UserProfileProvider } from "@/contexts/UserProfileContext";
 import RouteProgress from "@/components/RouteProgress";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -27,12 +28,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     return (
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
+                <UserProfileProvider>
                 <TooltipProvider>
                     <RouteProgress />
                     {children}
                     <Toaster />
                     <Sonner />
                 </TooltipProvider>
+                </UserProfileProvider>
             </AuthProvider>
         </QueryClientProvider>
     );

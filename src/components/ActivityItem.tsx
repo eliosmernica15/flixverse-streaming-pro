@@ -1,5 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Tv, Film, ChevronRight, Clock, MessageCircle, Plus, Heart } from 'lucide-react';
+import { Star, Tv, Film, ChevronRight, Clock, MessageCircle, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { UserActivity, ActivityType } from '@/hooks/useUserActivity';
@@ -57,7 +56,7 @@ const formatTimeAgo = (dateString: string) => {
     return date.toLocaleDateString();
 };
 
-const ActivityItem = ({ activity, index = 0 }: ActivityItemProps) => {
+const ActivityItem = ({ activity }: ActivityItemProps) => {
     const router = useRouter();
 
     const handleClick = () => {
@@ -67,49 +66,38 @@ const ActivityItem = ({ activity, index = 0 }: ActivityItemProps) => {
     };
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05, duration: 0.3 }}
+        <div
             onClick={handleClick}
-            className="flex items-start space-x-4 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group"
+            className="flex items-start space-x-4 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group animate-fade-in"
         >
-            {/* Poster Thumbnail */}
-            {
-                activity.contentPosterPath ? (
-                    <motion.div
-                        className="relative w-14 h-20 flex-shrink-0 rounded-lg overflow-hidden"
-                        whileHover={{ scale: 1.05 }}
-                    >
-                        <img
-                            src={getImageUrl(activity.contentPosterPath, 'medium')}
-                            alt={activity.contentTitle || 'Content'}
-                            loading="lazy"
-                            className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                        <div className="absolute bottom-1 left-1">
-                            {activity.contentType === 'tv' ? (
-                                <Tv className="w-3 h-3 text-white/80" />
-                            ) : (
-                                <Film className="w-3 h-3 text-white/80" />
-                            )}
-                        </div>
-                    </motion.div>
-                ) : (
-                    <div className="w-14 h-20 flex-shrink-0 rounded-lg bg-white/10 flex items-center justify-center">
+            {activity.contentPosterPath ? (
+                <div className="relative w-14 h-20 flex-shrink-0 rounded-lg overflow-hidden transition-transform duration-200 group-hover:scale-105">
+                    <img
+                        src={getImageUrl(activity.contentPosterPath, 'medium')}
+                        alt={activity.contentTitle || 'Content'}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-1 left-1">
                         {activity.contentType === 'tv' ? (
-                            <Tv className="w-6 h-6 text-gray-500" />
+                            <Tv className="w-3 h-3 text-white/80" />
                         ) : (
-                            <Film className="w-6 h-6 text-gray-500" />
+                            <Film className="w-3 h-3 text-white/80" />
                         )}
                     </div>
-                )
-            }
+                </div>
+            ) : (
+                <div className="w-14 h-20 flex-shrink-0 rounded-lg bg-white/10 flex items-center justify-center">
+                    {activity.contentType === 'tv' ? (
+                        <Tv className="w-6 h-6 text-gray-500" />
+                    ) : (
+                        <Film className="w-6 h-6 text-gray-500" />
+                    )}
+                </div>
+            )}
 
-            {/* Content */}
             <div className="flex-1 min-w-0">
-                {/* Activity Type Badge */}
                 <div className="flex items-center space-x-2 mb-1">
                     <span className={`inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${getActivityColor(activity.type)}`}>
                         {getActivityIcon(activity.type)}
@@ -118,14 +106,12 @@ const ActivityItem = ({ activity, index = 0 }: ActivityItemProps) => {
                     <span className="text-xs text-gray-500">{formatTimeAgo(activity.timestamp)}</span>
                 </div>
 
-                {/* Title */}
                 {activity.contentTitle && (
                     <h4 className="text-white font-medium truncate group-hover:text-red-400 transition-colors">
                         {activity.contentTitle}
                     </h4>
                 )}
 
-                {/* Rating */}
                 {activity.rating && (
                     <div className="flex items-center space-x-1 mt-1">
                         <div className="flex items-center">
@@ -145,28 +131,24 @@ const ActivityItem = ({ activity, index = 0 }: ActivityItemProps) => {
                     </div>
                 )}
 
-                {/* Review Text Preview */}
                 {activity.reviewText && (
                     <p className="text-sm text-gray-400 mt-1 line-clamp-2">
-                        "{activity.reviewText}"
+                        &ldquo;{activity.reviewText}&rdquo;
                     </p>
                 )}
 
-                {/* Comment Text Preview */}
                 {activity.commentText && (
                     <p className="text-sm text-gray-400 mt-1 line-clamp-2">
-                        "{activity.commentText}"
+                        &ldquo;{activity.commentText}&rdquo;
                     </p>
                 )}
             </div>
 
-            {/* Arrow */}
             <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-white group-hover:translate-x-1 transition-all flex-shrink-0" />
-        </motion.div >
+        </div>
     );
 };
 
-// Activity Feed Section component for the profile
 interface ActivityFeedProps {
     activities: UserActivity[];
     loading?: boolean;
@@ -193,24 +175,20 @@ export const ActivityFeed = ({ activities, loading, emptyMessage = "No activity 
 
     if (activities.length === 0) {
         return (
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center py-12"
-            >
+            <div className="text-center py-12 animate-fade-in">
                 <Clock className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                 <p className="text-gray-400">{emptyMessage}</p>
                 <p className="text-gray-500 text-sm mt-2">
                     Start watching and rating content to build your activity feed
                 </p>
-            </motion.div>
+            </div>
         );
     }
 
     return (
         <div className="space-y-3">
-            {activities.map((activity, index) => (
-                <ActivityItem key={activity.id} activity={activity} index={index} />
+            {activities.map((activity) => (
+                <ActivityItem key={activity.id} activity={activity} index={0} />
             ))}
         </div>
     );

@@ -11,6 +11,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+    metadataBase: new URL(
+        process.env.NEXT_PUBLIC_SITE_URL ?? "https://flixverse-streaming-pro.vercel.app"
+    ),
     title: "FlixVerse",
     description: "FlixVerse - Your Ultimate Streaming Platform",
     authors: [{ name: "FlixVerse" }],

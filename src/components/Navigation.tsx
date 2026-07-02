@@ -9,7 +9,7 @@ import NotificationSettings from "./NotificationSettings";
 import NotificationBell from "./NotificationBell";
 import { TMDBMovie, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useToast } from "@/hooks/use-toast";
 import { useThrottledScroll } from "@/hooks/useThrottledScroll";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ const Navigation = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, signOut } = useAuth();
-  const { profile } = useUserProfile();
+  const { profile } = useUserProfileContext();
   const { toast } = useToast();
 
   const handleMovieSelect = (movie: TMDBMovie) => {

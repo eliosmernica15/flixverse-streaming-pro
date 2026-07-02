@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Review } from '@/integrations/firebase/types';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface ReviewSectionProps {
   contentId: number;
@@ -97,12 +96,7 @@ const ReviewCard = ({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10"
-    >
+    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 animate-fade-in">
       <div className="flex items-start space-x-3">
         <Avatar className="w-10 h-10">
           <AvatarImage src={review.user_avatar_url || undefined} />
@@ -160,7 +154,7 @@ const ReviewCard = ({
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -336,14 +330,8 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
         </div>
 
         {/* Write Review Form */}
-        <AnimatePresence>
-          {showWriteReview && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-8"
-            >
+        {showWriteReview && (
+            <div className="mb-8 animate-fade-in">
               <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4">
                   {isEditing ? 'Edit Your Review' : 'Write a Review'}
@@ -387,9 +375,8 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
 
         {/* Reviews List */}
         {loading ? (
@@ -403,7 +390,6 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
           </div>
         ) : (
           <div className="space-y-4">
-            <AnimatePresence>
               {reviews.map((review) => (
                 <ReviewCard
                   key={review.id}
@@ -417,7 +403,6 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
                   isAuthenticated={isAuthenticated}
                 />
               ))}
-            </AnimatePresence>
           </div>
         )}
 

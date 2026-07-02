@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import { Clock, Star, Sparkles, Film } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import Link from "next/link";
 
 const PersonalizedWelcome = () => {
   const { user, isAuthenticated } = useAuth();
-  const { profile } = useUserProfile();
+  const { profile } = useUserProfileContext();
   const [greeting, setGreeting] = useState("Welcome");
   const [timeOfDay, setTimeOfDay] = useState("");
 
