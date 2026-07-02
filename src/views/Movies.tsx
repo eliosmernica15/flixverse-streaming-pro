@@ -1,6 +1,8 @@
 "use client";
 
 import MovieCarousel from "@/components/MovieCarousel";
+import PageHero from "@/components/PageHero";
+import PageContainer from "@/components/PageContainer";
 import { useMoviesCatalog } from "@/hooks/queries/useMoviesCatalog";
 import {
   Film,
@@ -19,13 +21,7 @@ import {
 } from "lucide-react";
 import { TMDBMovie } from "@/utils/tmdbApi";
 
-const SECTIONS: {
-  key: string;
-  title: string;
-  icon: React.ReactNode;
-  exploreAllPath: string;
-  comingSoon?: boolean;
-}[] = [
+const SECTIONS = [
   { key: "trending", title: "Trending Movies", icon: <Flame className="w-5 h-5 text-orange-400" />, exploreAllPath: "/browse/trending-movies" },
   { key: "nowPlaying", title: "Now Playing", icon: <Clock className="w-5 h-5 text-green-400" />, exploreAllPath: "/browse/now-playing-movies" },
   { key: "topRated", title: "Top Rated Movies", icon: <Trophy className="w-5 h-5 text-yellow-400" />, exploreAllPath: "/browse/top-rated-movies" },
@@ -45,30 +41,22 @@ const SECTIONS: {
 
 const Movies = () => {
   const { data = {}, isLoading, isFetching, isError, refetch } = useMoviesCatalog();
+  const loadedCount = Object.keys(data).length;
 
   return (
-  <>
-      <div className="relative pt-20 pb-8 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-red-900/15 via-transparent to-transparent pointer-events-none" />
-        <div className="relative z-10 max-w-7xl mx-auto">
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
-              <Film className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-4xl md:text-5xl font-black text-white">Movies</h1>
-              <p className="text-gray-400 text-sm">Discover blockbusters and hidden gems</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <>
+      <PageHero
+        title="Movies"
+        subtitle="Discover blockbusters and hidden gems"
+        meta={loadedCount > 0 ? `${loadedCount} curated collections` : undefined}
+        accent="red"
+        icon={<Film className="w-6 h-6 text-white" />}
+      />
 
-      <div className="px-4 sm:px-6 lg:px-8 pb-16">
+      <PageContainer>
         <div className="space-y-10">
           {SECTIONS.map((section, index) => {
             const movies = (data as Record<string, TMDBMovie[]>)[section.key];
-            const showDivider = index < SECTIONS.length - 1;
-
             return (
               <div key={section.key}>
                 <MovieCarousel
@@ -79,27 +67,24 @@ const Movies = () => {
                   exploreAllPath={section.exploreAllPath}
                   comingSoon={section.comingSoon}
                 />
-                {showDivider && <div className="section-divider mt-10" />}
+                {index < SECTIONS.length - 1 && <div className="section-divider mt-10" />}
               </div>
             );
           })}
 
           {isError && !isLoading && (
-            <div className="text-center py-20 bg-gray-900/50 rounded-3xl border border-white/5">
+            <div className="text-center py-16 glass-card rounded-3xl border border-white/8">
               <Film className="w-12 h-12 text-gray-600 mx-auto mb-4" />
               <h3 className="text-xl font-bold text-white mb-2">Could not load movies</h3>
               <p className="text-gray-400 mb-6">There was a connection issue. Please try again.</p>
-              <button
-                onClick={() => refetch()}
-                className="bg-red-500 hover:bg-red-600 px-8 py-3 rounded-xl font-bold transition-colors"
-              >
+              <button type="button" onClick={() => refetch()} className="btn-primary px-8 py-3">
                 Retry
               </button>
             </div>
           )}
         </div>
-      </div>
-  </>
+      </PageContainer>
+    </>
   );
 };
 

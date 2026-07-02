@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import MovieCard from "@/components/MovieCard";
+import PageContainer from "@/components/PageContainer";
 import { Sparkles, AlertCircle } from "lucide-react";
 import { useBrowseCategory, getBrowseCategoryConfig } from "@/hooks/queries/useBrowseCategory";
 
@@ -35,9 +36,9 @@ const Browse = () => {
   }
 
   return (
-    <div className="pt-20 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <header className="flex items-center gap-4 mb-10">
+    <>
+      <header className="relative pt-20 pb-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1800px] mx-auto flex items-center gap-4">
           <div className="p-2.5 bg-gradient-to-br from-red-500/20 to-purple-500/10 rounded-xl border border-white/5">
             <Sparkles className="w-6 h-6 text-red-500" />
           </div>
@@ -47,7 +48,10 @@ const Browse = () => {
               {isLoading ? "Loading..." : `${movies.length} title${movies.length !== 1 ? "s" : ""}`}
             </p>
           </div>
-        </header>
+        </div>
+      </header>
+
+      <PageContainer className="!pt-0">
 
         {isLoading && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
@@ -80,12 +84,12 @@ const Browse = () => {
         )}
 
         {!isLoading && !isError && movies.length === 0 && (
-          <div className="text-center py-20 text-gray-500">
+          <div className="text-center py-20 text-gray-500 glass-card rounded-2xl border border-white/8">
             <p>No titles in this category right now.</p>
           </div>
         )}
-      </div>
-    </div>
+      </PageContainer>
+    </>
   );
 };
 

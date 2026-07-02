@@ -21,8 +21,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-black text-white">
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
       <Navigation />
-      {children}
+      <main id="main-content" className="outline-none">
+        {children}
+      </main>
       <Footer />
     </div>
   );

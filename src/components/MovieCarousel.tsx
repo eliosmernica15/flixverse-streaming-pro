@@ -82,24 +82,21 @@ const MovieCarousel = memo(
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="flex items-center justify-between mb-8 animate-fade-in-up">
-          <div className="flex items-center space-x-4">
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             {icon && (
-              <div className="p-2.5 bg-gradient-to-br from-red-500/20 to-purple-500/10 rounded-xl border border-white/5">
+              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-red-500/15 to-purple-500/10 rounded-xl border border-white/8 shrink-0">
                 {icon}
               </div>
             )}
-            <div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight truncate">
                 {title}
               </h2>
-              <div className="flex items-center space-x-3 mt-1">
-                <span className="text-sm text-gray-500">
-                  {validMovies.length > 0 ? `${validMovies.length} titles` : "Upcoming releases"}
-                </span>
-                <span className="w-1 h-1 bg-gray-600 rounded-full" />
-                <span className="text-sm text-gray-500">Updated daily</span>
-              </div>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {validMovies.length > 0 ? `${validMovies.length} titles` : "Upcoming releases"}
+                <span className="hidden sm:inline"> · Updated daily</span>
+              </p>
             </div>
           </div>
 

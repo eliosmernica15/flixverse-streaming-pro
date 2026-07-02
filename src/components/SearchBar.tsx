@@ -180,8 +180,9 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
               setIsOpen(false);
             }
           }}
-          placeholder="Search movies, TV shows & people..."
-          className="w-full pl-10 pr-10 py-2 bg-black/60 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-red-500 focus:bg-black/80 transition-all"
+          placeholder="Search movies, TV & people..."
+          aria-label="Search movies, TV shows and people"
+          className="input-field pl-10 pr-10 py-2.5 text-sm"
         />
         {query && (
           <button
@@ -194,7 +195,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
       </div>
 
       {isOpen && (query.length >= 2 || results.length > 0) && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-black/95 backdrop-blur-md border border-white/20 rounded-lg max-h-96 overflow-y-auto z-50">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-950/98 border border-white/10 rounded-xl max-h-96 overflow-y-auto z-50 shadow-2xl shadow-black/50 custom-scrollbar">
           {loading && (
             <div className="p-4 text-center text-gray-400">
               <div className="animate-pulse">Searching...</div>
@@ -213,7 +214,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                 <button
                   key={`${result.id}-${result.media_type}`}
                   onClick={() => handleResultSelect(result)}
-                  className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-white/10 transition-colors text-left"
+                  className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-white/8 transition-colors text-left rounded-lg mx-1"
                 >
                   <div className="relative">
                     <img

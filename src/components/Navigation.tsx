@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { User, LogOut, Menu, X, Sparkles, ChevronDown } from "lucide-react";
 import Link from "next/link";
@@ -68,6 +68,21 @@ const Navigation = () => {
     { path: "/my-list", label: "My List" },
   ];
 
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) {
+      document.body.style.overflow = "";
+      return;
+    }
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-[background,box-shadow] duration-500 ${
@@ -105,6 +120,7 @@ const Navigation = () => {
               <Link
                 key={link.path}
                 href={link.path}
+                prefetch
                 className={`relative px-4 py-2.5 text-sm lg:text-base font-medium transition-colors duration-200 rounded-xl group ${
                   isActive(link.path) ? "text-white" : "text-gray-400 hover:text-white"
                 }`}
@@ -223,6 +239,7 @@ const Navigation = () => {
                 <Link
                   key={link.path}
                   href={link.path}
+                  prefetch
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-colors duration-200 ${
                     isActive(link.path)

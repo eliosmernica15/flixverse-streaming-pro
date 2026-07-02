@@ -19,8 +19,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Sparkles, Mail, Lock, User, ArrowLeft, Film, Tv, Star } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Eye, EyeOff, Sparkles, Mail, Lock, User, ArrowLeft } from 'lucide-react';
+
+const LoadingSpinner = ({ label }: { label: string }) => (
+  <span className="inline-flex items-center gap-2">
+    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+    {label}
+  </span>
+);
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -159,112 +165,35 @@ const Auth = () => {
     setLoading(false);
   };
 
-  const floatingIcons = [
-    { icon: Film, delay: 0, x: '10%', y: '20%' },
-    { icon: Tv, delay: 0.5, x: '80%', y: '15%' },
-    { icon: Star, delay: 1, x: '15%', y: '70%' },
-    { icon: Film, delay: 1.5, x: '85%', y: '75%' },
-    { icon: Star, delay: 2, x: '50%', y: '85%' },
-  ];
-
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-red-950/30 via-black to-purple-950/30" />
-
-        {/* Animated gradient orbs */}
-        <motion.div
-          className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-red-500/10 rounded-full blur-[150px]"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.1, 0.15, 0.1],
-            x: [0, 50, 0]
-          }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-[150px]"
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.1, 0.2, 0.1],
-            y: [0, -50, 0]
-          }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-        />
-
-        {/* Floating icons */}
-        {floatingIcons.map((item, index) => (
-          <motion.div
-            key={index}
-            className="absolute text-white/5"
-            style={{ left: item.x, top: item.y }}
-            animate={{
-              y: [0, -20, 0],
-              rotate: [0, 10, -10, 0]
-            }}
-            transition={{
-              duration: 5,
-              repeat: Infinity,
-              delay: item.delay,
-              ease: "easeInOut"
-            }}
-          >
-            <item.icon className="w-12 h-12" />
-          </motion.div>
-        ))}
-
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:100px_100px]" />
+    <div className="min-h-screen auth-bg flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="auth-orb auth-orb-red" />
+        <div className="auth-orb auth-orb-purple" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:80px_80px]" />
       </div>
 
-      <div className="w-full max-w-md relative z-10">
-        {/* Back to home link */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
+      <div className="w-full max-w-md relative z-10 animate-fade-in-up">
+        <Link
+          href="/"
+          className="inline-flex items-center space-x-2 text-gray-400 hover:text-white mb-8 transition-colors group"
         >
-          <Link
-            href="/"
-            className="inline-flex items-center space-x-2 text-gray-400 hover:text-white mb-8 transition-colors group"
-          >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span className="text-sm">Back to FlixVerse</span>
-          </Link>
-        </motion.div>
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span className="text-sm">Back to FlixVerse</span>
+        </Link>
 
-        {/* Logo and welcome text */}
-        <motion.div
-          className="text-center mb-10"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <div className="text-center mb-10">
           <div className="flex items-center justify-center mb-6">
-            <motion.div
-              className="relative"
-              whileHover={{ scale: 1.05, rotate: 5 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              <Sparkles className="w-12 h-12 text-red-500" />
-              <div className="absolute inset-0 blur-xl bg-red-500/40 animate-pulse-glow" />
-            </motion.div>
+            <Sparkles className="w-12 h-12 text-red-500" />
             <h1 className="text-4xl font-black ml-3">
               <span className="text-gradient-primary">Flix</span>
               <span className="text-white">Verse</span>
             </h1>
           </div>
           <p className="text-gray-400 text-lg">Your gateway to unlimited entertainment</p>
-        </motion.div>
+        </div>
 
-        {/* Auth Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="glass-premium border-white/10 rounded-3xl overflow-hidden">
+        <Card className="glass-premium border-white/10 rounded-3xl overflow-hidden">
             <CardHeader className="pb-2 pt-8">
               <CardTitle className="text-white text-center text-2xl font-bold">
                 {activeTab === 'signin' ? 'Welcome Back' : 'Join FlixVerse'}
@@ -293,15 +222,8 @@ const Auth = () => {
                   </TabsTrigger>
                 </TabsList>
 
-                <AnimatePresence mode="wait">
-                  <TabsContent value="signin" className="space-y-5 mt-0">
-                    <motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      transition={{ duration: 0.2 }}
-                      className="space-y-5"
-                    >
+                <TabsContent value="signin" className="space-y-5 mt-0">
+                    <div className="space-y-5">
                       <div className="space-y-2">
                         <Label htmlFor="email" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
                           <Mail className="w-4 h-4" />
@@ -344,20 +266,7 @@ const Auth = () => {
                         disabled={loading}
                         className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
                       >
-                        {loading ? (
-                          <motion.div
-                            className="flex items-center space-x-2"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                          >
-                            <motion.div
-                              className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            />
-                            <span>Signing in...</span>
-                          </motion.div>
-                        ) : "Sign In"}
+                        {loading ? <LoadingSpinner label="Signing in..." /> : "Sign In"}
                       </Button>
 
                       {/* Divider */}
@@ -397,17 +306,11 @@ const Auth = () => {
                         </svg>
                         <span>Continue with Google</span>
                       </Button>
-                    </motion.div>
+                    </div>
                   </TabsContent>
 
                   <TabsContent value="signup" className="space-y-5 mt-0">
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      transition={{ duration: 0.2 }}
-                      className="space-y-5"
-                    >
+                    <div className="space-y-5">
                       <div className="space-y-2">
                         <Label htmlFor="displayName" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
                           <User className="w-4 h-4" />
@@ -464,20 +367,7 @@ const Auth = () => {
                         disabled={loading}
                         className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
                       >
-                        {loading ? (
-                          <motion.div
-                            className="flex items-center space-x-2"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                          >
-                            <motion.div
-                              className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            />
-                            <span>Creating account...</span>
-                          </motion.div>
-                        ) : "Create Account"}
+                        {loading ? <LoadingSpinner label="Creating account..." /> : "Create Account"}
                       </Button>
 
                       {/* Divider */}
@@ -517,9 +407,8 @@ const Auth = () => {
                         </svg>
                         <span>Continue with Google</span>
                       </Button>
-                    </motion.div>
+                    </div>
                   </TabsContent>
-                </AnimatePresence>
               </Tabs>
 
               {/* Terms */}
@@ -531,7 +420,6 @@ const Auth = () => {
               </p>
             </CardContent>
           </Card>
-        </motion.div>
       </div>
     </div>
   );
