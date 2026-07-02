@@ -4,8 +4,9 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
-import { fetchContentDetails, getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations, isNotReleasedYet } from "@/utils/tmdbApi";
+import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations, isNotReleasedYet } from "@/utils/tmdbApi";
 import { getSimilarMoviesForMovie } from "@/utils/movieSimilarity";
+import { useContentDetails } from "@/hooks/queries/useContentDetails";
 import { useToast } from "@/hooks/use-toast";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,9 +30,8 @@ interface MovieDetailsProps {
 
 const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePosition, initialSeason, initialEpisode }: MovieDetailsProps) => {
   const router = useRouter();
-  const [content, setContent] = useState<TMDBMovie | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: content = null, isLoading: loading, isError } = useContentDetails(movieId, mediaType);
+  const error = isError ? "Failed to load content details" : null;
   const [showPlayer, setShowPlayer] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
@@ -46,49 +46,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const { getProgress } = useWatchHistoryContext();
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadContentDetails = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const contentData = await fetchContentDetails(movieId, mediaType);
-
-        if (!isMounted) return;
-
-        if (!contentData) {
-          setError('Content not found');
-          setLoading(false);
-          return;
-        }
-
-        setContent(contentData);
-
-      } catch (err) {
-        console.error('Error loading content details:', err);
-        if (isMounted) {
-          setError('Failed to load content details');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadContentDetails();
-
-    // Trigger animation after component mounts
-    const timer = setTimeout(() => {
-      if (isMounted) setIsVisible(true);
-    }, 10);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [movieId, mediaType]);
+    const timer = setTimeout(() => setIsVisible(true), 10);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Handle autoplay (skip for unreleased content - cannot play)
   useEffect(() => {

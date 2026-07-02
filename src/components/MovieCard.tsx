@@ -16,6 +16,8 @@ import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -64,6 +66,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const [isInLocalList, setIsInLocalList] = useState(false);
   const { addToList, removeFromList, isInList } = useUserMovieListContext();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -92,7 +95,8 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const prefetchMovie = useCallback(() => {
     const contentType = getContentType(movie);
     router.prefetch(`/movie/${movie.id}?type=${contentType}`);
-  }, [movie, router]);
+    prefetchContentDetails(queryClient, movie.id, contentType);
+  }, [movie, router, queryClient]);
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
