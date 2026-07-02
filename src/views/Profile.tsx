@@ -11,7 +11,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
 import { useUserMovieListContext } from '@/contexts/UserMovieListContext';
-import { useWatchHistory } from '@/hooks/useWatchHistory';
+import { useWatchHistoryContext } from '@/contexts/WatchHistoryContext';
 import { useUserActivity, ActivityType } from '@/hooks/useUserActivity';
 import { useToast } from '@/hooks/use-toast';
 import { ActivityFeed } from '@/components/ActivityItem';
@@ -40,7 +40,7 @@ const Profile = () => {
   const { user, isAuthenticated, loading: authLoading, signOut } = useAuth();
   const { profile, loading: profileLoading, updateProfile } = useUserProfileContext();
   const { movieList, loading: listLoading } = useUserMovieListContext();
-  const { history, getRecentlyWatched, getContinueWatching } = useWatchHistory();
+  const { history, getRecentlyWatched, getContinueWatching } = useWatchHistoryContext();
   const { activities, loading: activityLoading, refetch: refetchActivity, getActivitiesByType, getStats } = useUserActivity();
   const { toast } = useToast();
 

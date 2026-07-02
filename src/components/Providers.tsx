@@ -8,6 +8,8 @@ import { useState } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UserProfileProvider } from "@/contexts/UserProfileContext";
 import { UserMovieListProvider } from "@/contexts/UserMovieListContext";
+import { WatchHistoryProvider } from "@/contexts/WatchHistoryContext";
+import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import RouteProgress from "@/components/RouteProgress";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -31,12 +33,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <AuthProvider>
                 <UserProfileProvider>
                 <UserMovieListProvider>
+                <WatchHistoryProvider>
+                <UserPreferencesProvider>
                 <TooltipProvider>
                     <RouteProgress />
                     {children}
                     <Toaster />
                     <Sonner />
                 </TooltipProvider>
+                </UserPreferencesProvider>
+                </WatchHistoryProvider>
                 </UserMovieListProvider>
                 </UserProfileProvider>
             </AuthProvider>

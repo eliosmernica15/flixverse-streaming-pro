@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Server, ArrowLeft, Maximize2, Minimize2, MonitorPlay, Tv, Film, RefreshCw, AlertTriangle } from "lucide-react";
-import { useWatchHistory } from "@/hooks/useWatchHistory";
+import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import { useToast } from "@/hooks/use-toast";
 
 interface VideoPlayerProps {
@@ -25,7 +25,7 @@ const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, 
   const [hasError, setHasError] = useState(false);
   const startTimeRef = useRef<number | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const { updateProgress } = useWatchHistory();
+  const { updateProgress } = useWatchHistoryContext();
   const { toast } = useToast();
 
   // Build streaming sources with proper TMDB ID format

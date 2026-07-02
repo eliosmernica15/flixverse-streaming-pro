@@ -1,6 +1,6 @@
 import { Play, Clock, X } from 'lucide-react';
 import Image from 'next/image';
-import { useWatchHistory } from '@/hooks/useWatchHistory';
+import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import { useAuth } from '@/hooks/useAuth';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { useRouter } from 'next/navigation';
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/carousel';
 
 const ContinueWatching = () => {
-  const { getContinueWatching, removeFromHistory, loading } = useWatchHistory();
+  const { getContinueWatching, removeFromHistory, loading } = useWatchHistoryContext();
   const { isAuthenticated } = useAuth();
   const router = useRouter();
 

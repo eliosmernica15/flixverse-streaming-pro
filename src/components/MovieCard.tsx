@@ -12,7 +12,7 @@ import {
   getContentType,
 } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
-import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useRouter } from "next/navigation";
@@ -59,7 +59,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const { addToHistory, addFavoriteGenre } = useUserPreferences();
+  const { addToHistory, addFavoriteGenre } = useUserPreferencesContext();
   const { isAuthenticated } = useAuth();
   const [isInLocalList, setIsInLocalList] = useState(false);
   const { addToList, removeFromList, isInList } = useUserMovieListContext();

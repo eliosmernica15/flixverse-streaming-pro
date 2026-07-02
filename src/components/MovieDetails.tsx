@@ -9,7 +9,7 @@ import { getSimilarMoviesForMovie } from "@/utils/movieSimilarity";
 import { useToast } from "@/hooks/use-toast";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useAuth } from "@/hooks/useAuth";
-import { useWatchHistory } from "@/hooks/useWatchHistory";
+import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import QuickRating from "./QuickRating";
 import MovieCard from "./MovieCard";
 
@@ -43,7 +43,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieListContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { getProgress } = useWatchHistory();
+  const { getProgress } = useWatchHistoryContext();
 
   useEffect(() => {
     let isMounted = true;
