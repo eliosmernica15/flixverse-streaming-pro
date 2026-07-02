@@ -12,7 +12,7 @@ import {
 
 export const NEW_AND_POPULAR_KEY = ["new-and-popular"] as const;
 
-async function loadNewAndPopular() {
+export async function loadNewAndPopular() {
   const [
     trending,
     popular,

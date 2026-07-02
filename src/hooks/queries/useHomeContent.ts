@@ -15,7 +15,7 @@ import { getHeroMovieOfTheWeek } from "@/utils/popularMoviesRotator";
 
 export const HOME_CONTENT_KEY = ["home-content"] as const;
 
-async function loadHomeContent() {
+export async function loadHomeContent() {
   const [
     heroMovie,
     trendingMovies,

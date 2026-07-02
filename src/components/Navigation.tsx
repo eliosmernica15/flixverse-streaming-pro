@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useToast } from "@/hooks/use-toast";
 import { useThrottledScroll } from "@/hooks/useThrottledScroll";
+import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -43,6 +44,7 @@ const Navigation = () => {
   const { user, isAuthenticated, signOut } = useAuth();
   const { profile } = useUserProfileContext();
   const { toast } = useToast();
+  const prefetchRoute = useRoutePrefetch();
 
   const handleMovieSelect = (movie: TMDBMovie) => {
     const type = getContentType(movie);
@@ -110,7 +112,7 @@ const Navigation = () => {
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           <div className="flex items-center">
-            <Link href="/" className="flex-shrink-0 group">
+            <Link href="/" className="flex-shrink-0 group" onMouseEnter={() => prefetchRoute("/")} onFocus={() => prefetchRoute("/")}>
               <div className="flex items-center space-x-2.5">
                 <div className="relative">
                   <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-red-500 group-hover:text-red-400 transition-colors duration-200 group-hover:rotate-12" />
@@ -129,6 +131,8 @@ const Navigation = () => {
                 key={link.path}
                 href={link.path}
                 prefetch
+                onMouseEnter={() => prefetchRoute(link.path)}
+                onFocus={() => prefetchRoute(link.path)}
                 className={`relative px-4 py-2.5 text-sm lg:text-base font-medium transition-colors duration-200 rounded-xl group ${
                   isActive(link.path) ? "text-white" : "text-gray-400 hover:text-white"
                 }`}
@@ -252,6 +256,8 @@ const Navigation = () => {
                   key={link.path}
                   href={link.path}
                   prefetch
+                  onMouseEnter={() => prefetchRoute(link.path)}
+                  onFocus={() => prefetchRoute(link.path)}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-colors duration-200 ${
                     isActive(link.path)

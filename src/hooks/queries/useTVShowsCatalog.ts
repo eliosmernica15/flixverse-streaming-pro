@@ -30,7 +30,7 @@ const SECTIONS = [
   { id: "documentary", fetch: fetchDocumentaryTVShows },
 ] as const;
 
-async function loadTVShowsCatalog(): Promise<Record<string, TMDBMovie[]>> {
+export async function loadTVShowsCatalog(): Promise<Record<string, TMDBMovie[]>> {
   const results = await Promise.all(
     SECTIONS.map(async (section) => ({
       id: section.id,
