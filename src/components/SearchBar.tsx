@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Search, X, User, Film, Tv } from "lucide-react";
 import { TMDBMovie, TMDBPerson, searchMulti, searchPeople, getContentImage } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
+import { FOCUS_SEARCH_EVENT } from "@/hooks/useGlobalShortcuts";
 
 interface SearchBarProps {
   onMovieSelect: (movie: TMDBMovie) => void;
@@ -31,8 +32,19 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
+
+  useEffect(() => {
+    const focusSearch = () => {
+      inputRef.current?.focus();
+      setIsOpen(true);
+    };
+
+    window.addEventListener(FOCUS_SEARCH_EVENT, focusSearch);
+    return () => window.removeEventListener(FOCUS_SEARCH_EVENT, focusSearch);
+  }, []);
 
   useEffect(() => {
     const searchContent = async () => {
@@ -162,6 +174,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => {
@@ -170,6 +183,11 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
           }}
           onFocus={() => setIsOpen(true)}
           onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setIsOpen(false);
+              inputRef.current?.blur();
+              return;
+            }
             if (e.key === "Enter" && query.trim()) {
               e.preventDefault();
               router.push(`/search?q=${encodeURIComponent(query.trim())}`);
@@ -180,12 +198,17 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
           }}
           placeholder="Search movies, TV & people..."
           aria-label="Search movies, TV shows and people"
-          className="input-field pl-10 pr-10 py-2.5 text-sm"
+          aria-keyshortcuts="/"
+          className="input-field pl-10 pr-16 py-2.5 text-sm"
         />
+        <kbd className="hidden lg:inline-flex absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none select-none items-center rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+          /
+        </kbd>
         {query && (
           <button
+            type="button"
             onClick={clearSearch}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+            className="absolute right-10 lg:right-12 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
           >
             <X className="w-4 h-4" />
           </button>

@@ -11,6 +11,7 @@ import { UserMovieListProvider } from "@/contexts/UserMovieListContext";
 import { WatchHistoryProvider } from "@/contexts/WatchHistoryContext";
 import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import RouteProgress from "@/components/RouteProgress";
+import GlobalShortcuts from "@/components/GlobalShortcuts";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
@@ -37,6 +38,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 <UserPreferencesProvider>
                 <TooltipProvider>
                     <RouteProgress />
+                    <GlobalShortcuts />
                     {children}
                     <Toaster />
                     <Sonner />
