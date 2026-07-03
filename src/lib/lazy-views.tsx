@@ -9,3 +9,4 @@ export const LazyBrowse = dynamic(() => import("@/views/Browse"));
 export const LazyProfile = dynamic(() => import("@/views/Profile"));
 export const LazySearchResults = dynamic(() => import("@/views/SearchResults"));
 export const LazyMovieDetailsPage = dynamic(() => import("@/views/MovieDetailsPage"));
+export const LazyOfflineLibrary = dynamic(() => import("@/views/OfflineLibrary"));

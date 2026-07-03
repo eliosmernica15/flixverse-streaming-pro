@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { OPEN_SHORTCUTS_EVENT } from "@/components/KeyboardShortcutsHelp";
 
 export const FOCUS_SEARCH_EVENT = "flixverse:focus-search";
 
@@ -15,6 +16,13 @@ export function useGlobalShortcuts() {
         if (isEditableTarget(event.target)) return;
         event.preventDefault();
         window.dispatchEvent(new CustomEvent(FOCUS_SEARCH_EVENT));
+        return;
+      }
+
+      if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        if (isEditableTarget(event.target)) return;
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS_EVENT));
       }
     };
 

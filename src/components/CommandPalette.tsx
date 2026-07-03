@@ -12,7 +12,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Film, Tv, Home, Search, Heart, Sparkles, TrendingUp, User } from "lucide-react";
+import { Film, Tv, Home, Search, Heart, Sparkles, TrendingUp, User, WifiOff } from "lucide-react";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "flixverse:open-command";
 
@@ -22,6 +22,7 @@ const pages = [
   { href: "/tv-shows", label: "TV Shows", icon: Tv },
   { href: "/new-and-popular", label: "New & Popular", icon: TrendingUp },
   { href: "/my-list", label: "My List", icon: Heart },
+  { href: "/offline-library", label: "Offline Library", icon: WifiOff },
   { href: "/search", label: "Search", icon: Search },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/auth", label: "Sign In", icon: Sparkles },

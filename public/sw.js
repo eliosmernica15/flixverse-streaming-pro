@@ -1,6 +1,14 @@
-const CACHE_VERSION = "flixverse-v2";
+const CACHE_VERSION = "flixverse-v3";
 const OFFLINE_URL = "/offline";
-const PRECACHE = ["/", OFFLINE_URL, "/manifest.json", "/favicon.svg"];
+const PRECACHE = [
+  "/",
+  OFFLINE_URL,
+  "/offline-library",
+  "/movies",
+  "/tv-shows",
+  "/manifest.json",
+  "/favicon.svg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -29,27 +37,34 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(event.request);
-          return cached || caches.match(OFFLINE_URL);
-        })
-    );
+    event.respondWith(networkFirstNavigate(event.request));
     return;
   }
 
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/favicon")) {
+  if (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/favicon") ||
+    url.pathname === "/manifest.json"
+  ) {
     event.respondWith(staleWhileRevalidate(event.request, CACHE_VERSION));
   }
 });
+
+async function networkFirstNavigate(request) {
+  const cache = await caches.open(CACHE_VERSION);
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    const offline = await cache.match(OFFLINE_URL);
+    return offline || Response.error();
+  }
+}
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);

@@ -17,6 +17,8 @@ import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import InstallPrompt from "@/components/InstallPrompt";
 import OfflineBanner from "@/components/OfflineBanner";
 import BackToTop from "@/components/BackToTop";
+import OfflineCacheSync from "@/components/OfflineCacheSync";
+import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
@@ -45,6 +47,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                     <RouteProgress />
                     <GlobalShortcuts />
                     <CommandPalette />
+                    <KeyboardShortcutsHelp />
+                    <OfflineCacheSync />
                     <ServiceWorkerRegister />
                     <OfflineBanner />
                     <InstallPrompt />

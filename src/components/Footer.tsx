@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles, Film, Tv, Heart, TrendingUp, Github, Twitter, Instagram, Youtube } from "lucide-react";
+import { Sparkles, Film, Tv, Heart, TrendingUp, Github, Twitter, Instagram, Youtube, WifiOff } from "lucide-react";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -10,6 +10,7 @@ const Footer = () => {
     { path: "/tv-shows", label: "TV Shows", icon: Tv },
     { path: "/my-list", label: "My List", icon: Heart },
     { path: "/new-and-popular", label: "Trending", icon: TrendingUp },
+    { path: "/offline-library", label: "Offline Library", icon: WifiOff },
   ];
 
   const legalLinks = [
@@ -41,7 +42,7 @@ const Footer = () => {
               </h2>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-              Your ultimate destination for movies and TV shows. Stream unlimited entertainment, anytime, anywhere.
+              Watch free movies and TV shows online in HD. Stream trending films, build your watchlist, and browse offline with FlixVerse.
             </p>
           </div>
 

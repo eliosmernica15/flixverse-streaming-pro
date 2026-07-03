@@ -76,6 +76,7 @@ const Navigation = () => {
     { path: "/movies", label: "Movies" },
     { path: "/new-and-popular", label: "New & Popular" },
     { path: "/my-list", label: "My List" },
+    { path: "/offline-library", label: "Offline" },
   ];
 
   useEffect(() => {
