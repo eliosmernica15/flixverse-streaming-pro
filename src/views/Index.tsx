@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import HeroBanner from "@/components/HeroBanner";
 import MovieCarousel from "@/components/MovieCarousel";
 import PersonalizedWelcome from "@/components/PersonalizedWelcome";
+import LazySection from "@/components/LazySection";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeContent } from "@/hooks/queries/useHomeContent";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
@@ -61,57 +62,61 @@ const Index = () => {
             exploreAllPath="/browse/now-playing"
           />
 
-          <div className="section-divider" aria-hidden />
+          <LazySection minHeight={360}>
+            <>
+              <div className="section-divider" aria-hidden />
 
-          <MovieCarousel
-            title="Top Rated"
-            movies={data?.topRatedMovies || []}
-            loading={!data?.topRatedMovies?.length && (isLoading || isFetching)}
-            icon={<Star className="w-5 h-5 text-yellow-500" />}
-            exploreAllPath="/browse/top-rated"
-          />
+              <MovieCarousel
+                title="Top Rated"
+                movies={data?.topRatedMovies || []}
+                loading={!data?.topRatedMovies?.length && (isLoading || isFetching)}
+                icon={<Star className="w-5 h-5 text-yellow-500" />}
+                exploreAllPath="/browse/top-rated"
+              />
 
-          <div className="section-divider" aria-hidden />
+              <div className="section-divider" aria-hidden />
 
-          <MovieCarousel
-            title="Popular Movies"
-            movies={data?.popularMovies || []}
-            loading={!data?.popularMovies?.length && (isLoading || isFetching)}
-            icon={<Film className="w-5 h-5 text-blue-500" />}
-            exploreAllPath="/browse/popular-movies"
-          />
+              <MovieCarousel
+                title="Popular Movies"
+                movies={data?.popularMovies || []}
+                loading={!data?.popularMovies?.length && (isLoading || isFetching)}
+                icon={<Film className="w-5 h-5 text-blue-500" />}
+                exploreAllPath="/browse/popular-movies"
+              />
 
-          <div className="section-divider" aria-hidden />
+              <div className="section-divider" aria-hidden />
 
-          <MovieCarousel
-            title="Trending TV Shows"
-            movies={data?.trendingTVShows || []}
-            loading={!data?.trendingTVShows?.length && (isLoading || isFetching)}
-            icon={<Tv className="w-5 h-5 text-purple-500" />}
-            exploreAllPath="/browse/trending-tv"
-          />
+              <MovieCarousel
+                title="Trending TV Shows"
+                movies={data?.trendingTVShows || []}
+                loading={!data?.trendingTVShows?.length && (isLoading || isFetching)}
+                icon={<Tv className="w-5 h-5 text-purple-500" />}
+                exploreAllPath="/browse/trending-tv"
+              />
 
-          <div className="section-divider" aria-hidden />
+              <div className="section-divider" aria-hidden />
 
-          <MovieCarousel
-            title="Popular TV Shows"
-            movies={data?.popularTVShows || []}
-            loading={!data?.popularTVShows?.length && (isLoading || isFetching)}
-            icon={<Tv className="w-5 h-5 text-pink-500" />}
-            exploreAllPath="/browse/popular-tv"
-          />
+              <MovieCarousel
+                title="Popular TV Shows"
+                movies={data?.popularTVShows || []}
+                loading={!data?.popularTVShows?.length && (isLoading || isFetching)}
+                icon={<Tv className="w-5 h-5 text-pink-500" />}
+                exploreAllPath="/browse/popular-tv"
+              />
 
-          <div className="section-divider" aria-hidden />
+              <div className="section-divider" aria-hidden />
 
-          <MovieCarousel
-            title="Coming soon"
-            movies={data?.comingSoon || []}
-            loading={!data?.comingSoon?.length && (isLoading || isFetching)}
-            icon={<Calendar className="w-5 h-5 text-amber-500" />}
-            showWhenEmpty
-            exploreAllPath="/browse/coming-soon"
-            comingSoon
-          />
+              <MovieCarousel
+                title="Coming soon"
+                movies={data?.comingSoon || []}
+                loading={!data?.comingSoon?.length && (isLoading || isFetching)}
+                icon={<Calendar className="w-5 h-5 text-amber-500" />}
+                showWhenEmpty
+                exploreAllPath="/browse/coming-soon"
+                comingSoon
+              />
+            </>
+          </LazySection>
         </div>
       </div>
     </main>

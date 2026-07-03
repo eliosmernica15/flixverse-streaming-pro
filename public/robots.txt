@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://flixverse-streaming-pro.vercel.app/sitemap.xml

@@ -1,5 +1,6 @@
-import Index from "@/views/Index";
+import { LazyIndex } from "@/lib/lazy-views";
 import { buildPageMetadata } from "@/lib/seo/metadata";
+import { FAQJsonLd } from "@/components/seo/JsonLd";
 
 export const metadata = buildPageMetadata({
   title: "FlixVerse — Watch Free Movies & TV Shows Online in HD",
@@ -20,5 +21,10 @@ export const metadata = buildPageMetadata({
 });
 
 export default function Home() {
-  return <Index />;
+  return (
+    <>
+      <FAQJsonLd />
+      <LazyIndex />
+    </>
+  );
 }

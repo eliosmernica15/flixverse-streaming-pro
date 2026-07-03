@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,13 +13,16 @@ import { WatchHistoryProvider } from "@/contexts/WatchHistoryContext";
 import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import RouteProgress from "@/components/RouteProgress";
 import GlobalShortcuts from "@/components/GlobalShortcuts";
-import CommandPalette from "@/components/CommandPalette";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import InstallPrompt from "@/components/InstallPrompt";
 import OfflineBanner from "@/components/OfflineBanner";
 import BackToTop from "@/components/BackToTop";
 import OfflineCacheSync from "@/components/OfflineCacheSync";
-import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
+
+const CommandPalette = dynamic(() => import("@/components/CommandPalette"), { ssr: false });
+const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcutsHelp"), {
+  ssr: false,
+});
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(

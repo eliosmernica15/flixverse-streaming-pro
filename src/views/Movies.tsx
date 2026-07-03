@@ -3,6 +3,7 @@
 import MovieCarousel from "@/components/MovieCarousel";
 import PageHero from "@/components/PageHero";
 import PageContainer from "@/components/PageContainer";
+import LazySection from "@/components/LazySection";
 import { useMoviesCatalog } from "@/hooks/queries/useMoviesCatalog";
 import {
   Film,
@@ -20,6 +21,8 @@ import {
   Wand2,
 } from "lucide-react";
 import { TMDBMovie } from "@/utils/tmdbApi";
+
+const PRIORITY_KEYS = new Set(["trending", "nowPlaying", "topRated", "popular"]);
 
 const SECTIONS = [
   { key: "trending", title: "Trending Movies", icon: <Flame className="w-5 h-5 text-orange-400" />, exploreAllPath: "/browse/trending-movies" },
@@ -43,6 +46,26 @@ const Movies = () => {
   const { data = {}, isLoading, isFetching, isError, refetch } = useMoviesCatalog();
   const loadedCount = Object.keys(data).length;
 
+  const renderSection = (section: (typeof SECTIONS)[number], index: number) => {
+    const movies = (data as Record<string, TMDBMovie[]>)[section.key];
+    return (
+      <div key={section.key}>
+        <MovieCarousel
+          title={section.title}
+          movies={movies || []}
+          loading={!movies?.length && (isLoading || isFetching)}
+          icon={section.icon}
+          exploreAllPath={section.exploreAllPath}
+          comingSoon={section.comingSoon}
+        />
+        {index < SECTIONS.length - 1 && <div className="section-divider mt-10" />}
+      </div>
+    );
+  };
+
+  const prioritySections = SECTIONS.filter((s) => PRIORITY_KEYS.has(s.key));
+  const deferredSections = SECTIONS.filter((s) => !PRIORITY_KEYS.has(s.key));
+
   return (
     <>
       <PageHero
@@ -55,22 +78,16 @@ const Movies = () => {
 
       <PageContainer>
         <div className="space-y-10">
-          {SECTIONS.map((section, index) => {
-            const movies = (data as Record<string, TMDBMovie[]>)[section.key];
-            return (
-              <div key={section.key}>
-                <MovieCarousel
-                  title={section.title}
-                  movies={movies || []}
-                  loading={!movies?.length && (isLoading || isFetching)}
-                  icon={section.icon}
-                  exploreAllPath={section.exploreAllPath}
-                  comingSoon={section.comingSoon}
-                />
-                {index < SECTIONS.length - 1 && <div className="section-divider mt-10" />}
-              </div>
-            );
-          })}
+          {prioritySections.map((section, index) => renderSection(section, index))}
+
+          <LazySection minHeight={480} className="space-y-10">
+            <>
+              <div className="section-divider" />
+              {deferredSections.map((section, index) =>
+                renderSection(section, prioritySections.length + index)
+              )}
+            </>
+          </LazySection>
 
           {isError && !isLoading && (
             <div className="text-center py-16 glass-card rounded-3xl border border-white/8">

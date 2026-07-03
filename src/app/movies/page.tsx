@@ -1,5 +1,6 @@
 import { LazyMovies } from "@/lib/lazy-views";
-import { buildPageMetadata } from "@/lib/seo/metadata";
+import { buildPageMetadata, SITE_URL } from "@/lib/seo/metadata";
+import { CollectionPageJsonLd } from "@/components/seo/JsonLd";
 
 export const metadata = buildPageMetadata({
   title: "Free Movies Online — Stream HD Films",
@@ -19,5 +20,14 @@ export const metadata = buildPageMetadata({
 });
 
 export default function MoviesPage() {
-  return <LazyMovies />;
+  return (
+    <>
+      <CollectionPageJsonLd
+        name="Free Movies Online"
+        description="Browse and stream free HD movies — trending, top-rated, genre collections, and new releases on FlixVerse."
+        url={`${SITE_URL}/movies`}
+      />
+      <LazyMovies />
+    </>
+  );
 }

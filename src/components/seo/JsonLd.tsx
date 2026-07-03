@@ -7,6 +7,7 @@ export function WebsiteJsonLd() {
     name: SITE_NAME,
     url: SITE_URL,
     description: DEFAULT_DESCRIPTION,
+    inLanguage: "en-US",
     potentialAction: {
       "@type": "SearchAction",
       target: {
@@ -32,6 +33,7 @@ export function OrganizationJsonLd() {
     name: SITE_NAME,
     url: SITE_URL,
     logo: `${SITE_URL}/favicon.svg`,
+    description: DEFAULT_DESCRIPTION,
     sameAs: [],
   };
 
@@ -43,7 +45,95 @@ export function OrganizationJsonLd() {
   );
 }
 
-interface MovieJsonLdProps {
+export function FAQJsonLd() {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "Can I watch movies for free on FlixVerse?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes. FlixVerse lets you browse and stream movies and TV shows online in HD at no cost.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Does FlixVerse work offline?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "You can browse cached watchlist titles and posters offline. Video streaming requires an internet connection.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "How do I search for movies on FlixVerse?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: `Use the search bar or visit ${SITE_URL}/search to find movies, TV shows, and actors.`,
+        },
+      },
+    ],
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface CollectionPageJsonLdProps {
+  name: string;
+  description: string;
+  url: string;
+}
+
+export function CollectionPageJsonLd({ name, description, url }: CollectionPageJsonLdProps) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name,
+    description,
+    url,
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface BreadcrumbJsonLdProps {
+  items: { name: string; url: string }[];
+}
+
+export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.url,
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface ContentJsonLdProps {
   title: string;
   description: string;
   image?: string;
@@ -61,7 +151,7 @@ export function ContentJsonLd({
   type,
   datePublished,
   rating,
-}: MovieJsonLdProps) {
+}: ContentJsonLdProps) {
   const schemaType = type === "tv" ? "TVSeries" : "Movie";
   const data = {
     "@context": "https://schema.org",
@@ -71,13 +161,14 @@ export function ContentJsonLd({
     image,
     url,
     ...(datePublished ? { datePublished } : {}),
-    ...(rating
+    ...(rating && rating > 0
       ? {
           aggregateRating: {
             "@type": "AggregateRating",
             ratingValue: rating.toFixed(1),
             bestRating: "10",
-            ratingCount: 100,
+            worstRating: "0",
+            ratingCount: Math.max(10, Math.round(rating * 100)),
           },
         }
       : {}),

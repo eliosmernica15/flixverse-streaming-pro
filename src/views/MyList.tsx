@@ -1,38 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import MovieCarousel from "@/components/MovieCarousel";
 import PageHero from "@/components/PageHero";
 import PageContainer from "@/components/PageContainer";
 import EmptyState from "@/components/EmptyState";
-import { fetchMovieDetails, fetchTVShowDetails, TMDBMovie } from "@/utils/tmdbApi";
+import { TMDBMovie } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { Heart, LogIn, Film, Sparkles } from "lucide-react";
+import { useMemo } from "react";
 
 const MyList = () => {
   const { isAuthenticated } = useAuth();
-  const { movieList, loading: listLoading } = useUserMovieListContext();
+  const { movieList, loading } = useUserMovieListContext();
 
-  const listKey = movieList.map((item) => `${item.media_type}-${item.movie_id}`).join(",");
-
-  const { data: myMovies = [], isLoading: detailsLoading } = useQuery({
-    queryKey: ["my-list-details", listKey],
-    queryFn: async () => {
-      const movies = await Promise.all(
-        movieList.map((item) =>
-          item.media_type === "tv"
-            ? fetchTVShowDetails(item.movie_id)
-            : fetchMovieDetails(item.movie_id)
-        )
-      );
-      return movies.filter((movie): movie is TMDBMovie => movie !== null);
-    },
-    enabled: isAuthenticated && !listLoading && movieList.length > 0,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 15 * 60 * 1000,
-  });
+  const myMovies = useMemo<TMDBMovie[]>(
+    () =>
+      movieList.map((item) => ({
+        id: item.movie_id,
+        title: item.media_type === "tv" ? undefined : item.movie_title,
+        name: item.media_type === "tv" ? item.movie_title : undefined,
+        poster_path: item.movie_poster_path ?? "",
+        backdrop_path: "",
+        overview: "",
+        vote_average: 0,
+        genre_ids: [],
+        media_type: item.media_type ?? "movie",
+      })),
+    [movieList]
+  );
 
   if (!isAuthenticated) {
     return (
@@ -45,8 +42,6 @@ const MyList = () => {
       />
     );
   }
-
-  const loading = listLoading || (movieList.length > 0 && detailsLoading);
 
   return (
     <>

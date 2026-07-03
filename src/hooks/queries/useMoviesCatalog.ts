@@ -19,13 +19,21 @@ import {
 } from "@/utils/tmdbApi";
 
 export const MOVIES_CATALOG_KEY = ["movies-catalog"] as const;
+export const MOVIES_PRIORITY_KEY = ["movies-catalog", "priority"] as const;
+export const MOVIES_DEFERRED_KEY = ["movies-catalog", "deferred"] as const;
 
-const SECTIONS = [
+const STALE = 10 * 60 * 1000;
+const GC = 30 * 60 * 1000;
+
+const PRIORITY_SECTIONS = [
   { id: "trending", fetch: fetchTrendingMovies },
+  { id: "nowPlaying", fetch: fetchNowPlayingMovies },
   { id: "topRated", fetch: fetchTopRatedMovies },
   { id: "popular", fetch: fetchPopularMovies },
+] as const;
+
+const DEFERRED_SECTIONS = [
   { id: "upcoming", fetch: getUpcomingMoviesOnly },
-  { id: "nowPlaying", fetch: fetchNowPlayingMovies },
   { id: "action", fetch: fetchActionMovies },
   { id: "comedy", fetch: fetchComedyMovies },
   { id: "horror", fetch: fetchHorrorMovies },
@@ -38,9 +46,11 @@ const SECTIONS = [
   { id: "adventure", fetch: fetchAdventureMovies },
 ] as const;
 
-export async function loadMoviesCatalog(): Promise<Record<string, TMDBMovie[]>> {
+async function loadSections(
+  sections: readonly { id: string; fetch: () => Promise<TMDBMovie[]> }[]
+): Promise<Record<string, TMDBMovie[]>> {
   const results = await Promise.all(
-    SECTIONS.map(async (section) => ({
+    sections.map(async (section) => ({
       id: section.id,
       data: await section.fetch(),
     }))
@@ -53,11 +63,38 @@ export async function loadMoviesCatalog(): Promise<Record<string, TMDBMovie[]>> 
   return catalog;
 }
 
+/** Full load for route prefetch. */
+export async function loadMoviesCatalog(): Promise<Record<string, TMDBMovie[]>> {
+  const [priority, deferred] = await Promise.all([
+    loadSections(PRIORITY_SECTIONS),
+    loadSections(DEFERRED_SECTIONS),
+  ]);
+  return { ...priority, ...deferred };
+}
+
 export function useMoviesCatalog() {
-  return useQuery({
-    queryKey: MOVIES_CATALOG_KEY,
-    queryFn: loadMoviesCatalog,
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+  const priority = useQuery({
+    queryKey: MOVIES_PRIORITY_KEY,
+    queryFn: () => loadSections(PRIORITY_SECTIONS),
+    staleTime: STALE,
+    gcTime: GC,
   });
+
+  const deferred = useQuery({
+    queryKey: MOVIES_DEFERRED_KEY,
+    queryFn: () => loadSections(DEFERRED_SECTIONS),
+    enabled: priority.isSuccess,
+    staleTime: STALE,
+    gcTime: GC,
+  });
+
+  const data = { ...(priority.data ?? {}), ...(deferred.data ?? {}) };
+
+  return {
+    data,
+    isLoading: priority.isLoading,
+    isFetching: priority.isFetching || deferred.isFetching,
+    isError: priority.isError || deferred.isError,
+    refetch: () => Promise.all([priority.refetch(), deferred.refetch()]),
+  };
 }

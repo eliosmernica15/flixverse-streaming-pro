@@ -1,5 +1,6 @@
 import { LazyTVShows } from "@/lib/lazy-views";
-import { buildPageMetadata } from "@/lib/seo/metadata";
+import { buildPageMetadata, SITE_URL } from "@/lib/seo/metadata";
+import { CollectionPageJsonLd } from "@/components/seo/JsonLd";
 
 export const metadata = buildPageMetadata({
   title: "Free TV Shows Online — Stream Series in HD",
@@ -18,5 +19,14 @@ export const metadata = buildPageMetadata({
 });
 
 export default function TVShowsPage() {
-  return <LazyTVShows />;
+  return (
+    <>
+      <CollectionPageJsonLd
+        name="Free TV Shows Online"
+        description="Stream free TV series in HD — trending shows, dramas, comedies, and documentaries on FlixVerse."
+        url={`${SITE_URL}/tv-shows`}
+      />
+      <LazyTVShows />
+    </>
+  );
 }

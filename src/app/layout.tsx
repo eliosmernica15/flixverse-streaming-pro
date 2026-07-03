@@ -41,13 +41,13 @@ export const metadata: Metadata = {
         url: SITE_URL,
         siteName: SITE_NAME,
         locale: "en_US",
-        images: [{ url: `${SITE_URL}/favicon.svg`, width: 512, height: 512, alt: SITE_NAME }],
+        images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: SITE_NAME }],
     },
     twitter: {
         card: "summary_large_image",
         title: `${SITE_NAME} — Watch Movies Online Free`,
         description: DEFAULT_DESCRIPTION,
-        images: [`${SITE_URL}/favicon.svg`],
+        images: ["/opengraph-image"],
     },
     robots: {
         index: true,

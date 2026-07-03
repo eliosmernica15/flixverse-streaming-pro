@@ -60,6 +60,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const { addToHistory, addFavoriteGenre } = useUserPreferencesContext();
   const { isAuthenticated } = useAuth();
@@ -97,6 +98,20 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
     router.prefetch(`/movie/${movie.id}?type=${contentType}`);
     prefetchContentDetails(queryClient, movie.id, contentType);
   }, [movie, router, queryClient]);
+
+  const schedulePrefetch = useCallback(() => {
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    prefetchTimerRef.current = setTimeout(prefetchMovie, 180);
+  }, [prefetchMovie]);
+
+  const cancelPrefetch = useCallback(() => {
+    if (prefetchTimerRef.current) {
+      clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => cancelPrefetch(), [cancelPrefetch]);
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -165,9 +180,12 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
       className="relative group cursor-pointer movie-card"
       onMouseEnter={() => {
         setIsHovered(true);
-        prefetchMovie();
+        schedulePrefetch();
       }}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        cancelPrefetch();
+      }}
       onClick={handleCardClick}
     >
       <div className="relative overflow-hidden rounded-2xl bg-gray-900/50 movie-card-inner">
