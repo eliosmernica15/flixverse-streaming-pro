@@ -6,6 +6,9 @@ import MovieCarousel from "@/components/MovieCarousel";
 import PersonalizedWelcome from "@/components/PersonalizedWelcome";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeContent } from "@/hooks/queries/useHomeContent";
+import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { TrendingUp, Star, Play, Tv, Film, Calendar } from "lucide-react";
 
 const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), {
@@ -15,7 +18,14 @@ const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), 
 
 const Index = () => {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const { data, isLoading, isFetching } = useHomeContent();
+
+  useEffect(() => {
+    if (!data?.hero?.id) return;
+    const contentType = data.hero.media_type === "tv" ? "tv" : "movie";
+    prefetchContentDetails(queryClient, data.hero.id, contentType);
+  }, [data?.hero, queryClient]);
 
   return (
     <main>

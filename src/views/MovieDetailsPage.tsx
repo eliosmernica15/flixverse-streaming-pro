@@ -4,14 +4,11 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { MovieDetailSkeleton } from "@/components/skeletons/RouteSkeletons";
 
 const MovieDetails = dynamic(() => import("@/components/MovieDetails"), {
   ssr: false,
-  loading: () => (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="w-10 h-10 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
-    </div>
-  ),
+  loading: () => <MovieDetailSkeleton />,
 });
 
 const MovieDetailsPage = () => {

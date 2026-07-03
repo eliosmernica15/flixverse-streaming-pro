@@ -4,9 +4,9 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
-import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, fetchSimilarTVShows, fetchTVShowRecommendations, isNotReleasedYet } from "@/utils/tmdbApi";
-import { getSimilarMoviesForMovie } from "@/utils/movieSimilarity";
+import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, isNotReleasedYet } from "@/utils/tmdbApi";
 import { useContentDetails } from "@/hooks/queries/useContentDetails";
+import { useRelatedContent } from "@/hooks/queries/useRelatedContent";
 import { useToast } from "@/hooks/use-toast";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,7 +37,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
   const [showSeasonDropdown, setShowSeasonDropdown] = useState(false);
-  const [relatedContent, setRelatedContent] = useState<TMDBMovie[]>([]);
+  const { data: relatedContent = [] } = useRelatedContent(content, mediaType);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieListContext();
@@ -60,42 +60,6 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       return () => clearTimeout(timer);
     }
   }, [autoplay, content, showPlayer]);
-
-  // Fetch related/similar titles: movies use similarity scoring; TV uses similar + recommendations
-  useEffect(() => {
-    if (!content) return;
-    const isTV = content.media_type === 'tv' || mediaType === 'tv';
-    const id = content.id;
-    let cancelled = false;
-    const run = async () => {
-      try {
-        if (isTV) {
-          const [similar, recs] = await Promise.all([
-            fetchSimilarTVShows(id),
-            fetchTVShowRecommendations(id),
-          ]);
-          if (cancelled) return;
-          const combined = [...(similar || []), ...(recs || [])]
-            .filter((m) => m && m.id && m.id !== id)
-            .map((m) => ({ ...m, media_type: 'tv' as const }));
-          const seen = new Set<number>();
-          const unique = combined.filter((m) => {
-            if (seen.has(m.id)) return false;
-            seen.add(m.id);
-            return true;
-          });
-          setRelatedContent(unique.slice(0, 4));
-        } else {
-          const similar = await getSimilarMoviesForMovie(content, { maxResults: 4 });
-          if (!cancelled) setRelatedContent(similar);
-        }
-      } catch {
-        if (!cancelled) setRelatedContent([]);
-      }
-    };
-    run();
-    return () => { cancelled = true; };
-  }, [content, mediaType]);
 
   // No body scroll lock needed - component has its own scroll container
 

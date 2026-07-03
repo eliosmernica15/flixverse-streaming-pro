@@ -1,13 +1,16 @@
 "use client";
 
+import { useEffect } from "react";
 import Image from "next/image";
 import { Play, Star, Plus, Info, Check } from "lucide-react";
-import { TMDBMovie, getBackdropUrl, getContentTitle } from "@/utils/tmdbApi";
+import { TMDBMovie, getBackdropUrl, getContentTitle, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useToast } from "@/hooks/use-toast";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 
 interface HeroBannerProps {
   movie: TMDBMovie;
@@ -18,7 +21,19 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
   const { addToList, isInList } = useUserMovieListContext();
   const { toast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const reducedMotion = useReducedMotion();
+
+  const contentType = getContentType(movie);
+
+  useEffect(() => {
+    prefetchContentDetails(queryClient, movie.id, contentType);
+  }, [movie.id, contentType, queryClient]);
+
+  const prefetchHero = () => {
+    router.prefetch(`/movie/${movie.id}?type=${contentType}`);
+    prefetchContentDetails(queryClient, movie.id, contentType);
+  };
 
   const title = getContentTitle(movie);
   const backdropUrl = movie.backdrop_path ? getBackdropUrl(movie.backdrop_path, "large") : "";
@@ -39,12 +54,10 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
       setTimeout(() => router.push("/auth"), 1500);
       return;
     }
-    const contentType = movie.media_type === "tv" ? "tv" : "movie";
     router.push(`/movie/${movie.id}?type=${contentType}&autoplay=true`);
   };
 
   const handleMoreInfo = () => {
-    const contentType = movie.media_type === "tv" ? "tv" : "movie";
     router.push(`/movie/${movie.id}?type=${contentType}`);
   };
 
@@ -141,6 +154,8 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
             <div className="flex flex-wrap items-center gap-4">
               <button
                 onClick={handlePlayClick}
+                onMouseEnter={prefetchHero}
+                onFocus={prefetchHero}
                 className="group flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition-transform duration-200 shadow-2xl shadow-white/15 hover:scale-[1.02] active:scale-[0.98] btn-shine"
               >
                 <Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
@@ -162,6 +177,8 @@ const HeroBanner = ({ movie }: HeroBannerProps) => {
 
               <button
                 onClick={handleMoreInfo}
+                onMouseEnter={prefetchHero}
+                onFocus={prefetchHero}
                 className="group p-4 glass-card rounded-xl hover:bg-white/15 transition-transform duration-200 hover:scale-105 active:scale-95"
                 title="More Info"
               >
