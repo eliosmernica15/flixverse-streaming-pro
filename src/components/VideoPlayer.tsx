@@ -1,7 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { X, Server, ArrowLeft, Maximize2, Minimize2, MonitorPlay, Tv, Film, RefreshCw, AlertTriangle } from "lucide-react";
+"use client";
+
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  X, Server, ArrowLeft, Maximize2, Minimize2, Tv, Film,
+  RefreshCw, AlertTriangle, Keyboard, Clock, Signal, ChevronRight,
+} from "lucide-react";
 import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import { useToast } from "@/hooks/use-toast";
+import { buildStreamingSources } from "@/lib/streamingSources";
 
 interface VideoPlayerProps {
   movieId: number;
@@ -13,394 +19,326 @@ interface VideoPlayerProps {
   season?: number;
   episode?: number;
   posterPath?: string;
-  resumePosition?: number; // Resume position in seconds
-  totalDuration?: number; // Total duration in seconds
+  resumePosition?: number;
+  totalDuration?: number;
 }
 
-const VideoPlayer = ({ movieId, title, description, onClose, isTrailer = false, mediaType = "movie", season, episode, posterPath, resumePosition, totalDuration }: VideoPlayerProps) => {
+function formatTime(seconds: number) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+const VideoPlayer = ({
+  movieId, title, onClose, isTrailer = false, mediaType = "movie",
+  season, episode, posterPath, resumePosition, totalDuration,
+}: VideoPlayerProps) => {
   const [currentServer, setCurrentServer] = useState(0);
   const [showServerSelector, setShowServerSelector] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [isTheaterMode, setIsTheaterMode] = useState(false);
+  const [isCinematic, setIsCinematic] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+
   const startTimeRef = useRef<number | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hideControlsTimer = useRef<NodeJS.Timeout | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const { updateProgress } = useWatchHistoryContext();
   const { toast } = useToast();
 
-  // Build streaming sources with proper TMDB ID format
-  const streamingSources = [
-    {
-      name: "VidSrc CC",
-      icon: "📺",
-      url: mediaType === "tv" && season && episode
-        ? `https://vidsrc.cc/v2/embed/tv/${movieId}/${season}/${episode}`
-        : `https://vidsrc.cc/v2/embed/movie/${movieId}`
-    },
-    {
-      name: "VidSrc Pro",
-      icon: "🎬",
-      url: mediaType === "tv" && season && episode
-        ? `https://vidsrc.xyz/embed/tv?tmdb=${movieId}&season=${season}&episode=${episode}`
-        : `https://vidsrc.xyz/embed/movie?tmdb=${movieId}`
-    },
-    {
-      name: "VidLink",
-      icon: "🔗",
-      url: mediaType === "tv" && season && episode
-        ? `https://vidlink.pro/tv/${movieId}/${season}/${episode}`
-        : `https://vidlink.pro/movie/${movieId}`
-    },
-    {
-      name: "VidSrc ICU",
-      icon: "🎥",
-      url: mediaType === "tv" && season && episode
-        ? `https://vidsrc.icu/embed/tv/${movieId}/${season}/${episode}`
-        : `https://vidsrc.icu/embed/movie/${movieId}`
-    },
-    {
-      name: "Embed SU",
-      icon: "🎞️",
-      url: mediaType === "tv" && season && episode
-        ? `https://embed.su/embed/tv/${movieId}/${season}/${episode}`
-        : `https://embed.su/embed/movie/${movieId}`
-    },
-    {
-      name: "SuperEmbed",
-      icon: "📽️",
-      url: mediaType === "tv" && season && episode
-        ? `https://multiembed.mov/?video_id=${movieId}&tmdb=1&s=${season}&e=${episode}`
-        : `https://multiembed.mov/?video_id=${movieId}&tmdb=1`
-    },
-    {
-      name: "AutoEmbed",
-      icon: "⚡",
-      url: mediaType === "tv" && season && episode
-        ? `https://player.autoembed.cc/embed/tv/${movieId}/${season}/${episode}`
-        : `https://player.autoembed.cc/embed/movie/${movieId}`
-    },
-    {
-      name: "SmashyStream",
-      icon: "💥",
-      url: mediaType === "tv" && season && episode
-        ? `https://player.smashy.stream/tv/${movieId}?s=${season}&e=${episode}`
-        : `https://player.smashy.stream/movie/${movieId}`
-    },
-  ];
-
+  const streamingSources = useMemo(
+    () => buildStreamingSources(movieId, mediaType, season, episode),
+    [movieId, mediaType, season, episode]
+  );
   const currentSource = streamingSources[currentServer];
 
+  const progressPercent = totalDuration && !isTrailer
+    ? Math.min(100, (((resumePosition || 0) + elapsed) / totalDuration) * 100)
+    : 0;
+
+  const bumpControls = useCallback(() => {
+    setControlsVisible(true);
+    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
+    hideControlsTimer.current = setTimeout(() => setControlsVisible(false), 4000);
+  }, []);
+
   const handleClose = useCallback(() => {
-    // Close UI immediately so user can always go back (no blocking on progress save)
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
-    }
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
     onClose();
 
-    // Save progress in background (best-effort; don't block close)
     if (startTimeRef.current && totalDuration && !isTrailer) {
-      const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      const finalProgress = (resumePosition || 0) + elapsedSeconds;
+      const finalProgress = (resumePosition || 0) + elapsed;
       if (finalProgress < totalDuration) {
-        updateProgress(
-          movieId,
-          mediaType,
-          title,
-          posterPath || null,
-          finalProgress,
-          totalDuration,
-          season,
-          episode
-        ).catch((error) => {
-          console.error('Error saving final watch progress:', error);
-        });
+        updateProgress(movieId, mediaType, title, posterPath || null, finalProgress, totalDuration, season, episode).catch(() => undefined);
       }
     }
-  }, [movieId, mediaType, title, posterPath, season, episode, totalDuration, resumePosition, isTrailer, updateProgress, onClose]);
+  }, [movieId, mediaType, title, posterPath, season, episode, totalDuration, resumePosition, isTrailer, updateProgress, onClose, elapsed]);
 
-  const handleRetry = () => {
+  const switchServer = useCallback((index: number) => {
+    setCurrentServer(index);
+    setShowServerSelector(false);
     setIsLoading(true);
     setHasError(false);
-    // Clear progress tracking when switching servers
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     startTimeRef.current = null;
-    // Try next server
-    setCurrentServer((prev) => (prev + 1) % streamingSources.length);
+    setElapsed(0);
+  }, []);
+
+  const handleRetry = () => switchServer((currentServer + 1) % streamingSources.length);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { handleClose(); return; }
+      if (e.key === "t" || e.key === "T") { setIsTheaterMode((p) => !p); bumpControls(); return; }
+      if (e.key === "c" || e.key === "C") { setIsCinematic((p) => !p); bumpControls(); return; }
+      if (e.key === "n" || e.key === "N") { handleRetry(); bumpControls(); return; }
+      if (e.key === "s" || e.key === "S") { setShowServerSelector((p) => !p); bumpControls(); return; }
+      if (e.key === "?") { setShowShortcuts((p) => !p); return; }
+      bumpControls();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleClose, handleRetry, bumpControls]);
+
+  useEffect(() => {
+    bumpControls();
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [bumpControls]);
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (startTimeRef.current && !isLoading) {
+        setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [isLoading]);
+
+  useEffect(() => () => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
+  }, []);
+
+  const onIframeLoad = () => {
+    setIsLoading(false);
+    if (!isTrailer && totalDuration) {
+      startTimeRef.current = Date.now();
+      if (resumePosition && resumePosition > 60) {
+        toast({ title: "Resuming playback", description: `Continuing from ${formatTime(resumePosition)}` });
+      }
+      progressIntervalRef.current = setInterval(() => {
+        if (!startTimeRef.current) return;
+        const current = (resumePosition || 0) + Math.floor((Date.now() - startTimeRef.current) / 1000);
+        if (current < totalDuration) {
+          updateProgress(movieId, mediaType, title, posterPath || null, current, totalDuration, season, episode).catch(() => undefined);
+        }
+      }, 30000);
+    }
   };
 
-  // Handle keyboard shortcuts (must be after handleClose is defined)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleClose();
-      }
-      if (e.key === 't' || e.key === 'T') setIsTheaterMode(prev => !prev);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose]);
-
-  // Reset loading state when server changes
-  useEffect(() => {
-    setIsLoading(true);
-    setHasError(false);
-    const timer = setTimeout(() => setIsLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, [currentServer]);
-
-  // Lock body scroll when player is open, restore on unmount
-  useEffect(() => {
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, []);
-
-  // Cleanup progress tracking on unmount
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-  }, []);
+  const shortcuts = [
+    { key: "Esc", action: "Close player" },
+    { key: "T", action: "Theater mode" },
+    { key: "C", action: "Cinematic bars" },
+    { key: "N", action: "Next server" },
+    { key: "S", action: "Server menu" },
+    { key: "?", action: "Shortcuts" },
+  ];
 
   return (
     <div
-      className="fixed inset-0 bg-black z-50 overflow-hidden"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        width: '100vw',
-        height: '100vh',
-        zIndex: 50,
-        opacity: 1,
-      }}
+      ref={containerRef}
+      className="player-shell fixed inset-0 z-[9999] bg-black flex flex-col"
+      onMouseMove={bumpControls}
+      onTouchStart={bumpControls}
     >
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-30 pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,0,0,0.1),transparent_70%)]" />
-      </div>
+      <div className="player-ambient" aria-hidden />
 
-      {/* Main Container */}
-      <div className="relative h-full flex flex-col overflow-hidden">
-        {/* Top Bar - Responsive */}
-        <div className={`flex-shrink-0 bg-gradient-to-b from-black via-black/80 to-transparent transition-all duration-300 ${isTheaterMode ? 'opacity-0 hover:opacity-100' : ''}`}>
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
-            <div className="flex items-center justify-between gap-2 sm:gap-4">
-              {/* Left: Back & Title */}
-              <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
-                <button
-                  onClick={handleClose}
-                  className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 sm:py-2.5 bg-white/10 hover:bg-white/20 rounded-lg sm:rounded-xl transition-all duration-300 group backdrop-blur-sm border border-white/5"
-                >
-                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-x-1 transition-transform" />
-                  <span className="text-white text-xs sm:text-sm font-medium hidden xs:inline">Back</span>
-                </button>
-
-                <div className="min-w-0 flex-1 hidden sm:block">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0">
-                      {mediaType === "tv" ? <Tv className="w-4 h-4 text-white" /> : <Film className="w-4 h-4 text-white" />}
-                    </div>
-                    <div className="min-w-0">
-                      <h1 className="text-base lg:text-lg font-bold text-white truncate">{title}</h1>
-                      <div className="flex items-center space-x-2 text-xs text-gray-400">
-                        {isTrailer && <span className="text-red-400">Trailer</span>}
-                        {mediaType === "tv" && season && episode && (
-                          <span>Season {season}, Episode {episode}</span>
-                        )}
-                        {!isTrailer && !season && <span>Full {mediaType === "tv" ? "Episode" : "Movie"}</span>}
-                      </div>
-                    </div>
-                  </div>
+      {/* Top bar */}
+      <header className={`player-chrome top-0 ${controlsVisible || showServerSelector ? "player-chrome-visible" : ""}`}>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+            <button type="button" onClick={handleClose} className="player-btn group">
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+              <span className="hidden sm:inline text-sm font-medium">Back</span>
+            </button>
+            <div className="min-w-0 hidden sm:block">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shrink-0">
+                  {mediaType === "tv" ? <Tv className="w-4 h-4" /> : <Film className="w-4 h-4" />}
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-sm lg:text-base font-bold truncate">{title}</h1>
+                  <p className="text-xs text-gray-400 truncate">
+                    {isTrailer ? "Trailer" : mediaType === "tv" && season && episode ? `S${season} · E${episode}` : "Now streaming"}
+                  </p>
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* Right: Controls */}
-              <div className="flex items-center space-x-1 sm:space-x-2">
-                {/* Server Selector */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowServerSelector(!showServerSelector)}
-                    className="flex items-center space-x-1 sm:space-x-2 bg-white/10 hover:bg-white/20 text-white h-8 sm:h-10 px-2 sm:px-4 rounded-lg sm:rounded-xl transition-all duration-300 border border-white/5 backdrop-blur-sm"
-                  >
-                    <Server className="w-3 h-3 sm:w-4 sm:h-4 text-red-400" />
-                    <span className="text-xs sm:text-sm font-medium hidden md:inline">{currentSource.name}</span>
-                    <span className="text-base sm:text-lg">{currentSource.icon}</span>
-                  </button>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {!isTrailer && totalDuration && (
+              <span className="hidden md:flex items-center gap-1.5 text-xs text-gray-400 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                <Clock className="w-3.5 h-3.5" />
+                {formatTime((resumePosition || 0) + elapsed)} / {formatTime(totalDuration)}
+              </span>
+            )}
+            <button type="button" onClick={() => setShowShortcuts(true)} className="player-icon-btn" title="Shortcuts (?)">
+              <Keyboard className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => setShowServerSelector(true)} className="player-btn">
+              <Server className="w-4 h-4 text-red-400" />
+              <span className="hidden md:inline text-xs font-medium">{currentSource.name}</span>
+              <span className="text-sm">{currentSource.icon}</span>
+            </button>
+            <button type="button" onClick={() => setIsTheaterMode((p) => !p)} className="player-icon-btn" title="Theater (T)">
+              {isTheaterMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button type="button" onClick={handleClose} className="player-icon-btn hover:bg-red-500/80" title="Close (Esc)">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </header>
 
-                  {showServerSelector && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setShowServerSelector(false)} />
-                      <div className="absolute top-full right-0 mt-2 w-56 sm:w-72 max-h-[70vh] overflow-y-auto bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl z-20 shadow-2xl shadow-black/50 animate-scale-in">
-                        <div className="p-2 sm:p-3 bg-gradient-to-r from-red-500/10 to-transparent border-b border-white/5 sticky top-0 bg-gray-900/98">
-                          <div className="flex items-center space-x-2">
-                            <MonitorPlay className="w-4 h-4 text-red-400" />
-                            <span className="text-xs sm:text-sm font-semibold text-white">Select Server</span>
-                          </div>
-                        </div>
-                        <div className="p-1 sm:p-2">
-                          {streamingSources.map((source, index) => (
-                            <button
-                              key={index}
-                              onClick={() => {
-                                setCurrentServer(index);
-                                setShowServerSelector(false);
-                              }}
-                              className={`w-full flex items-center space-x-2 sm:space-x-3 px-2 sm:px-3 py-2 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all ${currentServer === index
-                                  ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20'
-                                  : 'text-gray-300 hover:bg-white/10'
-                                }`}
-                            >
-                              <span className="text-lg sm:text-xl">{source.icon}</span>
-                              <span className="font-medium flex-1 text-left">{source.name}</span>
-                              {currentServer === index && (
-                                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="p-2 sm:p-3 bg-black/30 border-t border-white/5 sticky bottom-0">
-                          <p className="text-[10px] sm:text-xs text-gray-500 text-center">Switch server if video doesn't load</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
+      {/* Video area */}
+      <div className={`flex-1 min-h-0 flex items-center justify-center relative ${isCinematic ? "py-16 sm:py-24" : "p-3 sm:p-6"}`}>
+        <div className={`relative w-full transition-all duration-500 ${isTheaterMode ? "max-w-[100vw]" : "max-w-6xl"}`}>
+          <div className="player-frame relative w-full overflow-hidden rounded-xl sm:rounded-2xl border border-white/10 shadow-[0_0_80px_rgba(239,68,68,0.15)]" style={{ aspectRatio: "16/9" }}>
+            {isLoading && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950">
+                <div className="player-loader mb-4" />
+                <p className="text-white font-semibold text-sm sm:text-base">Connecting to {currentSource.name}</p>
+                <p className="text-gray-500 text-xs mt-1">Server {currentServer + 1} of {streamingSources.length}</p>
+              </div>
+            )}
+
+            {hasError && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center">
+                <div className="w-14 h-14 rounded-full bg-red-500/15 flex items-center justify-center mb-4">
+                  <AlertTriangle className="w-7 h-7 text-red-500" />
                 </div>
-
-                {/* Theater Mode Toggle */}
-                <button
-                  onClick={() => setIsTheaterMode(!isTheaterMode)}
-                  className="h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg sm:rounded-xl transition-all duration-300 border border-white/5 backdrop-blur-sm"
-                  title={isTheaterMode ? "Exit Theater Mode (T)" : "Theater Mode (T)"}
-                >
-                  {isTheaterMode ? (
-                    <Minimize2 className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                  ) : (
-                    <Maximize2 className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                  )}
+                <p className="text-white font-semibold mb-1">Stream unavailable</p>
+                <p className="text-gray-500 text-sm mb-5">Try the next server — some sources rotate daily.</p>
+                <button type="button" onClick={handleRetry} className="btn-primary px-6 py-2.5 gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  Next server
                 </button>
+              </div>
+            )}
 
-                {/* Close - type="button" prevents any form submit; close runs then onClose() */}
+            <iframe
+              key={currentServer}
+              src={currentSource.url}
+              title={`Watch ${title}`}
+              className="absolute inset-0 w-full h-full border-0"
+              allowFullScreen
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              onLoad={onIframeLoad}
+              onError={() => setHasError(true)}
+            />
+          </div>
+
+          {/* Bottom progress + info */}
+          <div className={`player-chrome bottom-0 mt-3 ${controlsVisible ? "player-chrome-visible" : ""}`}>
+            {!isTrailer && totalDuration && (
+              <div className="mb-3">
+                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-red-600 to-orange-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
+                </div>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <Signal className="w-3.5 h-3.5 text-green-500" />
+                {currentSource.quality} · {currentSource.reliability === "high" ? "Stable" : "Backup"}
+              </span>
+              <button type="button" onClick={() => setIsCinematic((p) => !p)} className="hover:text-white transition-colors">
+                {isCinematic ? "Exit cinematic" : "Cinematic mode (C)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Server selector modal */}
+      {showServerSelector && (
+        <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowServerSelector(false)} />
+          <div className="relative w-full sm:max-w-lg bg-zinc-950 border border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl animate-fade-in-up max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Server className="w-5 h-5 text-red-500" />
+                <h2 className="font-bold text-white">Streaming servers</h2>
+              </div>
+              <button type="button" onClick={() => setShowServerSelector(false)} className="p-2 hover:bg-white/10 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-2 custom-scrollbar">
+              {streamingSources.map((source, index) => (
                 <button
+                  key={source.id}
                   type="button"
-                  onClick={() => {
-                    handleClose();
-                  }}
-                  className="h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center bg-white/10 hover:bg-red-500 rounded-lg sm:rounded-xl transition-all duration-300 border border-white/5 backdrop-blur-sm group"
-                  title="Close (Esc)"
-                  aria-label="Close video player"
+                  onClick={() => switchServer(index)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl mb-1 transition-all ${
+                    currentServer === index
+                      ? "bg-gradient-to-r from-red-600/30 to-orange-600/20 border border-red-500/30"
+                      : "hover:bg-white/5 border border-transparent"
+                  }`}
                 >
-                  <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  <span className="text-2xl">{source.icon}</span>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="font-medium text-white text-sm">{source.name}</p>
+                    <p className="text-xs text-gray-500">{source.quality} · {source.reliability === "high" ? "Recommended" : "Alternative"}</p>
+                  </div>
+                  {currentServer === index ? (
+                    <span className="text-xs text-red-400 font-medium">Active</span>
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-gray-600" />
+                  )}
                 </button>
-              </div>
+              ))}
             </div>
           </div>
         </div>
+      )}
 
-        {/* Video Container - min-h-0 allows flex child to size correctly */}
-        <div className="flex-1 min-h-0 flex items-center justify-center p-4 sm:p-6 md:p-8">
-          <div className="relative w-full max-w-6xl">
-            {/* Video Wrapper */}
-            <div
-              className="relative w-full bg-black overflow-hidden rounded-xl shadow-2xl shadow-black/80 border border-white/10"
-              style={{ aspectRatio: '16/9' }}
-            >
-              {/* Loading Overlay */}
-              {isLoading && (
-                <div className="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center z-10">
-                  <div className="relative mb-4 sm:mb-6">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin" />
-                    <Film className="w-4 h-4 sm:w-6 sm:h-6 text-red-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                  </div>
-                  <p className="text-white font-medium mb-1 text-sm sm:text-base">Loading {currentSource.name}...</p>
-                  <p className="text-gray-500 text-xs sm:text-sm">Preparing your stream</p>
-                </div>
-              )}
-
-              {/* Error State */}
-              {hasError && (
-                <div className="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center z-10 p-4">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-3 sm:mb-4">
-                    <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
-                  </div>
-                  <p className="text-white font-medium mb-2 text-sm sm:text-base">Playback Error</p>
-                  <p className="text-gray-500 text-xs sm:text-sm mb-4 sm:mb-6 text-center">This server might be unavailable</p>
-                  <button
-                    onClick={handleRetry}
-                    className="flex items-center space-x-2 bg-gradient-to-r from-red-600 to-red-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full text-sm sm:text-base font-medium hover:scale-105 transition-all"
-                  >
-                    <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>Try Next Server</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Video Frame */}
-              <iframe
-                key={currentServer}
-                src={currentSource.url}
-                title={`Watch ${title}`}
-                className="absolute inset-0 w-full h-full border-0"
-                allowFullScreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => {
-                  setIsLoading(false);
-                  // Start tracking progress when iframe loads
-                  if (!isTrailer && totalDuration) {
-                    startTimeRef.current = Date.now();
-
-                    // Show resume notification if resuming
-                    if (resumePosition && resumePosition > 60) {
-                      const minutes = Math.floor(resumePosition / 60);
-                      toast({
-                        title: "Resuming playback",
-                        description: `Continuing from ${minutes} minute${minutes > 1 ? 's' : ''} in`,
-                      });
-                    }
-
-                    // Update progress every 30 seconds
-                    if (progressIntervalRef.current) {
-                      clearInterval(progressIntervalRef.current);
-                    }
-                    progressIntervalRef.current = setInterval(async () => {
-                      if (startTimeRef.current) {
-                        const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
-                        const currentProgress = (resumePosition || 0) + elapsedSeconds;
-
-                        // Only update if we have valid data
-                        if (currentProgress < totalDuration) {
-                          try {
-                            await updateProgress(
-                              movieId,
-                              mediaType,
-                              title,
-                              posterPath || null,
-                              currentProgress,
-                              totalDuration,
-                              season,
-                              episode
-                            );
-                          } catch (error) {
-                            console.error('Error updating watch progress:', error);
-                          }
-                        }
-                      }
-                    }, 30000); // Update every 30 seconds
-                  }
-                }}
-                onError={() => setHasError(true)}
-              />
-            </div>
+      {/* Shortcuts modal */}
+      {showShortcuts && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowShortcuts(false)} />
+          <div className="relative bg-zinc-950 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-scale-in">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <Keyboard className="w-5 h-5 text-red-500" />
+              Player shortcuts
+            </h2>
+            <ul className="space-y-2">
+              {shortcuts.map((s) => (
+                <li key={s.key} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">{s.action}</span>
+                  <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/10 text-white font-mono text-xs">{s.key}</kbd>
+                </li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setShowShortcuts(false)} className="btn-primary w-full mt-5 py-2.5">
+              Got it
+            </button>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

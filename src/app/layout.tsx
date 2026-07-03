@@ -14,8 +14,11 @@ export const metadata: Metadata = {
     metadataBase: new URL(
         process.env.NEXT_PUBLIC_SITE_URL ?? "https://flixverse-streaming-pro.vercel.app"
     ),
-    title: "FlixVerse",
-    description: "FlixVerse - Your Ultimate Streaming Platform",
+    title: {
+        default: "FlixVerse — Stream Movies & TV",
+        template: "%s | FlixVerse",
+    },
+    description: "FlixVerse — Your ultimate streaming platform. Watch movies, TV shows, and build your watchlist. Fast, secure, and works offline.",
     authors: [{ name: "FlixVerse" }],
     icons: {
         icon: "/favicon.svg",
@@ -52,6 +55,12 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" className={inter.variable}>
+            <head>
+                <link rel="preconnect" href="https://api.themoviedb.org" />
+                <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />
+                <link rel="dns-prefetch" href="https://api.themoviedb.org" />
+                <link rel="dns-prefetch" href="https://image.tmdb.org" />
+            </head>
             <body className={`${inter.className} antialiased`}>
                 <Providers>
                     <AppShell>{children}</AppShell>

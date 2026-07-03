@@ -1,17 +1,37 @@
 {
-  "name": "FlixVerse",
+  "name": "FlixVerse — Stream Movies & TV",
   "short_name": "FlixVerse",
-  "description": "FlixVerse - Your Ultimate Streaming Platform",
+  "description": "Watch movies and TV shows. Fast, secure, works offline with cached browsing.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "categories": ["entertainment", "video"],
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Movies",
+      "url": "/movies",
+      "description": "Browse movies"
+    },
+    {
+      "name": "TV Shows",
+      "url": "/tv-shows",
+      "description": "Browse TV series"
+    },
+    {
+      "name": "My List",
+      "url": "/my-list",
+      "description": "Your watchlist"
     }
   ]
 }

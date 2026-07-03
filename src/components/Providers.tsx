@@ -12,6 +12,11 @@ import { WatchHistoryProvider } from "@/contexts/WatchHistoryContext";
 import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import RouteProgress from "@/components/RouteProgress";
 import GlobalShortcuts from "@/components/GlobalShortcuts";
+import CommandPalette from "@/components/CommandPalette";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import InstallPrompt from "@/components/InstallPrompt";
+import OfflineBanner from "@/components/OfflineBanner";
+import BackToTop from "@/components/BackToTop";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
@@ -39,6 +44,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 <TooltipProvider>
                     <RouteProgress />
                     <GlobalShortcuts />
+                    <CommandPalette />
+                    <ServiceWorkerRegister />
+                    <OfflineBanner />
+                    <InstallPrompt />
+                    <BackToTop />
                     {children}
                     <Toaster />
                     <Sonner />
