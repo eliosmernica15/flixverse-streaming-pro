@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Star, ThumbsUp, MessageCircle, User, Send, Trash2, Edit2 } from 'lucide-react';
 import { useReviews } from '@/hooks/useReviews';
 import { useAuth } from '@/hooks/useAuth';
@@ -164,30 +164,11 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
   const [reviewText, setReviewText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [likedReviews, setLikedReviews] = useState<Set<string>>(new Set());
   const [likingReviews, setLikingReviews] = useState<Set<string>>(new Set());
 
-  const { reviews, userReview, loading, addReview, updateReview, deleteReview, likeReview, hasUserLikedReview, getAverageRating } = useReviews(contentId, contentType);
+  const { reviews, userReview, likedReviewIds, loading, addReview, updateReview, deleteReview, likeReview, getAverageRating } = useReviews(contentId, contentType);
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-
-  // Check initial like status for all reviews
-  useEffect(() => {
-    const checkLikedReviews = async () => {
-      if (!isAuthenticated || reviews.length === 0) return;
-
-      const likedSet = new Set<string>();
-      for (const review of reviews) {
-        const isLiked = await hasUserLikedReview(review.id);
-        if (isLiked) {
-          likedSet.add(review.id);
-        }
-      }
-      setLikedReviews(likedSet);
-    };
-
-    checkLikedReviews();
-  }, [reviews, isAuthenticated, hasUserLikedReview]);
 
   const handleLikeReview = async (reviewId: string) => {
     if (!isAuthenticated) {
@@ -202,16 +183,7 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
     setLikingReviews(prev => new Set(prev).add(reviewId));
 
     try {
-      const isNowLiked = await likeReview(reviewId);
-      setLikedReviews(prev => {
-        const newSet = new Set(prev);
-        if (isNowLiked) {
-          newSet.add(reviewId);
-        } else {
-          newSet.delete(reviewId);
-        }
-        return newSet;
-      });
+      await likeReview(reviewId);
     } catch (error: unknown) {
       toast({
         title: "Error",
@@ -398,7 +370,7 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
                   onEdit={handleEditReview}
                   onDelete={handleDeleteReview}
                   onLike={() => handleLikeReview(review.id)}
-                  isLiked={likedReviews.has(review.id)}
+                  isLiked={likedReviewIds.has(review.id)}
                   isLiking={likingReviews.has(review.id)}
                   isAuthenticated={isAuthenticated}
                 />

@@ -21,6 +21,7 @@ import { Review } from '@/integrations/firebase/types';
 export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [userReview, setUserReview] = useState<Review | null>(null);
+  const [likedReviewIds, setLikedReviewIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
   const { profile } = useUserProfileContext();
@@ -69,6 +70,48 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
 
     return () => unsubscribe();
   }, [contentId, contentType, user]);
+
+  useEffect(() => {
+    if (!user || !isAuthenticated || reviews.length === 0) {
+      setLikedReviewIds(new Set());
+      return;
+    }
+
+    const db = getFirebaseDb();
+    if (!db) return;
+
+    const reviewIds = new Set(reviews.map((review) => review.id));
+    let cancelled = false;
+
+    const loadLikedReviews = async () => {
+      try {
+        const likesQuery = query(
+          collection(db, 'review_likes'),
+          where('user_id', '==', user.uid)
+        );
+        const snapshot = await getDocs(likesQuery);
+        if (cancelled) return;
+
+        const liked = new Set<string>();
+        snapshot.forEach((docSnapshot) => {
+          const reviewId = docSnapshot.data().review_id as string;
+          if (reviewIds.has(reviewId)) {
+            liked.add(reviewId);
+          }
+        });
+        setLikedReviewIds(liked);
+      } catch (error) {
+        console.error('Error loading review likes:', error);
+        if (!cancelled) setLikedReviewIds(new Set());
+      }
+    };
+
+    void loadLikedReviews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isAuthenticated, reviews]);
 
   // Add a new review
   const addReview = async (
@@ -188,6 +231,11 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
         await updateDoc(reviewRef, {
           likes_count: increment(-1)
         });
+        setLikedReviewIds((prev) => {
+          const next = new Set(prev);
+          next.delete(reviewId);
+          return next;
+        });
         return false; // Returns false to indicate unliked
       } else {
         // Like - add new like
@@ -199,6 +247,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
         await updateDoc(reviewRef, {
           likes_count: increment(1)
         });
+        setLikedReviewIds((prev) => new Set(prev).add(reviewId));
         return true; // Returns true to indicate liked
       }
     } catch (error) {
@@ -207,25 +256,6 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     }
   };
 
-  // Check if user has liked a review
-  const hasUserLikedReview = async (reviewId: string): Promise<boolean> => {
-    if (!user) return false;
-    
-    try {
-      const likesQuery = query(
-        collection(requireFirebaseDb(), 'review_likes'),
-        where('review_id', '==', reviewId),
-        where('user_id', '==', user.uid)
-      );
-      const existingLikes = await getDocs(likesQuery);
-      return !existingLikes.empty;
-    } catch (error) {
-      console.error('Error checking like status:', error);
-      return false;
-    }
-  };
-
-  // Get average rating for content
   const getAverageRating = useCallback(() => {
     if (reviews.length === 0) return 0;
     const total = reviews.reduce((sum, review) => sum + review.rating, 0);
@@ -235,12 +265,12 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
   return {
     reviews,
     userReview,
+    likedReviewIds,
     loading,
     addReview,
     updateReview,
     deleteReview,
     likeReview,
-    hasUserLikedReview,
     getAverageRating,
     reviewCount: reviews.length
   };
