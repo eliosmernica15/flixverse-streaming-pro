@@ -43,6 +43,7 @@ const VideoPlayer = ({
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const helpPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
 
   const streamingSources = useMemo(
     () => buildStreamingSources(movieId, mediaType, season, episode),
@@ -64,8 +65,53 @@ const VideoPlayer = ({
 
   const handleClose = useCallback(() => {
     clearTimers();
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => undefined);
+    }
     onClose();
   }, [clearTimers, onClose]);
+
+  const requestFrameFullscreen = useCallback(async () => {
+    const el = frameRef.current;
+    if (!el) return;
+    try {
+      if (el.requestFullscreen) {
+        await el.requestFullscreen();
+      } else if ("webkitRequestFullscreen" in el) {
+        await (el as HTMLElement & { webkitRequestFullscreen: () => Promise<void> }).webkitRequestFullscreen();
+      }
+    } catch {
+      // Fullscreen blocked — theater layout still applies
+    }
+  }, []);
+
+  const exitFrameFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) return;
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if ("webkitExitFullscreen" in document) {
+        await (document as Document & { webkitExitFullscreen: () => Promise<void> }).webkitExitFullscreen();
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleTheaterMode = useCallback(async () => {
+    const entering = !isTheaterMode;
+    setIsTheaterMode(entering);
+    bumpControls();
+
+    if (entering) {
+      // Let the expand animation start, then snap to browser fullscreen
+      requestAnimationFrame(() => {
+        void requestFrameFullscreen();
+      });
+    } else {
+      await exitFrameFullscreen();
+    }
+  }, [isTheaterMode, bumpControls, requestFrameFullscreen, exitFrameFullscreen]);
 
   const switchServer = useCallback((index: number) => {
     clearTimers();
@@ -96,8 +142,21 @@ const VideoPlayer = ({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { handleClose(); return; }
-      if (e.key === "t" || e.key === "T") { setIsTheaterMode((p) => !p); bumpControls(); return; }
+      if (e.key === "Escape") {
+        if (document.fullscreenElement) {
+          void exitFrameFullscreen();
+          setIsTheaterMode(false);
+          bumpControls();
+          return;
+        }
+        if (isTheaterMode) {
+          void toggleTheaterMode();
+          return;
+        }
+        handleClose();
+        return;
+      }
+      if (e.key === "t" || e.key === "T") { void toggleTheaterMode(); return; }
       if (e.key === "c" || e.key === "C") { setIsCinematic((p) => !p); bumpControls(); return; }
       if (e.key === "n" || e.key === "N") { handleRetry(); bumpControls(); return; }
       if (e.key === "s" || e.key === "S") { setShowServerSelector((p) => !p); bumpControls(); return; }
@@ -106,7 +165,18 @@ const VideoPlayer = ({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleClose, handleRetry, bumpControls]);
+  }, [handleClose, handleRetry, bumpControls, isTheaterMode, toggleTheaterMode, exitFrameFullscreen]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const active = document.fullscreenElement === frameRef.current;
+      if (!active && isTheaterMode) {
+        setIsTheaterMode(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, [isTheaterMode]);
 
   useEffect(() => {
     bumpControls();
@@ -145,7 +215,7 @@ const VideoPlayer = ({
 
   const shortcuts = [
     { key: "Esc", action: "Close player" },
-    { key: "T", action: "Theater mode" },
+    { key: "T", action: "Theater + fullscreen" },
     { key: "C", action: "Cinematic bars" },
     { key: "N", action: "Next server" },
     { key: "S", action: "Server menu" },
@@ -155,7 +225,7 @@ const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className="player-shell fixed inset-0 z-[9999] bg-black flex flex-col"
+      className={`player-shell fixed inset-0 z-[9999] bg-black flex flex-col ${isTheaterMode ? "player-theater" : ""}`}
       onMouseMove={bumpControls}
       onTouchStart={bumpControls}
     >
@@ -204,7 +274,7 @@ const VideoPlayer = ({
               <span className="hidden md:inline text-xs font-medium">{currentSource.name}</span>
               <span className="text-sm">{currentSource.icon}</span>
             </button>
-            <button type="button" onClick={() => setIsTheaterMode((p) => !p)} className="player-icon-btn" title="Theater (T)">
+            <button type="button" onClick={() => void toggleTheaterMode()} className="player-icon-btn" title="Theater + fullscreen (T)">
               {isTheaterMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
             <button type="button" onClick={handleClose} className="player-icon-btn hover:bg-red-500/80" title="Close (Esc)">
@@ -214,9 +284,21 @@ const VideoPlayer = ({
         </div>
       </header>
 
-      <div className={`flex-1 min-h-0 flex items-center justify-center relative ${isCinematic ? "py-16 sm:py-24" : "p-3 sm:p-6"}`}>
-        <div className={`relative w-full transition-all duration-500 ${isTheaterMode ? "max-w-[100vw]" : "max-w-6xl"}`}>
-          <div className="player-frame relative w-full overflow-hidden rounded-xl sm:rounded-2xl border border-white/10 shadow-[0_0_80px_rgba(239,68,68,0.15)]" style={{ aspectRatio: "16/9" }}>
+      <div className={`flex-1 min-h-0 flex items-center justify-center relative transition-all duration-500 ease-out ${
+        isTheaterMode ? "p-0" : isCinematic ? "py-16 sm:py-24" : "p-3 sm:p-6"
+      }`}>
+        <div className={`relative w-full h-full transition-all duration-500 ease-out ${
+          isTheaterMode ? "max-w-none flex-1 flex flex-col" : "max-w-6xl"
+        }`}>
+          <div
+            ref={frameRef}
+            className={`player-frame relative w-full overflow-hidden transition-all duration-500 ease-out ${
+              isTheaterMode
+                ? "rounded-none border-0 shadow-none flex-1 min-h-0"
+                : "rounded-xl sm:rounded-2xl border border-white/10 shadow-[0_0_80px_rgba(239,68,68,0.15)]"
+            }`}
+            style={isTheaterMode ? undefined : { aspectRatio: "16/9" }}
+          >
             {embedState === "loading" && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950">
                 <div className="player-loader mb-4" />
@@ -282,7 +364,7 @@ const VideoPlayer = ({
             />
           </div>
 
-          <div className={`player-chrome bottom-0 mt-3 ${controlsVisible ? "player-chrome-visible" : ""}`}>
+          <div className={`player-chrome bottom-0 mt-3 ${controlsVisible && !isTheaterMode ? "player-chrome-visible" : controlsVisible && isTheaterMode ? "player-chrome-visible player-chrome-theater" : ""}`}>
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span className="flex items-center gap-1.5">
                 <Signal className={`w-3.5 h-3.5 ${embedState === "ready" ? "text-green-500" : embedState === "error" ? "text-red-400" : "text-amber-400"}`} />

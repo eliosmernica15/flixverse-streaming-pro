@@ -28,7 +28,7 @@ const shortcuts = [
       { keys: ["Space"], label: "Play / pause" },
       { keys: ["F"], label: "Fullscreen" },
       { keys: ["M"], label: "Mute" },
-      { keys: ["T"], label: "Theater mode" },
+      { keys: ["T"], label: "Theater + fullscreen" },
       { keys: ["C"], label: "Cinematic bars" },
       { keys: ["N"], label: "Next server" },
       { keys: ["S"], label: "Server list" },
