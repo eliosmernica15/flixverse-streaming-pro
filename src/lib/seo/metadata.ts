@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 
-export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://flixverse-streaming-pro.vercel.app";
+export const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://flixverse-streaming-pro.vercel.app"
+)
+  .trim()
+  .replace(/\/$/, "");
 
 export const SITE_NAME = "FlixVerse";
 

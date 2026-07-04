@@ -1,8 +1,9 @@
 import { SITE_URL } from "@/lib/seo/metadata";
 
 /** Public IndexNow key — file must exist at /{KEY}.txt */
-export const INDEXNOW_KEY =
-  process.env.INDEXNOW_KEY ?? "flixverse8e4a2f1c9b0d3e7";
+export const INDEXNOW_KEY = (
+  process.env.INDEXNOW_KEY ?? "flixverse8e4a2f1c9b0d3e7"
+).trim();
 
 const INDEXNOW_ENDPOINTS = [
   "https://api.indexnow.org/indexnow",
@@ -20,11 +21,25 @@ export async function submitUrlsToIndexNow(urls: string[]): Promise<{
   const key = INDEXNOW_KEY;
   const keyLocation = `${SITE_URL}/${key}.txt`;
 
+  // Verify key file is reachable before submitting
+  try {
+    const keyRes = await fetch(keyLocation, { cache: "no-store" });
+    const keyBody = (await keyRes.text()).trim();
+    if (!keyRes.ok || keyBody !== key) {
+      return {
+        submitted: 0,
+        results: [{ endpoint: "key-verify", ok: false, status: keyRes.status }],
+      };
+    }
+  } catch {
+    return { submitted: 0, results: [{ endpoint: "key-verify", ok: false }] };
+  }
+
   const body = {
     host,
     key,
     keyLocation,
-    urlList: urls.slice(0, 10_000),
+    urlList: urls.slice(0, 10_000).map((u) => u.trim()),
   };
 
   const results = await Promise.all(
