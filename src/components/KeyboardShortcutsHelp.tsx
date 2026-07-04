@@ -23,16 +23,30 @@ const shortcuts = [
     ],
   },
   {
-    group: "Player",
+    group: "Player — playback",
     items: [
+      { keys: ["P"], label: "Play / pause" },
       { keys: ["Space"], label: "Play / pause" },
-      { keys: ["F"], label: "Fullscreen" },
+      { keys: ["K"], label: "Play / pause" },
+      { keys: ["←"], label: "Seek back 10s" },
+      { keys: ["→"], label: "Seek forward 10s" },
+      { keys: ["↑"], label: "Volume up" },
+      { keys: ["↓"], label: "Volume down" },
       { keys: ["M"], label: "Mute" },
+      { keys: ["R"], label: "Reload stream" },
+    ],
+  },
+  {
+    group: "Player — display & servers",
+    items: [
+      { keys: ["F"], label: "Theater + fullscreen" },
       { keys: ["T"], label: "Theater + fullscreen" },
       { keys: ["C"], label: "Cinematic bars" },
+      { keys: ["["], label: "Previous server" },
+      { keys: ["]"], label: "Next server" },
       { keys: ["N"], label: "Next server" },
-      { keys: ["S"], label: "Server list" },
-      { keys: ["←", "→"], label: "Seek 10s" },
+      { keys: ["S"], label: "Server menu" },
+      { keys: ["Esc"], label: "Exit fullscreen / close" },
     ],
   },
 ];
@@ -83,7 +97,7 @@ export default function KeyboardShortcutsHelp() {
                     <div className="flex items-center gap-1.5 shrink-0">
                       {item.keys.map((key, i) => (
                         <span key={`${item.label}-${key}`} className="flex items-center gap-1.5">
-                          {i > 0 && <span className="text-gray-600 text-xs">+</span>}
+                          {i > 0 && <span className="text-gray-600 text-xs">/</span>}
                           <KeyBadge>{key}</KeyBadge>
                         </span>
                       ))}

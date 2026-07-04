@@ -951,6 +951,24 @@
   background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
 }
 
+.player-flash-icon {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: player-flash-pop 0.7s ease-out forwards;
+}
+
+@keyframes player-flash-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  20% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.15); }
+}
+
 .player-loader {
   width: 48px;
   height: 48px;

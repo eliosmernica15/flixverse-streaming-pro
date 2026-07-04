@@ -4,8 +4,10 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   X, Server, ArrowLeft, Maximize2, Minimize2, Tv, Film,
   RefreshCw, AlertTriangle, Keyboard, Signal, ChevronRight, HelpCircle,
+  Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Rewind, FastForward,
 } from "lucide-react";
 import { buildStreamingSources } from "@/lib/streamingSources";
+import { sendEmbedAction, isPlayerShortcutKey } from "@/lib/playerEmbedControls";
 
 interface VideoPlayerProps {
   movieId: number;
@@ -38,12 +40,17 @@ const VideoPlayer = ({
   const [embedState, setEmbedState] = useState<EmbedState>("loading");
   const [showHelpPrompt, setShowHelpPrompt] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [playState, setPlayState] = useState<"playing" | "paused">("playing");
+  const [flashIcon, setFlashIcon] = useState<"play" | "pause" | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const helpPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const streamingSources = useMemo(
     () => buildStreamingSources(movieId, mediaType, season, episode),
@@ -55,6 +62,13 @@ const VideoPlayer = ({
     if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     if (helpPromptTimerRef.current) clearTimeout(helpPromptTimerRef.current);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+  }, []);
+
+  const showFlash = useCallback((icon: "play" | "pause") => {
+    setFlashIcon(icon);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setFlashIcon(null), 700);
   }, []);
 
   const bumpControls = useCallback(() => {
@@ -119,10 +133,49 @@ const VideoPlayer = ({
     setShowServerSelector(false);
     setEmbedState("loading");
     setShowHelpPrompt(false);
+    setPlayState("playing");
+    setIsMuted(false);
   }, [clearTimers]);
 
   const handleRetry = useCallback(() => {
     switchServer((currentServer + 1) % streamingSources.length);
+  }, [currentServer, streamingSources.length, switchServer]);
+
+  const togglePlayPause = useCallback(() => {
+    if (embedState !== "ready") return;
+    const next = playState === "playing" ? "paused" : "playing";
+    setPlayState(next);
+    showFlash(next === "paused" ? "pause" : "play");
+    sendEmbedAction(iframeRef.current, next === "paused" ? "pause" : "play");
+    bumpControls();
+  }, [embedState, playState, showFlash, bumpControls]);
+
+  const toggleMute = useCallback(() => {
+    if (embedState !== "ready") return;
+    setIsMuted((m) => !m);
+    sendEmbedAction(iframeRef.current, "mute");
+    bumpControls();
+  }, [embedState, bumpControls]);
+
+  const seek = useCallback((direction: "back" | "forward") => {
+    if (embedState !== "ready") return;
+    sendEmbedAction(iframeRef.current, direction === "back" ? "seekBack" : "seekForward");
+    bumpControls();
+  }, [embedState, bumpControls]);
+
+  const reloadStream = useCallback(() => {
+    if (embedState !== "ready") return;
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const src = iframe.src;
+    iframe.src = "";
+    iframe.src = src;
+    setPlayState("playing");
+    bumpControls();
+  }, [embedState, bumpControls]);
+
+  const prevServer = useCallback(() => {
+    switchServer((currentServer - 1 + streamingSources.length) % streamingSources.length);
   }, [currentServer, streamingSources.length, switchServer]);
 
   const startLoadTimeout = useCallback(() => {
@@ -142,6 +195,15 @@ const VideoPlayer = ({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (showServerSelector || showShortcuts) {
+        if (e.key === "Escape") return;
+        return;
+      }
+
+      if (isPlayerShortcutKey(e.key)) {
+        e.preventDefault();
+      }
+
       if (e.key === "Escape") {
         if (document.fullscreenElement) {
           void exitFrameFullscreen();
@@ -156,16 +218,84 @@ const VideoPlayer = ({
         handleClose();
         return;
       }
-      if (e.key === "t" || e.key === "T") { void toggleTheaterMode(); return; }
-      if (e.key === "c" || e.key === "C") { setIsCinematic((p) => !p); bumpControls(); return; }
-      if (e.key === "n" || e.key === "N") { handleRetry(); bumpControls(); return; }
-      if (e.key === "s" || e.key === "S") { setShowServerSelector((p) => !p); bumpControls(); return; }
-      if (e.key === "?") { setShowShortcuts((p) => !p); return; }
+
+      if (e.key === " " || e.key === "p" || e.key === "P" || e.key === "k" || e.key === "K") {
+        togglePlayPause();
+        return;
+      }
+      if (e.key === "f" || e.key === "F" || e.key === "t" || e.key === "T") {
+        void toggleTheaterMode();
+        return;
+      }
+      if (e.key === "m" || e.key === "M") {
+        toggleMute();
+        return;
+      }
+      if (e.key === "c" || e.key === "C") {
+        setIsCinematic((p) => !p);
+        bumpControls();
+        return;
+      }
+      if (e.key === "n" || e.key === "N" || e.key === "]") {
+        handleRetry();
+        bumpControls();
+        return;
+      }
+      if (e.key === "[" ) {
+        prevServer();
+        bumpControls();
+        return;
+      }
+      if (e.key === "s" || e.key === "S") {
+        setShowServerSelector((p) => !p);
+        bumpControls();
+        return;
+      }
+      if (e.key === "r" || e.key === "R") {
+        reloadStream();
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        seek("back");
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        seek("forward");
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        sendEmbedAction(iframeRef.current, "volumeUp");
+        bumpControls();
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        sendEmbedAction(iframeRef.current, "volumeDown");
+        bumpControls();
+        return;
+      }
+      if (e.key === "?") {
+        setShowShortcuts((p) => !p);
+        return;
+      }
       bumpControls();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleClose, handleRetry, bumpControls, isTheaterMode, toggleTheaterMode, exitFrameFullscreen]);
+  }, [
+    handleClose,
+    handleRetry,
+    prevServer,
+    reloadStream,
+    seek,
+    toggleMute,
+    togglePlayPause,
+    bumpControls,
+    isTheaterMode,
+    toggleTheaterMode,
+    exitFrameFullscreen,
+    showServerSelector,
+    showShortcuts,
+  ]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -214,11 +344,17 @@ const VideoPlayer = ({
         : `Streaming via ${currentSource.name}`;
 
   const shortcuts = [
-    { key: "Esc", action: "Close player" },
-    { key: "T", action: "Theater + fullscreen" },
+    { key: "P / Space / K", action: "Play / pause" },
+    { key: "← / →", action: "Seek 10 seconds" },
+    { key: "↑ / ↓", action: "Volume up / down" },
+    { key: "M", action: "Mute" },
+    { key: "F / T", action: "Theater + fullscreen" },
     { key: "C", action: "Cinematic bars" },
+    { key: "[ / ]", action: "Previous / next server" },
     { key: "N", action: "Next server" },
+    { key: "R", action: "Reload stream" },
     { key: "S", action: "Server menu" },
+    { key: "Esc", action: "Exit fullscreen / close" },
     { key: "?", action: "Shortcuts" },
   ];
 
@@ -268,6 +404,15 @@ const VideoPlayer = ({
             </span>
             <button type="button" onClick={() => setShowShortcuts(true)} className="player-icon-btn" title="Shortcuts (?)">
               <Keyboard className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={togglePlayPause}
+              disabled={embedState !== "ready"}
+              className="player-icon-btn disabled:opacity-40"
+              title="Play / Pause (P)"
+            >
+              {playState === "paused" ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
             </button>
             <button type="button" onClick={() => setShowServerSelector(true)} className="player-btn">
               <Server className="w-4 h-4 text-red-400" />
@@ -351,7 +496,20 @@ const VideoPlayer = ({
               </div>
             )}
 
+            {embedState === "ready" && flashIcon && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+                <div className="player-flash-icon">
+                  {flashIcon === "pause" ? (
+                    <Pause className="w-12 h-12 text-white" />
+                  ) : (
+                    <Play className="w-12 h-12 text-white fill-white" />
+                  )}
+                </div>
+              </div>
+            )}
+
             <iframe
+              ref={iframeRef}
               key={currentServer}
               src={currentSource.url}
               title={`Watch ${title}`}
@@ -365,6 +523,29 @@ const VideoPlayer = ({
           </div>
 
           <div className={`player-chrome bottom-0 mt-3 ${controlsVisible && !isTheaterMode ? "player-chrome-visible" : controlsVisible && isTheaterMode ? "player-chrome-visible player-chrome-theater" : ""}`}>
+            <div className="flex items-center justify-center gap-1 sm:gap-2 mb-3 flex-wrap">
+              <button type="button" onClick={prevServer} className="player-icon-btn" title="Previous server ([)">
+                <SkipBack className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={togglePlayPause} disabled={embedState !== "ready"} className="player-icon-btn !w-11 !h-11 disabled:opacity-40" title="Play / Pause (P)">
+                {playState === "paused" ? <Play className="w-5 h-5 fill-current" /> : <Pause className="w-5 h-5" />}
+              </button>
+              <button type="button" onClick={() => seek("back")} disabled={embedState !== "ready"} className="player-icon-btn disabled:opacity-40" title="Seek back 10s (←)">
+                <Rewind className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={() => seek("forward")} disabled={embedState !== "ready"} className="player-icon-btn disabled:opacity-40" title="Seek forward 10s (→)">
+                <FastForward className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={toggleMute} disabled={embedState !== "ready"} className="player-icon-btn disabled:opacity-40" title="Mute (M)">
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+              <button type="button" onClick={reloadStream} disabled={embedState !== "ready"} className="player-icon-btn disabled:opacity-40" title="Reload stream (R)">
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={handleRetry} className="player-icon-btn" title="Next server (])">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span className="flex items-center gap-1.5">
                 <Signal className={`w-3.5 h-3.5 ${embedState === "ready" ? "text-green-500" : embedState === "error" ? "text-red-400" : "text-amber-400"}`} />
