@@ -6,8 +6,8 @@ export const INDEXNOW_KEY = (
 ).trim();
 
 const INDEXNOW_ENDPOINTS = [
-  "https://api.indexnow.org/indexnow",
   "https://www.bing.com/indexnow",
+  "https://api.indexnow.org/indexnow",
   "https://yandex.com/indexnow",
 ];
 
@@ -38,7 +38,6 @@ export async function submitUrlsToIndexNow(urls: string[]): Promise<{
   const body = {
     host,
     key,
-    keyLocation,
     urlList: urls.slice(0, 10_000).map((u) => u.trim()),
   };
 
@@ -47,7 +46,10 @@ export async function submitUrlsToIndexNow(urls: string[]): Promise<{
       try {
         const res = await fetch(endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json; charset=utf-8" },
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "User-Agent": "FlixVerse-IndexNow/1.0",
+          },
           body: JSON.stringify(body),
         });
         return { endpoint, ok: res.ok || res.status === 202, status: res.status };
@@ -56,6 +58,13 @@ export async function submitUrlsToIndexNow(urls: string[]): Promise<{
       }
     })
   );
+
+  // GET fallback for priority URLs (Bing accepts single-URL pings)
+  const priority = urls.slice(0, 10);
+  for (const url of priority) {
+    const pingUrl = `https://www.bing.com/indexnow?url=${encodeURIComponent(url)}&key=${encodeURIComponent(key)}`;
+    await fetch(pingUrl, { method: "GET", headers: { "User-Agent": "FlixVerse-IndexNow/1.0" } }).catch(() => undefined);
+  }
 
   return { submitted: urls.length, results };
 }
