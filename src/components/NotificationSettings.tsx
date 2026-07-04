@@ -47,10 +47,10 @@ const NotificationSettings = () => {
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md mx-auto">
+      <DialogContent className="glass-card border-white/10 text-white max-w-md mx-auto rounded-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <Settings className="w-5 h-5 text-red-400" />
             Notification Settings
           </DialogTitle>
           <DialogDescription className="text-gray-400">
@@ -60,7 +60,7 @@ const NotificationSettings = () => {
 
         <div className="space-y-6">
           {!hasPermission ? (
-            <Card className="bg-gray-800 border-gray-700">
+            <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg text-white">Enable Notifications</CardTitle>
                 <CardDescription className="text-gray-400">
@@ -95,7 +95,7 @@ const NotificationSettings = () => {
               </div>
 
               {preferences.allNotifications && (
-                <div className="space-y-3 ml-4 border-l border-gray-700 pl-4">
+                <div className="space-y-3 ml-4 border-l border-white/10 pl-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <label className="text-sm text-white">New Movies</label>
@@ -143,11 +143,11 @@ const NotificationSettings = () => {
               )}
 
               {preferences.allNotifications && (
-                <div className="pt-4 border-t border-gray-700">
+                <div className="pt-4 border-t border-white/10">
                   <Button
                     onClick={handleTestNotification}
                     variant="outline"
-                    className="w-full border-gray-600 text-gray-300 hover:bg-gray-800"
+                    className="w-full border-white/10 text-gray-300 hover:bg-white/10"
                   >
                     <TestTube className="w-4 h-4 mr-2" />
                     Send Test Notification

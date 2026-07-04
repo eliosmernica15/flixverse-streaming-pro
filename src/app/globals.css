@@ -520,6 +520,11 @@
     transform: scale(1.04);
   }
 
+  .hero-ken-burns-alt {
+    animation: hero-ken-burns 25s ease-in-out infinite alternate;
+    transform-origin: center center;
+  }
+
   .hero-glow-red {
     animation: hero-glow-red 10s ease-in-out infinite;
   }
@@ -778,6 +783,21 @@
 
     .carousel-item:hover {
       transform: none;
+    }
+
+    .movie-card .movie-card-actions {
+      opacity: 1 !important;
+      transform: translateY(0) !important;
+      pointer-events: auto !important;
+    }
+
+    .continue-watching-remove,
+    .continue-watching-play {
+      opacity: 1 !important;
+    }
+
+    .continue-watching-play {
+      opacity: 0.85 !important;
     }
   }
 

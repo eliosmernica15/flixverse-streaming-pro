@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   User, Settings, Film, Tv, Star, Heart, Clock,
-  Calendar, Edit2, Camera, LogOut, ChevronRight,
+  Calendar, Edit2, Camera, LogOut, ChevronRight, Trash2,
   MessageCircle, TrendingUp, Award, Filter
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,6 +22,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { uploadToCloudinary } from '@/utils/cloudinary';
+import Image from 'next/image';
+import ProfileSettings from '@/components/ProfileSettings';
+import { PosterGridSkeleton } from '@/components/skeletons/ContentSkeletons';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -221,10 +224,10 @@ const Profile = () => {
   const tvCount = movieList.filter(m => m.media_type === 'tv').length;
 
   const stats = [
-    { icon: Heart, label: 'Watchlist', value: movieList.length, color: 'text-red-400' },
-    { icon: Film, label: 'Movies', value: moviesCount, color: 'text-blue-400' },
-    { icon: Tv, label: 'TV Shows', value: tvCount, color: 'text-purple-400' },
-    { icon: Clock, label: 'Watched', value: recentlyWatched.length, color: 'text-green-400' }
+    { icon: Heart, label: 'Watchlist', value: movieList.length, color: 'text-red-400', tab: 'watchlist' as const },
+    { icon: Film, label: 'Movies', value: moviesCount, color: 'text-blue-400', tab: 'watchlist' as const },
+    { icon: Tv, label: 'TV Shows', value: tvCount, color: 'text-purple-400', tab: 'watchlist' as const },
+    { icon: Clock, label: 'Watched', value: recentlyWatched.length, color: 'text-green-400', tab: 'history' as const }
   ];
 
   return (
@@ -271,7 +274,7 @@ const Profile = () => {
                         }`}
                       title="Remove picture"
                     >
-                      <LogOut className="w-4 h-4 text-white" />
+                      <Trash2 className="w-4 h-4 text-white" />
                     </button>
                   )}
 
@@ -409,15 +412,17 @@ const Profile = () => {
 
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8">
-              {stats.map((stat, index) => (
-                <div
+              {stats.map((stat) => (
+                <button
                   key={stat.label}
-                  className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-center"
+                  type="button"
+                  onClick={() => setActiveTab(stat.tab)}
+                  className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-center hover:bg-white/10 hover:border-white/20 transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500"
                 >
                   <stat.icon className={`w-6 h-6 mx-auto mb-2 ${stat.color}`} />
                   <p className="text-2xl font-bold text-white">{stat.value}</p>
                   <p className="text-sm text-gray-400">{stat.label}</p>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -439,11 +444,17 @@ const Profile = () => {
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Activity
               </TabsTrigger>
+              <TabsTrigger value="settings" className="data-[state=active]:bg-red-500 rounded-lg">
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </TabsTrigger>
             </TabsList>
 
             {/* Watchlist Tab */}
             <TabsContent value="watchlist">
-              {movieList.length === 0 ? (
+              {listLoading ? (
+                <PosterGridSkeleton count={12} />
+              ) : movieList.length === 0 ? (
                 <div className="text-center py-12">
                   <Heart className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                   <p className="text-gray-400">Your watchlist is empty</p>
@@ -456,20 +467,21 @@ const Profile = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                  {movieList.map((item, index) => (
+                  {movieList.map((item) => (
                     <div
                       key={item.id}
                       className="group cursor-pointer"
                       onClick={() => router.push(`/movie/${item.movie_id}?type=${item.media_type || 'movie'}`)}
                     >
-                      <div className="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 relative">
-                        <img
+                      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-gray-800 relative border border-white/5 group-hover:border-white/15 transition-colors">
+                        <Image
                           src={item.movie_poster_path ? getImageUrl(item.movie_poster_path, 'large') : '/placeholder.svg'}
                           alt={item.movie_title}
-                          loading="lazy"
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          fill
+                          sizes="(max-width: 640px) 33vw, 16vw"
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
                           <p className="text-white text-xs font-medium truncate">{item.movie_title}</p>
                         </div>
                       </div>
@@ -484,7 +496,14 @@ const Profile = () => {
               {history.length === 0 ? (
                 <div className="text-center py-12">
                   <Clock className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">No watch history yet</p>
+                  <p className="text-gray-400 mb-1">No watch history yet</p>
+                  <p className="text-gray-500 text-sm mb-4">Start streaming and your progress will appear here</p>
+                  <Button
+                    onClick={() => router.push('/')}
+                    className="bg-red-500 hover:bg-red-600"
+                  >
+                    Discover content
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -628,6 +647,10 @@ const Profile = () => {
                     : `No ${activityFilter} activity yet`
                 }
               />
+            </TabsContent>
+
+            <TabsContent value="settings">
+              <ProfileSettings />
             </TabsContent>
           </Tabs>
         </div>

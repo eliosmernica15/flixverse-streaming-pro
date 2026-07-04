@@ -4,6 +4,7 @@ import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import { useAuth } from '@/hooks/useAuth';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { useRouter } from 'next/navigation';
+import { ContinueWatchingSkeleton } from '@/components/skeletons/ContentSkeletons';
 import {
   Carousel,
   CarouselContent,
@@ -19,7 +20,15 @@ const ContinueWatching = () => {
 
   const continueWatchingItems = getContinueWatching();
 
-  if (!isAuthenticated || loading || continueWatchingItems.length === 0) {
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  if (loading) {
+    return <ContinueWatchingSkeleton />;
+  }
+
+  if (continueWatchingItems.length === 0) {
     return null;
   }
 
@@ -37,7 +46,6 @@ const ContinueWatching = () => {
   };
 
   const handleContinue = (item: typeof continueWatchingItems[0]) => {
-    // Pass resume position in URL params
     const resumeParam = item.progress_seconds > 0 ? `&resume=${item.progress_seconds}` : '';
     const url = item.content_type === 'tv' && item.season && item.episode
       ? `/movie/${item.content_id}?type=${item.content_type}&autoplay=true&season=${item.season}&episode=${item.episode}${resumeParam}`
@@ -66,7 +74,7 @@ const ContinueWatching = () => {
         className="w-full"
       >
         <CarouselContent className="-ml-3 md:-ml-5">
-          {items.map((item, index) => {
+          {items.map((item) => {
             const progressPercentage = formatProgress(item.progress_seconds, item.total_duration_seconds);
             const timeLeft = formatTime(item.total_duration_seconds - item.progress_seconds);
 
@@ -88,7 +96,7 @@ const ContinueWatching = () => {
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="continue-watching-play absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <div className="w-14 h-14 bg-white/95 rounded-full flex items-center justify-center shadow-xl">
                         <Play className="w-6 h-6 text-black fill-black ml-0.5" />
                       </div>
@@ -99,7 +107,7 @@ const ContinueWatching = () => {
                         e.stopPropagation();
                         removeFromHistory(item.id);
                       }}
-                      className="absolute top-2 right-2 p-2 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 z-10"
+                      className="continue-watching-remove absolute top-2 right-2 p-2 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 z-10"
                       aria-label="Remove from continue watching"
                     >
                       <X className="w-3.5 h-3.5 text-white" />

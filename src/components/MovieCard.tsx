@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, memo, useEffect } from "react";
-import { Play, Star, Heart, Film, Tv, Plus } from "lucide-react";
+import { Play, Star, Heart, Film, Tv, Plus, Loader2 } from "lucide-react";
 import Image from "next/image";
 import {
   getImageUrl,
@@ -65,7 +65,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const { addToHistory, addFavoriteGenre } = useUserPreferencesContext();
   const { isAuthenticated } = useAuth();
   const [isInLocalList, setIsInLocalList] = useState(false);
-  const { addToList, removeFromList, isInList } = useUserMovieListContext();
+  const { addToList, removeFromList, isInList, isOperating } = useUserMovieListContext();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -81,6 +81,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   }, [isAuthenticated, movie.id]);
 
   const isInMyList = isAuthenticated ? isInList(movie.id) : isInLocalList;
+  const listBusy = isAuthenticated && isOperating(movie.id);
 
   const handleCardClick = useCallback(() => {
     addToHistory(movie.id);
@@ -226,7 +227,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
           )}
 
           <div
-            className={`absolute inset-x-0 bottom-0 p-4 z-10 transition-all duration-200 ${isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"}`}
+            className={`movie-card-actions absolute inset-x-0 bottom-0 p-4 z-10 transition-all duration-200 ${isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"}`}
           >
             <h3 className="text-white font-black text-base mb-1 line-clamp-1 drop-shadow-md">
               {displayTitle}
@@ -257,10 +258,15 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
               )}
 
               <button
-                className={`p-2 rounded-lg transition-colors ${isInMyList ? "bg-red-500 text-white" : "glass-card text-white"}`}
+                type="button"
+                className={`p-2 rounded-lg transition-colors ${isInMyList ? "bg-red-500 text-white" : "glass-card text-white"} ${listBusy ? "opacity-70" : ""}`}
                 onClick={handleAddToListClick}
+                disabled={listBusy}
+                aria-label={isInMyList ? "Remove from list" : "Add to list"}
               >
-                {isInMyList ? (
+                {listBusy ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : isInMyList ? (
                   <Heart className="w-3.5 h-3.5 fill-current" />
                 ) : (
                   <Plus className="w-3.5 h-3.5" />

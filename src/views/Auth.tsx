@@ -223,7 +223,13 @@ const Auth = () => {
                 </TabsList>
 
                 <TabsContent value="signin" className="space-y-5 mt-0">
-                    <div className="space-y-5">
+                    <form
+                      className="space-y-5"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void signIn();
+                      }}
+                    >
                       <div className="space-y-2">
                         <Label htmlFor="email" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
                           <Mail className="w-4 h-4" />
@@ -262,7 +268,7 @@ const Auth = () => {
                         </div>
                       </div>
                       <Button
-                        onClick={signIn}
+                        type="submit"
                         disabled={loading}
                         className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
                       >
@@ -306,11 +312,17 @@ const Auth = () => {
                         </svg>
                         <span>Continue with Google</span>
                       </Button>
-                    </div>
+                    </form>
                   </TabsContent>
 
                   <TabsContent value="signup" className="space-y-5 mt-0">
-                    <div className="space-y-5">
+                    <form
+                      className="space-y-5"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void signUp();
+                      }}
+                    >
                       <div className="space-y-2">
                         <Label htmlFor="displayName" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
                           <User className="w-4 h-4" />
@@ -363,7 +375,7 @@ const Auth = () => {
                         </div>
                       </div>
                       <Button
-                        onClick={signUp}
+                        type="submit"
                         disabled={loading}
                         className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
                       >
@@ -407,7 +419,7 @@ const Auth = () => {
                         </svg>
                         <span>Continue with Google</span>
                       </Button>
-                    </div>
+                    </form>
                   </TabsContent>
               </Tabs>
 

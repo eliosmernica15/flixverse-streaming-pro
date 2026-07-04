@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle } from "lucide-react";
+import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2 } from "lucide-react";
 import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, isNotReleasedYet } from "@/utils/tmdbApi";
 import { useContentDetails } from "@/hooks/queries/useContentDetails";
 import { useRelatedContent } from "@/hooks/queries/useRelatedContent";
@@ -37,6 +37,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
   const [showSeasonDropdown, setShowSeasonDropdown] = useState(false);
+  const [showScrollHint, setShowScrollHint] = useState(true);
   const { data: relatedContent = [] } = useRelatedContent(content, mediaType);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
@@ -48,6 +49,14 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 10);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (window.scrollY > 64) setShowScrollHint(false);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   // Handle autoplay (skip for unreleased content - cannot play)
@@ -256,11 +265,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         <div className="relative min-h-screen w-full flex flex-col">
           {/* Background with Ken Burns effect */}
           <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
-            style={{
-              backgroundImage: `url(${getBackdropUrl(content.backdrop_path)})`,
-              animation: 'kenburns 25s ease-in-out infinite alternate'
-            }}
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none hero-ken-burns-alt"
+            style={{ backgroundImage: `url(${getBackdropUrl(content.backdrop_path)})` }}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/40"></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"></div>
@@ -442,18 +448,23 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     } ${(isOperating(movieId) || loadingList) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title={isInList(movieId) ? 'Remove from List' : 'Add to List'}
                 >
-                  <Heart className={`w-6 h-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
+                  {isOperating(movieId) ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <Heart className={`w-6 h-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
+                  )}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Scroll indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-            <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center pt-2">
-              <div className="w-1 h-3 bg-white/50 rounded-full"></div>
+          {showScrollHint && (
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hero-scroll-indicator pointer-events-none transition-opacity duration-500">
+              <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center pt-2">
+                <div className="w-1 h-3 bg-white/50 rounded-full" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Seasons & Episodes Section for TV Shows (only for released content) */}
@@ -516,15 +527,22 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     {Array.from({ length: episodeCount }, (_, i) => i + 1).map((episodeNum) => (
                       <button
                         key={episodeNum}
-                        onClick={() => setSelectedEpisode(episodeNum)}
-                        onDoubleClick={() => handleWatch(episodeNum)}
-                        className={`group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all duration-200 hover:scale-105 ${selectedEpisode === episodeNum
-                          ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20'
+                        type="button"
+                        onClick={() => {
+                          if (selectedEpisode === episodeNum) {
+                            handleWatch(episodeNum);
+                          } else {
+                            setSelectedEpisode(episodeNum);
+                          }
+                        }}
+                        className={`group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all duration-200 hover:scale-105 min-h-[72px] ${selectedEpisode === episodeNum
+                          ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20 ring-2 ring-red-400/40'
                           : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
                           }`}
+                        aria-label={`Episode ${episodeNum}${selectedEpisode === episodeNum ? ', tap again to play' : ''}`}
                       >
                         <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-white' : 'text-red-500 group-hover:text-red-400'}`} />
-                        <span className="font-bold text-xs sm:text-sm">{episodeNum}</span>
+                        <span className="font-bold text-xs sm:text-sm">E{episodeNum}</span>
                       </button>
                     ))}
                   </div>
@@ -536,7 +554,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 <div className="text-center sm:text-left">
                   <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">Ready to play</p>
                   <p className="text-white text-base sm:text-xl font-bold">Season {selectedSeason}, Episode {selectedEpisode}</p>
-                  <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 sm:mt-1">Tap an episode above to change selection</p>
+                  <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 sm:mt-1">Tap to select · tap again to play instantly</p>
                 </div>
                 <button
                   onClick={() => handleWatch()}
