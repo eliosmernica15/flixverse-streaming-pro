@@ -26,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${SITE_URL}/movie/${item.id}?type=${item.type}`,
     lastModified,
     changeFrequency: "weekly" as const,
-    priority: 0.72,
+    priority: item.type === "movie" ? 0.78 : 0.75,
   }));
 
   return [...staticRoutes, ...browseRoutes, ...contentRoutes];

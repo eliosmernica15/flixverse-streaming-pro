@@ -62,7 +62,14 @@ export const metadata: Metadata = {
     },
     alternates: {
         canonical: SITE_URL,
+        types: {
+            "application/rss+xml": `${SITE_URL}/sitemap.xml`,
+        },
     },
+    applicationName: SITE_NAME,
+    ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+        ? { verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } }
+        : {}),
 };
 
 export const viewport: Viewport = {

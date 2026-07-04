@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   X, Server, ArrowLeft, Maximize2, Minimize2, Tv, Film,
-  RefreshCw, AlertTriangle, Keyboard, Clock, Signal, ChevronRight,
+  RefreshCw, AlertTriangle, Keyboard, Signal, ChevronRight, HelpCircle,
 } from "lucide-react";
-import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
-import { useToast } from "@/hooks/use-toast";
 import { buildStreamingSources } from "@/lib/streamingSources";
 
 interface VideoPlayerProps {
@@ -23,35 +21,28 @@ interface VideoPlayerProps {
   totalDuration?: number;
 }
 
-function formatTime(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+type EmbedState = "loading" | "ready" | "error";
+
+const LOAD_TIMEOUT_MS = 22_000;
+const HELP_PROMPT_DELAY_MS = 6_000;
 
 const VideoPlayer = ({
   movieId, title, onClose, isTrailer = false, mediaType = "movie",
-  season, episode, posterPath, resumePosition, totalDuration,
+  season, episode,
 }: VideoPlayerProps) => {
   const [currentServer, setCurrentServer] = useState(0);
   const [showServerSelector, setShowServerSelector] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [isTheaterMode, setIsTheaterMode] = useState(false);
   const [isCinematic, setIsCinematic] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const [embedState, setEmbedState] = useState<EmbedState>("loading");
+  const [showHelpPrompt, setShowHelpPrompt] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [elapsed, setElapsed] = useState(0);
 
-  const startTimeRef = useRef<number | null>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hideControlsTimer = useRef<NodeJS.Timeout | null>(null);
+  const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const helpPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const { updateProgress } = useWatchHistoryContext();
-  const { toast } = useToast();
 
   const streamingSources = useMemo(
     () => buildStreamingSources(movieId, mediaType, season, episode),
@@ -59,9 +50,11 @@ const VideoPlayer = ({
   );
   const currentSource = streamingSources[currentServer];
 
-  const progressPercent = totalDuration && !isTrailer
-    ? Math.min(100, (((resumePosition || 0) + elapsed) / totalDuration) * 100)
-    : 0;
+  const clearTimers = useCallback(() => {
+    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    if (helpPromptTimerRef.current) clearTimeout(helpPromptTimerRef.current);
+  }, []);
 
   const bumpControls = useCallback(() => {
     setControlsVisible(true);
@@ -70,29 +63,36 @@ const VideoPlayer = ({
   }, []);
 
   const handleClose = useCallback(() => {
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
+    clearTimers();
     onClose();
-
-    if (startTimeRef.current && totalDuration && !isTrailer) {
-      const finalProgress = (resumePosition || 0) + elapsed;
-      if (finalProgress < totalDuration) {
-        updateProgress(movieId, mediaType, title, posterPath || null, finalProgress, totalDuration, season, episode).catch(() => undefined);
-      }
-    }
-  }, [movieId, mediaType, title, posterPath, season, episode, totalDuration, resumePosition, isTrailer, updateProgress, onClose, elapsed]);
+  }, [clearTimers, onClose]);
 
   const switchServer = useCallback((index: number) => {
+    clearTimers();
     setCurrentServer(index);
     setShowServerSelector(false);
-    setIsLoading(true);
-    setHasError(false);
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    startTimeRef.current = null;
-    setElapsed(0);
+    setEmbedState("loading");
+    setShowHelpPrompt(false);
+  }, [clearTimers]);
+
+  const handleRetry = useCallback(() => {
+    switchServer((currentServer + 1) % streamingSources.length);
+  }, [currentServer, streamingSources.length, switchServer]);
+
+  const startLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    loadTimeoutRef.current = setTimeout(() => {
+      setEmbedState("error");
+      setShowHelpPrompt(false);
+    }, LOAD_TIMEOUT_MS);
   }, []);
 
-  const handleRetry = () => switchServer((currentServer + 1) % streamingSources.length);
+  const scheduleHelpPrompt = useCallback(() => {
+    if (helpPromptTimerRef.current) clearTimeout(helpPromptTimerRef.current);
+    helpPromptTimerRef.current = setTimeout(() => {
+      setShowHelpPrompt(true);
+    }, HELP_PROMPT_DELAY_MS);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -116,35 +116,32 @@ const VideoPlayer = ({
   }, [bumpControls]);
 
   useEffect(() => {
-    const tick = setInterval(() => {
-      if (startTimeRef.current && !isLoading) {
-        setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
-      }
-    }, 1000);
-    return () => clearInterval(tick);
-  }, [isLoading]);
+    setEmbedState("loading");
+    setShowHelpPrompt(false);
+    startLoadTimeout();
+    return () => clearTimers();
+  }, [currentServer, startLoadTimeout, clearTimers]);
 
-  useEffect(() => () => {
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-  }, []);
+  useEffect(() => () => clearTimers(), [clearTimers]);
 
   const onIframeLoad = () => {
-    setIsLoading(false);
-    if (!isTrailer && totalDuration) {
-      startTimeRef.current = Date.now();
-      if (resumePosition && resumePosition > 60) {
-        toast({ title: "Resuming playback", description: `Continuing from ${formatTime(resumePosition)}` });
-      }
-      progressIntervalRef.current = setInterval(() => {
-        if (!startTimeRef.current) return;
-        const current = (resumePosition || 0) + Math.floor((Date.now() - startTimeRef.current) / 1000);
-        if (current < totalDuration) {
-          updateProgress(movieId, mediaType, title, posterPath || null, current, totalDuration, season, episode).catch(() => undefined);
-        }
-      }, 30000);
-    }
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    setEmbedState("ready");
+    scheduleHelpPrompt();
   };
+
+  const onIframeError = () => {
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    setEmbedState("error");
+    setShowHelpPrompt(false);
+  };
+
+  const statusLabel =
+    embedState === "loading"
+      ? `Connecting to ${currentSource.name}…`
+      : embedState === "error"
+        ? "Stream unavailable"
+        : `Streaming via ${currentSource.name}`;
 
   const shortcuts = [
     { key: "Esc", action: "Close player" },
@@ -164,7 +161,6 @@ const VideoPlayer = ({
     >
       <div className="player-ambient" aria-hidden />
 
-      {/* Top bar */}
       <header className={`player-chrome top-0 ${controlsVisible || showServerSelector ? "player-chrome-visible" : ""}`}>
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
@@ -188,12 +184,18 @@ const VideoPlayer = ({
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {!isTrailer && totalDuration && (
-              <span className="hidden md:flex items-center gap-1.5 text-xs text-gray-400 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-                <Clock className="w-3.5 h-3.5" />
-                {formatTime((resumePosition || 0) + elapsed)} / {formatTime(totalDuration)}
-              </span>
-            )}
+            <span
+              className={`hidden md:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border ${
+                embedState === "error"
+                  ? "text-red-300 bg-red-500/10 border-red-500/30"
+                  : embedState === "loading"
+                    ? "text-amber-300 bg-amber-500/10 border-amber-500/30"
+                    : "text-gray-400 bg-white/5 border-white/10"
+              }`}
+            >
+              <Signal className={`w-3.5 h-3.5 ${embedState === "ready" ? "text-green-500" : embedState === "error" ? "text-red-400" : "text-amber-400"}`} />
+              {statusLabel}
+            </span>
             <button type="button" onClick={() => setShowShortcuts(true)} className="player-icon-btn" title="Shortcuts (?)">
               <Keyboard className="w-4 h-4" />
             </button>
@@ -212,11 +214,10 @@ const VideoPlayer = ({
         </div>
       </header>
 
-      {/* Video area */}
       <div className={`flex-1 min-h-0 flex items-center justify-center relative ${isCinematic ? "py-16 sm:py-24" : "p-3 sm:p-6"}`}>
         <div className={`relative w-full transition-all duration-500 ${isTheaterMode ? "max-w-[100vw]" : "max-w-6xl"}`}>
           <div className="player-frame relative w-full overflow-hidden rounded-xl sm:rounded-2xl border border-white/10 shadow-[0_0_80px_rgba(239,68,68,0.15)]" style={{ aspectRatio: "16/9" }}>
-            {isLoading && (
+            {embedState === "loading" && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950">
                 <div className="player-loader mb-4" />
                 <p className="text-white font-semibold text-sm sm:text-base">Connecting to {currentSource.name}</p>
@@ -224,17 +225,47 @@ const VideoPlayer = ({
               </div>
             )}
 
-            {hasError && (
+            {embedState === "error" && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center">
                 <div className="w-14 h-14 rounded-full bg-red-500/15 flex items-center justify-center mb-4">
                   <AlertTriangle className="w-7 h-7 text-red-500" />
                 </div>
-                <p className="text-white font-semibold mb-1">Stream unavailable</p>
-                <p className="text-gray-500 text-sm mb-5">Try the next server — some sources rotate daily.</p>
+                <p className="text-white font-semibold mb-1">This server couldn&apos;t load the stream</p>
+                <p className="text-gray-500 text-sm mb-5 max-w-sm">
+                  The embed may be blocked, offline, or missing this episode. Try the next server — sources rotate often.
+                </p>
                 <button type="button" onClick={handleRetry} className="btn-primary px-6 py-2.5 gap-2">
                   <RefreshCw className="w-4 h-4" />
-                  Next server
+                  Try next server
                 </button>
+              </div>
+            )}
+
+            {embedState === "ready" && showHelpPrompt && (
+              <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-black/85 border border-white/15 backdrop-blur-md animate-fade-in-up">
+                <div className="flex items-start gap-2 min-w-0">
+                  <HelpCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-gray-200">
+                    Video blank or broken? The player can&apos;t detect playback inside embeds — switch servers if nothing plays.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors"
+                  >
+                    Next server
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowHelpPrompt(false)}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400"
+                    aria-label="Dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -242,28 +273,20 @@ const VideoPlayer = ({
               key={currentServer}
               src={currentSource.url}
               title={`Watch ${title}`}
-              className="absolute inset-0 w-full h-full border-0"
+              className={`absolute inset-0 w-full h-full border-0 ${embedState === "error" ? "pointer-events-none opacity-0" : ""}`}
               allowFullScreen
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerPolicy="strict-origin-when-cross-origin"
               onLoad={onIframeLoad}
-              onError={() => setHasError(true)}
+              onError={onIframeError}
             />
           </div>
 
-          {/* Bottom progress + info */}
           <div className={`player-chrome bottom-0 mt-3 ${controlsVisible ? "player-chrome-visible" : ""}`}>
-            {!isTrailer && totalDuration && (
-              <div className="mb-3">
-                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-red-600 to-orange-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
-                </div>
-              </div>
-            )}
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span className="flex items-center gap-1.5">
-                <Signal className="w-3.5 h-3.5 text-green-500" />
-                {currentSource.quality} · {currentSource.reliability === "high" ? "Stable" : "Backup"}
+                <Signal className={`w-3.5 h-3.5 ${embedState === "ready" ? "text-green-500" : embedState === "error" ? "text-red-400" : "text-amber-400"}`} />
+                {currentSource.quality} · {currentSource.reliability === "high" ? "Recommended" : "Backup"} · Server {currentServer + 1}/{streamingSources.length}
               </span>
               <button type="button" onClick={() => setIsCinematic((p) => !p)} className="hover:text-white transition-colors">
                 {isCinematic ? "Exit cinematic" : "Cinematic mode (C)"}
@@ -273,7 +296,6 @@ const VideoPlayer = ({
         </div>
       </div>
 
-      {/* Server selector modal */}
       {showServerSelector && (
         <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowServerSelector(false)} />
@@ -287,6 +309,9 @@ const VideoPlayer = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+            <p className="px-4 pt-2 text-xs text-gray-500">
+              If you see a blank or broken player, pick another server — playback runs inside third-party embeds.
+            </p>
             <div className="overflow-y-auto p-2 custom-scrollbar">
               {streamingSources.map((source, index) => (
                 <button
@@ -316,7 +341,6 @@ const VideoPlayer = ({
         </div>
       )}
 
-      {/* Shortcuts modal */}
       {showShortcuts && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowShortcuts(false)} />

@@ -23,8 +23,8 @@ export function buildStreamingSources(
       quality: "FHD",
       reliability: "high",
       url: isTv
-        ? `https://vidsrc.cc/v2/embed/tv/${movieId}/${season}/${episode}`
-        : `https://vidsrc.cc/v2/embed/movie/${movieId}`,
+        ? `https://vidsrc.cc/v2/embed/tv/${movieId}/${season}/${episode}?autoPlay=true`
+        : `https://vidsrc.cc/v2/embed/movie/${movieId}?autoPlay=true`,
     },
     {
       id: "vidsrc-pro",

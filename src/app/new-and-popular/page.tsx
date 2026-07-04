@@ -1,14 +1,38 @@
 import { LazyNewAndPopular } from "@/lib/lazy-views";
-import { buildPageMetadata } from "@/lib/seo/metadata";
+import { buildPageMetadata, SITE_URL } from "@/lib/seo/metadata";
+import { CollectionPageJsonLd, WebPageJsonLd } from "@/components/seo/JsonLd";
 
 export const metadata = buildPageMetadata({
-  title: "New & Popular Movies and TV Shows",
+  title: "New & Popular Movies and TV Shows — Trending This Week",
   description:
-    "Discover trending and new movies and TV shows on FlixVerse. What's hot this week — stream popular films and series free in HD.",
+    "Discover what's trending on FlixVerse — new movie releases, popular TV series, and the hottest films everyone is watching. Stream free in HD.",
   path: "/new-and-popular",
-  keywords: ["trending movies", "popular TV shows", "new releases", "what to watch", "FlixVerse"],
+  keywords: [
+    "trending movies",
+    "popular TV shows",
+    "new releases",
+    "what to watch",
+    "hot movies this week",
+    "FlixVerse trending",
+    "new movies 2026",
+  ],
 });
 
 export default function NewAndPopularPage() {
-  return <LazyNewAndPopular />;
+  const url = `${SITE_URL}/new-and-popular`;
+  return (
+    <>
+      <WebPageJsonLd
+        name="New & Popular on FlixVerse"
+        description="Trending movies and TV shows updated weekly."
+        url={url}
+      />
+      <CollectionPageJsonLd
+        name="New & Popular Movies and TV Shows"
+        description="Trending and newly released titles to stream free on FlixVerse."
+        url={url}
+      />
+      <LazyNewAndPopular />
+    </>
+  );
 }
