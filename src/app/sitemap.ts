@@ -3,7 +3,8 @@ import { BROWSE_CATEGORIES } from "@/utils/browseCategories";
 import { SITE_URL } from "@/lib/seo/metadata";
 import { fetchAllSitemapContent } from "@/lib/seo/sitemap-tmdb";
 
-export const revalidate = 86400;
+/** Build sitemap at deploy time — avoids runtime TMDB timeouts on Vercel. */
+export const dynamic = "force-static";
 
 function contentUrl(item: { id: number; type: "movie" | "tv" }) {
   return item.type === "tv"
