@@ -1,7 +1,15 @@
 import type { MetadataRoute } from "next";
 import { BROWSE_CATEGORIES } from "@/utils/browseCategories";
 import { SITE_URL } from "@/lib/seo/metadata";
-import { fetchTrendingForSitemap } from "@/lib/seo/sitemap-tmdb";
+import { fetchAllSitemapContent } from "@/lib/seo/sitemap-tmdb";
+
+export const revalidate = 86400;
+
+function contentUrl(item: { id: number; type: "movie" | "tv" }) {
+  return item.type === "tv"
+    ? `${SITE_URL}/movie/${item.id}?type=tv`
+    : `${SITE_URL}/movie/${item.id}`;
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = new Date();
@@ -21,13 +29,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.85,
   }));
 
-  const trending = await fetchTrendingForSitemap();
-  const contentRoutes: MetadataRoute.Sitemap = trending.map((item) => ({
-    url: `${SITE_URL}/movie/${item.id}?type=${item.type}`,
-    lastModified,
-    changeFrequency: "weekly" as const,
-    priority: item.type === "movie" ? 0.78 : 0.75,
-  }));
+  let contentRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const content = await fetchAllSitemapContent();
+    contentRoutes = content.map((item) => ({
+      url: contentUrl(item),
+      lastModified,
+      changeFrequency: "weekly" as const,
+      priority: item.type === "movie" ? 0.78 : 0.75,
+    }));
+  } catch {
+    // Static + browse routes still ship if TMDB is unavailable
+  }
 
   return [...staticRoutes, ...browseRoutes, ...contentRoutes];
 }

@@ -29,12 +29,13 @@ export function WebsiteJsonLd() {
 export function OrganizationJsonLd() {
   const data = {
     "@context": "https://schema.org",
-    "@type": "Organization",
+    "@type": ["Organization", "EntertainmentBusiness"],
     name: SITE_NAME,
     url: SITE_URL,
     logo: `${SITE_URL}/favicon.svg`,
     description: DEFAULT_DESCRIPTION,
     sameAs: [],
+    knowsAbout: ["Movies", "Television", "Streaming media", "Entertainment"],
   };
 
   return (

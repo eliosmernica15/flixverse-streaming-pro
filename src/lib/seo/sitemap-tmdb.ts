@@ -46,30 +46,69 @@ function toSitemapItems(results: TmdbTrendingItem[], type?: "movie" | "tv"): Sit
     }));
 }
 
-export async function fetchTrendingForSitemap(): Promise<SitemapContentItem[]> {
-  const [trendingWeek, trendingDay, popularMovies, popularTv] = await Promise.all([
+async function fetchMoviePages(pages: number[]): Promise<SitemapContentItem[]> {
+  const results = await Promise.all(
+    pages.map((page) => fetchTmdbPage(`/movie/popular?language=en-US&page=${page}`))
+  );
+  return results.flatMap((r) => toSitemapItems(r, "movie"));
+}
+
+async function fetchTvPages(pages: number[]): Promise<SitemapContentItem[]> {
+  const results = await Promise.all(
+    pages.map((page) => fetchTmdbPage(`/tv/popular?language=en-US&page=${page}`))
+  );
+  return results.flatMap((r) => toSitemapItems(r, "tv"));
+}
+
+function dedupeItems(items: SitemapContentItem[], limit: number): SitemapContentItem[] {
+  const seen = new Set<string>();
+  const unique: SitemapContentItem[] = [];
+  for (const item of items) {
+    const key = `${item.type}-${item.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+    if (unique.length >= limit) break;
+  }
+  return unique;
+}
+
+export async function fetchAllSitemapContent(): Promise<SitemapContentItem[]> {
+  const [
+    trendingWeek,
+    trendingDay,
+    topRatedMovies,
+    topRatedTv,
+    nowPlaying,
+    onTheAir,
+    popularMovies,
+    popularTv,
+  ] = await Promise.all([
     fetchTmdbPage("/trending/all/week?language=en-US"),
     fetchTmdbPage("/trending/all/day?language=en-US"),
-    fetchTmdbPage("/movie/popular?language=en-US&page=1"),
-    fetchTmdbPage("/tv/popular?language=en-US&page=1"),
+    fetchTmdbPage("/movie/top_rated?language=en-US&page=1"),
+    fetchTmdbPage("/tv/top_rated?language=en-US&page=1"),
+    fetchTmdbPage("/movie/now_playing?language=en-US&page=1"),
+    fetchTmdbPage("/tv/on_the_air?language=en-US&page=1"),
+    fetchMoviePages([1, 2, 3, 4, 5]),
+    fetchTvPages([1, 2, 3, 4, 5]),
   ]);
 
   const merged = [
     ...toSitemapItems(trendingWeek),
     ...toSitemapItems(trendingDay),
-    ...toSitemapItems(popularMovies, "movie"),
-    ...toSitemapItems(popularTv, "tv"),
+    ...toSitemapItems(topRatedMovies, "movie"),
+    ...toSitemapItems(topRatedTv, "tv"),
+    ...toSitemapItems(nowPlaying, "movie"),
+    ...toSitemapItems(onTheAir, "tv"),
+    ...popularMovies,
+    ...popularTv,
   ];
 
-  const seen = new Set<string>();
-  const unique: SitemapContentItem[] = [];
-  for (const item of merged) {
-    const key = `${item.type}-${item.id}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(item);
-    if (unique.length >= 250) break;
-  }
+  return dedupeItems(merged, 500);
+}
 
-  return unique;
+/** @deprecated Use fetchAllSitemapContent */
+export async function fetchTrendingForSitemap(): Promise<SitemapContentItem[]> {
+  return fetchAllSitemapContent();
 }
