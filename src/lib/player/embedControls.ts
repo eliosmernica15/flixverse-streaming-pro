@@ -213,51 +213,60 @@ function buildCommandPayloads(provider: ProviderConfig, action: EmbedAction, opt
   // Generic fallbacks
   switch (action) {
     case "play":
-      payloads.push({ method: "play" }, { action: "play" }, { type: "play" }, { event: "command", func: "playVideo" });
+      payloads.push("play", { method: "play" }, { action: "play" }, { type: "play" }, { event: "command", func: "playVideo" }, { type: "player", data: "play" });
       break;
     case "pause":
-      payloads.push({ method: "pause" }, { action: "pause" }, { type: "pause" }, { event: "command", func: "pauseVideo" });
+      payloads.push("pause", { method: "pause" }, { action: "pause" }, { type: "pause" }, { event: "command", func: "pauseVideo" }, { type: "player", data: "pause" });
       break;
     case "toggle":
       payloads.push(
+        "toggle",
+        "togglePlay",
         { method: "togglePlay" },
         { action: "toggle" },
         { type: "toggle" },
         { event: "command", func: "playVideo" },
-        { event: "command", func: "pauseVideo" }
+        { event: "command", func: "pauseVideo" },
+        { type: "player", data: "toggle" }
       );
       break;
     case "mute":
-      payloads.push({ method: "mute" }, { action: "mute" }, { type: "mute" }, { event: "command", func: "mute" });
+      payloads.push("mute", { method: "mute" }, { action: "mute" }, { type: "mute" }, { event: "command", func: "mute" }, { type: "player", data: "mute" });
       break;
     case "unmute":
       payloads.push(
+        "unmute",
         { method: "unmute" },
         { action: "unmute" },
         { type: "unmute" },
-        { event: "command", func: "unMute" }
+        { event: "command", func: "unMute" },
+        { type: "player", data: "unmute" }
       );
       break;
     case "volumeUp":
-      payloads.push({ method: "volumeUp" }, { action: "volumeUp" });
+      payloads.push("volumeUp", { method: "volumeUp" }, { action: "volumeUp" }, { type: "player", data: "volumeUp" });
       break;
     case "volumeDown":
-      payloads.push({ method: "volumeDown" }, { action: "volumeDown" });
+      payloads.push("volumeDown", { method: "volumeDown" }, { action: "volumeDown" }, { type: "player", data: "volumeDown" });
       break;
     case "seekForward":
       payloads.push(
+        "seekForward",
         { method: "seek", value: 10 },
         { action: "seek", seconds: 10 },
         { type: "seek", direction: "forward", amount: 10 },
-        { event: "command", func: "seek", args: [10] }
+        { event: "command", func: "seek", args: [10] },
+        { type: "player", data: "seekForward" }
       );
       break;
     case "seekBack":
       payloads.push(
+        "seekBack",
         { method: "seek", value: -10 },
         { action: "seek", seconds: -10 },
         { type: "seek", direction: "back", amount: 10 },
-        { event: "command", func: "seek", args: [-10] }
+        { event: "command", func: "seek", args: [-10] },
+        { type: "player", data: "seekBack" }
       );
       break;
     case "seekTo":
@@ -266,7 +275,8 @@ function buildCommandPayloads(provider: ProviderConfig, action: EmbedAction, opt
           { method: "seek", value: opts.seekSeconds },
           { action: "seek", seconds: opts.seekSeconds },
           { type: "seek", value: opts.seekSeconds },
-          { event: "command", func: "seek", args: [opts.seekSeconds] }
+          { event: "command", func: "seek", args: [opts.seekSeconds] },
+          { type: "player", data: { action: "seek", time: opts.seekSeconds } }
         );
       }
       break;
@@ -276,7 +286,8 @@ function buildCommandPayloads(provider: ProviderConfig, action: EmbedAction, opt
           { method: "setVolume", value: opts.volume },
           { action: "volume", value: opts.volume },
           { type: "volume", value: opts.volume },
-          { event: "command", func: "setVolume", args: [opts.volume] }
+          { event: "command", func: "setVolume", args: [opts.volume] },
+          { type: "player", data: { action: "volume", value: opts.volume } }
         );
       }
       break;

@@ -127,14 +127,21 @@ export function useEmbedBridge({
       if (event.source !== iframe.contentWindow) return;
       if (event.origin !== iframeOrigin && event.origin !== "*") return;
 
-      const data = parseMessageData(event) as Record<string, unknown>;
-      if (!data || typeof data !== "object") return;
-
-      // VidSrc.cc wraps events in { type: "PLAYER_EVENT", data: {...} }
-      const payload =
-        data.type === "PLAYER_EVENT" && typeof data.data === "object" && data.data !== null
-          ? (data.data as Record<string, unknown>)
-          : data;
+      const data = parseMessageData(event);
+      
+      // Handle providers that just send string events (like VidLink)
+      let payload: Record<string, unknown>;
+      if (typeof data === "string") {
+        payload = { event: data };
+      } else if (data && typeof data === "object") {
+        const dataObj = data as Record<string, unknown>;
+        payload =
+          dataObj.type === "PLAYER_EVENT" && typeof dataObj.data === "object" && dataObj.data !== null
+            ? (dataObj.data as Record<string, unknown>)
+            : dataObj;
+      } else {
+        return;
+      }
 
       let nextState = { ...stateRef.current };
       let changed = false;
@@ -153,11 +160,15 @@ export function useEmbedBridge({
       }
 
       if (matchesEvent(payload, provider.events.time)) {
+        const nestedData = typeof payload.data === "object" && payload.data ? (payload.data as Record<string, unknown>) : {};
         const t =
           extractNumber(payload.currentTime) ??
           extractNumber(payload.time) ??
           extractNumber(payload.current_time) ??
-          extractNumber(payload.position);
+          extractNumber(payload.position) ??
+          extractNumber(nestedData.currentTime) ??
+          extractNumber(nestedData.time) ??
+          extractNumber(nestedData.position);
         if (t !== undefined && isFinite(t)) {
           nextState.currentTime = Math.min(t, totalDuration || Infinity);
           changed = true;
@@ -165,7 +176,9 @@ export function useEmbedBridge({
         const d =
           extractNumber(payload.duration) ??
           extractNumber(payload.totalDuration) ??
-          extractNumber(payload.total);
+          extractNumber(payload.total) ??
+          extractNumber(nestedData.duration) ??
+          extractNumber(nestedData.totalDuration);
         if (d !== undefined && isFinite(d) && d > 0) {
           nextState.duration = d;
           changed = true;
@@ -173,7 +186,8 @@ export function useEmbedBridge({
       }
 
       if (matchesEvent(payload, provider.events.volume)) {
-        const v = extractNumber(payload.volume);
+        const nestedData = typeof payload.data === "object" && payload.data ? (payload.data as Record<string, unknown>) : {};
+        const v = extractNumber(payload.volume) ?? extractNumber(nestedData.volume);
         if (v !== undefined && isFinite(v)) {
           nextState.volume = Math.max(0, Math.min(1, v));
           changed = true;
@@ -181,7 +195,9 @@ export function useEmbedBridge({
       }
 
       if (matchesEvent(payload, provider.events.muted)) {
-        const m = payload.muted;
+        const nestedData = typeof payload.data === "object" && payload.data ? (payload.data as Record<string, unknown>) : {};
+        let m = payload.muted;
+        if (m === undefined) m = nestedData.muted;
         if (typeof m === "boolean") {
           nextState.isMuted = m;
           changed = true;
