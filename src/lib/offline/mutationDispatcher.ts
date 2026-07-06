@@ -1,7 +1,13 @@
 import { getEnv } from "@/utils/env";
 import { MutationAction, saveMutationToOutbox, getOutboxMutations, clearOutboxMutation } from "@/lib/offlineStorage";
-import { v4 as uuidv4 } from "uuid";
 // In a real implementation, we would import Firestore methods here.
+
+function generateId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
 
 export class MutationDispatcher {
   private static isOnline(): boolean {
@@ -10,7 +16,7 @@ export class MutationDispatcher {
 
   static async dispatch(type: MutationAction["type"], payload: any): Promise<void> {
     const action: MutationAction = {
-      id: uuidv4(),
+      id: generateId(),
       type,
       payload,
       timestamp: new Date().toISOString(),
