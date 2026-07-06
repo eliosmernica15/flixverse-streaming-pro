@@ -73,9 +73,6 @@ const PersonalizedWelcome = () => {
 
           {isAuthenticated && profile && (
             <div className="relative z-10 mt-4 pt-4 border-t border-white/5 flex flex-wrap gap-2">
-              <span className="px-3 py-1 rounded-lg text-xs font-medium bg-red-500/10 text-red-300 border border-red-500/20">
-                Premium Member
-              </span>
               <span className="px-3 py-1 rounded-lg text-xs font-medium bg-sky-500/10 text-sky-300 border border-sky-500/20">
                 Synced Watchlist
               </span>

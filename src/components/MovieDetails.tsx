@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2 } from "lucide-react";
+import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2 } from "lucide-react";
 import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, isNotReleasedYet } from "@/utils/tmdbApi";
 import { useContentDetails } from "@/hooks/queries/useContentDetails";
 import { useRelatedContent } from "@/hooks/queries/useRelatedContent";
@@ -11,6 +11,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
+import { SpoilerProtectedEpisode } from "./spoiler/SpoilerProtectedEpisode";
+import { BreadcrumbNav } from "./BreadcrumbNav";
+import { CastCrewGrid } from "./CastCrewGrid";
+import { TrendingDiscussions } from "./TrendingDiscussions";
 import QuickRating from "./QuickRating";
 import MovieCard from "./MovieCard";
 
@@ -86,7 +90,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       currentParams.delete('autoplay');
       currentParams.delete('resume');
       const newQs = currentParams.toString();
-      router.replace(`${pathname}${newQs ? `?${newQs}` : ''} `);
+      router.replace(`${pathname.trim()}${newQs ? `?${newQs}` : ''}`);
     }
   };
 
@@ -187,21 +191,22 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     }
   };
 
-  const handleDownload = () => {
+  const handleShare = async () => {
     const contentTitle = content?.title || content?.name || 'Unknown';
-
-    toast({
-      title: "Download Started",
-      description: `${contentTitle} download has been initiated. (Demo mode)`,
-    });
-
-    setTimeout(() => {
-      toast({
-        title: "Download Complete",
-        description: `${contentTitle} has been downloaded successfully.`,
-      });
-    }, 3000);
+    const url = `${window.location.origin}/movie/${movieId}?type=${mediaType || (content?.first_air_date ? 'tv' : 'movie')}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: contentTitle, url });
+      } catch {
+        // User cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link copied!", description: `${contentTitle} link copied to clipboard.` });
+    }
   };
+
+  // handleDownload intentionally omitted — offline downloads are not yet implemented.
 
   if (loading) {
     return (
@@ -454,6 +459,14 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     <Heart className={`w-6 h-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
                   )}
                 </button>
+
+                <button
+                  onClick={handleShare}
+                  className="group p-4 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all duration-300 hover:scale-110"
+                  title="Share"
+                >
+                  <Share2 className="w-6 h-6" />
+                </button>
               </div>
             </div>
           </div>
@@ -465,6 +478,21 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               </div>
             </div>
           )}
+        </div>
+
+        {/* Breadcrumb navigation */}
+        <div className="w-full px-4 md:px-16 py-3 bg-black/50 border-t border-white/5">
+          <div className="max-w-7xl mx-auto">
+            <BreadcrumbNav
+              items={[
+                {
+                  label: isTV ? "TV Shows" : "Movies",
+                  href: isTV ? "/tv-shows" : "/movies",
+                },
+                { label: contentTitle },
+              ]}
+            />
+          </div>
         </div>
 
         {/* Seasons & Episodes Section for TV Shows (only for released content) */}
@@ -525,25 +553,33 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 return (
                   <div className="grid grid-cols-4 xs:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 sm:gap-3">
                     {Array.from({ length: episodeCount }, (_, i) => i + 1).map((episodeNum) => (
-                      <button
-                        key={episodeNum}
-                        type="button"
-                        onClick={() => {
-                          if (selectedEpisode === episodeNum) {
-                            handleWatch(episodeNum);
-                          } else {
-                            setSelectedEpisode(episodeNum);
-                          }
-                        }}
-                        className={`group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all duration-200 hover:scale-105 min-h-[72px] ${selectedEpisode === episodeNum
-                          ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20 ring-2 ring-red-400/40'
-                          : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
-                          }`}
-                        aria-label={`Episode ${episodeNum}${selectedEpisode === episodeNum ? ', tap again to play' : ''}`}
+                      <SpoilerProtectedEpisode
+                        key={`spoiler-${episodeNum}`}
+                        contentId={content.id}
+                        season={selectedSeason}
+                        episode={episodeNum}
+                        className="w-full h-full"
                       >
-                        <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-white' : 'text-red-500 group-hover:text-red-400'}`} />
-                        <span className="font-bold text-xs sm:text-sm">E{episodeNum}</span>
-                      </button>
+                        <button
+                          key={episodeNum}
+                          type="button"
+                          onClick={() => {
+                            if (selectedEpisode === episodeNum) {
+                              handleWatch(episodeNum);
+                            } else {
+                              setSelectedEpisode(episodeNum);
+                            }
+                          }}
+                          className={`w-full h-full group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all duration-200 hover:scale-105 min-h-[72px] ${selectedEpisode === episodeNum
+                            ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20 ring-2 ring-red-400/40'
+                            : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
+                            }`}
+                          aria-label={`Episode ${episodeNum}${selectedEpisode === episodeNum ? ', tap again to play' : ''}`}
+                        >
+                          <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-white' : 'text-red-500 group-hover:text-red-400'}`} />
+                          <span className="font-bold text-xs sm:text-sm">E{episodeNum}</span>
+                        </button>
+                      </SpoilerProtectedEpisode>
                     ))}
                   </div>
                 );
@@ -637,6 +673,37 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           contentTitle={contentTitle}
           contentPosterPath={content.poster_path}
         />
+
+        {/* Trending Discussions */}
+        <div className="w-full px-4 sm:px-6 md:px-16 py-6 border-t border-white/5">
+          <div className="max-w-7xl mx-auto">
+            <TrendingDiscussions tmdbId={content.id} />
+          </div>
+        </div>
+
+        {/* Cast & Crew */}
+        {content.credits && (content.credits.cast.length > 0 || content.credits.crew.length > 0) && (
+          <div className="w-full px-4 sm:px-6 md:px-16 py-10 md:py-14 border-t border-white/5">
+            <div className="max-w-7xl mx-auto">
+              <CastCrewGrid
+                cast={content.credits.cast.map((c) => ({
+                  id: c.id,
+                  name: c.name || "Unknown",
+                  character: (c as any).character || "",
+                  profile_path: c.profile_path,
+                  order: (c as any).order || 0,
+                }))}
+                crew={content.credits.crew.map((c) => ({
+                  id: c.id,
+                  name: c.name || "Unknown",
+                  job: (c as any).job || "",
+                  department: (c as any).department || "",
+                  profile_path: c.profile_path,
+                }))}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Comments Section */}
         <CommentSection

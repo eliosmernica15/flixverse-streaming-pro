@@ -5,6 +5,7 @@ import HeroBanner from "@/components/HeroBanner";
 import MovieCarousel from "@/components/MovieCarousel";
 import PersonalizedWelcome from "@/components/PersonalizedWelcome";
 import LazySection from "@/components/LazySection";
+import { PlaySomething } from "@/components/PlaySomething";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeContent } from "@/hooks/queries/useHomeContent";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
@@ -29,15 +30,16 @@ const Index = () => {
   }, [data?.hero, queryClient]);
 
   return (
-    <main>
+    <div>
       {data?.hero ? (
         <HeroBanner movie={data.hero} />
       ) : isLoading ? (
         <div className="h-[88vh] lg:h-[92vh] bg-zinc-950 skeleton-shimmer" />
       ) : null}
 
-      <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8">
+      <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8 flex items-center gap-3">
         <PersonalizedWelcome />
+        <PlaySomething />
       </div>
 
       <div className="relative z-10">
@@ -119,7 +121,7 @@ const Index = () => {
           </LazySection>
         </div>
       </div>
-    </main>
+    </div>
   );
 };
 

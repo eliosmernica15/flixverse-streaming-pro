@@ -37,7 +37,7 @@ export const securityHeaders = [
       "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev",
       "font-src 'self' data:",
       "connect-src 'self' https://api.themoviedb.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://*.firebaseio.com",
-      "frame-src 'self' https: blob:",
+      "frame-src 'self' https://vidsrc.cc https://vidsrc.xyz https://vidsrc.icu https://vidlink.pro https://embed.su https://multiembed.mov https://player.autoembed.cc https://player.smashy.stream https://www.youtube.com https://www.youtube-nocookie.com blob:",
       "upgrade-insecure-requests",
     ].join("; "),
   },

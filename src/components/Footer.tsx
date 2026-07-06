@@ -14,10 +14,10 @@ const Footer = () => {
   ];
 
   const legalLinks = [
-    { label: "Privacy Policy", href: "#privacy" },
-    { label: "Terms of Service", href: "#terms" },
-    { label: "Contact Us", href: "#contact" },
-    { label: "Help Center", href: "#help" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Contact Us", href: "/contact" },
+    { label: "Help Center", href: "/help" },
   ];
 
   const socialLinks = [

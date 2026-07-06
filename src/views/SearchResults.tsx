@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import MovieCard from "@/components/MovieCard";
 import { searchMultiWithPagination, getContentImage, TMDBMovie } from "@/utils/tmdbApi";
-import { Search, Film, User, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Search, Film, User } from "lucide-react";
+import { SearchFilters, SearchFilterState } from "@/components/SearchFilters";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 interface SearchResultItem {
   id: number;
@@ -26,9 +27,18 @@ const SearchResults = () => {
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<SearchFilterState>({
+    mediaType: "all",
+    year: "",
+    sort: "relevance",
+  });
+  const [allResults, setAllResults] = useState<TMDBMovie[]>([]);
+  const [allPeople, setAllPeople] = useState<SearchResultItem[]>([]);
 
   useEffect(() => {
     setPage(1);
+    setAllResults([]);
+    setAllPeople([]);
   }, [query]);
 
   const { data, isLoading, isFetching } = useQuery({
@@ -39,23 +49,78 @@ const SearchResults = () => {
     placeholderData: (previous) => previous,
   });
 
-  const all = data?.results ?? [];
-  const results = all.filter(
-    (item: SearchResultItem) => item.media_type === "movie" || item.media_type === "tv"
-  );
-  const people = all.filter((item: SearchResultItem) => item.media_type === "person") as SearchResultItem[];
+  // Merge results for infinite scroll
+  useEffect(() => {
+    if (!data?.results) return;
+    const items = data.results as SearchResultItem[];
+    const moviesTv = items.filter(
+      (item) => item.media_type === "movie" || item.media_type === "tv"
+    ) as TMDBMovie[];
+    const people = items.filter((item) => item.media_type === "person");
+
+    if (page === 1) {
+      setAllResults(moviesTv);
+      setAllPeople(people);
+    } else {
+      setAllResults((prev) => [...prev, ...moviesTv]);
+      setAllPeople((prev) => [...prev, ...people]);
+    }
+  }, [data, page]);
+
   const totalPages = data?.total_pages ?? 1;
   const totalResults = data?.total_results ?? 0;
   const loading = isLoading || isFetching;
+  const hasMore = page < totalPages;
 
-  const movieTvResults = results as TMDBMovie[];
-  const hasContent = movieTvResults.length > 0 || people.length > 0;
-  const isEmpty = !loading && query && !hasContent;
+  // Apply client-side filters
+  const filteredResults = allResults.filter((item) => {
+    if (filters.mediaType === "person") return false;
+    if (filters.mediaType === "movie" && item.media_type !== "movie") return false;
+    if (filters.mediaType === "tv" && item.media_type !== "tv") return false;
+    if (filters.year) {
+      const date = item.release_date || item.first_air_date || "";
+      if (!date.startsWith(filters.year)) return false;
+    }
+    return true;
+  });
 
-  const loadPage = (newPage: number) => {
-    if (newPage < 1 || newPage > totalPages) return;
-    setPage(newPage);
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  const filteredPeople = filters.mediaType === "all" || filters.mediaType === "person"
+    ? allPeople
+    : [];
+
+  // Sort
+  const sortedResults = [...filteredResults].sort((a, b) => {
+    switch (filters.sort) {
+      case "rating_desc":
+        return (b.vote_average || 0) - (a.vote_average || 0);
+      case "rating_asc":
+        return (a.vote_average || 0) - (b.vote_average || 0);
+      case "date_desc":
+        return new Date(b.release_date || b.first_air_date || 0).getTime() -
+               new Date(a.release_date || a.first_air_date || 0).getTime();
+      case "date_asc":
+        return new Date(a.release_date || a.first_air_date || 0).getTime() -
+               new Date(b.release_date || b.first_air_date || 0).getTime();
+      default:
+        return 0;
+    }
+  });
+
+  const loadMore = useCallback(() => {
+    if (!loading && hasMore) {
+      setPage((p) => p + 1);
+    }
+  }, [loading, hasMore]);
+
+  const { sentinelRef } = useInfiniteScroll({
+    enabled: query.length > 0,
+    onLoadMore: loadMore,
+    hasMore,
+    isLoading: loading,
+  });
+
+  const handleFiltersChange = (newFilters: SearchFilterState) => {
+    setFilters(newFilters);
   };
 
   return (
@@ -66,11 +131,26 @@ const SearchResults = () => {
           Search results
           {query && <span className="text-gray-400 font-normal">for &quot;{query}&quot;</span>}
         </h1>
-        {!loading && query && (
-          <p className="text-gray-400 mt-1">
-            {totalResults} result{totalResults !== 1 ? "s" : ""} found
-          </p>
-        )}
+      </div>
+
+      {/* Inline search input */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <input
+            id="search-input"
+            type="search"
+            defaultValue={query}
+            placeholder="Search movies, TV shows, people..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                const val = (e.target as HTMLInputElement).value.trim();
+                if (val) window.location.href = `/search?q=${encodeURIComponent(val)}`;
+              }
+            }}
+            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20 transition-colors"
+          />
+        </div>
       </div>
 
       {!query ? (
@@ -78,13 +158,13 @@ const SearchResults = () => {
           <Search className="w-16 h-16 mx-auto mb-4 opacity-50" />
           <p>Enter a search term to find movies, TV shows, and more.</p>
         </div>
-      ) : loading && !data ? (
+      ) : loading && allResults.length === 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className="aspect-[2/3] rounded-2xl skeleton-shimmer" />
           ))}
         </div>
-      ) : isEmpty ? (
+      ) : sortedResults.length === 0 && filteredPeople.length === 0 && !loading ? (
         <div className="text-center py-16 text-gray-400">
           <Search className="w-16 h-16 mx-auto mb-4 opacity-50" />
           <p>No results found for &quot;{query}&quot;</p>
@@ -92,33 +172,37 @@ const SearchResults = () => {
         </div>
       ) : (
         <>
-          {movieTvResults.length > 0 && (
+          <SearchFilters
+            filters={filters}
+            onChange={handleFiltersChange}
+            resultCount={sortedResults.length + filteredPeople.length}
+          />
+
+          {sortedResults.length > 0 && (
             <section className="mb-12 content-auto">
               <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
                 <Film className="w-5 h-5 text-red-500" />
                 Movies & TV Shows
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
-                {movieTvResults.map((item) => (
+                {sortedResults.map((item) => (
                   <MovieCard key={`${item.id}-${item.media_type}`} movie={item} />
                 ))}
               </div>
             </section>
           )}
 
-          {people.length > 0 && (
+          {filteredPeople.length > 0 && (
             <section className="mb-12 content-auto">
               <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
                 <User className="w-5 h-5 text-red-500" />
                 People
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {people.map((person) => (
+                {filteredPeople.map((person) => (
                   <a
                     key={`person-${person.id}`}
-                    href={`https://www.themoviedb.org/person/${person.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={`/person/${person.id}`}
                     className="flex flex-col items-center p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
                   >
                     <img
@@ -137,30 +221,20 @@ const SearchResults = () => {
             </section>
           )}
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-8">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => loadPage(page - 1)}
-                disabled={page <= 1}
-                className="border-white/20 text-white hover:bg-white/10 disabled:opacity-50"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-              <span className="text-gray-400">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => loadPage(page + 1)}
-                disabled={page >= totalPages}
-                className="border-white/20 text-white hover:bg-white/10 disabled:opacity-50"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </Button>
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="h-4" />
+
+          {/* Loading more indicator */}
+          {loading && allResults.length > 0 && (
+            <div className="flex justify-center py-8">
+              <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
             </div>
+          )}
+
+          {!hasMore && allResults.length > 0 && (
+            <p className="text-center text-gray-500 text-sm py-8">
+              You&apos;ve reached the end of results
+            </p>
           )}
         </>
       )}

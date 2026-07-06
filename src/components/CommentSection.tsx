@@ -13,34 +13,40 @@ interface CommentSectionProps {
   contentType: 'movie' | 'tv';
 }
 
+function timeAgo(dateString: string) {
+  const date = new Date(dateString);
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return date.toLocaleDateString();
+}
+
 const CommentCard = ({
   comment,
   isOwner,
+  isLiked,
+  isLiking,
+  onLike,
   onReply,
   onDelete,
   replies,
-  depth = 0
+  isAuthenticated,
+  depth = 0,
 }: {
   comment: Comment;
   isOwner: boolean;
+  isLiked: boolean;
+  isLiking: boolean;
+  onLike: (id: string) => void;
   onReply: (parentId: string) => void;
   onDelete: (commentId: string) => void;
   replies: Comment[];
+  isAuthenticated: boolean;
   depth?: number;
 }) => {
   const [showReplies, setShowReplies] = useState(true);
-
-  const timeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    return date.toLocaleDateString();
-  };
 
   return (
     <div className={`animate-fade-in ${depth > 0 ? 'ml-8 border-l-2 border-white/10 pl-4' : ''}`}>
@@ -63,6 +69,7 @@ const CommentCard = ({
                 <button
                   type="button"
                   onClick={() => onDelete(comment.id)}
+                  aria-label="Delete comment"
                   className="p-1 hover:bg-red-500/20 rounded transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-red-400" />
@@ -73,10 +80,19 @@ const CommentCard = ({
             <p className="text-gray-300 text-sm leading-relaxed">{comment.text}</p>
 
             <div className="flex items-center space-x-4 mt-2">
-              <button type="button" className="flex items-center space-x-1 text-gray-500 hover:text-white transition-colors text-xs">
-                <ThumbsUp className="w-3.5 h-3.5" />
+              <button
+                type="button"
+                onClick={() => isAuthenticated && onLike(comment.id)}
+                disabled={isLiking || !isAuthenticated}
+                aria-label={`Like comment${isLiked ? ' (liked)' : ''}`}
+                className={`flex items-center space-x-1 transition-colors text-xs ${
+                  isLiked ? 'text-red-400 hover:text-red-300' : 'text-gray-500 hover:text-white'
+                } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''} ${isLiking ? 'opacity-50' : ''}`}
+              >
+                <ThumbsUp className={`w-3.5 h-3.5 ${isLiked ? 'fill-current' : ''}`} />
                 <span>{comment.likes_count}</span>
               </button>
+
               {depth < 2 && (
                 <button
                   type="button"
@@ -87,13 +103,15 @@ const CommentCard = ({
                   <span>Reply</span>
                 </button>
               )}
+
               {replies.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowReplies(!showReplies)}
-                  className="text-xs text-blue-400 hover:text-blue-400 transition-colors"
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                  {showReplies ? 'Hide' : 'Show'} {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+                  {showReplies ? 'Hide' : 'Show'} {replies.length}{' '}
+                  {replies.length === 1 ? 'reply' : 'replies'}
                 </button>
               )}
             </div>
@@ -107,10 +125,14 @@ const CommentCard = ({
             <CommentCard
               key={reply.id}
               comment={reply}
-              isOwner={isOwner}
+              isOwner={false}
+              isLiked={false}
+              isLiking={false}
+              onLike={onLike}
               onReply={onReply}
               onDelete={onDelete}
               replies={[]}
+              isAuthenticated={isAuthenticated}
               depth={depth + 1}
             />
           ))}
@@ -124,36 +146,36 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [likingComments, setLikingComments] = useState<Set<string>>(new Set());
 
-  const { comments, loading, addComment, deleteComment, getReplies, getTopLevelComments, commentCount } = useComments(contentId, contentType);
+  const {
+    comments,
+    loading,
+    addComment,
+    deleteComment,
+    likeComment,
+    likedCommentIds,
+    getReplies,
+    getTopLevelComments,
+    commentCount,
+  } = useComments(contentId, contentType);
+
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
 
   const handleSubmitComment = async () => {
     if (!newComment.trim()) {
-      toast({
-        title: "Comment required",
-        description: "Please write something before posting",
-        variant: "destructive"
-      });
+      toast({ title: 'Comment required', description: 'Please write something before posting', variant: 'destructive' });
       return;
     }
-
     setSubmitting(true);
     try {
       await addComment(contentId, contentType, newComment, replyingTo || undefined);
       setNewComment('');
       setReplyingTo(null);
-      toast({
-        title: "Comment posted",
-        description: "Your comment has been added"
-      });
+      toast({ title: 'Comment posted', description: 'Your comment has been added' });
     } catch (error: unknown) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to post comment",
-        variant: "destructive"
-      });
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to post comment', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -162,15 +184,27 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
   const handleDeleteComment = async (commentId: string) => {
     try {
       await deleteComment(commentId);
-      toast({
-        title: "Comment deleted",
-        description: "Your comment has been removed"
-      });
+      toast({ title: 'Comment deleted', description: 'Your comment has been removed' });
     } catch (error: unknown) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete comment",
-        variant: "destructive"
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to delete comment', variant: 'destructive' });
+    }
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    if (!isAuthenticated) {
+      toast({ title: 'Sign in required', description: 'Please sign in to like comments', variant: 'destructive' });
+      return;
+    }
+    setLikingComments((prev) => new Set(prev).add(commentId));
+    try {
+      await likeComment(commentId);
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to like comment', variant: 'destructive' });
+    } finally {
+      setLikingComments((prev) => {
+        const next = new Set(prev);
+        next.delete(commentId);
+        return next;
       });
     }
   };
@@ -182,9 +216,7 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center space-x-2 mb-6">
           <MessageCircle className="w-6 h-6 text-white" />
-          <h2 className="text-xl md:text-2xl font-bold text-white">
-            Comments ({commentCount})
-          </h2>
+          <h2 className="text-xl md:text-2xl font-bold text-white">Comments ({commentCount})</h2>
         </div>
 
         {isAuthenticated ? (
@@ -193,11 +225,7 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
               {replyingTo && (
                 <div className="flex items-center justify-between mb-2 px-3 py-2 bg-blue-500/10 rounded-lg">
                   <span className="text-sm text-blue-400">Replying to a comment</span>
-                  <button
-                    type="button"
-                    onClick={() => setReplyingTo(null)}
-                    className="text-xs text-gray-400 hover:text-white"
-                  >
+                  <button type="button" onClick={() => setReplyingTo(null)} className="text-xs text-gray-400 hover:text-white">
                     Cancel
                   </button>
                 </div>
@@ -214,6 +242,11 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Add a comment..."
                     className="bg-transparent border-0 text-white min-h-[60px] resize-none focus:ring-0 p-0 placeholder:text-gray-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        void handleSubmitComment();
+                      }
+                    }}
                   />
                   <div className="flex justify-end mt-2">
                     <Button
@@ -223,7 +256,7 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
                       className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400"
                     >
                       <Send className="w-4 h-4 mr-1" />
-                      {submitting ? 'Posting...' : 'Post'}
+                      {submitting ? 'Posting…' : 'Post'}
                     </Button>
                   </div>
                 </div>
@@ -234,7 +267,7 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
           <div className="mb-8 text-center p-6 bg-white/5 rounded-xl border border-white/10">
             <p className="text-gray-400 mb-3">Sign in to join the conversation</p>
             <Button
-              onClick={() => window.location.href = '/auth'}
+              onClick={() => (window.location.href = '/auth')}
               size="sm"
               className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400"
             >
@@ -259,9 +292,13 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
                 key={comment.id}
                 comment={comment}
                 isOwner={user?.uid === comment.user_id}
+                isLiked={likedCommentIds.has(comment.id)}
+                isLiking={likingComments.has(comment.id)}
+                onLike={handleLikeComment}
                 onReply={(parentId) => setReplyingTo(parentId)}
                 onDelete={handleDeleteComment}
                 replies={getReplies(comment.id)}
+                isAuthenticated={isAuthenticated}
               />
             ))}
           </div>

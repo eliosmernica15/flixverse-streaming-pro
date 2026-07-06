@@ -18,11 +18,14 @@ import InstallPrompt from "@/components/InstallPrompt";
 import OfflineBanner from "@/components/OfflineBanner";
 import BackToTop from "@/components/BackToTop";
 import OfflineCacheSync from "@/components/OfflineCacheSync";
+import { CookieConsent } from "@/components/CookieConsent";
 
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"), { ssr: false });
 const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcutsHelp"), {
   ssr: false,
 });
+import { OfflineSyncProvider } from "@/components/offline/OfflineSyncProvider";
+import { ExperimentProvider } from "@/contexts/ExperimentContext";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
@@ -47,6 +50,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 <UserMovieListProvider>
                 <WatchHistoryProvider>
                 <UserPreferencesProvider>
+                <OfflineSyncProvider>
+                <ExperimentProvider>
                 <TooltipProvider>
                     <RouteProgress />
                     <GlobalShortcuts />
@@ -57,10 +62,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                     <OfflineBanner />
                     <InstallPrompt />
                     <BackToTop />
+                    <CookieConsent />
                     {children}
                     <Toaster />
                     <Sonner />
                 </TooltipProvider>
+                </ExperimentProvider>
+                </OfflineSyncProvider>
                 </UserPreferencesProvider>
                 </WatchHistoryProvider>
                 </UserMovieListProvider>

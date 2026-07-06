@@ -135,3 +135,57 @@ export interface ContentRating {
   created_at: string;
   updated_at: string;
 }
+
+// FlixParty
+export interface FlixPartyParticipant {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  lastSeenAt: number;
+  role: 'host' | 'guest';
+}
+
+export interface FlixPartyRoom {
+  id: string;
+  code: string;
+  hostId: string;
+  encryptedPayload: string;
+  playbackState: 'playing' | 'paused';
+  lastKnownTime: number;
+  serverIndex: number;
+  updatedAt: number;
+  participants: FlixPartyParticipant[];
+  createdAt: number;
+}
+
+// Timeline Comment
+export interface TimelineComment {
+  id: string;
+  userId: string;
+  userDisplayName: string;
+  userAvatarUrl: string | null;
+  tmdbId: number;
+  timestampSeconds: number;
+  text: string;
+  likesCount: number;
+  status: 'visible' | 'hidden';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Member Profile (Netflix-style multi-profile)
+export type ProfileType = 'standard' | 'kids';
+
+export interface MemberProfile {
+  id: string;
+  ownerId: string; // the Firebase Auth user who owns this account
+  displayName: string;
+  avatarUrl: string | null;
+  type: ProfileType;
+  isPrimary: boolean;
+  pinHash?: string | null; // bcrypt hash for mature profile lock
+  maxCertification?: string; // e.g. 'PG-13', 'R', 'NC-17'
+  blockedGenres?: number[];
+  createdAt: string;
+  updatedAt: string;
+}

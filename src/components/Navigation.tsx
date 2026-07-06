@@ -134,6 +134,7 @@ const Navigation = () => {
                 prefetch
                 onMouseEnter={() => prefetchRoute(link.path)}
                 onFocus={() => prefetchRoute(link.path)}
+                aria-current={isActive(link.path) ? "page" : undefined}
                 className={`relative px-4 py-2.5 text-sm lg:text-base font-medium transition-colors duration-200 rounded-xl group ${
                   isActive(link.path) ? "text-white" : "text-gray-400 hover:text-white"
                 }`}
@@ -178,7 +179,7 @@ const Navigation = () => {
                             user?.email?.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-black" />
+                      {/* Online dot removed — no real presence tracking yet */}
                     </div>
                     <div className="hidden lg:flex items-center space-x-1">
                       <span className="text-sm font-medium text-white">
@@ -260,6 +261,7 @@ const Navigation = () => {
                   onMouseEnter={() => prefetchRoute(link.path)}
                   onFocus={() => prefetchRoute(link.path)}
                   onClick={() => setIsMobileMenuOpen(false)}
+                  aria-current={isActive(link.path) ? "page" : undefined}
                   className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-colors duration-200 ${
                     isActive(link.path)
                       ? "text-white bg-gradient-to-r from-red-500/20 to-orange-500/10 border-l-2 border-red-500"

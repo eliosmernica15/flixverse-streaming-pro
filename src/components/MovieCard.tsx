@@ -18,6 +18,7 @@ import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
+import CardPreviewPanel from "./CardPreviewPanel";
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -57,10 +58,12 @@ const genreNames: Record<number, string> = {
 
 const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const { addToHistory, addFavoriteGenre } = useUserPreferencesContext();
   const { isAuthenticated } = useAuth();
@@ -112,7 +115,10 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
     }
   }, []);
 
-  useEffect(() => () => cancelPrefetch(), [cancelPrefetch]);
+  useEffect(() => () => {
+    cancelPrefetch();
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+  }, [cancelPrefetch]);
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -182,10 +188,15 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
       onMouseEnter={() => {
         setIsHovered(true);
         schedulePrefetch();
+        // Show preview panel after 400ms hover delay
+        if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+        previewTimerRef.current = setTimeout(() => setShowPreview(true), 400);
       }}
       onMouseLeave={() => {
         setIsHovered(false);
         cancelPrefetch();
+        if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+        previewTimerRef.current = setTimeout(() => setShowPreview(false), 200);
       }}
       onClick={handleCardClick}
     >
@@ -283,6 +294,13 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
           {year} • {hasValidRating ? `${rating.toFixed(1)} Rating` : "New"}
         </p>
       </div>
+
+      <CardPreviewPanel
+        movie={movie}
+        anchorEl={cardRef.current}
+        isVisible={showPreview}
+        onClose={() => setShowPreview(false)}
+      />
     </div>
   );
 };

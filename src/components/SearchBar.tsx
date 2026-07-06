@@ -31,8 +31,10 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -92,6 +94,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
           .slice(0, 12) as SearchResult[];
 
         setResults(combined);
+        setActiveIndex(-1);
       } catch (error) {
         console.error('Search error:', error);
         toast({
@@ -120,17 +123,14 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
 
   const handleResultSelect = (result: SearchResult) => {
     if (result.media_type === 'person') {
-      toast({
-        title: "Person Selected",
-        description: `Viewing ${result.name}'s profile`,
-      });
+      router.push(`/person/${result.id}`);
     } else {
-      // Handle movie/TV show selection
       onMovieSelect(result as TMDBMovie);
     }
     setQuery("");
     setResults([]);
     setIsOpen(false);
+    setActiveIndex(-1);
   };
 
   const clearSearch = () => {
@@ -185,15 +185,31 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               setIsOpen(false);
+              setActiveIndex(-1);
               inputRef.current?.blur();
               return;
             }
-            if (e.key === "Enter" && query.trim()) {
+            if (e.key === "ArrowDown") {
               e.preventDefault();
-              router.push(`/search?q=${encodeURIComponent(query.trim())}`);
-              setQuery("");
-              setResults([]);
-              setIsOpen(false);
+              setActiveIndex((prev) => Math.min(prev + 1, results.length - 1));
+              return;
+            }
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActiveIndex((prev) => Math.max(prev - 1, -1));
+              return;
+            }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (activeIndex >= 0 && activeIndex < results.length) {
+                handleResultSelect(results[activeIndex]);
+              } else if (query.trim()) {
+                router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+                setQuery("");
+                setResults([]);
+                setIsOpen(false);
+                setActiveIndex(-1);
+              }
             }
           }}
           placeholder="Search movies, TV & people..."
@@ -216,7 +232,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
       </div>
 
       {isOpen && (query.length >= 2 || results.length > 0) && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-950/98 border border-white/10 rounded-xl max-h-96 overflow-y-auto z-50 shadow-2xl shadow-black/50 custom-scrollbar">
+        <div ref={listRef} className="absolute top-full left-0 right-0 mt-2 bg-zinc-950/98 border border-white/10 rounded-xl max-h-96 overflow-y-auto z-50 shadow-2xl shadow-black/50 custom-scrollbar">
           {loading && (
             <div className="p-4 text-center text-gray-400">
               <div className="animate-pulse">Searching...</div>
@@ -231,11 +247,19 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
 
           {!loading && results.length > 0 && (
             <div className="py-2">
-              {results.map((result) => (
+              {results.map((result, index) => (
                 <button
                   key={`${result.id}-${result.media_type}`}
                   onClick={() => handleResultSelect(result)}
-                  className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-white/8 transition-colors text-left rounded-lg mx-1"
+                  onMouseEnter={() => setActiveIndex(index)}
+                  ref={(el) => {
+                    if (index === activeIndex) {
+                      el?.scrollIntoView({ block: "nearest" });
+                    }
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 transition-colors text-left rounded-lg mx-1 ${
+                    index === activeIndex ? "bg-white/8" : "hover:bg-white/8"
+                  }`}
                 >
                   <div className="relative">
                     <img

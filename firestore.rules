@@ -11,38 +11,83 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Helper: field exists and is the correct type
+    function hasString(field) {
+      return field is string && field.size() > 0;
+    }
+
+    // Helper: timestamp is a valid number
+    function isTimestamp(field) {
+      return field is number && field > 0;
+    }
+
+    // Default deny — no match rule = no access
+    // (Firestore deny-by-default when no rule matches)
+
     // User profiles - users can read any profile, write only their own
     match /profiles/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && hasString(request.resource.data.display_name)
+        && request.resource.data.user_id == request.auth.uid;
+      allow update: if isOwner(userId)
+        && request.resource.data.user_id == request.auth.uid;
+      allow delete: if false; // profiles are never deleted via client
     }
     
     // User movie lists - users can only access their own movie list
     match /user_movie_lists/{docId} {
       allow read, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.user_id 
-                    && request.auth.uid == request.resource.data.user_id;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.movie_id is number
+        && request.resource.data.movie_title is string;
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.user_id
+        && request.auth.uid == request.resource.data.user_id;
     }
 
     // Reviews - anyone can read, authenticated users can write their own
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
-      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.content_id is number
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 10
+        && request.resource.data.review_text is string
+        && request.resource.data.review_text.size() <= 5000;
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.user_id
+        // Only allow updating review_text, rating, updated_at
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['review_text', 'rating', 'updated_at', 'likes_count'])
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 10;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
     }
 
     // Comments - anyone can read, authenticated users can write their own
     match /comments/{commentId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
-      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000;
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.user_id
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['text', 'likes_count', 'updated_at']);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
     }
 
     // Likes - users can manage their own likes
     match /likes/{likeId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.target_type in ['review', 'comment', 'content'];
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
     }
 
@@ -56,35 +101,127 @@ service cloud.firestore {
     // Content ratings - users can manage their own ratings
     match /content_ratings/{ratingId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
-      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 10;
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.user_id
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 10;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
     }
 
     // Follows - users can manage their own follows
     match /follows/{followId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.follower_id;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.follower_id
+        && request.resource.data.follower_id != request.resource.data.following_id;
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.follower_id;
     }
 
     // Watch history - users can only access their own history
     match /watch_history/{historyId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.user_id;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.content_id is number
+        && request.resource.data.progress_seconds is number;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow delete: if false; // watch history is never deleted via client
     }
 
-    // Notifications - users can only access their own notifications
+    // Notifications — FIX: prevent spoofing — create requires user_id == auth.uid
+    // and target user_id must exist (field validator)
     match /notifications/{notificationId} {
       allow read, update: if isAuthenticated() && request.auth.uid == resource.data.user_id;
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.type in ['like', 'comment', 'follow', 'review', 'new_episode', 'recommendation']
+        && hasString(request.resource.data.title)
+        && hasString(request.resource.data.message);
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
     }
 
     // Activity feed - anyone authenticated can read
     match /activity_feed/{activityId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.type in ['review', 'rating', 'watchlist_add', 'watched', 'follow'];
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
+    // ── FlixParty ──────────────────────────────────────────────
+    match /flix_parties/{roomId} {
+      // Anyone in the room can read
+      allow read: if isAuthenticated()
+        && request.auth.uid in request.resource.data.participants[*].userId;
+      // Only the host can update room state
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.hostId;
+      // Any authenticated user can create a room
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.hostId
+        && request.resource.data.code is string
+        && request.resource.data.code.size() == 6
+        && request.resource.data.participants is list;
+      // Room can be deleted by host or when last participant leaves
+      allow delete: if isAuthenticated()
+        && (request.auth.uid == resource.data.hostId
+            || request.auth.uid in resource.data.participants[*].userId);
+
+      // Chat messages subcollection
+      match /messages/{messageId} {
+        allow read: if isAuthenticated()
+          && request.auth.uid in get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participants[*].userId;
+        allow create: if isAuthenticated()
+          && request.auth.uid == request.resource.data.senderId
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 500;
+        // Messages are append-only (no update/delete for chat history)
+        allow update, delete: if false;
+      }
+
+      // WebRTC signaling subcollection
+      match /signals/{signalId} {
+        allow read: if isAuthenticated()
+          && request.auth.uid in get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participants[*].userId;
+        allow create: if isAuthenticated()
+          && request.auth.uid == request.resource.data.senderId
+          && request.resource.data.type in ['offer', 'answer', 'candidate'];
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Timeline Comments ──────────────────────────────────────
+    match /timeline_comments/{commentId} {
+      allow read: if true;
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.userId
+        && request.resource.data.tmdbId is number
+        && request.resource.data.timestampSeconds is number
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 500;
+      // Only owner can update (likes) or delete
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['likesCount', 'status', 'updatedAt']);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    // ── Reports (moderation) ───────────────────────────────────
+    match /reports/{reportId} {
+      allow read: if isAuthenticated(); // moderators need access
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.reporterId
+        && request.resource.data.targetType in ['review', 'comment', 'timeline_comment', 'profile']
+        && hasString(request.resource.data.reason);
+      allow update: if false; // only admin Cloud Functions update reports
+      allow delete: if false;
     }
   }
 }

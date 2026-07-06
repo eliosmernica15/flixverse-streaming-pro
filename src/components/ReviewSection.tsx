@@ -49,6 +49,7 @@ const StarRating = ({
             onMouseEnter={() => editable && setHoverRating(star * 2)}
             onMouseLeave={() => editable && setHoverRating(0)}
             disabled={!editable}
+            aria-label={`Rate ${star * 2} out of 10`}
           >
             <Star
               className={`${sizeClasses[size]} ${isFilled

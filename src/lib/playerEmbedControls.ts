@@ -132,6 +132,10 @@ export function isPlayerShortcutKey(key: string) {
     key === "ArrowUp" ||
     key === "ArrowDown" ||
     key === "[" ||
-    key === "]"
+    key === "]" ||
+    key === "g" ||
+    key === "G" ||
+    key === "l" ||
+    key === "L"
   );
 }

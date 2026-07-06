@@ -49,7 +49,7 @@ const MovieDetailsPage = () => {
     <MovieDetails
       movieId={movieId}
       mediaType={mediaType}
-      onClose={() => router.push("/")}
+      onClose={() => router.back()}
       autoplay={autoplay}
       resumePosition={resumePosition}
       initialSeason={season}

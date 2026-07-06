@@ -24,6 +24,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <a href="#main-content" className="skip-link">
         Skip to content
       </a>
+      <a href="#search-input" className="skip-link">
+        Skip to search
+      </a>
       <Navigation />
       <main id="main-content" className="outline-none">
         {children}

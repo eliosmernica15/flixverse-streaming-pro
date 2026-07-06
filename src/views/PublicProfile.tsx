@@ -1,0 +1,202 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Film, Tv, Star, Activity } from "lucide-react";
+import Image from "next/image";
+import { useQuery } from "@tanstack/react-query";
+import { getFirestore, collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
+import { MemberProfile, ActivityFeedItem } from "@/integrations/firebase/types";
+import MovieCard from "@/components/MovieCard";
+import { TMDBMovie } from "@/utils/tmdbApi";
+
+interface PublicProfileProps {
+  username: string;
+}
+
+export default function PublicProfile({ username }: PublicProfileProps) {
+  const router = useRouter();
+  const [profile, setProfile] = useState<MemberProfile | null>(null);
+  const [watchlist, setWatchlist] = useState<TMDBMovie[]>([]);
+  const [activity, setActivity] = useState<ActivityFeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const db = getFirestore();
+        const profilesRef = collection(db, "member_profiles");
+        const q = query(profilesRef, where("displayName", "==", username), limit(1));
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+          setLoading(false);
+          return;
+        }
+
+        const doc = snap.docs[0];
+        const data = doc.data() as MemberProfile;
+        setProfile({ ...data, id: doc.id });
+
+        // Load public watchlist
+        const listsRef = collection(db, "user_movie_lists");
+        const listQ = query(listsRef, where("user_id", "==", data.ownerId), limit(20));
+        const listSnap = await getDocs(listQ);
+        const items: TMDBMovie[] = [];
+        listSnap.forEach((d) => {
+          const item = d.data();
+          items.push({
+            id: item.movie_id,
+            title: item.movie_title,
+            name: item.movie_title,
+            poster_path: item.movie_poster_path,
+            backdrop_path: null,
+            media_type: item.media_type || "movie",
+            vote_average: 0,
+            overview: "",
+            genre_ids: [],
+            release_date: "",
+          } as TMDBMovie);
+        });
+        setWatchlist(items);
+
+        // Load activity feed
+        const activityQ = query(
+          collection(db, "activity_feed"),
+          where("user_id", "==", data.ownerId),
+          orderBy("created_at", "desc"),
+          limit(10)
+        );
+        const activitySnap = await getDocs(activityQ);
+        const feedItems: ActivityFeedItem[] = [];
+        activitySnap.forEach((d) => {
+          feedItems.push({ id: d.id, ...d.data() } as ActivityFeedItem);
+        });
+        setActivity(feedItems);
+      } catch {
+        // Profile might not exist or isn't public
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, [username]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
+        <p className="text-white text-lg font-semibold">Profile not found</p>
+        <button onClick={() => router.back()} className="text-red-400 text-sm hover:underline">
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  const AVATAR_COLORS = [
+    "from-red-500 to-orange-600",
+    "from-blue-500 to-cyan-600",
+    "from-green-500 to-emerald-600",
+    "from-purple-500 to-pink-600",
+  ];
+  const colorIndex = profile.displayName.charCodeAt(0) % AVATAR_COLORS.length;
+
+  return (
+    <div className="min-h-screen bg-black">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
+          <button onClick={() => router.back()} className="p-2 rounded-lg hover:bg-white/10" aria-label="Go back">
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </button>
+          <h1 className="text-white font-bold truncate">{profile.displayName}</h1>
+        </div>
+      </div>
+
+      <div className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+        {/* Profile header */}
+        <div className="flex items-center gap-6 mb-10">
+          {profile.avatarUrl ? (
+            <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-white/10">
+              <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="object-cover" />
+            </div>
+          ) : (
+            <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${AVATAR_COLORS[colorIndex]} flex items-center justify-center`}>
+              <span className="text-3xl font-black text-white">{profile.displayName.charAt(0).toUpperCase()}</span>
+            </div>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-white">{profile.displayName}</h1>
+            <p className="text-sm text-gray-500">
+              {profile.type === "kids" ? "Kids Profile" : "Member"}
+              {profile.isPrimary && " · Primary"}
+            </p>
+          </div>
+        </div>
+
+        {/* Watchlist */}
+        {watchlist.length > 0 ? (
+          <section>
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Film className="w-5 h-5 text-red-500" />
+              My List
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {watchlist.map((movie) => (
+                <MovieCard key={movie.id} movie={movie} />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <div className="text-center py-16">
+            <Film className="w-12 h-12 text-gray-700 mx-auto mb-4" />
+            <p className="text-gray-500 text-sm">This profile&apos;s list is private or empty.</p>
+          </div>
+        )}
+
+        {/* Activity Feed */}
+        {activity.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-red-500" />
+              Recent Activity
+            </h2>
+            <div className="space-y-3">
+              {activity.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                    {item.type === "review" && <Star className="w-4 h-4 text-yellow-400" />}
+                    {item.type === "rating" && <Star className="w-4 h-4 text-yellow-400" />}
+                    {item.type === "watchlist_add" && <Film className="w-4 h-4 text-red-400" />}
+                    {item.type === "watched" && <Tv className="w-4 h-4 text-blue-400" />}
+                    {item.type === "follow" && <Activity className="w-4 h-4 text-green-400" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-gray-300">
+                      {item.type === "review" && `Reviewed ${item.content_title}`}
+                      {item.type === "rating" && `Rated ${item.content_title} ${item.rating}/10`}
+                      {item.type === "watchlist_add" && `Added ${item.content_title} to list`}
+                      {item.type === "watched" && `Watched ${item.content_title}`}
+                      {item.type === "follow" && `Started following ${item.target_user_name}`}
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-0.5">
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,17 +1,42 @@
 "use client";
 
-import { Bell, Globe, Sparkles, Trash2 } from "lucide-react";
+import { Bell, Globe, Sparkles, Trash2, Palette, Shield } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
 
 export default function ProfileSettings() {
   const { preferences, updatePreferences } = useUserPreferencesContext();
   const { hasPermission, preferences: notifPrefs, requestPermission, updatePreferences: updateNotif } =
     useNotifications();
   const { toast } = useToast();
+
+  // Ambient glow toggle (persisted in localStorage)
+  const [ambientGlow, setAmbientGlow] = useState(true);
+  const [spoilerGuard, setSpoilerGuard] = useState(true);
+
+  useEffect(() => {
+    try {
+      setAmbientGlow(localStorage.getItem("flixverse-ambient-glow") !== "false");
+      setSpoilerGuard(localStorage.getItem("flixverse-spoiler-guard") !== "false");
+    } catch {}
+  }, []);
+
+  const toggleAmbientGlow = (checked: boolean) => {
+    setAmbientGlow(checked);
+    localStorage.setItem("flixverse-ambient-glow", String(checked));
+    window.dispatchEvent(new CustomEvent("toggle-ambient-glow", { detail: { enabled: checked } }));
+    toast({ title: checked ? "Ambient glow on" : "Ambient glow off" });
+  };
+
+  const toggleSpoilerGuard = (checked: boolean) => {
+    setSpoilerGuard(checked);
+    localStorage.setItem("flixverse-spoiler-guard", String(checked));
+    toast({ title: checked ? "Spoiler guard on" : "Spoiler guard off" });
+  };
 
   const languages = [
     { code: "en", label: "English" },
@@ -60,6 +85,28 @@ export default function ProfileSettings() {
                 toast({ title: checked ? "Recommendations on" : "Recommendations off" });
               }}
             />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+            <div className="flex items-center gap-3">
+              <Palette className="w-4 h-4 text-purple-400 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-white">Ambient glow</p>
+                <p className="text-xs text-gray-500 mt-0.5">Dynamic backlight effect during playback</p>
+              </div>
+            </div>
+            <Switch checked={ambientGlow} onCheckedChange={toggleAmbientGlow} />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+            <div className="flex items-center gap-3">
+              <Shield className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-white">Spoiler guard</p>
+                <p className="text-xs text-gray-500 mt-0.5">Hide episodes you haven&apos;t watched yet</p>
+              </div>
+            </div>
+            <Switch checked={spoilerGuard} onCheckedChange={toggleSpoilerGuard} />
           </div>
 
           <div className="p-4 rounded-xl bg-white/5 border border-white/5">
