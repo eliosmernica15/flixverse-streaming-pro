@@ -551,7 +551,7 @@ export function PlayerShell({
           {/* Main transport controls */}
           <div className="max-w-2xl mx-auto flex items-center justify-center gap-3 sm:gap-4">
             <button onClick={() => handleSeek("back")} className="player-icon-btn !w-10 !h-10 sm:!w-12 sm:!h-12" title="Rewind 10s (←)">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 17a1 1 0 0 1-1-1v-4l-5 3V9l5 3V8a1 1 0 0 1 1.5-.86l6 4a1 1 0 0 1 0 1.72l-6 4A1 1 0 0 1 11 17z"/><text x="3" y="20" fontSize="7" fill="currentColor" stroke="none" fontWeight="bold">10</text></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 17a1 1 0 0 0 1-1v-4l5 3V9l-5 3V8a1 1 0 0 0-1.5-.86l-6 4a1 1 0 0 0 0 1.72l6 4A1 1 0 0 0 13 17z"/><text x="3" y="20" fontSize="7" fill="currentColor" stroke="none" fontWeight="bold">10</text></svg>
             </button>
 
             <button
@@ -571,7 +571,7 @@ export function PlayerShell({
             </button>
 
             <button onClick={() => handleSeek("forward")} className="player-icon-btn !w-10 !h-10 sm:!w-12 sm:!h-12" title="Forward 10s (→)">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 17a1 1 0 0 0 1-1v-4l5 3V9l-5 3V8a1 1 0 0 0-1.5-.86l-6 4a1 1 0 0 0 0 1.72l6 4A1 1 0 0 0 13 17z"/><text x="14" y="20" fontSize="7" fill="currentColor" stroke="none" fontWeight="bold">10</text></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 17a1 1 0 0 1-1-1v-4l-5 3V9l5 3V8a1 1 0 0 1 1.5-.86l6 4a1 1 0 0 1 0 1.72l-6 4A1 1 0 0 1 11 17z"/><text x="14" y="20" fontSize="7" fill="currentColor" stroke="none" fontWeight="bold">10</text></svg>
             </button>
           </div>
 
