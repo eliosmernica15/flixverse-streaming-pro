@@ -5,6 +5,9 @@ export type EmbedAction =
   | "pause"
   | "toggle"
   | "mute"
+  | "unmute"
+  | "setMute"
+  | "setVolume"
   | "seekForward"
   | "seekBack"
   | "volumeUp"
@@ -44,7 +47,7 @@ function postAll(iframe: HTMLIFrameElement | null, payloads: unknown[]) {
   }
 }
 
-export function sendEmbedAction(iframe: HTMLIFrameElement | null, action: EmbedAction) {
+export function sendEmbedAction(iframe: HTMLIFrameElement | null, action: EmbedAction, value?: number) {
   if (!iframe) return;
 
   switch (action) {
@@ -79,6 +82,8 @@ export function sendEmbedAction(iframe: HTMLIFrameElement | null, action: EmbedA
       ]);
       clickEmbedCenter(iframe);
       return;
+
+    // ── Mute / Unmute (explicit state) ──
     case "mute":
       postAll(iframe, [
         { event: "command", func: "mute", args: "" },
@@ -87,6 +92,63 @@ export function sendEmbedAction(iframe: HTMLIFrameElement | null, action: EmbedA
         { type: "player:mute" },
       ]);
       return;
+    case "unmute":
+      postAll(iframe, [
+        { event: "command", func: "unMute", args: "" },
+        { event: "command", func: "unmute", args: "" },
+        { method: "unmute" },
+        { action: "unmute" },
+        { type: "player:unmute" },
+      ]);
+      return;
+    case "setMute":
+      // value: 1 = mute, 0 = unmute
+      if (value && value > 0) {
+        sendEmbedAction(iframe, "mute");
+      } else {
+        sendEmbedAction(iframe, "unmute");
+      }
+      return;
+
+    // ── Volume (explicit level) ──
+    case "setVolume":
+      // value: 0-100 volume level
+      {
+        const vol = Math.max(0, Math.min(100, value ?? 100));
+        postAll(iframe, [
+          { event: "command", func: "setVolume", args: [vol] },
+          { event: "command", func: "volume", args: [vol] },
+          { method: "setVolume", value: vol },
+          { action: "setVolume", volume: vol },
+          { type: "player:setVolume", volume: vol },
+        ]);
+        // Also handle mute/unmute based on volume
+        if (vol === 0) {
+          sendEmbedAction(iframe, "mute");
+        } else {
+          sendEmbedAction(iframe, "unmute");
+        }
+      }
+      return;
+
+    // ── Relative volume ──
+    case "volumeUp":
+      postAll(iframe, [
+        { method: "volumeUp" },
+        { action: "volumeUp" },
+        { event: "command", func: "setVolume", args: ["100"] },
+        { event: "command", func: "unMute", args: "" },
+        { event: "command", func: "unmute", args: "" },
+      ]);
+      return;
+    case "volumeDown":
+      postAll(iframe, [
+        { method: "volumeDown" },
+        { action: "volumeDown" },
+      ]);
+      return;
+
+    // ── Seek ──
     case "seekForward":
       postAll(iframe, [
         { event: "command", func: "seek", args: [10] },
@@ -104,12 +166,6 @@ export function sendEmbedAction(iframe: HTMLIFrameElement | null, action: EmbedA
         { type: "seek", direction: "back", amount: 10 },
       ]);
       clickEmbedCenter(iframe);
-      return;
-    case "volumeUp":
-      postAll(iframe, [{ method: "volumeUp" }, { action: "volumeUp" }]);
-      return;
-    case "volumeDown":
-      postAll(iframe, [{ method: "volumeDown" }, { action: "volumeDown" }]);
       return;
   }
 }

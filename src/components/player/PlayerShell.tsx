@@ -197,10 +197,12 @@ export function PlayerShell({
 
   const toggleMute = useCallback(() => {
     if (embedState !== "ready") return;
-    setIsMuted((m) => !m);
-    sendEmbedAction(iframeRef.current, "mute");
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    // Send explicit mute or unmute command to keep embed state synced
+    sendEmbedAction(iframeRef.current, newMuted ? "mute" : "unmute");
     bumpControls();
-  }, [embedState, bumpControls]);
+  }, [embedState, isMuted, bumpControls]);
 
   const seek = useCallback((direction: "back" | "forward") => {
     if (embedState !== "ready") return;
@@ -282,7 +284,12 @@ export function PlayerShell({
       if (e.key === "r" || e.key === "R") { reloadStream(); return; }
       if (e.key === "ArrowLeft") { seek("back"); return; }
       if (e.key === "ArrowRight") { seek("forward"); return; }
-      if (e.key === "ArrowUp") { sendEmbedAction(iframeRef.current, "volumeUp"); bumpControls(); return; }
+      if (e.key === "ArrowUp") {
+        if (isMuted) setIsMuted(false); // Volume up implies unmuting
+        sendEmbedAction(iframeRef.current, "volumeUp");
+        bumpControls();
+        return;
+      }
       if (e.key === "ArrowDown") { sendEmbedAction(iframeRef.current, "volumeDown"); bumpControls(); return; }
       if (e.key === "g" || e.key === "G") { setShowPartySidebar((p) => !p); bumpControls(); return; }
       if (e.key === "l" || e.key === "L") { setShowTimelineControls((p) => !p); bumpControls(); return; }
@@ -290,7 +297,7 @@ export function PlayerShell({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleClose, handleRetry, prevServer, reloadStream, seek, toggleMute, togglePlayPause, bumpControls, toggleTheaterMode, exitContainerFullscreen, showServerSelector]);
+  }, [handleClose, handleRetry, prevServer, reloadStream, seek, toggleMute, togglePlayPause, bumpControls, toggleTheaterMode, exitContainerFullscreen, showServerSelector, isMuted]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
