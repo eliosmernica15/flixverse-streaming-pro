@@ -1,4 +1,10 @@
-/** Best-effort playback controls for cross-origin embed iframes. */
+/**
+ * Player embed controls.
+ *
+ * Strategy: focus the iframe → dispatch keyboard events (these penetrate
+ * cross-origin iframes) → also send postMessage as fallback for providers
+ * that expose an API. Keyboard is primary because it works universally.
+ */
 
 export type EmbedAction =
   | "play"
@@ -6,166 +12,153 @@ export type EmbedAction =
   | "toggle"
   | "mute"
   | "unmute"
-  | "setMute"
-  | "setVolume"
   | "seekForward"
   | "seekBack"
   | "volumeUp"
   | "volumeDown";
 
-export function focusEmbed(iframe: HTMLIFrameElement | null) {
-  iframe?.focus({ preventScroll: true });
-}
+// ── Low-level helpers ──
 
-export function clickEmbedCenter(iframe: HTMLIFrameElement | null) {
+function focusIframe(iframe: HTMLIFrameElement | null) {
   if (!iframe) return;
   iframe.focus({ preventScroll: true });
-  const rect = iframe.getBoundingClientRect();
-  const clientX = rect.left + rect.width / 2;
-  const clientY = rect.top + rect.height / 2;
-  const opts: MouseEventInit = {
-    bubbles: true,
-    cancelable: true,
-    clientX,
-    clientY,
-    view: window,
-  };
-  for (const type of ["pointerdown", "mousedown", "mouseup", "click"] as const) {
-    iframe.dispatchEvent(new MouseEvent(type, opts));
-  }
 }
 
-function postAll(iframe: HTMLIFrameElement | null, payloads: unknown[]) {
+/** Send a keyboard event into the focused iframe. */
+function pressKey(iframe: HTMLIFrameElement | null, key: string, code?: string) {
+  if (!iframe) return;
+  focusIframe(iframe);
+  const win = iframe.contentWindow;
+  if (!win) return;
+
+  const opts: KeyboardEventInit = {
+    key,
+    code: code || key,
+    bubbles: true,
+    cancelable: true,
+  };
+
+  try {
+    win.dispatchEvent(new KeyboardEvent("keydown", opts));
+    win.dispatchEvent(new KeyboardEvent("keyup", opts));
+  } catch {
+    // cross-origin — may fail silently
+  }
+
+  // Also dispatch on the iframe element itself for some providers
+  try {
+    iframe.dispatchEvent(new KeyboardEvent("keydown", opts));
+  } catch {}
+}
+
+/** PostMessage with every known provider format. */
+function postMessage(iframe: HTMLIFrameElement | null, payloads: unknown[]) {
   const win = iframe?.contentWindow;
   if (!win) return;
   for (const payload of payloads) {
     try {
-      win.postMessage(typeof payload === "string" ? payload : JSON.stringify(payload), "*");
-    } catch {
-      // cross-origin postMessage failures are ignored
-    }
+      win.postMessage(
+        typeof payload === "string" ? payload : JSON.stringify(payload),
+        "*"
+      );
+    } catch {}
   }
 }
 
-export function sendEmbedAction(iframe: HTMLIFrameElement | null, action: EmbedAction, value?: number) {
+// ── Public API ──
+
+export function sendEmbedAction(
+  iframe: HTMLIFrameElement | null,
+  action: EmbedAction
+) {
   if (!iframe) return;
 
   switch (action) {
+    // ── Play / Pause ──
+    // Most players treat Space as play/pause toggle. Some use K.
+    // YouTube API also accepts postMessage.
     case "toggle":
-      clickEmbedCenter(iframe);
-      postAll(iframe, [
-        { event: "command", func: "pauseVideo", args: "" },
-        { event: "command", func: "playVideo", args: "" },
+      pressKey(iframe, " ");
+      postMessage(iframe, [
+        { event: "command", func: "playVideo" },
+        { event: "command", func: "pauseVideo" },
         { method: "togglePlay" },
         { type: "toggle" },
+        { action: "toggle" },
       ]);
       return;
+
     case "play":
-      focusEmbed(iframe);
-      postAll(iframe, [
-        { event: "command", func: "playVideo", args: "" },
+      pressKey(iframe, " ");
+      postMessage(iframe, [
+        { event: "command", func: "playVideo" },
         { method: "play" },
         { action: "play" },
-        { type: "player:play" },
-        "play",
+        { type: "play" },
       ]);
-      clickEmbedCenter(iframe);
       return;
+
     case "pause":
-      focusEmbed(iframe);
-      postAll(iframe, [
-        { event: "command", func: "pauseVideo", args: "" },
+      pressKey(iframe, " ");
+      postMessage(iframe, [
+        { event: "command", func: "pauseVideo" },
         { method: "pause" },
         { action: "pause" },
-        { type: "player:pause" },
-        "pause",
+        { type: "pause" },
       ]);
-      clickEmbedCenter(iframe);
       return;
 
-    // ── Mute / Unmute (explicit state) ──
+    // ── Mute ──
+    // M key is universal for mute toggle.
     case "mute":
-      postAll(iframe, [
-        { event: "command", func: "mute", args: "" },
+    case "unmute":
+      pressKey(iframe, "m", "KeyM");
+      postMessage(iframe, [
+        { event: "command", func: "mute" },
         { method: "mute" },
         { action: "mute" },
-        { type: "player:mute" },
-      ]);
-      return;
-    case "unmute":
-      postAll(iframe, [
-        { event: "command", func: "unMute", args: "" },
-        { event: "command", func: "unmute", args: "" },
-        { method: "unmute" },
-        { action: "unmute" },
-        { type: "player:unmute" },
-      ]);
-      return;
-    case "setMute":
-      // value: 1 = mute, 0 = unmute
-      if (value && value > 0) {
-        sendEmbedAction(iframe, "mute");
-      } else {
-        sendEmbedAction(iframe, "unmute");
-      }
-      return;
-
-    // ── Volume (explicit level) ──
-    case "setVolume":
-      // value: 0-100 volume level
-      {
-        const vol = Math.max(0, Math.min(100, value ?? 100));
-        postAll(iframe, [
-          { event: "command", func: "setVolume", args: [vol] },
-          { event: "command", func: "volume", args: [vol] },
-          { method: "setVolume", value: vol },
-          { action: "setVolume", volume: vol },
-          { type: "player:setVolume", volume: vol },
-        ]);
-        // Also handle mute/unmute based on volume
-        if (vol === 0) {
-          sendEmbedAction(iframe, "mute");
-        } else {
-          sendEmbedAction(iframe, "unmute");
-        }
-      }
-      return;
-
-    // ── Relative volume ──
-    case "volumeUp":
-      postAll(iframe, [
-        { method: "volumeUp" },
-        { action: "volumeUp" },
-        { event: "command", func: "setVolume", args: ["100"] },
-        { event: "command", func: "unMute", args: "" },
-        { event: "command", func: "unmute", args: "" },
-      ]);
-      return;
-    case "volumeDown":
-      postAll(iframe, [
-        { method: "volumeDown" },
-        { action: "volumeDown" },
+        { type: "mute" },
       ]);
       return;
 
     // ── Seek ──
+    // Arrow keys are universal for seeking in most players.
     case "seekForward":
-      postAll(iframe, [
+      pressKey(iframe, "ArrowRight", "ArrowRight");
+      postMessage(iframe, [
         { event: "command", func: "seek", args: [10] },
         { method: "seek", value: 10 },
         { action: "seek", seconds: 10 },
-        { type: "seek", direction: "forward", amount: 10 },
+        { type: "seek", direction: "forward" },
       ]);
-      clickEmbedCenter(iframe);
       return;
+
     case "seekBack":
-      postAll(iframe, [
+      pressKey(iframe, "ArrowLeft", "ArrowLeft");
+      postMessage(iframe, [
         { event: "command", func: "seek", args: [-10] },
         { method: "seek", value: -10 },
         { action: "seek", seconds: -10 },
-        { type: "seek", direction: "back", amount: 10 },
+        { type: "seek", direction: "back" },
       ]);
-      clickEmbedCenter(iframe);
+      return;
+
+    // ── Volume ──
+    // ArrowUp/ArrowDown control volume in most players.
+    case "volumeUp":
+      pressKey(iframe, "ArrowUp", "ArrowUp");
+      postMessage(iframe, [
+        { method: "volumeUp" },
+        { action: "volumeUp" },
+      ]);
+      return;
+
+    case "volumeDown":
+      pressKey(iframe, "ArrowDown", "ArrowDown");
+      postMessage(iframe, [
+        { method: "volumeDown" },
+        { action: "volumeDown" },
+      ]);
       return;
   }
 }
@@ -173,25 +166,12 @@ export function sendEmbedAction(iframe: HTMLIFrameElement | null, action: EmbedA
 export function isPlayerShortcutKey(key: string) {
   return (
     key === " " ||
-    key === "p" ||
-    key === "P" ||
-    key === "k" ||
-    key === "K" ||
-    key === "f" ||
-    key === "F" ||
-    key === "m" ||
-    key === "M" ||
-    key === "r" ||
-    key === "R" ||
+    key === "k" || key === "K" ||
+    key === "f" || key === "F" ||
+    key === "m" || key === "M" ||
     key === "ArrowLeft" ||
     key === "ArrowRight" ||
     key === "ArrowUp" ||
-    key === "ArrowDown" ||
-    key === "[" ||
-    key === "]" ||
-    key === "g" ||
-    key === "G" ||
-    key === "l" ||
-    key === "L"
+    key === "ArrowDown"
   );
 }

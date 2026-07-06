@@ -188,24 +188,28 @@ export function PlayerShell({
 
   const togglePlayPause = useCallback(() => {
     if (embedState !== "ready") return;
-    const next = playState === "playing" ? "paused" : "playing";
-    setPlayState(next);
-    showFlash(next === "paused" ? "pause" : "play");
-    sendEmbedAction(iframeRef.current, next === "paused" ? "pause" : "play");
+    // Flip our local state for the UI icon
+    setPlayState((prev) => {
+      const next = prev === "playing" ? "paused" : "playing";
+      showFlash(next === "paused" ? "pause" : "play");
+      return next;
+    });
+    // Send keyboard toggle to the embed — Space key penetrates cross-origin
+    sendEmbedAction(iframeRef.current, "toggle");
     bumpControls();
-  }, [embedState, playState, showFlash, bumpControls]);
+  }, [embedState, showFlash, bumpControls]);
 
   const toggleMute = useCallback(() => {
     if (embedState !== "ready") return;
-    const newMuted = !isMuted;
-    setIsMuted(newMuted);
-    // Send explicit mute or unmute command to keep embed state synced
-    sendEmbedAction(iframeRef.current, newMuted ? "mute" : "unmute");
+    setIsMuted((prev) => !prev);
+    // M key penetrates cross-origin iframes
+    sendEmbedAction(iframeRef.current, "mute");
     bumpControls();
-  }, [embedState, isMuted, bumpControls]);
+  }, [embedState, bumpControls]);
 
   const seek = useCallback((direction: "back" | "forward") => {
     if (embedState !== "ready") return;
+    // Arrow keys penetrate cross-origin iframes
     sendEmbedAction(iframeRef.current, direction === "back" ? "seekBack" : "seekForward");
     const delta = direction === "back" ? -10 : 10;
     seekTo(currentTime + delta);
@@ -285,7 +289,7 @@ export function PlayerShell({
       if (e.key === "ArrowLeft") { seek("back"); return; }
       if (e.key === "ArrowRight") { seek("forward"); return; }
       if (e.key === "ArrowUp") {
-        if (isMuted) setIsMuted(false); // Volume up implies unmuting
+        if (isMuted) setIsMuted(false);
         sendEmbedAction(iframeRef.current, "volumeUp");
         bumpControls();
         return;
