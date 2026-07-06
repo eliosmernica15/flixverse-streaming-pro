@@ -210,38 +210,101 @@ function buildCommandPayloads(provider: ProviderConfig, action: EmbedAction, opt
       break;
   }
 
-  // Generic fallbacks
+  // Generic fallbacks (exhaustive list for undocumented APIs like VidLink)
   switch (action) {
     case "play":
-      payloads.push("play", { method: "play" }, { action: "play" }, { type: "play" }, { event: "command", func: "playVideo" }, { type: "player", data: "play" });
+      payloads.push(
+        "play",
+        { method: "play" },
+        { action: "play" },
+        { type: "play" },
+        { event: "command", func: "playVideo" },
+        { type: "player", data: "play" },
+        { type: "player", action: "play" },
+        { type: "player", event: "play" },
+        { type: "player", method: "play" },
+        { type: "player", data: { type: "play" } },
+        { type: "player", data: { action: "play" } },
+        { type: "player", data: { event: "play" } },
+        { type: "player", data: { method: "play" } },
+        { event: "play" },
+        { command: "play" }
+      );
       break;
     case "pause":
-      payloads.push("pause", { method: "pause" }, { action: "pause" }, { type: "pause" }, { event: "command", func: "pauseVideo" }, { type: "player", data: "pause" });
+      payloads.push(
+        "pause",
+        { method: "pause" },
+        { action: "pause" },
+        { type: "pause" },
+        { event: "command", func: "pauseVideo" },
+        { type: "player", data: "pause" },
+        { type: "player", action: "pause" },
+        { type: "player", event: "pause" },
+        { type: "player", method: "pause" },
+        { type: "player", data: { type: "pause" } },
+        { type: "player", data: { action: "pause" } },
+        { type: "player", data: { event: "pause" } },
+        { type: "player", data: { method: "pause" } },
+        { event: "pause" },
+        { command: "pause" }
+      );
       break;
     case "toggle":
       payloads.push(
-        "toggle",
-        "togglePlay",
-        { method: "togglePlay" },
-        { action: "toggle" },
-        { type: "toggle" },
-        { event: "command", func: "playVideo" },
-        { event: "command", func: "pauseVideo" },
-        { type: "player", data: "toggle" }
+        "toggle", "togglePlay",
+        { method: "toggle" }, { method: "togglePlay" },
+        { action: "toggle" }, { action: "togglePlay" },
+        { type: "toggle" }, { type: "togglePlay" },
+        { type: "player", data: "toggle" },
+        { type: "player", data: "togglePlay" },
+        { type: "player", action: "toggle" },
+        { type: "player", data: { method: "toggle" } }
       );
       break;
+    case "seekTo":
+      if (opts.seekSeconds !== undefined) {
+        payloads.push(
+          { method: "seek", value: opts.seekSeconds },
+          { action: "seek", value: opts.seekSeconds },
+          { type: "seek", value: opts.seekSeconds },
+          { type: "player", action: "seek", value: opts.seekSeconds },
+          { type: "player", data: { method: "seek", value: opts.seekSeconds } },
+          { type: "player", data: { action: "seek", value: opts.seekSeconds } },
+          { event: "command", func: "seekTo", args: [opts.seekSeconds, true] },
+          { method: "setCurrentTime", value: opts.seekSeconds },
+          { type: "player", data: { method: "setCurrentTime", value: opts.seekSeconds } }
+        );
+      }
+      break;
     case "mute":
-      payloads.push("mute", { method: "mute" }, { action: "mute" }, { type: "mute" }, { event: "command", func: "mute" }, { type: "player", data: "mute" });
+      payloads.push(
+        "mute",
+        { method: "mute" }, { action: "mute" }, { type: "mute" },
+        { method: "setMute", value: true },
+        { type: "player", data: "mute" },
+        { type: "player", data: { method: "mute" } }
+      );
       break;
     case "unmute":
       payloads.push(
         "unmute",
-        { method: "unmute" },
-        { action: "unmute" },
-        { type: "unmute" },
-        { event: "command", func: "unMute" },
-        { type: "player", data: "unmute" }
+        { method: "unmute" }, { action: "unmute" }, { type: "unmute" },
+        { method: "setMute", value: false },
+        { type: "player", data: "unmute" },
+        { type: "player", data: { method: "unmute" } }
       );
+      break;
+    case "setVolume":
+      if (opts.volume !== undefined) {
+        payloads.push(
+          { method: "setVolume", value: opts.volume },
+          { action: "setVolume", value: opts.volume },
+          { type: "volume", value: opts.volume },
+          { event: "command", func: "setVolume", args: [opts.volume] },
+          { type: "player", data: { method: "setVolume", value: opts.volume } }
+        );
+      }
       break;
     case "volumeUp":
       payloads.push("volumeUp", { method: "volumeUp" }, { action: "volumeUp" }, { type: "player", data: "volumeUp" });
