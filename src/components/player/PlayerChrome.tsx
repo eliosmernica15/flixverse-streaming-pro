@@ -56,7 +56,7 @@ export function PlayerChrome({
     <>
       {/* Top bar — only shows on hover */}
       <header
-        className={`absolute top-0 left-0 right-0 z-30 transition-all duration-300 ${
+        className={`absolute top-0 left-0 right-0 z-40 transition-all duration-300 ${
           controlsVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"
         }`}
       >

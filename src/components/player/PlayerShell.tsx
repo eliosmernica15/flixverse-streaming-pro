@@ -397,7 +397,7 @@ export function PlayerShell({
 
       {/* Center play/pause indicator on tap */}
       {showCenterPlay && embedState === "ready" && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/20 animate-scale-in">
             {playState === "playing" ? (
               <div className="flex gap-1.5">
@@ -413,7 +413,7 @@ export function PlayerShell({
 
       {/* Seek indicator (double-tap) */}
       {seekIndicator && (
-        <div className={`absolute top-1/2 -translate-y-1/2 z-30 pointer-events-none ${
+        <div className={`absolute top-1/2 -translate-y-1/2 z-50 pointer-events-none ${
           seekIndicator === "back" ? "left-8" : "right-8"
         }`}>
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10 animate-fade-in">
@@ -425,7 +425,7 @@ export function PlayerShell({
       )}
 
       {/* Bottom controls — clean centered layout */}
-      <div className={`absolute bottom-0 left-0 right-0 z-20 transition-all duration-300 ${
+      <div className={`absolute bottom-0 left-0 right-0 z-40 transition-all duration-300 ${
         controlsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}>
         <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-16 pb-4 px-4">

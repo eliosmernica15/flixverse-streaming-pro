@@ -39,12 +39,12 @@ export function EmbedFrame({
   isCinematic,
 }: EmbedFrameProps) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black">
+    <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
       {/* The iframe fills the entire viewport — true fullscreen video */}
       <div className="relative w-full h-full">
         {/* Loading state */}
         {embedState === "loading" && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950">
             <div className="w-12 h-12 border-3 border-red-500/20 border-t-red-500 rounded-full animate-spin mb-4" />
             <p className="text-white font-semibold text-sm">{currentSource.name}</p>
             <p className="text-gray-500 text-xs mt-1">Server {currentServer + 1} of {streamingSourcesCount}</p>
@@ -53,7 +53,7 @@ export function EmbedFrame({
 
         {/* Error state */}
         {embedState === "error" && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center">
             <div className="w-14 h-14 rounded-full bg-red-500/15 flex items-center justify-center mb-4">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
@@ -70,7 +70,7 @@ export function EmbedFrame({
 
         {/* Help prompt */}
         {embedState === "ready" && showHelpPrompt && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 p-3 rounded-xl bg-black/85 border border-white/15 backdrop-blur-md animate-fade-in-up max-w-md">
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 p-3 rounded-xl bg-black/85 border border-white/15 backdrop-blur-md animate-fade-in-up max-w-md">
             <p className="text-xs text-gray-300">
               Video blank? Try switching servers with the button above.
             </p>
