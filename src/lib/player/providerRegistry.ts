@@ -1,0 +1,275 @@
+/**
+ * Provider-aware registry for third-party embed players.
+ *
+ * Cross-origin iframes cannot be queried directly, so we use a layered strategy:
+ * 1. Focus the iframe and dispatch keyboard events (universal fallback).
+ * 2. Emit provider-specific postMessage commands when known.
+ * 3. Parse provider-specific postMessage events to sync local UI state.
+ */
+
+export type EmbedProvider =
+  | "vidsrc"
+  | "vidlink"
+  | "embedsu"
+  | "superembed"
+  | "autoembed"
+  | "smashystream"
+  | "generic";
+
+export interface ProviderCommands {
+  play?: unknown;
+  pause?: unknown;
+  toggle?: unknown;
+  mute?: unknown;
+  unmute?: unknown;
+  volumeUp?: unknown;
+  volumeDown?: unknown;
+  seekForward?: unknown;
+  seekBack?: unknown;
+  seekTo?: (seconds: number) => unknown;
+  setVolume?: (volume: number) => unknown; // 0..1
+}
+
+export interface ProviderEvents {
+  play?: string | string[];
+  pause?: string | string[];
+  time?: string | string[];
+  ended?: string | string[];
+  volume?: string | string[];
+  muted?: string | string[];
+}
+
+export interface ProviderConfig {
+  id: EmbedProvider;
+  name: string;
+  origins: string[];
+  keyboardShortcuts: {
+    playToggle: string;
+    muteToggle: string;
+    volumeUp: string;
+    volumeDown: string;
+    seekBack: string;
+    seekForward: string;
+  };
+  commands: ProviderCommands;
+  events: ProviderEvents;
+  supportsPostMessage: boolean;
+}
+
+const VIDSRC_KEYBOARD = {
+  playToggle: " ",
+  muteToggle: "m",
+  volumeUp: "ArrowUp",
+  volumeDown: "ArrowDown",
+  seekBack: "ArrowLeft",
+  seekForward: "ArrowRight",
+};
+
+const VIDSRC_COMMANDS: ProviderCommands = {
+  toggle: { event: "command", func: "togglePlay" },
+  play: { event: "command", func: "playVideo" },
+  pause: { event: "command", func: "pauseVideo" },
+  mute: { event: "command", func: "mute" },
+  unmute: { event: "command", func: "unMute" },
+  volumeUp: { method: "volumeUp" },
+  volumeDown: { method: "volumeDown" },
+  seekForward: { event: "command", func: "seek", args: [10] },
+  seekBack: { event: "command", func: "seek", args: [-10] },
+  seekTo: (seconds: number) => ({ event: "command", func: "seek", args: [seconds] }),
+  setVolume: (volume: number) => ({ event: "command", func: "setVolume", args: [volume] }),
+};
+
+const VIDSRC_EVENTS: ProviderEvents = {
+  play: ["play"],
+  pause: ["pause"],
+  time: ["time"],
+  ended: ["complete", "ended"],
+};
+
+export const PROVIDERS: ProviderConfig[] = [
+  {
+    id: "vidsrc",
+    name: "VidSrc",
+    origins: [
+      "vidsrc.cc",
+      "vidsrc.xyz",
+      "vidsrc.icu",
+      "vidsrc.fyi",
+      "vidsrc.wiki",
+      "vidsrc-embed.ru",
+      "vidsrcme.su",
+      "vsrc.su",
+    ],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
+    commands: VIDSRC_COMMANDS,
+    events: VIDSRC_EVENTS,
+    supportsPostMessage: true,
+  },
+  {
+    id: "vidlink",
+    name: "VidLink",
+    origins: ["vidlink.pro", "vidlink.cc"],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
+    commands: {
+      toggle: { method: "togglePlay" },
+      play: { method: "play" },
+      pause: { method: "pause" },
+      mute: { method: "mute" },
+      unmute: { method: "unmute" },
+      volumeUp: { method: "volumeUp" },
+      volumeDown: { method: "volumeDown" },
+      seekForward: { method: "seek", value: 10 },
+      seekBack: { method: "seek", value: -10 },
+      seekTo: (seconds: number) => ({ method: "seek", value: seconds }),
+      setVolume: (volume: number) => ({ method: "setVolume", value: volume }),
+    },
+    events: {
+      play: ["play", "playing"],
+      pause: ["pause", "paused"],
+      time: ["timeupdate", "time"],
+      ended: ["ended", "complete"],
+    },
+    supportsPostMessage: true,
+  },
+  {
+    id: "embedsu",
+    name: "Embed SU",
+    origins: ["embed.su", "embedsu.cc"],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
+    commands: {
+      toggle: { action: "toggle" },
+      play: { action: "play" },
+      pause: { action: "pause" },
+      mute: { action: "mute" },
+      unmute: { action: "unmute" },
+      volumeUp: { action: "volumeUp" },
+      volumeDown: { action: "volumeDown" },
+      seekForward: { action: "seek", seconds: 10 },
+      seekBack: { action: "seek", seconds: -10 },
+      seekTo: (seconds: number) => ({ action: "seek", seconds }),
+      setVolume: (volume: number) => ({ action: "volume", value: volume }),
+    },
+    events: {
+      play: ["play", "playing"],
+      pause: ["pause"],
+      time: ["timeupdate"],
+      ended: ["ended"],
+    },
+    supportsPostMessage: true,
+  },
+  {
+    id: "superembed",
+    name: "SuperEmbed",
+    origins: ["multiembed.mov", "multiembed.cc"],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
+    commands: {
+      toggle: { action: "toggle" },
+      play: { action: "play" },
+      pause: { action: "pause" },
+      mute: { action: "mute" },
+      unmute: { action: "unmute" },
+      volumeUp: { action: "volumeUp" },
+      volumeDown: { action: "volumeDown" },
+      seekForward: { action: "seek", seconds: 10 },
+      seekBack: { action: "seek", seconds: -10 },
+      seekTo: (seconds: number) => ({ action: "seek", seconds }),
+      setVolume: (volume: number) => ({ action: "volume", value: volume }),
+    },
+    events: {
+      play: ["play"],
+      pause: ["pause"],
+      time: ["timeupdate"],
+      ended: ["ended"],
+    },
+    supportsPostMessage: true,
+  },
+  {
+    id: "autoembed",
+    name: "AutoEmbed",
+    origins: ["autoembed.cc", "player.autoembed.cc"],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
+    commands: {
+      toggle: { type: "toggle" },
+      play: { type: "play" },
+      pause: { type: "pause" },
+      mute: { type: "mute" },
+      unmute: { type: "unmute" },
+      volumeUp: { type: "volumeUp" },
+      volumeDown: { type: "volumeDown" },
+      seekForward: { type: "seek", direction: "forward", amount: 10 },
+      seekBack: { type: "seek", direction: "back", amount: 10 },
+      seekTo: (seconds: number) => ({
+        type: "seek",
+        direction: seconds >= 0 ? "forward" : "back",
+        amount: Math.abs(seconds),
+      }),
+      setVolume: (volume: number) => ({ type: "volume", value: volume }),
+    },
+    events: {
+      play: ["play"],
+      pause: ["pause"],
+      time: ["timeupdate"],
+      ended: ["ended"],
+    },
+    supportsPostMessage: true,
+  },
+  {
+    id: "smashystream",
+    name: "SmashyStream",
+    origins: ["smashy.stream", "player.smashy.stream"],
+    keyboardShortcuts: {
+      playToggle: " ",
+      muteToggle: "m",
+      volumeUp: "ArrowUp",
+      volumeDown: "ArrowDown",
+      seekBack: "ArrowLeft",
+      seekForward: "ArrowRight",
+    },
+    commands: {
+      toggle: { cmd: "pause" },
+      play: { cmd: "play" },
+      pause: { cmd: "pause" },
+      mute: { cmd: "mute" },
+      unmute: { cmd: "unmute" },
+      volumeUp: { cmd: "volumeUp" },
+      volumeDown: { cmd: "volumeDown" },
+      seekForward: { cmd: "seek", param: 10 },
+      seekBack: { cmd: "seek", param: -10 },
+      seekTo: (seconds: number) => ({ cmd: "seek", param: seconds }),
+      setVolume: (volume: number) => ({ cmd: "volume", param: volume }),
+    },
+    events: {
+      play: ["play"],
+      pause: ["pause"],
+      time: ["timeupdate"],
+      ended: ["ended"],
+    },
+    supportsPostMessage: true,
+  },
+  {
+    id: "generic",
+    name: "Generic",
+    origins: [],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
+    commands: {},
+    events: {},
+    supportsPostMessage: false,
+  },
+];
+
+export function detectProvider(src: string): ProviderConfig {
+  try {
+    const url = new URL(src);
+    const host = url.hostname.toLowerCase();
+    const matched = PROVIDERS.find(
+      (p) => p.id !== "generic" && p.origins.some((o) => host === o || host.endsWith(`.${o}`))
+    );
+    return matched || PROVIDERS.find((p) => p.id === "generic")!;
+  } catch {
+    return PROVIDERS.find((p) => p.id === "generic")!;
+  }
+}
+
+export function isKnownProvider(src: string): boolean {
+  return detectProvider(src).id !== "generic";
+}

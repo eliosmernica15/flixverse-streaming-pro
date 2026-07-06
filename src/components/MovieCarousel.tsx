@@ -108,7 +108,7 @@ const MovieCarousel = memo(
               prefetch
               onMouseEnter={() => prefetchRoute(exploreAllPath)}
               onFocus={() => prefetchRoute(exploreAllPath)}
-              className="hidden sm:flex items-center space-x-2 text-sm text-gray-400 hover:text-white transition-all duration-200 group/btn glass-card px-4 py-2 rounded-xl hover:translate-x-0.5"
+              className="hidden sm:flex items-center space-x-2 text-sm text-gray-400 hover:text-white transition-all duration-200 group/btn glass-card glass-sheen px-4 py-2 rounded-xl hover:translate-x-0.5 hover-lift-sm"
             >
               <Sparkles className="w-4 h-4 text-red-500" />
               <span>Explore All</span>

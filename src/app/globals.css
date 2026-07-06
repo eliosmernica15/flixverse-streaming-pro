@@ -1120,3 +1120,159 @@
 .animate-ambient-glow-pulse {
   animation: ambient-glow-pulse 6s ease-in-out infinite;
 }
+
+/* ── Advanced micro-interactions ── */
+
+/* Magnetic hover lift */
+.hover-lift-sm {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+}
+.hover-lift-sm:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* Press-down active state */
+.press-effect {
+  transition: transform 0.12s ease;
+}
+.press-effect:active {
+  transform: scale(0.96);
+}
+
+/* Glow border on focus/hover */
+.glow-border {
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+.glow-border:hover,
+.glow-border:focus-visible {
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4), 0 0 20px rgba(239, 68, 68, 0.15);
+}
+
+/* Subtle glass sheen */
+.glass-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.glass-sheen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+.glass-sheen:hover::before {
+  transform: translateX(100%);
+}
+
+/* Smooth image zoom */
+.img-zoom {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.img-zoom:hover {
+  transform: scale(1.08);
+}
+
+/* Stagger fade-in children */
+.stagger-children > * {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: stagger-fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+
+@keyframes stagger-fade-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom range slider for volume */
+input[type="range"].player-volume {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"].player-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+  transition: transform 0.15s ease;
+}
+input[type="range"].player-volume::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+input[type="range"].player-volume::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* Tooltip-ish popover animations */
+.popover-enter {
+  animation: popover-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes popover-enter {
+  from { opacity: 0; transform: scale(0.95) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Premium badge shine */
+.badge-shine {
+  position: relative;
+  overflow: hidden;
+}
+.badge-shine::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(to bottom right, transparent 45%, rgba(255,255,255,0.15) 50%, transparent 55%);
+  transform: rotate(30deg) translateX(-100%);
+  animation: badge-shine-sweep 3s ease-in-out infinite;
+}
+@keyframes badge-shine-sweep {
+  0%, 100% { transform: rotate(30deg) translateX(-100%); }
+  50% { transform: rotate(30deg) translateX(100%); }
+}
+
+/* Status dot pulse */
+.status-dot {
+  position: relative;
+}
+.status-dot::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: inherit;
+  opacity: 0.5;
+  animation: status-pulse 2s ease-in-out infinite;
+  z-index: -1;
+}
+@keyframes status-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.6); opacity: 0; }
+}
