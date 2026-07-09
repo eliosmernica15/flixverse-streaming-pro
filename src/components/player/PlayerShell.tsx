@@ -11,6 +11,7 @@ import { useCaptions } from "@/hooks/player/useCaptions";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { PaywallGate } from "@/components/PaywallGate";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 import { CaptionOverlay } from "./CaptionOverlay";
 import { computeResync, sendSoftSeek, injectSeekParam } from "@/lib/player/embedSeekUrls";
 import {
@@ -1105,6 +1106,7 @@ export function PlayerShell({
               </span>
 
               {/* FlixParty */}
+              {isFeatureEnabled("flixparty") && (
               <button
                 type="button"
                 onClick={() => setShowPartySidebar((p) => !p)}
@@ -1115,6 +1117,7 @@ export function PlayerShell({
               >
                 <Users className="w-5 h-5" />
               </button>
+              )}
 
               {/* Skip intro */}
               <button

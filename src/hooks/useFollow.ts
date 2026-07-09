@@ -10,6 +10,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
+import { enqueuePendingJob } from "@/lib/pendingJobs";
 
 export function useFollow(targetUserId: string | null) {
   const { user } = useAuth();
@@ -76,6 +77,11 @@ export function useFollow(targetUserId: string | null) {
         follower_id: user.uid,
         following_id: targetUserId,
         created_at: new Date().toISOString(),
+      });
+      void enqueuePendingJob(user.uid, "follow_notify", {
+        toUserId: targetUserId,
+        fromUserId: user.uid,
+        message: "Someone started following you.",
       });
       setIsFollowing(true);
       setFollowerCount((prev) => prev + 1);

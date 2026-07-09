@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "worker:jobs": "python scripts/python/process_jobs.py --once",
+    "worker:reports": "python scripts/python/process_reports.py"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

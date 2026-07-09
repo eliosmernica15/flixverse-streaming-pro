@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
+import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
 import { WatchHistory } from '@/integrations/firebase/types';
 
 export const useWatchHistory = () => {
@@ -75,25 +76,20 @@ export const useWatchHistory = () => {
       ? `${user.uid}_${contentId}_s${season}e${episode}`
       : `${user.uid}_${contentId}`;
 
-    const db = requireFirebaseDb();
-    const historyRef = doc(db, 'watch_history', historyId);
+    const completed = progressSeconds >= totalDurationSeconds * 0.9;
 
-    const completed = progressSeconds >= totalDurationSeconds * 0.9; // 90% watched = completed
-
-    await setDoc(historyRef, {
-      id: historyId,
-      user_id: user.uid,
-      content_id: contentId,
-      content_type: contentType,
-      content_title: contentTitle,
-      content_poster_path: contentPosterPath,
-      season: season || null,
-      episode: episode || null,
-      progress_seconds: progressSeconds,
-      total_duration_seconds: totalDurationSeconds,
+    await MutationDispatcher.dispatch('UPDATE_PROGRESS', {
+      userId: user.uid,
+      contentId,
+      contentType,
+      contentTitle,
+      posterPath: contentPosterPath,
+      progressSeconds,
+      totalDurationSeconds,
       completed,
-      watched_at: new Date().toISOString()
-    }, { merge: true });
+      season: season ?? null,
+      episode: episode ?? null,
+    });
   };
 
   // Get progress for a specific content

@@ -15,6 +15,11 @@ export function proxy(request: NextRequest) {
 
   const response = NextResponse.next();
 
+  const locale = request.cookies.get("flixverse-locale")?.value;
+  if (locale) {
+    response.headers.set("x-flixverse-locale", locale);
+  }
+
   for (const header of securityHeaders) {
     response.headers.set(header.key, header.value);
   }

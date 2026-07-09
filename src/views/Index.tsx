@@ -13,6 +13,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { TrendingUp, Star, Play, Tv, Film, Calendar } from "lucide-react";
 import Reveal from "@/components/Reveal";
+import { isFeatureEnabled } from "@/lib/featureFlags";
+
+const Top10Row = dynamic(() => import("@/components/Top10Row"), {
+  ssr: false,
+  loading: () => <div className="h-64 skeleton-shimmer rounded-2xl" />,
+});
 
 const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), {
   ssr: false,
@@ -60,6 +66,12 @@ const Index = () => {
               exploreAllPath="/browse/trending-now"
             />
           </Reveal>
+
+          {isFeatureEnabled("top10-row") && (data?.trendingMovies?.length ?? 0) >= 10 && (
+            <Reveal delay={40}>
+              <Top10Row movies={data!.trendingMovies!} />
+            </Reveal>
+          )}
 
           <div className="divider-glow" aria-hidden />
 

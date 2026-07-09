@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { trackSignup } from "@/lib/analytics";
 import { Eye, EyeOff, Sparkles, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 
 const Auth = () => {
@@ -80,6 +81,7 @@ const Auth = () => {
         title: "Welcome to FlixVerse!",
         description: "Your account has been created successfully",
       });
+      trackSignup("email");
       router.push('/');
     } catch (error: unknown) {
       toast({

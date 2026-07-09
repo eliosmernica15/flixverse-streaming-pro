@@ -38,6 +38,16 @@ const NotificationBell = dynamic(() => import("./NotificationBell"), {
   loading: () => null,
 });
 
+const LanguageSwitcher = dynamic(() => import("./LanguageSwitcher").then((m) => m.LanguageSwitcher), {
+  ssr: false,
+  loading: () => null,
+});
+
+const OfflineSyncBadge = dynamic(() => import("./OfflineSyncBadge").then((m) => m.OfflineSyncBadge), {
+  ssr: false,
+  loading: () => null,
+});
+
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isScrolled = useThrottledScroll(20);
@@ -167,6 +177,9 @@ const Navigation = () => {
             <div className="hidden glow-hover rounded-xl sm:block">
               <SearchBar onMovieSelect={handleMovieSelect} />
             </div>
+
+            <LanguageSwitcher />
+            <OfflineSyncBadge />
 
             {isAuthenticated && (
               <>

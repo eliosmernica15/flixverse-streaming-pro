@@ -35,6 +35,7 @@ export function setAppLocale(locale: Locale) {
   if (!locales.includes(locale)) return;
   try {
     localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    document.cookie = `${LOCALE_STORAGE_KEY}=${locale};path=/;max-age=31536000`;
     window.location.reload();
   } catch {
     // ignore

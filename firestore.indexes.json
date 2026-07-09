@@ -133,25 +133,11 @@
       ]
     },
     {
-      "collectionGroup": "flix_parties",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "code", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "watch_parties",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "participants", "arrayConfig": "CONTAINS" },
         { "fieldPath": "status", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "member_profiles",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "ownerId", "order": "ASCENDING" }
       ]
     }
   ],

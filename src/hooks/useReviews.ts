@@ -17,6 +17,7 @@ import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client
 import { useAuth } from './useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
 import { Review } from '@/integrations/firebase/types';
+import { enqueuePendingJob } from '@/lib/pendingJobs';
 
 export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => {
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -155,6 +156,12 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     };
 
     const docRef = await addDoc(collection(requireFirebaseDb(), 'reviews'), newReview);
+    void enqueuePendingJob(user.uid, "activity_review", {
+      userId: user.uid,
+      contentId,
+      contentType,
+      rating,
+    });
     return { id: docRef.id, ...newReview } as Review;
   };
 

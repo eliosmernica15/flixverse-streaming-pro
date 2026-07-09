@@ -13,6 +13,8 @@ import {
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { TMDBMovie } from '@/utils/tmdbApi';
+import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
+import { trackListAdd, trackListRemove } from '@/lib/analytics';
 import { UserMovieListItem } from '@/integrations/firebase/types';
 
 export const useUserMovieList = () => {
@@ -109,14 +111,14 @@ export const useUserMovieList = () => {
     setMovieList(prev => [optimisticItem, ...prev]);
 
     try {
-      await addDoc(collection(requireFirebaseDb(), 'user_movie_lists'), {
-        user_id: user.uid,
-        movie_id: movie.id,
-        movie_title: movie.title || movie.name || 'Unknown Title',
-        movie_poster_path: movie.poster_path,
-        media_type: mediaType,
-        added_at: new Date().toISOString()
+      await MutationDispatcher.dispatch('ADD_WATCHLIST', {
+        userId: user.uid,
+        movieId: movie.id,
+        movieTitle: movie.title || movie.name || 'Unknown Title',
+        posterPath: movie.poster_path,
+        mediaType,
       });
+      trackListAdd(movie.id, mediaType);
     } catch (error) {
       setMovieList(prev => prev.filter(item => item.movie_id !== movie.id));
       console.error('Error adding movie to list:', error);
@@ -146,11 +148,12 @@ export const useUserMovieList = () => {
     setMovieList(prev => prev.filter(item => item.movie_id !== movieId));
 
     try {
-      if (itemToRemove && !itemToRemove.id.startsWith('temp-')) {
-        await deleteDoc(doc(requireFirebaseDb(), 'user_movie_lists', itemToRemove.id));
-      } else if (!itemToRemove) {
-        return;
-      }
+      const mediaType = itemToRemove?.media_type ?? 'movie';
+      await MutationDispatcher.dispatch('REMOVE_WATCHLIST', {
+        userId: user.uid,
+        movieId,
+      });
+      trackListRemove(movieId);
     } catch (error) {
       setMovieList(originalList);
       console.error('Error removing movie from list:', error);

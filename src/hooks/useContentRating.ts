@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
+import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
 import { ContentRating } from '@/integrations/firebase/types';
 
 export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv') => {
@@ -70,19 +71,12 @@ export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv
       throw new Error('Rating must be between 1 and 10');
     }
 
-    // Use a deterministic ID based on user and content
-    const ratingId = `${user.uid}_${contentId}_${contentType}`;
-    const ratingRef = doc(requireFirebaseDb(), 'content_ratings', ratingId);
-
-    await setDoc(ratingRef, {
-      id: ratingId,
-      user_id: user.uid,
-      content_id: contentId,
-      content_type: contentType,
+    await MutationDispatcher.dispatch('RATE_CONTENT', {
+      userId: user.uid,
+      contentId,
+      contentType,
       rating,
-      created_at: userRating ? undefined : new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }, { merge: true });
+    });
 
     setUserRating(rating);
   };

@@ -37,6 +37,11 @@ dist
 .env.development.local
 .env.test.local
 .env.production.local
+*firebase-adminsdk*.json
+scripts/python/.venv/
+scripts/python/__pycache__/
+tsconfig.tsbuildinfo
+functions/
 
 
 .vercel

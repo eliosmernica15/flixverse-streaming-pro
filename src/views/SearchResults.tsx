@@ -10,6 +10,7 @@ import { searchMultiWithPagination, getContentImage, TMDBMovie } from "@/utils/t
 import { Search, Clock, X } from "lucide-react";
 import { SearchFilters, SearchFilterState } from "@/components/SearchFilters";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { trackSearch } from "@/lib/analytics";
 
 const RECENT_KEY = "flixverse:recent-searches";
 
@@ -143,6 +144,12 @@ const SearchResults = () => {
       setPage((p) => p + 1);
     }
   }, [loading, hasMore]);
+
+  useEffect(() => {
+    if (query && !loading) {
+      trackSearch(query, sortedResults.length + filteredPeople.length);
+    }
+  }, [query, loading, sortedResults.length, filteredPeople.length]);
 
   const { sentinelRef } = useInfiniteScroll({
     enabled: query.length > 0,

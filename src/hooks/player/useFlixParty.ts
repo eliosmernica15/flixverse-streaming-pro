@@ -17,6 +17,11 @@ import {
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { isRateLimited } from "@/lib/rateLimit";
+import { trackPartyJoin } from "@/lib/analytics";
+
+function participantIds(participants: FlixPartyParticipant[]): string[] {
+  return participants.map((p) => p.userId);
+}
 
 export interface FlixPartyParticipant {
   userId: string;
@@ -183,6 +188,7 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
         updatedAt: Date.now(),
         createdAt: Date.now(),
         participants: [participant],
+        participantIds: [user.uid],
       };
 
       await setDoc(doc(db, "flix_parties", roomId), roomData);
@@ -207,7 +213,11 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
         const updated = participants.map((p) =>
           p.userId === user.uid ? { ...p, lastSeenAt: Date.now() } : p
         );
-        await updateDoc(roomRef, { participants: updated, updatedAt: Date.now() });
+        await updateDoc(roomRef, {
+          participants: updated,
+          participantIds: participantIds(updated),
+          updatedAt: Date.now(),
+        });
         return true;
       }
 
@@ -225,8 +235,10 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
 
       await updateDoc(roomRef, {
         participants: [...participants, newParticipant],
+        participantIds: participantIds([...participants, newParticipant]),
         updatedAt: Date.now(),
       });
+      trackPartyJoin(targetRoomId);
       return true;
     },
     [user]
@@ -265,8 +277,10 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
           role: "guest",
         };
 
+        const nextParticipants = [...participants, newParticipant];
         await updateDoc(doc(db, "flix_parties", roomDoc.id), {
-          participants: [...participants, newParticipant],
+          participants: nextParticipants,
+          participantIds: participantIds(nextParticipants),
           updatedAt: Date.now(),
         });
       } else {
@@ -276,6 +290,7 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
         );
         await updateDoc(doc(db, "flix_parties", roomDoc.id), {
           participants: updated,
+          participantIds: participantIds(updated),
           updatedAt: Date.now(),
         });
       }
@@ -313,6 +328,7 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
 
         await updateDoc(roomRef, {
           participants: updatedParticipants,
+          participantIds: participantIds(updatedParticipants),
           hostId: newHostId,
           updatedAt: Date.now(),
         });
