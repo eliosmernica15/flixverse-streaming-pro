@@ -1,74 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { buildStreamingSources, pickServerByQuality } from "@/lib/streamingSources";
+import { buildStreamingSources } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
-import { useTimelineComments } from "@/hooks/player/useTimelineComments";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
-import { useFlixParty } from "@/hooks/player/useFlixParty";
-import { useWebRTCSync, type SyncMessage } from "@/hooks/player/useWebRTCSync";
-import { useCaptions } from "@/hooks/player/useCaptions";
-import { useAuth } from "@/hooks/useAuth";
-import { useSubscription } from "@/hooks/useSubscription";
-import { PaywallGate } from "@/components/PaywallGate";
-import { isFeatureEnabled } from "@/lib/featureFlags";
-import { CaptionOverlay } from "./CaptionOverlay";
-import { computeResync, sendSoftSeek, injectSeekParam } from "@/lib/player/embedSeekUrls";
-import {
-  CAPTION_LANGUAGES,
-  getCaptionLanguageLabel,
-} from "@/lib/player/captionLanguages";
-import { useSyncedCaptionPreferences } from "@/hooks/player/useSyncedCaptionPreferences";
-import {
-  CAPTION_SIZES,
-  CAPTION_STYLES,
-  CAPTION_POSITIONS,
-  CAPTION_OPACITY_MIN,
-  CAPTION_OPACITY_MAX,
-  opacityToPercent,
-  percentToOpacity,
-} from "@/lib/player/captionPreferences";
-import {
-  encryptPayload,
-  generateRoomKey,
-  buildPartyJoinUrl,
-} from "@/lib/player/roomEncryption";
-import type { SyncStatus } from "./SyncStatusBadge";
 import { EmbedFrame } from "./EmbedFrame";
-import { PlayerChrome } from "./PlayerChrome";
-import { AmbientGlowFrame } from "./AmbientGlowFrame";
-import { FlixPartySidebar } from "./FlixPartySidebar";
-import { FlixPartyInviteDialog } from "./FlixPartyInviteDialog";
-import { PlayerOverlayControls } from "./PlayerOverlayControls";
-import { AddCommentDialog } from "./AddCommentDialog";
-import { getImageUrl } from "@/utils/tmdbApi";
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Volume2,
-  Volume1,
-  VolumeX,
-  Settings,
-  Captions,
-  PictureInPicture2,
-  Sparkles,
-  AudioLines,
-  ListVideo,
-  Activity,
-  Film,
-  HelpCircle,
-  Users,
-  Server,
-  Maximize2,
-  Minimize2,
-  X,
-} from "lucide-react";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
-import { useBufferingDiagnostics } from "@/hooks/player/useBufferingDiagnostics";
 import { trackPlaybackStart } from "@/lib/analytics";
-import { playUiSound, getUiSoundsEnabled, setUiSoundsEnabled } from "@/lib/uiSound";
 import "@/app/video-player.css";
 
 interface PlayerShellProps {
@@ -83,148 +21,31 @@ interface PlayerShellProps {
   posterPath?: string;
   resumePosition?: number;
   totalDuration?: number;
-  /** Total episodes in current season (TV) — enables real Up Next autoplay */
   episodeCount?: number;
   onAdvanceEpisode?: (nextSeason: number, nextEpisode: number) => void;
 }
 
 const LOAD_TIMEOUT_MS = 15_000;
 
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds) || seconds < 0) seconds = 0;
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function SettingsToggle({
-  label,
-  icon,
-  checked,
-  onChange,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <div className="video-cc-row">
-      <span className="video-cc-label">
-        {icon}
-        <span>{label}</span>
-      </span>
-      <button
-        type="button"
-        className="video-switch focus-ring"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={onChange}
-      >
-        <span className="sr-only">{checked ? "On" : "Off"}</span>
-      </button>
-    </div>
-  );
-}
-
 export function PlayerShell({
   movieId,
   title,
   onClose,
-  isTrailer = false,
   mediaType = "movie",
   season,
   episode,
   posterPath,
   resumePosition = 0,
   totalDuration,
-  episodeCount,
-  onAdvanceEpisode,
 }: PlayerShellProps) {
   const [currentServer, setCurrentServer] = useState(0);
-  const [showServerSelector, setShowServerSelector] = useState(false);
-  const [isTheaterMode, setIsTheaterMode] = useState(true);
-  const [isCinematic, setIsCinematic] = useState(false);
   const [embedState, setEmbedState] = useState<"loading" | "ready" | "error">("loading");
-  const [showHelpPrompt, setShowHelpPrompt] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const [flashIcon, setFlashIcon] = useState<"play" | "pause" | null>(null);
-  const [showCenterPlay, setShowCenterPlay] = useState(false);
-  const [seekIndicator, setSeekIndicator] = useState<"back" | "forward" | null>(null);
-  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-
-  // Advanced settings panel state
-  const [quality, setQuality] = useState<string>("Auto");
-  const [ambientEnabled, setAmbientEnabled] = useState(true);
-  const [uiSounds, setUiSounds] = useState(true);
+  const [showHint, setShowHint] = useState(true);
   const [liveDuration, setLiveDuration] = useState(0);
-  const [autoplayNext, setAutoplayNext] = useState(false);
-  const [showStats, setShowStats] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
-  const [upNextDismissed, setUpNextDismissed] = useState(false);
-  const [upNextCount, setUpNextCount] = useState(10);
 
-  // FlixParty state
-  const [showPartySidebar, setShowPartySidebar] = useState(false);
-  const [partyRoomId, setPartyRoomId] = useState<string | null>(null);
-  const [partyRoomKey, setPartyRoomKey] = useState<string | null>(null);
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [partySyncStatus, setPartySyncStatus] = useState<SyncStatus>("disconnected");
-  const [partyDriftMs, setPartyDriftMs] = useState(0);
-
-  const {
-    captionLang,
-    captionSize,
-    captionStyle,
-    captionPosition,
-    captionOpacity,
-    setCaptionLang,
-    setCaptionSize,
-    setCaptionStyle,
-    setCaptionPosition,
-    setCaptionOpacity,
-    showCaptions,
-    setShowCaptions,
-    cloudSynced: captionsCloudSynced,
-  } = useSyncedCaptionPreferences();
-
-  // Timeline comments state
-  const [showTimelineControls, setShowTimelineControls] = useState(false);
-  const [showCommentDialog, setShowCommentDialog] = useState(false);
-  const [commentTimestamp, setCommentTimestamp] = useState(0);
-
-  const { user } = useAuth();
-  const { hasStandard, hasPremium } = useSubscription();
-  const {
-    room: partyRoom,
-    isHost: isPartyHost,
-    createRoom: createPartyRoom,
-    joinRoom: joinPartyRoom,
-    joinRoomById: joinPartyById,
-    leaveRoom: leavePartyRoom,
-    updatePlaybackState,
-  } = useFlixParty({ roomId: partyRoomId });
-
-  /** Consecutive automatic server failovers — resets once a stream loads. */
   const autoFailoverRef = useRef(0);
-  /** True while the pointer is over the control dock (pauses auto-hide). */
-  const dockHoverRef = useRef(false);
-  /** True while a popover/panel is open (pauses auto-hide). */
-  const uiOpenRef = useRef(false);
-  const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const controlsGraceUntil = useRef(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const seekIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const centerPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const bufferingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const upNextTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastTapRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -233,41 +54,9 @@ export function PlayerShell({
     [movieId, mediaType, season, episode]
   );
   const currentSource = streamingSources[currentServer];
-
-  const fullPosterUrl = useMemo(() => {
-    return posterPath ? getImageUrl(posterPath, "medium") : null;
-  }, [posterPath]);
-
-  // Prefer the real duration reported by the embed over the TMDB estimate.
   const effectiveDuration = liveDuration || totalDuration || 120 * 60;
 
-  const {
-    isPlaying,
-    isMuted,
-    volume,
-    providerName,
-    isLiveSynced,
-    togglePlay,
-    toggleMute,
-    setVolume,
-    adjustVolume,
-    seek,
-    seekRelative,
-    setReady,
-    setPlaying,
-    playbackRate,
-    setPlaybackRate,
-  } = useEmbedBridge({
-    iframeRef,
-    enabled: embedState === "ready",
-    totalDuration: effectiveDuration,
-    onTimeUpdate: (time) => syncTo(time),
-    onPlayStateChange: (playing) => setPlaying(playing),
-    onDurationChange: (duration) => setLiveDuration(duration),
-    onEnded: () => setUpNextDismissed(false),
-  });
-
-  const { currentTime, seekTo, syncTo } = usePlaybackClock({
+  const { syncTo } = usePlaybackClock({
     movieId,
     mediaType,
     title,
@@ -276,599 +65,95 @@ export function PlayerShell({
     episode,
     initialPosition: resumePosition,
     totalDuration: effectiveDuration,
-    isPlaying: isPlaying && embedState === "ready",
+    isPlaying: embedState === "ready",
   });
 
-  const { comments, addComment, likeComment, getMarkers, getCommentsNear } =
-    useTimelineComments({ tmdbId: movieId, enabled: showTimelineControls });
-  const commentMarkers = useMemo(
-    () => getMarkers(effectiveDuration),
-    [getMarkers, effectiveDuration]
-  );
-  const nearbyComments = useMemo(
-    () => getCommentsNear(currentTime, 5),
-    [getCommentsNear, currentTime]
-  );
-
-  const { getCueAt, source: captionSource, loading: captionsLoading } = useCaptions({
-    tmdbId: movieId,
-    mediaType,
-    season,
-    episode,
-    duration: effectiveDuration,
-    enabled: showCaptions,
-    lang: captionLang,
-  });
-  const activeCaption = getCueAt(currentTime);
-  const bufferingDiag = useBufferingDiagnostics();
-
-  const partyParticipantIds = useMemo(
-    () => partyRoom?.participants?.map((p) => p.userId) ?? [],
-    [partyRoom?.participants]
-  );
-
-  const handlePartyPlaybackSync = useCallback(
-    (msg: SyncMessage) => {
-      if (isPartyHost) return;
-      if (msg.type === "play") setPlaying(true);
-      if (msg.type === "pause") setPlaying(false);
-      if (msg.type === "seek" && typeof msg.data.currentTime === "number") {
-        seekTo(msg.data.currentTime);
-      }
-      if (msg.type === "heartbeat" && typeof msg.data.currentTime === "number") {
-        const drift = Math.abs(currentTime - msg.data.currentTime);
-        if (drift > 3) seekTo(msg.data.currentTime);
-      }
-    },
-    [isPartyHost, setPlaying, seekTo, currentTime]
-  );
-
-  const { isConnected: rtcConnected, sendMessage: sendRtcMessage } = useWebRTCSync({
-    roomId: partyRoomId,
-    isHost: !!isPartyHost,
-    hostId: partyRoom?.hostId ?? null,
-    participantIds: partyParticipantIds,
-    onPlaybackSync: handlePartyPlaybackSync,
-  });
-
-  // Guest sync via Firestore room state (fallback when WebRTC is not connected)
-  const lastPartyResyncRef = useRef(0);
-  useEffect(() => {
-    if (!partyRoom || isPartyHost || !partyRoomId) return;
-
-    const driftSec = Math.abs(currentTime - partyRoom.lastKnownTime);
-    setPartyDriftMs(driftSec * 1000);
-
-    if (partyRoom.playbackState === "playing" && !isPlaying) setPlaying(true);
-    if (partyRoom.playbackState === "paused" && isPlaying) setPlaying(false);
-
-    if (driftSec < 3) {
-      setPartySyncStatus(rtcConnected ? "connected" : "connecting");
-      return;
-    }
-
-    const now = Date.now();
-    if (now - lastPartyResyncRef.current < 4000) return;
-    lastPartyResyncRef.current = now;
-
-    const action = computeResync(
-      partyRoom.lastKnownTime,
-      currentTime,
-      currentSource.providerUrl,
-      currentSource.id
-    );
-
-    if (action.kind === "soft") {
-      setPartySyncStatus("drift");
-      sendSoftSeek(iframeRef.current, action.deltaSeconds);
-      seekRelative(action.deltaSeconds);
-    } else if (action.kind === "hard" && iframeRef.current) {
-      setPartySyncStatus("drift");
-      iframeRef.current.src = injectSeekParam(currentSource.providerUrl, partyRoom.lastKnownTime);
-    }
-  }, [
-    partyRoom?.lastKnownTime,
-    partyRoom?.playbackState,
-    isPartyHost,
-    partyRoomId,
-    isPlaying,
-    currentSource,
-    rtcConnected,
-    setPlaying,
+  const {
+    togglePlay,
+    toggleMute,
+    adjustVolume,
+    seek,
     seekRelative,
-    currentTime,
-  ]);
-
-  useEffect(() => {
-    if (!partyRoomId) {
-      setPartySyncStatus("disconnected");
-      return;
-    }
-    if (rtcConnected) setPartySyncStatus("connected");
-    else if (partyRoom) setPartySyncStatus("connecting");
-  }, [partyRoomId, rtcConnected, partyRoom]);
-
-  // Auto-join party from URL ?party=ROOM_ID
-  const partyJoinAttempted = useRef(false);
-  useEffect(() => {
-    if (partyRoomId || !user || partyJoinAttempted.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const joinId = params.get("party");
-    if (!joinId) return;
-
-    partyJoinAttempted.current = true;
-    void joinPartyById(joinId).then((ok) => {
-      if (ok) setPartyRoomId(joinId);
-    });
-  }, [partyRoomId, user, joinPartyById]);
-
-  const broadcastPartyState = useCallback(
-    (state: "playing" | "paused", time: number) => {
-      if (!partyRoomId || !isPartyHost) return;
-      void updatePlaybackState(state, time);
-      sendRtcMessage(state === "playing" ? "play" : "pause", { currentTime: time });
-    },
-    [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage]
-  );
-
-  // Host heartbeat — keeps guests in sync via WebRTC + Firestore fallback
-  const partyTimeRef = useRef(currentTime);
-  const partyPlayingRef = useRef(isPlaying);
-  partyTimeRef.current = currentTime;
-  partyPlayingRef.current = isPlaying;
-
-  useEffect(() => {
-    if (!partyRoomId || !isPartyHost) return;
-
-    const HEARTBEAT_MS = 2500;
-    const tick = () => {
-      const time = partyTimeRef.current;
-      const playing = partyPlayingRef.current;
-      void updatePlaybackState(playing ? "playing" : "paused", time);
-      sendRtcMessage("heartbeat", { currentTime: time });
-    };
-
-    tick();
-    const id = setInterval(tick, HEARTBEAT_MS);
-    return () => clearInterval(id);
-  }, [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage]);
-
-  const handleStartParty = useCallback(async () => {
-    if (!user || !hasStandard) {
-      setShowPartySidebar(true);
-      return;
-    }
-    try {
-      const key = generateRoomKey();
-      const encrypted = await encryptPayload(
-        { tmdbId: movieId, mediaType, season, episode, serverIndex: currentServer },
-        key
-      );
-      const id = await createPartyRoom(encrypted);
-      setPartyRoomId(id);
-      setPartyRoomKey(key);
-      setShowInviteDialog(true);
-      setShowPartySidebar(true);
-      playUiSound("success");
-    } catch (err) {
-      console.error("Failed to create party:", err);
-      playUiSound("error");
-    }
-  }, [user, hasStandard, movieId, mediaType, season, episode, currentServer, createPartyRoom]);
-
-  const buffered = Math.min(effectiveDuration, currentTime + effectiveDuration * 0.12 + 15);
-
-  const clearTimers = useCallback(() => {
-    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    if (seekIndicatorTimerRef.current) clearTimeout(seekIndicatorTimerRef.current);
-    if (centerPlayTimerRef.current) clearTimeout(centerPlayTimerRef.current);
-    if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current);
-    if (upNextTimerRef.current) clearInterval(upNextTimerRef.current);
-  }, []);
-
-  const showFlash = useCallback((icon: "play" | "pause") => {
-    setFlashIcon(icon);
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = setTimeout(() => setFlashIcon(null), 600);
-  }, []);
-
-  const showSeekIndicator = useCallback((dir: "back" | "forward") => {
-    setSeekIndicator(dir);
-    if (seekIndicatorTimerRef.current) clearTimeout(seekIndicatorTimerRef.current);
-    seekIndicatorTimerRef.current = setTimeout(() => setSeekIndicator(null), 500);
-  }, []);
-
-  const bumpControls = useCallback(() => {
-    setControlsVisible(true);
-    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-    const scheduleHide = () => {
-      hideControlsTimer.current = setTimeout(() => {
-        if (Date.now() < controlsGraceUntil.current) {
-          scheduleHide();
-          return;
-        }
-        // Never hide while the user is on the dock or a panel is open.
-        if (dockHoverRef.current || uiOpenRef.current) {
-          scheduleHide();
-          return;
-        }
-        setControlsVisible(false);
-        setShowSettings(false);
-      }, 4500);
-    };
-    scheduleHide();
-  }, []);
-
-  const handleClose = useCallback(() => {
-    clearTimers();
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => undefined);
-    }
-    onClose();
-  }, [clearTimers, onClose]);
-
-  const requestContainerFullscreen = useCallback(async () => {
-    const el = containerRef.current;
-    if (!el) return;
-    try {
-      if (el.requestFullscreen) await el.requestFullscreen();
-    } catch {}
-  }, []);
-
-  const exitContainerFullscreen = useCallback(async () => {
-    if (!document.fullscreenElement) return;
-    try {
-      if (document.exitFullscreen) await document.exitFullscreen();
-    } catch {}
-  }, []);
-
-  const toggleTheaterMode = useCallback(async () => {
-    const entering = !isTheaterMode;
-    setIsTheaterMode(entering);
-    bumpControls();
-    if (entering) {
-      requestAnimationFrame(() => void requestContainerFullscreen());
-    } else {
-      await exitContainerFullscreen();
-    }
-  }, [isTheaterMode, bumpControls, requestContainerFullscreen, exitContainerFullscreen]);
+    setReady,
+    setPlaying,
+  } = useEmbedBridge({
+    iframeRef,
+    enabled: embedState === "ready",
+    totalDuration: effectiveDuration,
+    onTimeUpdate: (time) => syncTo(time),
+    onDurationChange: (duration) => setLiveDuration(duration),
+  });
 
   const switchServer = useCallback((index: number) => {
-    clearTimers();
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     autoFailoverRef.current = 0;
     setCurrentServer(index);
-    setShowServerSelector(false);
     setEmbedState("loading");
-    setShowHelpPrompt(false);
     setLiveDuration(0);
     setPlaying(true);
     setReady(false);
-    playUiSound("tap");
-  }, [clearTimers, setPlaying, setReady]);
+  }, [setPlaying, setReady]);
 
-  const handleRetry = useCallback(() => {
+  const nextServer = useCallback(() => {
     switchServer((currentServer + 1) % streamingSources.length);
   }, [currentServer, streamingSources.length, switchServer]);
-
-  const triggerBuffering = useCallback(() => {
-    setIsBuffering(true);
-    if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current);
-    bufferingTimerRef.current = setTimeout(() => setIsBuffering(false), 650);
-  }, []);
-
-  const togglePlayPause = useCallback(() => {
-    if (embedState !== "ready") return;
-    togglePlay();
-    const nextPlaying = !isPlaying;
-    showFlash(isPlaying ? "pause" : "play");
-    playUiSound(isPlaying ? "pause" : "play");
-    broadcastPartyState(nextPlaying ? "playing" : "paused", currentTime);
-    bumpControls();
-  }, [embedState, togglePlay, isPlaying, showFlash, bumpControls, broadcastPartyState, currentTime]);
-
-  const handleToggleMute = useCallback(() => {
-    if (embedState !== "ready") return;
-    toggleMute();
-    playUiSound("volume");
-    bumpControls();
-  }, [embedState, toggleMute, bumpControls]);
-
-  const handleAdjustVolume = useCallback((delta: number) => {
-    if (embedState !== "ready") return;
-    adjustVolume(delta);
-    playUiSound("volume");
-    bumpControls();
-  }, [embedState, adjustVolume, bumpControls]);
-
-  const handleSeek = useCallback((direction: "back" | "forward") => {
-    if (embedState !== "ready") return;
-    const delta = direction === "back" ? -10 : 10;
-    seekRelative(delta);
-    showSeekIndicator(direction);
-    playUiSound("seek");
-    triggerBuffering();
-    bumpControls();
-  }, [embedState, seekRelative, showSeekIndicator, triggerBuffering, bumpControls]);
-
-  const handleScrub = useCallback((seconds: number) => {
-    if (embedState !== "ready") return;
-    seek(seconds);
-    seekTo(seconds);
-    playUiSound("seek");
-    triggerBuffering();
-    if (isPartyHost) sendRtcMessage("seek", { currentTime: seconds });
-    bumpControls();
-  }, [embedState, seek, seekTo, triggerBuffering, bumpControls, isPartyHost, sendRtcMessage]);
-
-  const handleSeekToPercent = useCallback((percent: number) => {
-    if (embedState !== "ready" || effectiveDuration <= 0) return;
-    handleScrub((percent / 100) * effectiveDuration);
-    showSeekIndicator(percent >= 50 ? "forward" : "back");
-  }, [embedState, effectiveDuration, handleScrub, showSeekIndicator]);
-
-  const reloadStream = useCallback(() => {
-    if (embedState !== "ready") return;
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-    const src = iframe.src;
-    iframe.src = "";
-    iframe.src = src;
-    setPlaying(true);
-    bumpControls();
-  }, [embedState, setPlaying, bumpControls]);
 
   const prevServer = useCallback(() => {
     switchServer((currentServer - 1 + streamingSources.length) % streamingSources.length);
   }, [currentServer, streamingSources.length, switchServer]);
 
-  const skipIntro = useCallback(() => {
-    if (embedState !== "ready") return;
-    seekRelative(85);
-    showSeekIndicator("forward");
-    playUiSound("seek");
-    triggerBuffering();
-    bumpControls();
-  }, [embedState, seekRelative, showSeekIndicator, triggerBuffering, bumpControls]);
+  const handleClose = useCallback(() => {
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => undefined);
+    }
+    onClose();
+  }, [onClose]);
 
-  const toggleAmbient = useCallback(() => {
-    if (!hasPremium) return;
-    const next = !ambientEnabled;
-    setAmbientEnabled(next);
+  const toggleFullscreen = useCallback(async () => {
+    const el = containerRef.current;
+    if (!el) return;
     try {
-      window.dispatchEvent(
-        new CustomEvent("toggle-ambient-glow", { detail: { enabled: next } })
-      );
-    } catch {}
-    bumpControls();
-  }, [ambientEnabled, bumpControls, hasPremium]);
-
-  const handlePictureInPicture = useCallback(() => {
-    const iframe = iframeRef.current as unknown as {
-      requestPictureInPicture?: () => Promise<void>;
-    } | null;
-    if (!iframe || typeof iframe.requestPictureInPicture !== "function") return;
-    try {
-      void iframe.requestPictureInPicture();
-    } catch {}
-    bumpControls();
-  }, [bumpControls]);
-
-  const toggleCaptions = useCallback(() => {
-    setShowCaptions(!showCaptions);
-    bumpControls();
-  }, [showCaptions, setShowCaptions, bumpControls]);
-
-  const changeCaptionLang = useCallback((lang: string) => {
-    setCaptionLang(lang);
-    playUiSound("tap");
-    bumpControls();
-  }, [setCaptionLang, bumpControls]);
-
-  const changeCaptionSize = useCallback((size: Parameters<typeof setCaptionSize>[0]) => {
-    setCaptionSize(size);
-    playUiSound("tap");
-    bumpControls();
-  }, [setCaptionSize, bumpControls]);
-
-  const changeCaptionStyle = useCallback((style: Parameters<typeof setCaptionStyle>[0]) => {
-    setCaptionStyle(style);
-    playUiSound("tap");
-    bumpControls();
-  }, [setCaptionStyle, bumpControls]);
-
-  const changeCaptionPosition = useCallback((position: Parameters<typeof setCaptionPosition>[0]) => {
-    setCaptionPosition(position);
-    playUiSound("tap");
-    bumpControls();
-  }, [setCaptionPosition, bumpControls]);
-
-  const changeCaptionOpacity = useCallback((percent: number) => {
-    setCaptionOpacity(percentToOpacity(percent));
-    bumpControls();
-  }, [setCaptionOpacity, bumpControls]);
-
-  const toggleAutoNext = useCallback(() => {
-    setAutoplayNext((p) => !p);
-    setUpNextDismissed(false);
-    bumpControls();
-  }, [bumpControls]);
-
-  const toggleStats = useCallback(() => {
-    setShowStats((p) => !p);
-    bumpControls();
-  }, [bumpControls]);
-
-  const QUALITY_OPTIONS = ["Auto", "4K", "1080p", "720p", "480p"];
-  const qualityFromSource = (q: string): string => {
-    if (q === "4K") return "4K";
-    if (q === "FHD") return "1080p";
-    return "720p";
-  };
-
-  const changePlaybackRate = useCallback((rate: number) => {
-    setPlaybackRate(rate);
-    setShowSettings(false);
-    bumpControls();
-  }, [setPlaybackRate, bumpControls]);
-
-  const changeQuality = useCallback((opt: string) => {
-    if (opt === "4K" && !hasPremium) {
-      setShowSettings(false);
-      bumpControls();
-      return;
-    }
-    setQuality(opt);
-    const idx = pickServerByQuality(streamingSources, opt, currentServer);
-    if (idx !== currentServer) switchServer(idx);
-    setShowSettings(false);
-    bumpControls();
-  }, [hasPremium, streamingSources, currentServer, switchServer, bumpControls]);
-
-  const playUpNext = useCallback(() => {
-    if (mediaType === "tv" && season && episode && episodeCount && episode < episodeCount) {
-      onAdvanceEpisode?.(season, episode + 1);
-      setUpNextDismissed(true);
-      setUpNextCount(10);
-      playUiSound("success");
-      return;
-    }
-    if (mediaType === "tv" && season && episode && episodeCount && episode >= episodeCount) {
-      setUpNextDismissed(true);
-      onClose();
-      return;
-    }
-    handleRetry();
-  }, [mediaType, season, episode, episodeCount, onAdvanceEpisode, onClose, handleRetry]);
-
-  // Double-tap seek on mobile
-  const handleTap = useCallback((e: React.TouchEvent) => {
-    const now = Date.now();
-    const timeSince = now - lastTapRef.current;
-    lastTapRef.current = now;
-
-    if (timeSince < 300 && timeSince > 0) {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const x = e.touches[0].clientX - rect.left;
-      const isLeftHalf = x < rect.width / 2;
-      handleSeek(isLeftHalf ? "back" : "forward");
-    } else {
-      if (controlsVisible) {
-        setControlsVisible(false);
-      } else {
-        bumpControls();
-        setShowCenterPlay(true);
-        if (centerPlayTimerRef.current) clearTimeout(centerPlayTimerRef.current);
-        centerPlayTimerRef.current = setTimeout(() => setShowCenterPlay(false), 1200);
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (el.requestFullscreen) {
+        await el.requestFullscreen();
       }
+    } catch {
+      // ignore
     }
-  }, [controlsVisible, bumpControls, handleSeek]);
+  }, []);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (showServerSelector) {
-        if (e.key === "Escape") setShowServerSelector(false);
-        return;
-      }
-
-      // Don't hijack typing or slider interactions
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" ||
-          target.isContentEditable)
-      ) {
-        if (e.key === "Escape") (target as HTMLElement).blur();
-        return;
-      }
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      const handledKeys = [
-        " ", "k", "K", "m", "M",
-        "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
-        "f", "F", "t", "T", "c", "C", "n", "N", "]", "[",
-        "s", "S", "r", "R", "g", "G", "l", "L", "i", "I", "d", "D", "?", "/",
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-      ];
-      if (handledKeys.includes(e.key)) e.preventDefault();
-
-      if (e.key === "Escape") {
-        if (document.fullscreenElement) {
-          void exitContainerFullscreen();
-          setIsTheaterMode(false);
-          bumpControls();
-          return;
-        }
-        handleClose();
-        return;
-      }
-      // Playback
-      if (e.key === " " || e.key === "k" || e.key === "K") { togglePlayPause(); return; }
-      if (e.key === "m" || e.key === "M") { handleToggleMute(); return; }
-      if (e.key === "ArrowLeft") { handleSeek("back"); return; }
-      if (e.key === "ArrowRight") { handleSeek("forward"); return; }
-      if (e.key === "ArrowUp") { handleAdjustVolume(0.1); return; }
-      if (e.key === "ArrowDown") { handleAdjustVolume(-0.1); return; }
-      if (/^[0-9]$/.test(e.key)) { handleSeekToPercent(parseInt(e.key, 10) * 10); return; }
-      // UI / modes
-      if (e.key === "f" || e.key === "F" || e.key === "t" || e.key === "T") { void toggleTheaterMode(); return; }
-      if (e.key === "c" || e.key === "C") { setIsCinematic((p) => !p); bumpControls(); return; }
-      if (e.key === "n" || e.key === "N" || e.key === "]") { handleRetry(); return; }
-      if (e.key === "[") { prevServer(); return; }
-      if (e.key === "s" || e.key === "S") { setShowServerSelector((p) => !p); return; }
-      if (e.key === "r" || e.key === "R") { reloadStream(); return; }
-      if (e.key === "g" || e.key === "G") { setShowPartySidebar((p) => !p); bumpControls(); return; }
-      if (e.key === "l" || e.key === "L") { setShowTimelineControls((p) => !p); bumpControls(); return; }
-      if (e.key === "i" || e.key === "I") { skipIntro(); return; }
-      if (e.key === "d" || e.key === "D") { setShowStats((p) => !p); bumpControls(); return; }
-      if (e.key === "?" || e.key === "/") { setShowShortcuts((p) => !p); return; }
-      bumpControls();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleClose, handleRetry, prevServer, reloadStream, handleSeek, handleToggleMute, togglePlayPause, bumpControls, toggleTheaterMode, exitContainerFullscreen, showServerSelector, handleAdjustVolume, handleSeekToPercent, skipIntro]);
+  const seekToPercent = useCallback(
+    (percent: number) => {
+      if (embedState !== "ready" || effectiveDuration <= 0) return;
+      const seconds = (percent / 100) * effectiveDuration;
+      seek(seconds);
+      syncTo(seconds);
+    },
+    [embedState, effectiveDuration, seek, syncTo]
+  );
 
   useEffect(() => {
-    const onFullscreenChange = () => {
-      if (document.fullscreenElement !== containerRef.current && isTheaterMode) {
-        setIsTheaterMode(false);
-      }
-    };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, [isTheaterMode]);
-
-  useEffect(() => {
-    bumpControls();
     const prevBody = document.body.style.overflow;
     const prevHtml = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
+
+    const hintTimer = setTimeout(() => setShowHint(false), 8000);
+
     return () => {
       document.body.style.overflow = prevBody;
       document.documentElement.style.overflow = prevHtml;
+      clearTimeout(hintTimer);
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     };
-  }, [bumpControls]);
-
-  // Pause the auto-hide timer while any panel/dialog is open, and keep the
-  // controls visible when a panel opens.
-  useEffect(() => {
-    uiOpenRef.current =
-      showSettings || showServerSelector || showShortcuts || showCommentDialog || showInviteDialog;
-    if (uiOpenRef.current) setControlsVisible(true);
-  }, [showSettings, showServerSelector, showShortcuts, showCommentDialog, showInviteDialog]);
+  }, []);
 
   useEffect(() => {
     setEmbedState("loading");
-    setShowHelpPrompt(false);
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     loadTimeoutRef.current = setTimeout(() => {
-      // Auto-failover: try the next server before surfacing an error.
       if (autoFailoverRef.current < streamingSources.length - 1) {
         autoFailoverRef.current += 1;
         setLiveDuration(0);
@@ -877,758 +162,130 @@ export function PlayerShell({
         return;
       }
       setEmbedState("error");
-      setShowHelpPrompt(false);
     }, LOAD_TIMEOUT_MS);
-    return () => clearTimers();
-  }, [currentServer, clearTimers, streamingSources.length, setReady]);
+    return () => {
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    };
+  }, [currentServer, streamingSources.length, setReady]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (showShortcuts && e.key === "Escape") {
+        e.preventDefault();
+        setShowShortcuts(false);
+        return;
+      }
+
+      const handled = [
+        " ", "k", "K", "m", "M",
+        "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+        "f", "F", "n", "N", "]", "[", "?", "/",
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+        "Escape",
+      ];
+      if (handled.includes(e.key)) e.preventDefault();
+
+      if (e.key === "Escape") {
+        if (document.fullscreenElement) {
+          void document.exitFullscreen();
+          return;
+        }
+        handleClose();
+        return;
+      }
+      if (e.key === "?" || e.key === "/") {
+        setShowShortcuts((p) => !p);
+        return;
+      }
+      if (embedState !== "ready") {
+        if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
+        if (e.key === "[") prevServer();
+        return;
+      }
+
+      if (e.key === " " || e.key === "k" || e.key === "K") togglePlay();
+      else if (e.key === "m" || e.key === "M") toggleMute();
+      else if (e.key === "ArrowLeft") seekRelative(-10);
+      else if (e.key === "ArrowRight") seekRelative(10);
+      else if (e.key === "ArrowUp") adjustVolume(0.1);
+      else if (e.key === "ArrowDown") adjustVolume(-0.1);
+      else if (e.key === "f" || e.key === "F") void toggleFullscreen();
+      else if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
+      else if (e.key === "[") prevServer();
+      else if (/^[0-9]$/.test(e.key)) seekToPercent(parseInt(e.key, 10) * 10);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    embedState,
+    handleClose,
+    togglePlay,
+    toggleMute,
+    adjustVolume,
+    seekRelative,
+    toggleFullscreen,
+    nextServer,
+    prevServer,
+    seekToPercent,
+    showShortcuts,
+  ]);
 
   const onIframeLoad = () => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     autoFailoverRef.current = 0;
     setEmbedState("ready");
     setReady(true);
-    controlsGraceUntil.current = Date.now() + 12_000;
-    setControlsVisible(true);
-    if (playbackRate !== 1) setPlaybackRate(playbackRate);
     trackPlaybackStart(movieId, mediaType, currentSource.id);
-    playUiSound("success");
   };
 
   const onIframeError = () => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     setEmbedState("error");
     setReady(false);
-    playUiSound("error");
   };
-
-  // Sync quality label with the active server (UI-only)
-  useEffect(() => {
-    setQuality((prev) => (prev === "Auto" ? "Auto" : qualityFromSource(currentSource.quality)));
-  }, [currentServer, currentSource.quality]);
-
-  // Initialize ambient + sound toggles from persisted preferences
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("flixverse-ambient-glow");
-      if (stored !== null) setAmbientEnabled(stored === "true");
-    } catch {}
-    setUiSounds(getUiSoundsEnabled());
-  }, []);
-
-  const toggleUiSounds = useCallback(() => {
-    setUiSounds((prev) => {
-      const next = !prev;
-      setUiSoundsEnabled(next);
-      return next;
-    });
-    bumpControls();
-  }, [bumpControls]);
-
-  // Keep ambient toggle in sync if changed elsewhere
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ enabled: boolean }>).detail;
-      setAmbientEnabled(detail.enabled);
-    };
-    window.addEventListener("toggle-ambient-glow", handler);
-    return () => window.removeEventListener("toggle-ambient-glow", handler);
-  }, []);
-
-  // Up Next countdown — best-effort auto-advance when near the end
-  const nearEnd =
-    autoplayNext &&
-    embedState === "ready" &&
-    effectiveDuration > 0 &&
-    currentTime / effectiveDuration > 0.95 &&
-    !upNextDismissed;
-
-  useEffect(() => {
-    if (!nearEnd) {
-      setUpNextCount(10);
-      return;
-    }
-    if (upNextTimerRef.current) clearInterval(upNextTimerRef.current);
-    upNextTimerRef.current = setInterval(() => {
-      setUpNextCount((c) => {
-        if (c <= 1) {
-          if (upNextTimerRef.current) clearInterval(upNextTimerRef.current);
-          playUpNext();
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => {
-      if (upNextTimerRef.current) clearInterval(upNextTimerRef.current);
-    };
-  }, [nearEnd, playUpNext]);
-
-  const volumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
-  const VolumeIcon = volumeIcon;
 
   return (
     <div
       ref={containerRef}
-      className="player-shell fixed inset-0 z-[9999] bg-black flex flex-col overflow-hidden"
-      onMouseMove={bumpControls}
-      onTouchStart={handleTap}
+      className="player-shell player-shell--minimal"
+      role="dialog"
+      aria-label={`Watching ${title}`}
     >
-      <AmbientGlowFrame posterPath={fullPosterUrl} isActive={hasPremium && ambientEnabled} />
-
-      <PlayerChrome
-        title={title}
-        mediaType={mediaType}
-        season={season}
-        episode={episode}
-        isTrailer={isTrailer}
-        controlsVisible={controlsVisible}
-        embedState={embedState}
-        currentSource={currentSource}
-        currentServer={currentServer}
-        streamingSources={streamingSources}
-        isTheaterMode={isTheaterMode}
-        isCinematic={isCinematic}
-        playState={isPlaying ? "playing" : "paused"}
-        showServerSelector={showServerSelector}
-        handleClose={handleClose}
-        togglePlayPause={togglePlayPause}
-        setShowServerSelector={setShowServerSelector}
-        toggleTheaterMode={toggleTheaterMode}
-        prevServer={prevServer}
-        seek={handleSeek}
-        reloadStream={reloadStream}
-        handleRetry={handleRetry}
-        switchServer={switchServer}
-        setIsCinematic={setIsCinematic}
-      />
-
       <EmbedFrame
         currentSource={currentSource}
         currentServer={currentServer}
         streamingSourcesCount={streamingSources.length}
         embedState={embedState}
-        showHelpPrompt={showHelpPrompt}
-        flashIcon={flashIcon}
-        playState={isPlaying ? "playing" : "paused"}
         title={title}
         iframeRef={iframeRef}
         onIframeLoad={onIframeLoad}
         onIframeError={onIframeError}
-        handleRetry={handleRetry}
-        setShowHelpPrompt={setShowHelpPrompt}
-        isTheaterMode={isTheaterMode}
-        isCinematic={isCinematic}
+        onRetry={nextServer}
       />
 
-      {/* Tap zone — sits above the iframe so play/pause works without hitting embed UI */}
-      {embedState === "ready" && (
-        <button
-          type="button"
-          className="video-tap-zone"
-          onClick={togglePlayPause}
-          onDoubleClick={(e) => {
-            e.preventDefault();
-            void toggleTheaterMode();
-          }}
-          aria-label={isPlaying ? "Pause" : "Play"}
-        />
-      )}
-
-      {/* Reveal layer — only active while controls are hidden. The iframe
-          swallows mouse events, so without this the controls could never be
-          brought back while the cursor is over the video. */}
-      {!controlsVisible && (
-        <div
-          className="video-reveal-layer"
-          onMouseMove={bumpControls}
-          onClick={bumpControls}
-          aria-hidden="true"
-        />
-      )}
-
-      {showCenterPlay && embedState === "ready" && (
-        <div className="video-center-play">
-          <div className="video-center-play-circle">
-            {isPlaying ? (
-              <div className="flex gap-1.5">
-                <div className="w-2 h-6 bg-white rounded-sm" />
-                <div className="w-2 h-6 bg-white rounded-sm" />
-              </div>
-            ) : (
-              <div className="w-0 h-0 border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent border-l-[16px] border-l-white ml-1" />
-            )}
-          </div>
-        </div>
-      )}
-
-      {seekIndicator && (
-        <div
-          className={`video-seek-ind ${seekIndicator === "back" ? "left-8" : "right-8"}`}
-          aria-hidden="true"
-        >
-          {seekIndicator === "back" ? "−10s" : "+10s"}
-        </div>
-      )}
-
-      {/* ── Floating glass control dock ── */}
-      <div
-        className={`video-dock-wrap ${controlsVisible ? "" : "video-hidden"}`}
-        onTouchStart={(e) => e.stopPropagation()}
-        onMouseEnter={() => { dockHoverRef.current = true; }}
-        onMouseLeave={() => { dockHoverRef.current = false; }}
-      >
-        <div className="video-dock">
-          {/* Centerpiece scrubber + comment markers */}
-          <PlayerOverlayControls
-            currentTime={currentTime}
-            totalDuration={effectiveDuration}
-            markers={commentMarkers}
-            nearbyComments={nearbyComments}
-            onSeek={handleScrub}
-            onAddComment={(t) => {
-              if (!hasStandard) {
-                setShowPartySidebar(true);
-                return;
-              }
-              setCommentTimestamp(t);
-              setShowCommentDialog(true);
-            }}
-            onLikeComment={likeComment}
-            isPlaying={isPlaying}
-            controlsVisible={controlsVisible}
-            buffered={buffered}
-          />
-
-          {/* Controls row */}
-          <div className="video-controls">
-            <div className="video-left">
-              {/* Play / pause (primary) */}
-              <button
-                type="button"
-                onClick={togglePlayPause}
-                disabled={embedState !== "ready"}
-                className="video-btn video-btn-primary video-btn-shine focus-ring"
-                aria-label={isPlaying ? "Pause" : "Play"}
-                title="Play / Pause (Space)"
-              >
-                {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
-              </button>
-
-              {/* Skip back / forward ±10s */}
-              <button
-                type="button"
-                onClick={() => handleSeek("back")}
-                disabled={embedState !== "ready"}
-                className="video-btn video-btn-icon video-hide-sm"
-                aria-label="Seek back 10 seconds"
-                title="Seek back 10s"
-              >
-                <SkipBack className="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSeek("forward")}
-                disabled={embedState !== "ready"}
-                className="video-btn video-btn-icon video-hide-sm"
-                aria-label="Seek forward 10 seconds"
-                title="Seek forward 10s"
-              >
-                <SkipForward className="w-5 h-5" />
-              </button>
-
-              {/* Volume */}
-              <div
-                className="video-volume-wrap video-hide-sm"
-                onMouseEnter={() => setShowVolumeSlider(true)}
-                onMouseLeave={() => setShowVolumeSlider(false)}
-              >
-                <button
-                  type="button"
-                  onClick={handleToggleMute}
-                  className="video-btn video-btn-icon video-hide-sm"
-                  aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"}
-                  aria-pressed={isMuted || volume === 0}
-                  title="Mute (M)"
-                >
-                  <VolumeIcon className="w-5 h-5" />
-                </button>
-                <input
-                  type="range"
-                  className={`video-volume ${showVolumeSlider ? "is-open" : ""}`}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={isMuted ? 0 : volume}
-                  onChange={(e) => {
-                    setVolume(parseFloat(e.target.value));
-                    playUiSound("volume");
-                  }}
-                  aria-label="Volume"
-                  tabIndex={0}
-                />
-              </div>
-
-              {/* Time readout */}
-              <div className="video-time video-hide-sm">
-                <span>{formatTime(currentTime)}</span>
-                <span className="video-time-sep">/</span>
-                <span className="video-time-total">{formatTime(effectiveDuration)}</span>
-              </div>
-
-              {/* Live sync indicator */}
-              <span
-                className={`video-sync-chip video-hide-sm ${isLiveSynced ? "is-live" : ""}`}
-                title={
-                  isLiveSynced
-                    ? `Controls synced live with ${providerName}`
-                    : "Estimated time — waiting for player events"
-                }
-              >
-                <span className="video-sync-dot" aria-hidden="true" />
-                {isLiveSynced ? "SYNCED" : "EST"}
-              </span>
-
-              {/* FlixParty */}
-              {isFeatureEnabled("flixparty") && (
-              <button
-                type="button"
-                onClick={() => setShowPartySidebar((p) => !p)}
-                className={`video-btn video-btn-icon video-hide-sm ${showPartySidebar ? "is-active" : ""}`}
-                aria-label="Toggle FlixParty"
-                aria-pressed={showPartySidebar}
-                title="FlixParty (G)"
-              >
-                <Users className="w-5 h-5" />
-              </button>
-              )}
-
-              {/* Skip intro */}
-              <button
-                type="button"
-                onClick={skipIntro}
-                className="video-btn video-hide-sm"
-                aria-label="Skip intro"
-                title="Skip intro (I)"
-              >
-                <SkipForward className="w-5 h-5" />
-                <span className="video-btn-label">Skip Intro</span>
-              </button>
-            </div>
-
-            <div className="video-right">
-              {/* Settings panel */}
-              <div className="relative video-hide-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    playUiSound(showSettings ? "close" : "open");
-                    setShowSettings((p) => !p);
-                  }}
-                  className={`video-btn video-btn-icon focus-ring press-effect ${showSettings ? "is-active" : ""}`}
-                  aria-label="Player settings"
-                  aria-haspopup="menu"
-                  aria-expanded={showSettings}
-                  title="Settings"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
-                {showSettings && (
-                  <div className="video-settings scrollbar-thin" role="menu" aria-label="Player settings">
-                    {/* Playback speed */}
-                    <div className="video-settings-section">
-                      <p className="video-settings-head">Playback speed</p>
-                      <div className="video-settings-grid">
-                        {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
-                          <button
-                            key={rate}
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={playbackRate === rate}
-                            onClick={() => changePlaybackRate(rate)}
-                            className={`video-quality ${playbackRate === rate ? "is-selected" : ""}`}
-                          >
-                            {rate === 1 ? "Normal" : `${rate}x`}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="video-settings-divider" />
-
-                    {/* Quality */}
-                    <div className="video-settings-section">
-                      <p className="video-settings-head">Quality</p>
-                      <div className="video-settings-grid">
-                        {QUALITY_OPTIONS.map((opt) => (
-                          <button
-                            key={opt}
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={quality === opt}
-                            onClick={() => changeQuality(opt)}
-                            className={`video-quality ${quality === opt ? "is-selected" : ""} ${opt === "4K" && !hasPremium ? "opacity-60" : ""}`}
-                            title={opt === "4K" && !hasPremium ? "Premium required" : undefined}
-                          >
-                            {opt}{opt === "4K" && !hasPremium ? " 🔒" : ""}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="video-settings-divider" />
-
-                    {/* Toggles */}
-                    <div className="video-settings-section video-settings-toggles">
-                      <SettingsToggle
-                        label="Captions / Subtitles"
-                        icon={<Captions className="w-4 h-4" />}
-                        checked={showCaptions}
-                        onChange={toggleCaptions}
-                      />
-                      {showCaptions && (
-                        <div className="video-settings-caption-lang">
-                          <label className="video-settings-head" htmlFor="caption-lang-select">
-                            Subtitle language
-                          </label>
-                          <select
-                            id="caption-lang-select"
-                            value={captionLang}
-                            onChange={(e) => changeCaptionLang(e.target.value)}
-                            className="video-settings-select"
-                            aria-label="Subtitle language"
-                          >
-                            {CAPTION_LANGUAGES.map((lang) => (
-                              <option key={lang.code} value={lang.code}>
-                                {lang.label}
-                              </option>
-                            ))}
-                          </select>
-                          {captionsLoading && (
-                            <p className="video-settings-caption-status">Loading subtitles…</p>
-                          )}
-                          {captionsCloudSynced && user && (
-                            <p className="video-settings-caption-status">Synced to your account</p>
-                          )}
-                          <p className="video-settings-head">Caption size</p>
-                          <div className="video-settings-grid">
-                            {CAPTION_SIZES.map((opt) => (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={captionSize === opt.value}
-                                onClick={() => changeCaptionSize(opt.value)}
-                                className={`video-quality ${captionSize === opt.value ? "is-selected" : ""}`}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </div>
-                          <p className="video-settings-head">Caption style</p>
-                          <div className="video-settings-grid">
-                            {CAPTION_STYLES.map((opt) => (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={captionStyle === opt.value}
-                                onClick={() => changeCaptionStyle(opt.value)}
-                                className={`video-quality ${captionStyle === opt.value ? "is-selected" : ""}`}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </div>
-                          <p className="video-settings-head">Caption position</p>
-                          <div className="video-settings-grid">
-                            {CAPTION_POSITIONS.map((opt) => (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={captionPosition === opt.value}
-                                onClick={() => changeCaptionPosition(opt.value)}
-                                className={`video-quality ${captionPosition === opt.value ? "is-selected" : ""}`}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="video-settings-opacity">
-                            <label className="video-settings-head" htmlFor="caption-opacity">
-                              Caption opacity · {opacityToPercent(captionOpacity)}%
-                            </label>
-                            <input
-                              id="caption-opacity"
-                              type="range"
-                              min={opacityToPercent(CAPTION_OPACITY_MIN)}
-                              max={opacityToPercent(CAPTION_OPACITY_MAX)}
-                              value={opacityToPercent(captionOpacity)}
-                              onChange={(e) => changeCaptionOpacity(parseInt(e.target.value, 10))}
-                              className="video-settings-range"
-                              aria-label="Caption opacity"
-                            />
-                          </div>
-                        </div>
-                      )}
-                      <PaywallGate feature="Ambient light" locked={!hasPremium}>
-                        <SettingsToggle
-                          label="Ambient light"
-                          icon={<Sparkles className="w-4 h-4" />}
-                          checked={ambientEnabled && hasPremium}
-                          onChange={toggleAmbient}
-                        />
-                      </PaywallGate>
-                      <SettingsToggle
-                        label="UI sounds"
-                        icon={<AudioLines className="w-4 h-4" />}
-                        checked={uiSounds}
-                        onChange={toggleUiSounds}
-                      />
-                      <SettingsToggle
-                        label="Autoplay next"
-                        icon={<ListVideo className="w-4 h-4" />}
-                        checked={autoplayNext}
-                        onChange={toggleAutoNext}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Picture-in-Picture (best-effort) */}
-              <button
-                type="button"
-                onClick={handlePictureInPicture}
-                className="video-btn video-btn-icon video-hide-sm focus-ring press-effect"
-                aria-label="Picture in picture (best-effort)"
-                title="Picture in picture"
-              >
-                <PictureInPicture2 className="w-5 h-5" />
-              </button>
-
-              {/* Captions quick toggle */}
-              <button
-                type="button"
-                onClick={toggleCaptions}
-                className={`video-btn video-btn-icon video-hide-sm focus-ring press-effect ${showCaptions ? "is-active" : ""}`}
-                aria-label="Toggle captions"
-                aria-pressed={showCaptions}
-                title="Captions (CC)"
-              >
-                <Captions className="w-5 h-5" />
-              </button>
-
-              {/* Stats for nerds */}
-              <button
-                type="button"
-                onClick={toggleStats}
-                className={`video-btn video-btn-icon video-hide-sm focus-ring press-effect ${showStats ? "is-active" : ""}`}
-                aria-label="Toggle stats"
-                aria-pressed={showStats}
-                title="Stats (D)"
-              >
-                <Activity className="w-5 h-5" />
-              </button>
-
-              {/* Cinematic toggle */}
-              <button
-                type="button"
-                onClick={() => setIsCinematic((p) => !p)}
-                className={`video-btn video-btn-icon video-hide-sm ${isCinematic ? "is-active" : ""}`}
-                aria-label={isCinematic ? "Exit cinematic mode" : "Enable cinematic mode"}
-                aria-pressed={isCinematic}
-                title="Cinematic (C)"
-              >
-                <Film className="w-5 h-5" />
-              </button>
-
-              {/* Keyboard shortcuts */}
-              <button
-                type="button"
-                onClick={() => setShowShortcuts(true)}
-                className="video-btn video-btn-icon video-hide-sm"
-                aria-label="Keyboard shortcuts"
-                title="Keyboard shortcuts (?)"
-              >
-                <HelpCircle className="w-5 h-5" />
-              </button>
-
-              {/* Server selector */}
-              <button
-                type="button"
-                onClick={() => setShowServerSelector(true)}
-                className="video-btn video-btn-icon"
-                aria-label={`Server: ${currentSource.name}, ${currentServer + 1} of ${streamingSources.length}`}
-                title="Servers (S)"
-              >
-                <Server className="w-5 h-5" />
-              </button>
-
-              {/* Theater / fullscreen */}
-              <button
-                type="button"
-                onClick={toggleTheaterMode}
-                className="video-btn video-btn-icon"
-                aria-label={isTheaterMode ? "Exit theater / fullscreen" : "Enter theater / fullscreen"}
-                title="Theater (F)"
-              >
-                {isTheaterMode ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-              </button>
-
-              {/* Close */}
-              <button
-                type="button"
-                onClick={handleClose}
-                className="video-btn video-btn-icon is-danger"
-                aria-label="Close player"
-                title="Close (Esc)"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {showCommentDialog && (
-        <AddCommentDialog
-          timestamp={commentTimestamp}
-          onSubmit={async (text) => {
-            await addComment(commentTimestamp, text);
-            setShowCommentDialog(false);
-          }}
-          onClose={() => setShowCommentDialog(false)}
-        />
-      )}
-
-      {showPartySidebar && (
-        <PaywallGate feature="FlixParty" locked={!hasStandard}>
-          <FlixPartySidebar
-            isOpen={showPartySidebar}
-            onClose={() => setShowPartySidebar(false)}
-            roomId={partyRoomId}
-            syncStatus={partySyncStatus}
-            driftMs={partyDriftMs}
-            onLeaveRoom={() => {
-              void leavePartyRoom();
-              setPartyRoomId(null);
-              setPartyRoomKey(null);
-              setShowPartySidebar(false);
-            }}
-            onStartParty={handleStartParty}
-            movieId={movieId}
-            mediaType={mediaType}
-            season={season}
-            episode={episode}
-            title={title}
-            posterPath={posterPath || null}
-            currentTime={currentTime}
-            isPlaying={isPlaying}
-            onSyncToPosition={seekTo}
-            partyJoinUrl={
-              partyRoomId && partyRoomKey
-                ? buildPartyJoinUrl(partyRoomId, partyRoomKey)
-                : partyRoom?.code
-                  ? `${typeof window !== "undefined" ? window.location.origin : ""}/party/join?code=${partyRoom.code}`
-                  : null
-            }
-          />
-        </PaywallGate>
+      {showHint && embedState === "ready" && (
+        <p className="player-hint" aria-live="polite">
+          <span className="player-hint-title">{title}</span>
+          <span className="player-hint-keys">
+            {currentSource.name} · {currentServer + 1}/{streamingSources.length} — Esc close · ? shortcuts
+          </span>
+        </p>
       )}
 
       <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
-
-      <FlixPartyInviteDialog
-        isOpen={showInviteDialog}
-        onClose={() => setShowInviteDialog(false)}
-        roomCode={partyRoom?.code || (partyRoomId ? partyRoomId.slice(0, 6).toUpperCase() : "")}
-        roomUrl={
-          partyRoomId && partyRoomKey
-            ? buildPartyJoinUrl(partyRoomId, partyRoomKey)
-            : typeof window !== "undefined"
-              ? `${window.location.origin}/party/join?code=${partyRoom?.code || ""}`
-              : ""
-        }
-      />
-
-      {/* Buffering / seeking indicator (not during normal playback) */}
-      {isBuffering && embedState === "ready" && (
-        <div className="video-buffering" aria-hidden="true">
-          <div className="video-spinner" role="status" aria-label="Buffering" />
-        </div>
-      )}
-
-      {/* Real caption overlay synced to playback clock */}
-      <CaptionOverlay
-        cue={activeCaption}
-        visible={showCaptions && embedState === "ready"}
-        source={captionSource}
-        size={captionSize}
-        style={captionStyle}
-        position={captionPosition}
-        opacity={captionOpacity}
-      />
-      {showCaptions && captionsLoading && embedState === "ready" && (
-        <div className="video-caption" role="status">
-          <span className="video-caption-demo">Loading subtitles…</span>
-        </div>
-      )}
-
-      {/* Stats for nerds */}
-      {showStats && embedState === "ready" && (
-        <div className="video-stats" role="status" aria-label="Player stats">
-          <p className="video-stats-title">Stats for nerds</p>
-          <div className="video-stats-row"><span>Time</span><span>{formatTime(currentTime)}</span></div>
-          <div className="video-stats-row"><span>Duration</span><span>{formatTime(effectiveDuration)}{liveDuration ? " (live)" : " (est)"}</span></div>
-          <div className="video-stats-row"><span>Server</span><span>{currentSource.name}</span></div>
-          <div className="video-stats-row"><span>Provider</span><span>{providerName}</span></div>
-          <div className="video-stats-row"><span>Sync</span><span>{isLiveSynced ? "Live (postMessage)" : "Estimated clock"}</span></div>
-          <div className="video-stats-row"><span>Captions</span><span>{showCaptions ? `${getCaptionLanguageLabel(captionLang)} · ${captionSize} · ${captionPosition}` : "Off"}</span></div>
-          <div className="video-stats-row"><span>Quality</span><span>{quality}</span></div>
-          <div className="video-stats-row"><span>Speed</span><span>{playbackRate}x</span></div>
-          <div className="video-stats-row"><span>Network</span><span>{bufferingDiag.networkType} ({bufferingDiag.bandwidth} Mbps)</span></div>
-          <div className="video-stats-row"><span>Health</span><span>{bufferingDiag.health}</span></div>
-          <div className="video-stats-row"><span>Frame drops</span><span>{bufferingDiag.frameDrops}</span></div>
-          <div className="video-stats-row"><span>Buffered</span><span>{formatTime(buffered)}</span></div>
-        </div>
-      )}
-
-      {/* Up Next (autoplay next) */}
-      {nearEnd && (
-        <div className="video-autonext" role="dialog" aria-label="Up next">
-          <div className="video-autonext-head">
-            <span className="video-autonext-title">Up Next</span>
-            <span className="video-autonext-count">{upNextCount}s</span>
-          </div>
-          <p className="video-autonext-sub">
-            {mediaType === "tv" && season && episode && episodeCount && episode < episodeCount
-              ? `Season ${season}, Episode ${episode + 1} starts automatically.`
-              : mediaType === "tv"
-                ? "End of season — closing player."
-                : "Trying the next available server."}
-          </p>
-          <div className="video-autonext-actions">
-            <button
-              type="button"
-              className="video-autonext-btn focus-ring press-effect"
-              onClick={() => setUpNextDismissed(true)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="video-autonext-btn is-primary focus-ring press-effect"
-              onClick={() => {
-                setUpNextDismissed(true);
-                playUpNext();
-              }}
-            >
-              Play now
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
