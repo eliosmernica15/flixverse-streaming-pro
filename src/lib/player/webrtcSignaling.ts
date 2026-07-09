@@ -3,12 +3,8 @@ import {
   doc,
   addDoc,
   onSnapshot,
-  setDoc,
-  updateDoc,
-  deleteDoc,
   query,
   where,
-  getDocs,
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 
@@ -25,64 +21,81 @@ export class WebRTCSignaling {
   private peerConnection: RTCPeerConnection;
   private unsubscribe: (() => void) | null = null;
   private dataChannel: RTCDataChannel | null = null;
+  private onMessage: (msg: unknown) => void;
+  private isHost: boolean;
 
   constructor(
     roomId: string,
     userId: string,
     peerConnection: RTCPeerConnection,
-    onMessage: (msg: any) => void
+    onMessage: (msg: unknown) => void,
+    isHost = false
   ) {
     this.roomId = roomId;
     this.userId = userId;
     this.peerConnection = peerConnection;
+    this.onMessage = onMessage;
+    this.isHost = isHost;
 
     this.peerConnection.ondatachannel = (event) => {
-      this.dataChannel = event.channel;
-      this.dataChannel.onmessage = (e) => onMessage(JSON.parse(e.data));
+      this.attachDataChannel(event.channel);
     };
   }
 
-  async createRoom() {
-    const db = requireFirebaseDb();
-    const roomRef = doc(db, "flixparty_rooms", this.roomId);
-    await setDoc(roomRef, { hostId: this.userId, createdAt: Date.now() });
-
-    this.dataChannel = this.peerConnection.createDataChannel("sync");
-    // We would attach onmessage here, but we pass it via callback to the hook
+  private attachDataChannel(channel: RTCDataChannel) {
+    this.dataChannel = channel;
+    channel.onmessage = (e) => {
+      try {
+        this.onMessage(JSON.parse(e.data as string));
+      } catch {
+        // ignore malformed messages
+      }
+    };
   }
 
-  async joinRoom() {
-    // Basic join logic - real implementation would handle multi-peer
+  async initAsHost() {
+    this.dataChannel = this.peerConnection.createDataChannel("sync");
+    this.attachDataChannel(this.dataChannel);
+
+    const offer = await this.peerConnection.createOffer();
+    await this.peerConnection.setLocalDescription(offer);
+    await this.sendSignal("offer", offer);
   }
 
   listenForSignals() {
     const db = requireFirebaseDb();
-    const signalsRef = collection(db, "flixparty_rooms", this.roomId, "signals");
-    
-    this.unsubscribe = onSnapshot(query(signalsRef, where("senderId", "!=", this.userId)), (snapshot) => {
-      snapshot.docChanges().forEach(async (change) => {
-        if (change.type === "added") {
+    const signalsRef = collection(db, "flix_parties", this.roomId, "signals");
+
+    this.unsubscribe = onSnapshot(
+      query(signalsRef, where("senderId", "!=", this.userId)),
+      (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type !== "added") return;
           const data = change.doc.data() as SignalMessage;
           const payload = JSON.parse(data.payload);
 
-          if (data.type === "offer") {
-            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(payload));
-            const answer = await this.peerConnection.createAnswer();
-            await this.peerConnection.setLocalDescription(answer);
-            await this.sendSignal("answer", answer);
-          } else if (data.type === "answer") {
-            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(payload));
-          } else if (data.type === "candidate") {
-            await this.peerConnection.addIceCandidate(new RTCIceCandidate(payload));
+          try {
+            if (data.type === "offer" && !this.isHost) {
+              await this.peerConnection.setRemoteDescription(new RTCSessionDescription(payload));
+              const answer = await this.peerConnection.createAnswer();
+              await this.peerConnection.setLocalDescription(answer);
+              await this.sendSignal("answer", answer);
+            } else if (data.type === "answer" && this.isHost) {
+              await this.peerConnection.setRemoteDescription(new RTCSessionDescription(payload));
+            } else if (data.type === "candidate") {
+              await this.peerConnection.addIceCandidate(new RTCIceCandidate(payload));
+            }
+          } catch (err) {
+            console.warn("WebRTC signal handling failed:", err);
           }
-        }
-      });
-    });
+        });
+      }
+    );
   }
 
-  async sendSignal(type: "offer" | "answer" | "candidate", payload: any) {
+  async sendSignal(type: "offer" | "answer" | "candidate", payload: unknown) {
     const db = requireFirebaseDb();
-    const signalsRef = collection(db, "flixparty_rooms", this.roomId, "signals");
+    const signalsRef = collection(db, "flix_parties", this.roomId, "signals");
     await addDoc(signalsRef, {
       senderId: this.userId,
       type,
@@ -91,14 +104,15 @@ export class WebRTCSignaling {
     });
   }
 
-  sendMessage(message: any) {
-    if (this.dataChannel && this.dataChannel.readyState === "open") {
+  sendMessage(message: unknown) {
+    if (this.dataChannel?.readyState === "open") {
       this.dataChannel.send(JSON.stringify(message));
     }
   }
 
   destroy() {
     if (this.unsubscribe) this.unsubscribe();
+    this.dataChannel?.close();
     this.peerConnection.close();
   }
 }

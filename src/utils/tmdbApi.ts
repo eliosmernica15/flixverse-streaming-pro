@@ -1,7 +1,9 @@
 import { getEnv } from './env';
 
 const TMDB_API_KEY = getEnv('NEXT_PUBLIC_TMDB_API_KEY');
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+/** Client uses the server proxy; SSR/build calls TMDB directly with server env keys. */
+const TMDB_BASE_URL =
+  typeof window !== "undefined" ? "/api/tmdb" : "https://api.themoviedb.org/3";
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces';
 
@@ -16,12 +18,14 @@ const TMDB_POSTER_SIZES = {
   original: `${TMDB_IMAGE_BASE}/original`
 };
 
-const options = {
-  method: 'GET',
+const options: RequestInit = {
+  method: "GET",
   headers: {
-    accept: 'application/json',
-    Authorization: `Bearer ${getEnv('NEXT_PUBLIC_TMDB_ACCESS_TOKEN')}`
-  }
+    accept: "application/json",
+    ...(typeof window === "undefined" && getEnv("NEXT_PUBLIC_TMDB_ACCESS_TOKEN")
+      ? { Authorization: `Bearer ${getEnv("NEXT_PUBLIC_TMDB_ACCESS_TOKEN")}` }
+      : {}),
+  },
 };
 
 export interface TMDBMovie {

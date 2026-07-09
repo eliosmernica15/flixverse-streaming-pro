@@ -1,11 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { buildStreamingSources } from "@/lib/streamingSources";
+import { buildStreamingSources, wrapEmbedUrl } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
 import { useTimelineComments } from "@/hooks/player/useTimelineComments";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
+import { useFlixParty } from "@/hooks/player/useFlixParty";
+import { useWebRTCSync, type SyncMessage } from "@/hooks/player/useWebRTCSync";
+import { useCaptions } from "@/hooks/player/useCaptions";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
+import { PaywallGate } from "@/components/PaywallGate";
+import { CaptionOverlay } from "./CaptionOverlay";
+import { computeResync, sendSoftSeek, injectSeekParam } from "@/lib/player/embedSeekUrls";
+import {
+  encryptPayload,
+  generateRoomKey,
+  buildPartyJoinUrl,
+} from "@/lib/player/roomEncryption";
+import type { SyncStatus } from "./SyncStatusBadge";
 import { EmbedFrame } from "./EmbedFrame";
 import { PlayerChrome } from "./PlayerChrome";
 import { AmbientGlowFrame } from "./AmbientGlowFrame";
@@ -139,7 +152,11 @@ export function PlayerShell({
   // FlixParty state
   const [showPartySidebar, setShowPartySidebar] = useState(false);
   const [partyRoomId, setPartyRoomId] = useState<string | null>(null);
+  const [partyRoomKey, setPartyRoomKey] = useState<string | null>(null);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [partySyncStatus, setPartySyncStatus] = useState<SyncStatus>("disconnected");
+  const [partyDriftMs, setPartyDriftMs] = useState(0);
+  const [captionLang, setCaptionLang] = useState("en");
 
   // Timeline comments state
   const [showTimelineControls, setShowTimelineControls] = useState(false);
@@ -147,6 +164,15 @@ export function PlayerShell({
   const [commentTimestamp, setCommentTimestamp] = useState(0);
 
   const { user } = useAuth();
+  const { hasStandard } = useSubscription();
+  const {
+    room: partyRoom,
+    isHost: isPartyHost,
+    createRoom: createPartyRoom,
+    joinRoom: joinPartyRoom,
+    leaveRoom: leavePartyRoom,
+    updatePlaybackState,
+  } = useFlixParty({ roomId: partyRoomId });
 
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -218,6 +244,136 @@ export function PlayerShell({
     () => getCommentsNear(currentTime, 5),
     [getCommentsNear, currentTime]
   );
+
+  const { getCueAt, source: captionSource, loading: captionsLoading } = useCaptions({
+    tmdbId: movieId,
+    mediaType,
+    season,
+    episode,
+    duration: effectiveDuration,
+    enabled: showCaptions,
+    lang: captionLang,
+  });
+  const activeCaption = getCueAt(currentTime);
+
+  const handlePartyPlaybackSync = useCallback(
+    (msg: SyncMessage) => {
+      if (isPartyHost) return;
+      if (msg.type === "play") setPlaying(true);
+      if (msg.type === "pause") setPlaying(false);
+      if (msg.type === "seek" && typeof msg.data.currentTime === "number") {
+        seekTo(msg.data.currentTime);
+      }
+      if (msg.type === "heartbeat" && typeof msg.data.currentTime === "number") {
+        const drift = Math.abs(currentTime - msg.data.currentTime);
+        if (drift > 3) seekTo(msg.data.currentTime);
+      }
+    },
+    [isPartyHost, setPlaying, seekTo, currentTime]
+  );
+
+  const { isConnected: rtcConnected, sendMessage: sendRtcMessage } = useWebRTCSync({
+    roomId: partyRoomId,
+    isHost: !!isPartyHost,
+    onPlaybackSync: handlePartyPlaybackSync,
+  });
+
+  // Guest sync via Firestore room state (fallback when WebRTC is not connected)
+  const lastPartyResyncRef = useRef(0);
+  useEffect(() => {
+    if (!partyRoom || isPartyHost || !partyRoomId) return;
+
+    const driftSec = Math.abs(currentTime - partyRoom.lastKnownTime);
+    setPartyDriftMs(driftSec * 1000);
+
+    if (partyRoom.playbackState === "playing" && !isPlaying) setPlaying(true);
+    if (partyRoom.playbackState === "paused" && isPlaying) setPlaying(false);
+
+    if (driftSec < 3) {
+      setPartySyncStatus(rtcConnected ? "connected" : "connecting");
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastPartyResyncRef.current < 4000) return;
+    lastPartyResyncRef.current = now;
+
+    const action = computeResync(
+      partyRoom.lastKnownTime,
+      currentTime,
+      currentSource.providerUrl,
+      currentSource.id
+    );
+
+    if (action.kind === "soft") {
+      setPartySyncStatus("drift");
+      sendSoftSeek(iframeRef.current, action.deltaSeconds);
+      seekRelative(action.deltaSeconds);
+    } else if (action.kind === "hard" && iframeRef.current) {
+      setPartySyncStatus("drift");
+      iframeRef.current.src = wrapEmbedUrl(injectSeekParam(currentSource.providerUrl, partyRoom.lastKnownTime));
+    }
+  }, [
+    partyRoom?.lastKnownTime,
+    partyRoom?.playbackState,
+    isPartyHost,
+    partyRoomId,
+    isPlaying,
+    currentSource,
+    rtcConnected,
+    setPlaying,
+    seekRelative,
+    currentTime,
+  ]);
+
+  useEffect(() => {
+    if (!partyRoomId) {
+      setPartySyncStatus("disconnected");
+      return;
+    }
+    if (rtcConnected) setPartySyncStatus("connected");
+    else if (partyRoom) setPartySyncStatus("connecting");
+  }, [partyRoomId, rtcConnected, partyRoom]);
+
+  // Auto-join party from URL ?party=ROOM_ID
+  useEffect(() => {
+    if (partyRoomId || !user) return;
+    const params = new URLSearchParams(window.location.search);
+    const joinId = params.get("party");
+    if (joinId) setPartyRoomId(joinId);
+  }, [partyRoomId, user]);
+
+  const broadcastPartyState = useCallback(
+    (state: "playing" | "paused", time: number) => {
+      if (!partyRoomId || !isPartyHost) return;
+      void updatePlaybackState(state, time);
+      sendRtcMessage(state === "playing" ? "play" : "pause", { currentTime: time });
+    },
+    [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage]
+  );
+
+  const handleStartParty = useCallback(async () => {
+    if (!user || !hasStandard) {
+      setShowPartySidebar(true);
+      return;
+    }
+    try {
+      const key = generateRoomKey();
+      const encrypted = await encryptPayload(
+        { tmdbId: movieId, mediaType, season, episode, serverIndex: currentServer },
+        key
+      );
+      const id = await createPartyRoom(encrypted);
+      setPartyRoomId(id);
+      setPartyRoomKey(key);
+      setShowInviteDialog(true);
+      setShowPartySidebar(true);
+      playUiSound("success");
+    } catch (err) {
+      console.error("Failed to create party:", err);
+      playUiSound("error");
+    }
+  }, [user, hasStandard, movieId, mediaType, season, episode, currentServer, createPartyRoom]);
 
   const buffered = Math.min(effectiveDuration, currentTime + effectiveDuration * 0.12 + 15);
 
@@ -309,10 +465,12 @@ export function PlayerShell({
   const togglePlayPause = useCallback(() => {
     if (embedState !== "ready") return;
     togglePlay();
+    const nextPlaying = !isPlaying;
     showFlash(isPlaying ? "pause" : "play");
     playUiSound(isPlaying ? "pause" : "play");
+    broadcastPartyState(nextPlaying ? "playing" : "paused", currentTime);
     bumpControls();
-  }, [embedState, togglePlay, isPlaying, showFlash, bumpControls]);
+  }, [embedState, togglePlay, isPlaying, showFlash, bumpControls, broadcastPartyState, currentTime]);
 
   const handleToggleMute = useCallback(() => {
     if (embedState !== "ready") return;
@@ -344,8 +502,9 @@ export function PlayerShell({
     seekTo(seconds);
     playUiSound("seek");
     triggerBuffering();
+    if (isPartyHost) sendRtcMessage("seek", { currentTime: seconds });
     bumpControls();
-  }, [embedState, seek, seekTo, triggerBuffering, bumpControls]);
+  }, [embedState, seek, seekTo, triggerBuffering, bumpControls, isPartyHost, sendRtcMessage]);
 
   const handleSeekToPercent = useCallback((percent: number) => {
     if (embedState !== "ready" || effectiveDuration <= 0) return;
@@ -717,6 +876,10 @@ export function PlayerShell({
             nearbyComments={nearbyComments}
             onSeek={handleScrub}
             onAddComment={(t) => {
+              if (!hasStandard) {
+                setShowPartySidebar(true);
+                return;
+              }
               setCommentTimestamp(t);
               setShowCommentDialog(true);
             }}
@@ -1031,27 +1194,44 @@ export function PlayerShell({
         />
       )}
 
-      <FlixPartySidebar
-        isOpen={showPartySidebar}
-        onClose={() => setShowPartySidebar(false)}
-        roomId={partyRoomId}
-        syncStatus="connected"
-        onLeaveRoom={() => {
-          setPartyRoomId(null);
-          setShowPartySidebar(false);
-        }}
-      />
+      <PaywallGate feature="FlixParty" locked={!hasStandard}>
+        <FlixPartySidebar
+          isOpen={showPartySidebar}
+          onClose={() => setShowPartySidebar(false)}
+          roomId={partyRoomId}
+          syncStatus={partySyncStatus}
+          driftMs={partyDriftMs}
+          onLeaveRoom={() => {
+            void leavePartyRoom();
+            setPartyRoomId(null);
+            setPartyRoomKey(null);
+            setShowPartySidebar(false);
+          }}
+          onStartParty={handleStartParty}
+          movieId={movieId}
+          mediaType={mediaType}
+          season={season}
+          episode={episode}
+          title={title}
+          posterPath={posterPath || null}
+          currentTime={currentTime}
+          isPlaying={isPlaying}
+          onSyncToPosition={seekTo}
+        />
+      </PaywallGate>
 
       <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
 
       <FlixPartyInviteDialog
         isOpen={showInviteDialog}
         onClose={() => setShowInviteDialog(false)}
-        roomCode={partyRoomId ? partyRoomId.slice(0, 6).toUpperCase() : ""}
+        roomCode={partyRoom?.code || (partyRoomId ? partyRoomId.slice(0, 6).toUpperCase() : "")}
         roomUrl={
-          typeof window !== "undefined"
-            ? `${window.location.origin}/party/join?code=${partyRoomId?.slice(0, 6).toUpperCase() || ""}`
-            : ""
+          partyRoomId && partyRoomKey
+            ? buildPartyJoinUrl(partyRoomId, partyRoomKey)
+            : typeof window !== "undefined"
+              ? `${window.location.origin}/party/join?code=${partyRoom?.code || ""}`
+              : ""
         }
       />
 
@@ -1062,11 +1242,11 @@ export function PlayerShell({
         </div>
       )}
 
-      {/* Captions UI (UI-only demo placeholder) */}
-      {showCaptions && embedState === "ready" && (
-        <div className="video-caption" role="status" aria-live="polite">
-          <span className="video-caption-demo">Demo captions</span>
-          {title} — {formatTime(currentTime)}
+      {/* Real caption overlay synced to playback clock */}
+      <CaptionOverlay cue={activeCaption} visible={showCaptions && embedState === "ready"} source={captionSource} />
+      {showCaptions && captionsLoading && embedState === "ready" && (
+        <div className="video-caption" role="status">
+          <span className="video-caption-demo">Loading subtitles…</span>
         </div>
       )}
 

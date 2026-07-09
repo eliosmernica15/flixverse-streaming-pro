@@ -1,6 +1,8 @@
 import { Metadata } from "next";
+import { Suspense } from "react";
 import { SectionHeader } from "@/components/SectionHeader";
 import PlansPricing from "@/components/PlansPricing";
+import { PlansCheckoutSuccess } from "@/components/PlansCheckoutSuccess";
 
 export const metadata: Metadata = {
   title: "Plans — FlixVerse",
@@ -16,6 +18,9 @@ export default function PlansPage() {
           Start for free, upgrade when you want more. All plans include unlimited browsing.
         </p>
         <PlansPricing />
+        <Suspense fallback={null}>
+          <PlansCheckoutSuccess />
+        </Suspense>
       </div>
     </div>
   );

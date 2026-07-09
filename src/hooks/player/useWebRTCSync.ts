@@ -6,38 +6,59 @@ import { NTPClient } from "@/lib/player/ntpClockSync";
 export interface SyncMessage {
   type: "play" | "pause" | "seek" | "heartbeat" | "chat";
   timestamp: number;
-  data: any;
+  data: {
+    currentTime?: number;
+    text?: string;
+    [key: string]: unknown;
+  };
 }
 
-export function useWebRTCSync(roomId: string | null) {
+interface UseWebRTCSyncOptions {
+  roomId: string | null;
+  isHost?: boolean;
+  onPlaybackSync?: (msg: SyncMessage) => void;
+}
+
+export function useWebRTCSync({
+  roomId,
+  isHost = false,
+  onPlaybackSync,
+}: UseWebRTCSyncOptions) {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
   const signalingRef = useRef<WebRTCSignaling | null>(null);
+  const onPlaybackSyncRef = useRef(onPlaybackSync);
+  onPlaybackSyncRef.current = onPlaybackSync;
 
   useEffect(() => {
-    NTPClient.calibrate();
+    void NTPClient.calibrate();
   }, []);
 
   useEffect(() => {
-    if (!roomId || !user) return;
+    if (!roomId || !user) {
+      setIsConnected(false);
+      return;
+    }
 
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
 
-    const sig = new WebRTCSignaling(roomId, user.uid, pc, (msg: SyncMessage) => {
+    const sig = new WebRTCSignaling(roomId, user.uid, pc, (raw) => {
+      const msg = raw as SyncMessage;
       if (msg.type === "chat") {
         setMessages((prev) => [...prev, msg]);
-      } else {
-        // Handle playback sync
-        console.log("Received sync event", msg);
+        return;
       }
-    });
+      if (["play", "pause", "seek", "heartbeat"].includes(msg.type)) {
+        onPlaybackSyncRef.current?.(msg);
+      }
+    }, isHost);
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        sig.sendSignal("candidate", event.candidate.toJSON());
+        void sig.sendSignal("candidate", event.candidate.toJSON());
       }
     };
 
@@ -46,14 +67,20 @@ export function useWebRTCSync(roomId: string | null) {
     };
 
     sig.listenForSignals();
+    if (isHost) {
+      void sig.initAsHost();
+    }
+
     signalingRef.current = sig;
 
     return () => {
       sig.destroy();
+      signalingRef.current = null;
+      setIsConnected(false);
     };
-  }, [roomId, user]);
+  }, [roomId, user, isHost]);
 
-  const sendMessage = useCallback((type: SyncMessage["type"], data: any) => {
+  const sendMessage = useCallback((type: SyncMessage["type"], data: SyncMessage["data"]) => {
     if (!signalingRef.current) return;
     const msg: SyncMessage = {
       type,

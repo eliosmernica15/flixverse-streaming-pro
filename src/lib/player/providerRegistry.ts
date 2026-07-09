@@ -260,7 +260,8 @@ export const PROVIDERS: ProviderConfig[] = [
 
 export function detectProvider(src: string): ProviderConfig {
   try {
-    const url = new URL(src);
+    const resolved = resolveEmbedSrc(src);
+    const url = new URL(resolved);
     const host = url.hostname.toLowerCase();
     const matched = PROVIDERS.find(
       (p) => p.id !== "generic" && p.origins.some((o) => host === o || host.endsWith(`.${o}`))
@@ -269,6 +270,18 @@ export function detectProvider(src: string): ProviderConfig {
   } catch {
     return PROVIDERS.find((p) => p.id === "generic")!;
   }
+}
+
+/** Extract the real provider URL when loaded through /api/embed proxy. */
+export function resolveEmbedSrc(iframeSrc: string): string {
+  try {
+    const url = new URL(iframeSrc, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    const embedded = url.searchParams.get("src");
+    if (embedded) return decodeURIComponent(embedded);
+  } catch {
+    // ignore
+  }
+  return iframeSrc;
 }
 
 export function isKnownProvider(src: string): boolean {

@@ -19,7 +19,7 @@ import {
   sendEmbedVolumeStep,
   EmbedAction,
 } from "@/lib/player/embedControls";
-import { detectProvider, ProviderConfig } from "@/lib/player/providerRegistry";
+import { detectProvider, resolveEmbedSrc, ProviderConfig } from "@/lib/player/providerRegistry";
 
 export type PlayerState = {
   isPlaying: boolean;
@@ -170,8 +170,8 @@ export function useEmbedBridge({
       const iframe = iframeRef.current;
       if (!iframe) return;
 
-      // Provider detection can change when the iframe src changes; re-detect each message.
-      const provider = detectProvider(iframe.src || "");
+      const providerSrc = resolveEmbedSrc(iframe.src || "");
+      const provider = detectProvider(providerSrc);
       providerRef.current = provider;
       if (provider.id !== stateRef.current.provider) {
         setState((prev) => ({
@@ -194,7 +194,11 @@ export function useEmbedBridge({
       }
       const fromIframeWindow = event.source === iframe.contentWindow;
       const fromProviderOrigin = hostMatchesProvider(originHost, provider);
-      if (!fromIframeWindow && !fromProviderOrigin) return;
+      const fromProxyWrapper =
+        typeof window !== "undefined" &&
+        iframe.src.includes("/api/embed") &&
+        event.origin === window.location.origin;
+      if (!fromIframeWindow && !fromProviderOrigin && !fromProxyWrapper) return;
 
       const data = parseMessageData(event);
 

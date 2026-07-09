@@ -2,19 +2,25 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, Crown, Zap, ArrowRight, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, Crown, Zap, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/Reveal";
+import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useToast } from "@/hooks/use-toast";
+
+type PlanId = "free" | "standard" | "premium";
 
 type Plan = {
+  id: PlanId;
   name: string;
   subtitle: string;
   icon: typeof Zap;
   accent: string;
   features: string[];
   cta: string;
-  href: string;
   popular: boolean;
   monthly: number;
   yearly: number;
@@ -22,6 +28,7 @@ type Plan = {
 
 const PLANS: Plan[] = [
   {
+    id: "free",
     name: "Free",
     subtitle: "For casual viewers",
     icon: Zap,
@@ -34,12 +41,12 @@ const PLANS: Plan[] = [
       "Standard video quality",
     ],
     cta: "Get Started",
-    href: "/auth",
     popular: false,
     monthly: 0,
     yearly: 0,
   },
   {
+    id: "standard",
     name: "Standard",
     subtitle: "For everyday streaming",
     icon: Sparkles,
@@ -54,12 +61,12 @@ const PLANS: Plan[] = [
       "Priority support",
     ],
     cta: "Start Free Trial",
-    href: "/auth",
     popular: true,
     monthly: 9.99,
     yearly: 99.99,
   },
   {
+    id: "premium",
     name: "Premium",
     subtitle: "The ultimate experience",
     icon: Crown,
@@ -75,7 +82,6 @@ const PLANS: Plan[] = [
       "Priority support",
     ],
     cta: "Start Free Trial",
-    href: "/auth",
     popular: false,
     monthly: 15.99,
     yearly: 159.99,
@@ -84,6 +90,69 @@ const PLANS: Plan[] = [
 
 export function PlansPricing() {
   const [yearly, setYearly] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
+  const { user } = useAuth();
+  const { subscription, hasStandard, hasPremium } = useSubscription();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const handleCheckout = async (plan: Plan) => {
+    if (plan.id === "free") {
+      router.push(user ? "/" : "/auth");
+      return;
+    }
+
+    if (!user) {
+      router.push("/auth?redirect=/plans");
+      return;
+    }
+
+    setLoadingPlan(plan.id);
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: plan.id,
+          billingPeriod: yearly ? "yearly" : "monthly",
+          userId: user.uid,
+          email: user.email,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: "Checkout unavailable",
+          description: data.error || "Stripe is not configured yet.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (data.url) window.location.href = data.url;
+    } catch {
+      toast({ title: "Checkout failed", variant: "destructive" });
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
+  const handleManage = async () => {
+    if (!subscription.stripeCustomerId) return;
+    const res = await fetch("/api/billing/portal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customerId: subscription.stripeCustomerId }),
+    });
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+  };
+
+  const isCurrentPlan = (plan: Plan) => {
+    if (plan.id === "free" && subscription.plan === "free") return true;
+    if (plan.id === "standard" && hasStandard && !hasPremium) return true;
+    if (plan.id === "premium" && hasPremium) return true;
+    return false;
+  };
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -115,6 +184,15 @@ export function PlansPricing() {
             </span>
           </button>
         </div>
+        {subscription.stripeCustomerId && (
+          <button
+            type="button"
+            onClick={handleManage}
+            className="text-xs text-gray-400 hover:text-white underline"
+          >
+            Manage billing
+          </button>
+        )}
       </div>
 
       <Reveal className="stagger grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
@@ -122,6 +200,7 @@ export function PlansPricing() {
           const Icon = plan.icon;
           const price = plan.monthly === 0 ? "$0" : yearly ? `$${plan.yearly}` : `$${plan.monthly}`;
           const period = plan.monthly === 0 ? "forever" : yearly ? "/year" : "/month";
+          const current = isCurrentPlan(plan);
           return (
             <div key={plan.name} className={`relative rounded-2xl p-[1px] ${plan.popular ? "gradient-border" : ""}`}>
               <div
@@ -134,6 +213,11 @@ export function PlansPricing() {
                     <Badge variant="gradient" className="shadow-lg">
                       Most Popular
                     </Badge>
+                  </div>
+                )}
+                {current && (
+                  <div className="absolute -top-3 right-4">
+                    <Badge className="bg-green-600/90">Current plan</Badge>
                   </div>
                 )}
 
@@ -162,12 +246,32 @@ export function PlansPricing() {
                   ))}
                 </ul>
 
-                <Button asChild variant="gradient" className="w-full min-h-[44px]">
-                  <Link href={plan.href}>
-                    {plan.cta}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
+                {plan.id === "free" ? (
+                  <Button asChild variant="gradient" className="w-full min-h-[44px]">
+                    <Link href={user ? "/" : "/auth"}>
+                      {plan.cta}
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="gradient"
+                    className="w-full min-h-[44px]"
+                    disabled={current || loadingPlan === plan.id}
+                    onClick={() => handleCheckout(plan)}
+                  >
+                    {loadingPlan === plan.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : current ? (
+                      "Current Plan"
+                    ) : (
+                      <>
+                        {plan.cta}
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           );

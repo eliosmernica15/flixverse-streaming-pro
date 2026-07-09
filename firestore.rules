@@ -157,10 +157,12 @@ service cloud.firestore {
     match /flix_parties/{roomId} {
       // Anyone in the room can read
       allow read: if isAuthenticated()
-        && request.auth.uid in request.resource.data.participants[*].userId;
-      // Only the host can update room state
-      allow update: if isAuthenticated()
-        && request.auth.uid == resource.data.hostId;
+        && request.auth.uid in resource.data.participants[*].userId;
+      // Host controls playback; participants can join/leave/update presence
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.hostId
+        || request.auth.uid in resource.data.participants[*].userId
+      );
       // Any authenticated user can create a room
       allow create: if isAuthenticated()
         && request.auth.uid == request.resource.data.hostId
@@ -252,6 +254,13 @@ service cloud.firestore {
         && (request.auth.uid == resource.data.fromUserId
             || request.auth.uid == resource.data.toUserId);
       allow update: if false; // requests are deleted, not updated
+    }
+
+    // ── Subscriptions (Stripe billing) ─────────────────────────
+    match /subscriptions/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
     }
 
     // ── Watch Parties ─────────────────────────────────────────

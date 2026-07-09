@@ -45,6 +45,8 @@ interface WatchPartyProps {
   currentTime: number;
   isPlaying: boolean;
   onSyncToPosition: (position: number) => void;
+  onStartParty?: () => void;
+  externalRoomId?: string | null;
 }
 
 export function WatchParty({
@@ -57,6 +59,8 @@ export function WatchParty({
   currentTime,
   isPlaying,
   onSyncToPosition,
+  onStartParty,
+  externalRoomId,
 }: WatchPartyProps) {
   const { user } = useAuth();
   const { friends } = useFriends();
@@ -202,11 +206,11 @@ export function WatchParty({
   return (
     <div className="space-y-4">
       {/* No active room — show create/invite */}
-      {!activeRoom && (
+      {!activeRoom && !externalRoomId && (
         <div>
           <button
-            onClick={createRoom}
-            disabled={creating}
+            onClick={onStartParty || createRoom}
+            disabled={creating && !onStartParty}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-sm font-bold text-white transition-all disabled:opacity-50"
           >
             {creating ? (
@@ -223,7 +227,7 @@ export function WatchParty({
       )}
 
       {/* Active room — show party info + invite */}
-      {activeRoom && (
+      {(activeRoom || externalRoomId) && (
         <div className="space-y-3">
           {/* Room status */}
           <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
@@ -232,7 +236,7 @@ export function WatchParty({
               <span className="text-xs font-medium text-purple-300">Party active</span>
             </div>
             <span className="text-[10px] text-gray-500">
-              {activeRoom.participants.length} watching
+              {activeRoom?.participants.length ?? 1} watching
             </span>
           </div>
 
@@ -298,7 +302,7 @@ export function WatchParty({
           </div>
 
           {/* End party (host only) */}
-          {activeRoom.hostId === user?.uid && (
+          {activeRoom?.hostId === user?.uid && (
             <button
               onClick={endParty}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 hover:bg-red-500/20 transition-colors"
@@ -309,7 +313,7 @@ export function WatchParty({
           )}
 
           {/* Leave party (non-host) */}
-          {activeRoom.hostId !== user?.uid && (
+          {activeRoom && activeRoom.hostId !== user?.uid && (
             <button
               onClick={leaveParty}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-500 hover:text-white transition-colors"

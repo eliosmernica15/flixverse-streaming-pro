@@ -21,21 +21,30 @@ export async function GET(
     tmdbParams.set(key, value);
   }
 
-  // Inject the API key
+  // Inject API key or Bearer token
   const apiKey = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!apiKey) {
+  const accessToken = process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN;
+
+  const headers: Record<string, string> = { Accept: "application/json" };
+  let tmdbUrl: string;
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+    tmdbUrl = `${TMDB_BASE}/${tmdbPath}?${tmdbParams.toString()}`;
+  } else if (apiKey) {
+    tmdbParams.set("api_key", apiKey);
+    tmdbUrl = `${TMDB_BASE}/${tmdbPath}?${tmdbParams.toString()}`;
+  } else {
     return NextResponse.json(
-      { error: "TMDB API key not configured" },
+      { error: "TMDB API key or access token not configured" },
       { status: 500 }
     );
   }
-  tmdbParams.set("api_key", apiKey);
-
-  const tmdbUrl = `${TMDB_BASE}/${tmdbPath}?${tmdbParams.toString()}`;
 
   try {
     const res = await fetch(tmdbUrl, {
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      headers,
+      next: { revalidate: 3600 },
     });
 
     if (!res.ok) {

@@ -9,7 +9,7 @@
  *  5. Send generic postMessage fallbacks.
  */
 
-import { detectProvider, EmbedProvider, ProviderConfig } from "./providerRegistry";
+import { detectProvider, resolveEmbedSrc, ProviderConfig } from "./providerRegistry";
 
 export type EmbedAction =
   | "play"
@@ -363,7 +363,7 @@ function getProviderFromIframe(iframe: HTMLIFrameElement | null): ProviderConfig
   if (!iframe?.src) {
     return { id: "generic", name: "Generic", origins: [], keyboardShortcuts: { playToggle: " ", muteToggle: "m", volumeUp: "ArrowUp", volumeDown: "ArrowDown", seekBack: "ArrowLeft", seekForward: "ArrowRight" }, commands: {}, events: {}, supportsPostMessage: false };
   }
-  return detectProvider(iframe.src);
+  return detectProvider(resolveEmbedSrc(iframe.src));
 }
 
 /** Send an action to the embedded provider player. */
@@ -439,4 +439,4 @@ export function isPlayerShortcutKey(key: string) {
 }
 
 export { detectProvider };
-export type { EmbedProvider };
+export type { EmbedProvider } from "./providerRegistry";

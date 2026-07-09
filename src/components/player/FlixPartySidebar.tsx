@@ -17,6 +17,7 @@ interface FlixPartySidebarProps {
   syncStatus: SyncStatus;
   driftMs?: number;
   onLeaveRoom: () => void;
+  onStartParty?: () => void;
   /** Current playback context for WatchParty */
   movieId?: number;
   mediaType?: "movie" | "tv";
@@ -38,6 +39,7 @@ export function FlixPartySidebar({
   syncStatus,
   driftMs,
   onLeaveRoom,
+  onStartParty,
   movieId,
   mediaType,
   season,
@@ -120,6 +122,9 @@ export function FlixPartySidebar({
                 <span className="text-red-400 ml-1">· {incomingRequests.length} request{incomingRequests.length !== 1 ? "s" : ""}</span>
               )}
             </p>
+            {roomId && (
+              <SyncStatusBadge status={syncStatus} driftMs={driftMs} className="mt-1" />
+            )}
           </div>
         </div>
         <button
@@ -257,6 +262,8 @@ export function FlixPartySidebar({
                 currentTime={currentTime || 0}
                 isPlaying={isPlaying || false}
                 onSyncToPosition={onSyncToPosition || (() => {})}
+                onStartParty={onStartParty}
+                externalRoomId={roomId}
               />
             )}
           </div>
