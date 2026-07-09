@@ -17,6 +17,7 @@ import {
   sendEmbedVolume,
   sendEmbedSeek,
   sendEmbedVolumeStep,
+  sendEmbedPlaybackRate,
   EmbedAction,
 } from "@/lib/player/embedControls";
 import { detectProvider, resolveEmbedSrc, ProviderConfig } from "@/lib/player/providerRegistry";
@@ -32,6 +33,7 @@ export type PlayerState = {
   providerName: string;
   /** True once real playback events have been received from the embed. */
   isLiveSynced: boolean;
+  playbackRate: number;
 };
 
 interface UseEmbedBridgeProps {
@@ -139,6 +141,7 @@ export function useEmbedBridge({
     provider: "generic",
     providerName: "Generic",
     isLiveSynced: false,
+    playbackRate: 1,
   });
 
   const stateRef = useRef(state);
@@ -419,6 +422,35 @@ export function useEmbedBridge({
     setState((prev) => (prev.isPlaying === playing ? prev : { ...prev, isPlaying: playing }));
   }, []);
 
+  const setPlaybackRate = useCallback(
+    (rate: number) => {
+      const clamped = Math.max(0.25, Math.min(2, rate));
+      sendEmbedPlaybackRate(iframeRef.current, clamped);
+      setState((prev) => ({ ...prev, playbackRate: clamped }));
+      try {
+        localStorage.setItem("flixverse-playback-rate", String(clamped));
+      } catch {
+        // ignore
+      }
+    },
+    [iframeRef]
+  );
+
+  // Restore persisted playback rate on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("flixverse-playback-rate");
+      if (stored) {
+        const rate = parseFloat(stored);
+        if (!isNaN(rate) && rate >= 0.25 && rate <= 2) {
+          setState((prev) => ({ ...prev, playbackRate: rate }));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   return {
     ...state,
     sendAction,
@@ -432,5 +464,6 @@ export function useEmbedBridge({
     seekRelative,
     setReady,
     setPlaying,
+    setPlaybackRate,
   };
 }

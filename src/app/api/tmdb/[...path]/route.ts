@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
@@ -11,6 +12,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  const limit = await rateLimitByIp(request, "tmdb", 120, "1 m");
+  if (!limit.success) return rateLimitResponse(limit);
+
   const { path } = await params;
   const tmdbPath = path.join("/");
 

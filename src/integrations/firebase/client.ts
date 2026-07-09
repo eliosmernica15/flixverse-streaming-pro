@@ -2,6 +2,12 @@ import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  getToken,
+  type AppCheck,
+} from "firebase/app-check";
 
 import { getEnv } from "@/utils/env";
 
@@ -23,6 +29,7 @@ let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
 let storageInstance: FirebaseStorage | null = null;
+let appCheckInstance: AppCheck | null = null;
 
 function getFirebaseApp(): FirebaseApp | null {
   if (typeof window === "undefined") return null;
@@ -34,7 +41,37 @@ function getFirebaseApp(): FirebaseApp | null {
     app = getApps().length > 0 ? getApps()[0]! : initializeApp(config);
   }
 
+  initAppCheck(app);
+
   return app;
+}
+
+function initAppCheck(firebaseApp: FirebaseApp) {
+  if (appCheckInstance) return;
+  const siteKey = getEnv("NEXT_PUBLIC_FIREBASE_RECAPTCHA_KEY");
+  if (!siteKey) return;
+
+  try {
+    if (process.env.NODE_ENV === "development") {
+      (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
+    appCheckInstance = initializeAppCheck(firebaseApp, {
+      provider: new ReCaptchaEnterpriseProvider(siteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err) {
+    console.warn("[Firebase] App Check init failed:", err);
+  }
+}
+
+export async function getAppCheckToken(): Promise<string | null> {
+  if (!appCheckInstance) return null;
+  try {
+    const result = await getToken(appCheckInstance, false);
+    return result.token;
+  } catch {
+    return null;
+  }
 }
 
 export function getFirebaseAuth(): Auth | null {

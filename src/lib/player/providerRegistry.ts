@@ -28,6 +28,7 @@ export interface ProviderCommands {
   seekBack?: unknown;
   seekTo?: (seconds: number) => unknown;
   setVolume?: (volume: number) => unknown; // 0..1
+  setPlaybackRate?: (rate: number) => unknown;
 }
 
 export interface ProviderEvents {
@@ -77,6 +78,7 @@ const VIDSRC_COMMANDS: ProviderCommands = {
   seekBack: { event: "command", func: "seek", args: [-10] },
   seekTo: (seconds: number) => ({ event: "command", func: "seek", args: [seconds] }),
   setVolume: (volume: number) => ({ event: "command", func: "setVolume", args: [volume] }),
+  setPlaybackRate: (rate: number) => ({ event: "command", func: "setPlaybackRate", args: [rate] }),
 };
 
 // Documented: VidSrc CC emits { type: "PLAYER_EVENT", data: { event, currentTime, duration } }
@@ -124,6 +126,7 @@ export const PROVIDERS: ProviderConfig[] = [
       seekBack: { method: "seek", value: -10 },
       seekTo: (seconds: number) => ({ method: "seek", value: seconds }),
       setVolume: (volume: number) => ({ method: "setVolume", value: volume }),
+      setPlaybackRate: (rate: number) => ({ method: "setPlaybackRate", value: rate }),
     },
     // Documented: VidLink emits { type: "PLAYER_EVENT", data: { event, currentTime, duration } }
     // with events "play" | "pause" | "seeked" | "ended" | "timeupdate",

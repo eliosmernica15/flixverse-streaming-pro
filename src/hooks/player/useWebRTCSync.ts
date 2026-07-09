@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { WebRTCSignaling } from "@/lib/player/webrtcSignaling";
+import { WebRTCPartySync } from "@/lib/player/webrtcPartySync";
 import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
 
@@ -16,18 +16,22 @@ export interface SyncMessage {
 interface UseWebRTCSyncOptions {
   roomId: string | null;
   isHost?: boolean;
+  hostId?: string | null;
+  participantIds?: string[];
   onPlaybackSync?: (msg: SyncMessage) => void;
 }
 
 export function useWebRTCSync({
   roomId,
   isHost = false,
+  hostId = null,
+  participantIds = [],
   onPlaybackSync,
 }: UseWebRTCSyncOptions) {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
-  const signalingRef = useRef<WebRTCSignaling | null>(null);
+  const syncRef = useRef<WebRTCPartySync | null>(null);
   const onPlaybackSyncRef = useRef(onPlaybackSync);
   onPlaybackSyncRef.current = onPlaybackSync;
 
@@ -41,53 +45,52 @@ export function useWebRTCSync({
       return;
     }
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
-
-    const sig = new WebRTCSignaling(roomId, user.uid, pc, (raw) => {
-      const msg = raw as SyncMessage;
-      if (msg.type === "chat") {
-        setMessages((prev) => [...prev, msg]);
-        return;
+    const sync = new WebRTCPartySync(
+      roomId,
+      user.uid,
+      isHost,
+      isHost ? null : hostId,
+      (raw) => {
+        const msg = raw as SyncMessage;
+        if (msg.type === "chat") {
+          setMessages((prev) => [...prev, msg]);
+          return;
+        }
+        if (["play", "pause", "seek", "heartbeat"].includes(msg.type)) {
+          onPlaybackSyncRef.current?.(msg);
+        }
       }
-      if (["play", "pause", "seek", "heartbeat"].includes(msg.type)) {
-        onPlaybackSyncRef.current?.(msg);
-      }
-    }, isHost);
+    );
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        void sig.sendSignal("candidate", event.candidate.toJSON());
-      }
-    };
+    sync.start();
+    syncRef.current = sync;
 
-    pc.onconnectionstatechange = () => {
-      setIsConnected(pc.connectionState === "connected");
-    };
-
-    sig.listenForSignals();
-    if (isHost) {
-      void sig.initAsHost();
-    }
-
-    signalingRef.current = sig;
+    const poll = setInterval(() => {
+      setIsConnected(sync.isConnected);
+    }, 1000);
 
     return () => {
-      sig.destroy();
-      signalingRef.current = null;
+      clearInterval(poll);
+      sync.destroy();
+      syncRef.current = null;
       setIsConnected(false);
     };
-  }, [roomId, user, isHost]);
+  }, [roomId, user, isHost, hostId]);
+
+  // Host: maintain star connections for all guests
+  useEffect(() => {
+    if (!isHost || !syncRef.current) return;
+    syncRef.current.syncParticipants(participantIds);
+  }, [isHost, participantIds.join(",")]);
 
   const sendMessage = useCallback((type: SyncMessage["type"], data: SyncMessage["data"]) => {
-    if (!signalingRef.current) return;
+    if (!syncRef.current) return;
     const msg: SyncMessage = {
       type,
       data,
       timestamp: NTPClient.now(),
     };
-    signalingRef.current.sendMessage(msg);
+    syncRef.current.sendMessage(msg);
   }, []);
 
   return { isConnected, sendMessage, messages };

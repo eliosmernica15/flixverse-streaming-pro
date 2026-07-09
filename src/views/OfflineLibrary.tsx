@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { WifiOff, Download, Film, Info } from "lucide-react";
+import { WifiOff, Download, Film, Trash2, Play } from "lucide-react";
 import { loadOfflineCache, type OfflineCachePayload } from "@/lib/offlineStorage";
+import { listDownloads, removeDownload, formatDownloadSize } from "@/lib/offline/downloadManager";
+import type { OfflineDownloadRecord } from "@/lib/offlineStorage";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getImageUrl } from "@/utils/tmdbApi";
 import PageContainer from "@/components/PageContainer";
@@ -16,23 +18,35 @@ import EmptyState from "@/components/EmptyState";
 const OfflineLibrary = () => {
   const isOnline = useOnlineStatus();
   const [cache, setCache] = useState<OfflineCachePayload | null>(null);
+  const [downloads, setDownloads] = useState<OfflineDownloadRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const refresh = async () => {
+    const [cacheData, downloadData] = await Promise.all([loadOfflineCache(), listDownloads()]);
+    setCache(cacheData);
+    setDownloads(downloadData.filter((d) => d.status !== "error"));
+    setLoading(false);
+  };
+
   useEffect(() => {
-    loadOfflineCache().then((data) => {
-      setCache(data);
-      setLoading(false);
-    });
+    void refresh();
   }, []);
 
   const hasItems =
-    (cache?.watchlist?.length ?? 0) > 0 || (cache?.continueWatching?.length ?? 0) > 0;
+    (cache?.watchlist?.length ?? 0) > 0 ||
+    (cache?.continueWatching?.length ?? 0) > 0 ||
+    downloads.length > 0;
+
+  const handleDelete = async (id: string) => {
+    await removeDownload(id);
+    void refresh();
+  };
 
   return (
     <div className="pt-20 min-h-screen">
       <PageHero
         title="Offline Library"
-        subtitle="Your saved catalog for when you're without internet. Posters and pages you've visited may still load — streaming requires a connection."
+        subtitle="Browse cached titles and play downloaded trailers offline. Full video downloads require Premium and hosted content."
         icon={<WifiOff className="w-6 h-6 text-white" />}
         accent="amber"
       />
@@ -41,23 +55,86 @@ const OfflineLibrary = () => {
         {!isOnline && (
           <div className="mb-8 flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-100 text-sm">
             <WifiOff className="w-5 h-5 shrink-0" />
-            You&apos;re offline. Items below were saved while you were online.
+            You&apos;re offline. Cached and downloaded items below are available.
           </div>
         )}
 
-        <section className="mb-12 p-6 rounded-2xl glass-panel">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-              <Download className="w-6 h-6 text-blue-400" />
+        {downloads.length > 0 && (
+          <Reveal as="section" className="mb-12">
+            <SectionHeader title="Downloads" eyebrow="Offline" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+              {downloads.map((item) => (
+                <div
+                  key={item.id}
+                  className="glass-panel rounded-2xl p-4 flex gap-4 border border-white/10"
+                >
+                  <div className="relative w-20 h-28 rounded-xl overflow-hidden shrink-0 bg-white/5">
+                    {item.posterPath ? (
+                      <Image
+                        src={getImageUrl(item.posterPath, "small")}
+                        alt={item.title}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Film className="w-8 h-8 text-gray-600" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-semibold text-sm line-clamp-2">{item.title}</p>
+                    {item.mediaType === "tv" && item.season && item.episode && (
+                      <p className="text-xs text-gray-400 mt-0.5">S{item.season} E{item.episode}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      {item.status === "complete"
+                        ? formatDownloadSize(item.sizeBytes)
+                        : `${item.progress}% · ${item.status}`}
+                    </p>
+                    <div className="flex gap-2 mt-3">
+                      {item.status === "complete" && (
+                        <Link
+                          href={`/movie/${item.tmdbId}?type=${item.mediaType}${item.season ? `&season=${item.season}&episode=${item.episode}` : ""}`}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-red-400 hover:text-red-300"
+                        >
+                          <Play className="w-3 h-3" />
+                          Play
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(item.id)}
+                        className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-400"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-white mb-1">Movie downloads — coming soon</h2>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                Full offline playback needs videos hosted on our servers. We&apos;re preparing a Downloads feature for owned/licensed content. For now, use this library to browse cached titles offline.
-              </p>
+          </Reveal>
+        )}
+
+        {downloads.length === 0 && (
+          <section className="mb-12 p-6 rounded-2xl glass-panel">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
+                <Download className="w-6 h-6 text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white mb-1">Download titles from any movie page</h2>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  Premium members can download metadata, posters, and trailers for offline browsing.
+                  Tap the download button on a title&apos;s detail page to get started.
+                </p>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4 animate-pulse">
@@ -140,13 +217,6 @@ const OfflineLibrary = () => {
             )}
           </div>
         )}
-
-        <div className="mt-12 p-4 rounded-xl bg-white/5 border border-white/10 flex gap-3 text-sm text-gray-400">
-          <Info className="w-5 h-5 shrink-0 text-gray-500" />
-          <p>
-            Offline mode caches posters and pages you&apos;ve visited. Video streaming always needs an internet connection until our Downloads feature launches with hosted files.
-          </p>
-        </div>
       </PageContainer>
     </div>
   );

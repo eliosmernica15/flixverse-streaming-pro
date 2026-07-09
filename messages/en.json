@@ -1,0 +1,35 @@
+{
+  "common": {
+    "play": "Play",
+    "download": "Download",
+    "share": "Share",
+    "myList": "My List",
+    "search": "Search",
+    "loading": "Loading...",
+    "offline": "Offline",
+    "upgrade": "Upgrade"
+  },
+  "nav": {
+    "home": "Home",
+    "movies": "Movies",
+    "tvShows": "TV Shows",
+    "myList": "My List",
+    "plans": "Plans"
+  },
+  "player": {
+    "upNext": "Up Next",
+    "stats": "Stats for nerds",
+    "captions": "Captions",
+    "quality": "Quality",
+    "speed": "Playback speed"
+  },
+  "offline": {
+    "title": "Offline Library",
+    "downloads": "Downloads",
+    "comingSoon": "Downloaded titles play offline when available."
+  },
+  "paywall": {
+    "upgradePrompt": "Upgrade to Standard or Premium to access this feature.",
+    "viewPlans": "View Plans"
+  }
+}

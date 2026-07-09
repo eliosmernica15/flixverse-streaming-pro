@@ -22,19 +22,22 @@ export type EmbedAction =
   | "seekForward"
   | "seekBack"
   | "seekTo"
-  | "setVolume";
+  | "setVolume"
+  | "setPlaybackRate";
 
 interface SendOptions {
   /** Seek target in seconds (for seekTo). */
   seekSeconds?: number;
   /** Volume level 0..1 (for setVolume). */
   volume?: number;
+  /** Playback rate multiplier (for setPlaybackRate). */
+  rate?: number;
   /** Number of keyboard steps to emit for relative actions. */
   steps?: number;
 }
 
 const ACTION_KEY_MAP: Record<
-  Exclude<EmbedAction, "seekTo" | "setVolume">,
+  Exclude<EmbedAction, "seekTo" | "setVolume" | "setPlaybackRate">,
   keyof ProviderConfig["keyboardShortcuts"]
 > = {
   play: "playToggle",
@@ -208,6 +211,11 @@ function buildCommandPayloads(provider: ProviderConfig, action: EmbedAction, opt
         add(cmds.setVolume(opts.volume));
       }
       break;
+    case "setPlaybackRate":
+      if (opts.rate !== undefined && cmds.setPlaybackRate) {
+        add(cmds.setPlaybackRate(opts.rate));
+      }
+      break;
   }
 
   // Generic fallbacks (exhaustive list for undocumented APIs like VidLink)
@@ -306,6 +314,17 @@ function buildCommandPayloads(provider: ProviderConfig, action: EmbedAction, opt
         );
       }
       break;
+    case "setPlaybackRate":
+      if (opts.rate !== undefined) {
+        payloads.push(
+          { method: "setPlaybackRate", value: opts.rate },
+          { action: "setPlaybackRate", value: opts.rate },
+          { type: "playbackRate", value: opts.rate },
+          { event: "command", func: "setPlaybackRate", args: [opts.rate] },
+          { type: "player", data: { method: "setPlaybackRate", value: opts.rate } }
+        );
+      }
+      break;
     case "volumeUp":
       payloads.push("volumeUp", { method: "volumeUp" }, { action: "volumeUp" }, { type: "player", data: "volumeUp" });
       break;
@@ -390,11 +409,14 @@ export function sendEmbedAction(
 
   if (action === "setVolume") {
     // Volume keys are relative, so we ignore them here in favor of postMessage.
-    // The caller can use volumeUp/volumeDown for step-based changes.
     return;
   }
 
-  const keyName = ACTION_KEY_MAP[action as Exclude<EmbedAction, "seekTo" | "setVolume">];
+  if (action === "setPlaybackRate") {
+    return;
+  }
+
+  const keyName = ACTION_KEY_MAP[action as Exclude<EmbedAction, "seekTo" | "setVolume" | "setPlaybackRate">];
   if (!keyName) return;
   const key = provider.keyboardShortcuts[keyName];
   const code = keyToCode(key);
@@ -420,6 +442,12 @@ export function sendEmbedSeek(iframe: HTMLIFrameElement | null, seconds: number)
 export function sendEmbedVolume(iframe: HTMLIFrameElement | null, volume: number) {
   const clamped = Math.max(0, Math.min(1, volume));
   sendEmbedAction(iframe, "setVolume", { volume: clamped });
+}
+
+/** Send an absolute playback rate command. */
+export function sendEmbedPlaybackRate(iframe: HTMLIFrameElement | null, rate: number) {
+  const clamped = Math.max(0.25, Math.min(2, rate));
+  sendEmbedAction(iframe, "setPlaybackRate", { rate: clamped });
 }
 
 export function isPlayerShortcutKey(key: string) {

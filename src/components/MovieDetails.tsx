@@ -3,13 +3,16 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2 } from "lucide-react";
+import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2, Download } from "lucide-react";
 import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, isNotReleasedYet } from "@/utils/tmdbApi";
 import { useContentDetails } from "@/hooks/queries/useContentDetails";
 import { useRelatedContent } from "@/hooks/queries/useRelatedContent";
 import { useToast } from "@/hooks/use-toast";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
+import { enqueueDownload } from "@/lib/offline/downloadManager";
+import { trackDownload } from "@/lib/analytics";
 import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import { SpoilerProtectedEpisode } from "./spoiler/SpoilerProtectedEpisode";
 import { BreadcrumbNav } from "./BreadcrumbNav";
@@ -48,6 +51,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const { data: relatedContent = [] } = useRelatedContent(content, mediaType);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  const { hasPremium } = useSubscription();
   const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieListContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -209,7 +213,46 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     }
   };
 
-  // handleDownload intentionally omitted — offline downloads are not yet implemented.
+  const handleDownload = async () => {
+    if (!content) return;
+    if (!hasPremium) {
+      toast({
+        title: "Premium required",
+        description: "Offline downloads are available on the Premium plan.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const contentTitle = content.title || content.name || "Unknown";
+    const isTvContent = content.media_type === "tv" || mediaType === "tv";
+    const trailer = content.videos?.results.find(
+      (v) => v.type === "Trailer" && v.site === "YouTube"
+    );
+
+    try {
+      await enqueueDownload({
+        tmdbId: content.id,
+        mediaType: isTvContent ? "tv" : "movie",
+        title: contentTitle,
+        posterPath: content.poster_path,
+        season: isTvContent ? selectedSeason : undefined,
+        episode: isTvContent ? selectedEpisode : undefined,
+        trailerKey: trailer?.key,
+      });
+      trackDownload(content.id, isTvContent ? "tv" : "movie");
+      toast({
+        title: "Download started",
+        description: `${contentTitle} is being saved for offline use.`,
+      });
+    } catch {
+      toast({
+        title: "Download failed",
+        description: "Could not start the download. Try again later.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -461,6 +504,14 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   ) : (
                     <Heart className={`h-6 w-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
                   )}
+                </button>
+
+                <button
+                  onClick={handleDownload}
+                  className="group rounded-full border border-white/20 bg-white/10 p-4 text-white transition-all duration-300 hover:scale-110 hover:bg-white/20 focus-ring"
+                  title={hasPremium ? "Download for offline" : "Premium required"}
+                >
+                  <Download className={`h-6 w-6 ${!hasPremium ? "opacity-60" : ""}`} />
                 </button>
 
                 <button
@@ -758,6 +809,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
             totalDuration = content.runtime ? content.runtime * 60 : undefined;
           }
 
+          const currentSeasonData = content.seasons?.find((s) => s.season_number === selectedSeason);
+          const episodeCount = currentSeasonData?.episode_count;
+
           return (
             <div
               key={`player-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ''}`}
@@ -785,6 +839,11 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 posterPath={content.poster_path}
                 resumePosition={effectiveResumePosition}
                 totalDuration={totalDuration}
+                episodeCount={isTV ? episodeCount : undefined}
+                onAdvanceEpisode={(nextSeason, nextEpisode) => {
+                  setSelectedSeason(nextSeason);
+                  setSelectedEpisode(nextEpisode);
+                }}
               />
             </div>
           );

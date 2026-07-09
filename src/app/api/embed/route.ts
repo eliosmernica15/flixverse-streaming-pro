@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAllowedEmbedUrl } from "@/lib/streamingSources";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
 /**
  * Injected at the top of proxied embed HTML to block popups, tab hijacks,
@@ -27,6 +28,9 @@ function rewriteRelativeUrls(html: string, baseOrigin: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  const limit = await rateLimitByIp(request, "embed", 60, "1 m");
+  if (!limit.success) return rateLimitResponse(limit);
+
   const src = request.nextUrl.searchParams.get("src");
   if (!src) {
     return NextResponse.json({ error: "Missing src parameter" }, { status: 400 });

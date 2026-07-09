@@ -26,6 +26,8 @@ const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcu
 });
 import { OfflineSyncProvider } from "@/components/offline/OfflineSyncProvider";
 import { ExperimentProvider } from "@/contexts/ExperimentContext";
+import { IntlProvider } from "@/components/IntlProvider";
+import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
@@ -45,6 +47,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
     return (
         <QueryClientProvider client={queryClient}>
+            <IntlProvider>
+            <AnalyticsProvider>
             <AuthProvider>
                 <UserProfileProvider>
                 <UserMovieListProvider>
@@ -74,6 +78,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 </UserMovieListProvider>
                 </UserProfileProvider>
             </AuthProvider>
+            </AnalyticsProvider>
+            </IntlProvider>
         </QueryClientProvider>
     );
 }

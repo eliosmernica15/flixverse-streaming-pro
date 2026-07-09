@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseSubtitles } from "@/lib/player/captionParser";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
@@ -100,6 +101,9 @@ function buildFallbackCues(title: string, duration: number): ReturnType<typeof p
 }
 
 export async function GET(request: NextRequest) {
+  const limit = await rateLimitByIp(request, "captions", 40, "1 m");
+  if (!limit.success) return rateLimitResponse(limit);
+
   const { searchParams } = request.nextUrl;
   const tmdbId = parseInt(searchParams.get("tmdbId") || "0", 10);
   const mediaType = (searchParams.get("type") || "movie") as "movie" | "tv";

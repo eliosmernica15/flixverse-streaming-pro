@@ -134,3 +134,41 @@ export function buildStreamingSources(
     url: wrapEmbedUrl(s.providerUrl),
   }));
 }
+
+const QUALITY_RANK: Record<StreamingSource["quality"], number> = {
+  HD: 1,
+  FHD: 2,
+  "4K": 3,
+};
+
+/** Pick the best server index matching a quality label (Auto returns current or best FHD). */
+export function pickServerByQuality(
+  sources: StreamingSource[],
+  label: string,
+  currentIndex = 0
+): number {
+  if (label === "Auto") {
+    const fhd = sources.findIndex((s) => s.quality === "FHD");
+    return fhd >= 0 ? fhd : currentIndex;
+  }
+
+  const targetQuality =
+    label === "4K" ? "4K" :
+    label === "1080p" ? "FHD" :
+    "HD";
+
+  const match = sources.findIndex((s) => s.quality === targetQuality);
+  if (match >= 0) return match;
+
+  const rank = targetQuality === "4K" ? 3 : targetQuality === "FHD" ? 2 : 1;
+  let bestIdx = 0;
+  let bestRank = -1;
+  sources.forEach((s, i) => {
+    const r = QUALITY_RANK[s.quality];
+    if (r <= rank && r > bestRank) {
+      bestRank = r;
+      bestIdx = i;
+    }
+  });
+  return bestIdx;
+}

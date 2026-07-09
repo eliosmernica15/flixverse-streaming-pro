@@ -1,0 +1,35 @@
+{
+  "common": {
+    "play": "Reproducir",
+    "download": "Descargar",
+    "share": "Compartir",
+    "myList": "Mi lista",
+    "search": "Buscar",
+    "loading": "Cargando...",
+    "offline": "Sin conexión",
+    "upgrade": "Mejorar plan"
+  },
+  "nav": {
+    "home": "Inicio",
+    "movies": "Películas",
+    "tvShows": "Series",
+    "myList": "Mi lista",
+    "plans": "Planes"
+  },
+  "player": {
+    "upNext": "A continuación",
+    "stats": "Estadísticas",
+    "captions": "Subtítulos",
+    "quality": "Calidad",
+    "speed": "Velocidad"
+  },
+  "offline": {
+    "title": "Biblioteca sin conexión",
+    "downloads": "Descargas",
+    "comingSoon": "Los títulos descargados se reproducen sin conexión cuando estén disponibles."
+  },
+  "paywall": {
+    "upgradePrompt": "Mejora a Standard o Premium para acceder a esta función.",
+    "viewPlans": "Ver planes"
+  }
+}

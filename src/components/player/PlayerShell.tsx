@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { buildStreamingSources, wrapEmbedUrl } from "@/lib/streamingSources";
+import { buildStreamingSources, wrapEmbedUrl, pickServerByQuality } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
 import { useTimelineComments } from "@/hooks/player/useTimelineComments";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
@@ -65,6 +65,8 @@ import {
   X,
 } from "lucide-react";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
+import { useBufferingDiagnostics } from "@/hooks/player/useBufferingDiagnostics";
+import { trackPlaybackStart } from "@/lib/analytics";
 import { playUiSound, getUiSoundsEnabled, setUiSoundsEnabled } from "@/lib/uiSound";
 import "@/app/video-player.css";
 
@@ -80,6 +82,9 @@ interface PlayerShellProps {
   posterPath?: string;
   resumePosition?: number;
   totalDuration?: number;
+  /** Total episodes in current season (TV) — enables real Up Next autoplay */
+  episodeCount?: number;
+  onAdvanceEpisode?: (nextSeason: number, nextEpisode: number) => void;
 }
 
 const LOAD_TIMEOUT_MS = 22_000;
@@ -135,6 +140,8 @@ export function PlayerShell({
   posterPath,
   resumePosition = 0,
   totalDuration,
+  episodeCount,
+  onAdvanceEpisode,
 }: PlayerShellProps) {
   const [currentServer, setCurrentServer] = useState(0);
   const [showServerSelector, setShowServerSelector] = useState(false);
@@ -149,7 +156,6 @@ export function PlayerShell({
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
 
   // Advanced settings panel state
   const [quality, setQuality] = useState<string>("Auto");
@@ -192,7 +198,7 @@ export function PlayerShell({
   const [commentTimestamp, setCommentTimestamp] = useState(0);
 
   const { user } = useAuth();
-  const { hasStandard } = useSubscription();
+  const { hasStandard, hasPremium } = useSubscription();
   const {
     room: partyRoom,
     isHost: isPartyHost,
@@ -241,6 +247,8 @@ export function PlayerShell({
     seekRelative,
     setReady,
     setPlaying,
+    playbackRate,
+    setPlaybackRate,
   } = useEmbedBridge({
     iframeRef,
     enabled: embedState === "ready",
@@ -284,6 +292,12 @@ export function PlayerShell({
     lang: captionLang,
   });
   const activeCaption = getCueAt(currentTime);
+  const bufferingDiag = useBufferingDiagnostics();
+
+  const partyParticipantIds = useMemo(
+    () => partyRoom?.participants?.map((p) => p.userId) ?? [],
+    [partyRoom?.participants]
+  );
 
   const handlePartyPlaybackSync = useCallback(
     (msg: SyncMessage) => {
@@ -304,6 +318,8 @@ export function PlayerShell({
   const { isConnected: rtcConnected, sendMessage: sendRtcMessage } = useWebRTCSync({
     roomId: partyRoomId,
     isHost: !!isPartyHost,
+    hostId: partyRoom?.hostId ?? null,
+    participantIds: partyParticipantIds,
     onPlaybackSync: handlePartyPlaybackSync,
   });
 
@@ -594,6 +610,7 @@ export function PlayerShell({
   }, [embedState, seekRelative, showSeekIndicator, triggerBuffering, bumpControls]);
 
   const toggleAmbient = useCallback(() => {
+    if (!hasPremium) return;
     const next = !ambientEnabled;
     setAmbientEnabled(next);
     try {
@@ -602,7 +619,7 @@ export function PlayerShell({
       );
     } catch {}
     bumpControls();
-  }, [ambientEnabled, bumpControls]);
+  }, [ambientEnabled, bumpControls, hasPremium]);
 
   const handlePictureInPicture = useCallback(() => {
     const iframe = iframeRef.current as unknown as {
@@ -671,7 +688,36 @@ export function PlayerShell({
     setPlaybackRate(rate);
     setShowSettings(false);
     bumpControls();
-  }, [bumpControls]);
+  }, [setPlaybackRate, bumpControls]);
+
+  const changeQuality = useCallback((opt: string) => {
+    if (opt === "4K" && !hasPremium) {
+      setShowSettings(false);
+      bumpControls();
+      return;
+    }
+    setQuality(opt);
+    const idx = pickServerByQuality(streamingSources, opt, currentServer);
+    if (idx !== currentServer) switchServer(idx);
+    setShowSettings(false);
+    bumpControls();
+  }, [hasPremium, streamingSources, currentServer, switchServer, bumpControls]);
+
+  const playUpNext = useCallback(() => {
+    if (mediaType === "tv" && season && episode && episodeCount && episode < episodeCount) {
+      onAdvanceEpisode?.(season, episode + 1);
+      setUpNextDismissed(true);
+      setUpNextCount(10);
+      playUiSound("success");
+      return;
+    }
+    if (mediaType === "tv" && season && episode && episodeCount && episode >= episodeCount) {
+      setUpNextDismissed(true);
+      onClose();
+      return;
+    }
+    handleRetry();
+  }, [mediaType, season, episode, episodeCount, onAdvanceEpisode, onClose, handleRetry]);
 
   // Double-tap seek on mobile
   const handleTap = useCallback((e: React.TouchEvent) => {
@@ -794,6 +840,8 @@ export function PlayerShell({
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     setEmbedState("ready");
     setReady(true);
+    if (playbackRate !== 1) setPlaybackRate(playbackRate);
+    trackPlaybackStart(movieId, mediaType, currentSource.id);
     playUiSound("success");
   };
 
@@ -855,8 +903,7 @@ export function PlayerShell({
       setUpNextCount((c) => {
         if (c <= 1) {
           if (upNextTimerRef.current) clearInterval(upNextTimerRef.current);
-          setUpNextDismissed(true);
-          handleRetry();
+          playUpNext();
           return 0;
         }
         return c - 1;
@@ -865,7 +912,7 @@ export function PlayerShell({
     return () => {
       if (upNextTimerRef.current) clearInterval(upNextTimerRef.current);
     };
-  }, [nearEnd, handleRetry]);
+  }, [nearEnd, playUpNext]);
 
   const volumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const VolumeIcon = volumeIcon;
@@ -877,7 +924,7 @@ export function PlayerShell({
       onMouseMove={bumpControls}
       onTouchStart={handleTap}
     >
-      <AmbientGlowFrame posterPath={fullPosterUrl} />
+      <AmbientGlowFrame posterPath={fullPosterUrl} isActive={hasPremium && ambientEnabled} />
 
       <PlayerChrome
         title={title}
@@ -1122,7 +1169,7 @@ export function PlayerShell({
 
                     <div className="video-settings-divider" />
 
-                    {/* Quality (UI-only) */}
+                    {/* Quality */}
                     <div className="video-settings-section">
                       <p className="video-settings-head">Quality</p>
                       <div className="video-settings-grid">
@@ -1132,10 +1179,11 @@ export function PlayerShell({
                             type="button"
                             role="menuitemradio"
                             aria-checked={quality === opt}
-                            onClick={() => setQuality(opt)}
-                            className={`video-quality ${quality === opt ? "is-selected" : ""}`}
+                            onClick={() => changeQuality(opt)}
+                            className={`video-quality ${quality === opt ? "is-selected" : ""} ${opt === "4K" && !hasPremium ? "opacity-60" : ""}`}
+                            title={opt === "4K" && !hasPremium ? "Premium required" : undefined}
                           >
-                            {opt}
+                            {opt}{opt === "4K" && !hasPremium ? " 🔒" : ""}
                           </button>
                         ))}
                       </div>
@@ -1237,12 +1285,14 @@ export function PlayerShell({
                           </div>
                         </div>
                       )}
-                      <SettingsToggle
-                        label="Ambient light"
-                        icon={<Sparkles className="w-4 h-4" />}
-                        checked={ambientEnabled}
-                        onChange={toggleAmbient}
-                      />
+                      <PaywallGate feature="Ambient light" locked={!hasPremium}>
+                        <SettingsToggle
+                          label="Ambient light"
+                          icon={<Sparkles className="w-4 h-4" />}
+                          checked={ambientEnabled && hasPremium}
+                          onChange={toggleAmbient}
+                        />
+                      </PaywallGate>
                       <SettingsToggle
                         label="UI sounds"
                         icon={<AudioLines className="w-4 h-4" />}
@@ -1448,6 +1498,10 @@ export function PlayerShell({
           <div className="video-stats-row"><span>Sync</span><span>{isLiveSynced ? "Live (postMessage)" : "Estimated clock"}</span></div>
           <div className="video-stats-row"><span>Captions</span><span>{showCaptions ? `${getCaptionLanguageLabel(captionLang)} · ${captionSize} · ${captionPosition}` : "Off"}</span></div>
           <div className="video-stats-row"><span>Quality</span><span>{quality}</span></div>
+          <div className="video-stats-row"><span>Speed</span><span>{playbackRate}x</span></div>
+          <div className="video-stats-row"><span>Network</span><span>{bufferingDiag.networkType} ({bufferingDiag.bandwidth} Mbps)</span></div>
+          <div className="video-stats-row"><span>Health</span><span>{bufferingDiag.health}</span></div>
+          <div className="video-stats-row"><span>Frame drops</span><span>{bufferingDiag.frameDrops}</span></div>
           <div className="video-stats-row"><span>Buffered</span><span>{formatTime(buffered)}</span></div>
         </div>
       )}
@@ -1460,7 +1514,11 @@ export function PlayerShell({
             <span className="video-autonext-count">{upNextCount}s</span>
           </div>
           <p className="video-autonext-sub">
-            {title} will play automatically. Demo only — advances to the next server.
+            {mediaType === "tv" && season && episode && episodeCount && episode < episodeCount
+              ? `Season ${season}, Episode ${episode + 1} starts automatically.`
+              : mediaType === "tv"
+                ? "End of season — closing player."
+                : "Trying the next available server."}
           </p>
           <div className="video-autonext-actions">
             <button
@@ -1475,7 +1533,7 @@ export function PlayerShell({
               className="video-autonext-btn is-primary focus-ring press-effect"
               onClick={() => {
                 setUpNextDismissed(true);
-                handleRetry();
+                playUpNext();
               }}
             >
               Play now
