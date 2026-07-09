@@ -11,14 +11,15 @@ export interface StreamingSource {
 
 /** Allowed embed hostnames — must match security-headers.mjs frame-src. */
 export const ALLOWED_EMBED_HOSTS = [
-  "vidsrc.cc",
-  "vidsrc.xyz",
-  "vidsrc.icu",
   "vidlink.pro",
-  "embed.su",
+  "videasy.net",
+  "player.videasy.net",
+  "vidfast.pro",
+  "vidsrc.me",
+  "vidsrc.net",
+  "2embed.cc",
   "multiembed.mov",
-  "player.autoembed.cc",
-  "player.smashy.stream",
+  "embed.su",
 ] as const;
 
 export function isAllowedEmbedUrl(url: string): boolean {
@@ -28,14 +29,6 @@ export function isAllowedEmbedUrl(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-/** Route third-party embeds through our guard proxy. */
-export function wrapEmbedUrl(providerUrl: string): string {
-  if (typeof window === "undefined") {
-    return providerUrl;
-  }
-  return `/api/embed?src=${encodeURIComponent(providerUrl)}`;
 }
 
 export function buildStreamingSources(
@@ -48,90 +41,81 @@ export function buildStreamingSources(
 
   const raw: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
     {
-      id: "vidsrc-cc",
-      name: "VidSrc CC",
-      icon: "📺",
-      quality: "FHD",
-      reliability: "high",
-      providerUrl: isTv
-        ? `https://vidsrc.cc/v2/embed/tv/${movieId}/${season}/${episode}?autoPlay=true`
-        : `https://vidsrc.cc/v2/embed/movie/${movieId}?autoPlay=true`,
-    },
-    {
-      id: "vidsrc-pro",
-      name: "VidSrc Pro",
-      icon: "🎬",
-      quality: "FHD",
-      reliability: "high",
-      providerUrl: isTv
-        ? `https://vidsrc.xyz/embed/tv?tmdb=${movieId}&season=${season}&episode=${episode}`
-        : `https://vidsrc.xyz/embed/movie?tmdb=${movieId}`,
-    },
-    {
       id: "vidlink",
       name: "VidLink",
       icon: "🔗",
-      quality: "HD",
-      reliability: "medium",
+      quality: "FHD",
+      reliability: "high",
       providerUrl: isTv
-        ? `https://vidlink.pro/tv/${movieId}/${season}/${episode}`
-        : `https://vidlink.pro/movie/${movieId}`,
+        ? `https://vidlink.pro/tv/${movieId}/${season}/${episode}?autoplay=true`
+        : `https://vidlink.pro/movie/${movieId}?autoplay=true`,
     },
     {
-      id: "vidsrc-icu",
-      name: "VidSrc ICU",
-      icon: "🎥",
-      quality: "HD",
-      reliability: "medium",
+      id: "videasy",
+      name: "Videasy",
+      icon: "🎬",
+      quality: "4K",
+      reliability: "high",
       providerUrl: isTv
-        ? `https://vidsrc.icu/embed/tv/${movieId}/${season}/${episode}`
-        : `https://vidsrc.icu/embed/movie/${movieId}`,
+        ? `https://player.videasy.net/tv/${movieId}/${season}/${episode}?autoplay=true`
+        : `https://player.videasy.net/movie/${movieId}?autoplay=true`,
     },
     {
-      id: "embed-su",
-      name: "Embed SU",
+      id: "vidfast",
+      name: "VidFast",
+      icon: "⚡",
+      quality: "FHD",
+      reliability: "high",
+      providerUrl: isTv
+        ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
+        : `https://vidfast.pro/movie/${movieId}?autoPlay=true`,
+    },
+    {
+      id: "vidsrc",
+      name: "VidSrc",
+      icon: "📺",
+      quality: "HD",
+      reliability: "high",
+      providerUrl: isTv
+        ? `https://vidsrc.me/embed/tv?tmdb=${movieId}&season=${season}&episode=${episode}`
+        : `https://vidsrc.me/embed/movie?tmdb=${movieId}`,
+    },
+    {
+      id: "2embed",
+      name: "2Embed",
       icon: "🎞️",
       quality: "HD",
       reliability: "medium",
       providerUrl: isTv
-        ? `https://embed.su/embed/tv/${movieId}/${season}/${episode}`
-        : `https://embed.su/embed/movie/${movieId}`,
+        ? `https://www.2embed.cc/embedtv/${movieId}&s=${season}&e=${episode}`
+        : `https://www.2embed.cc/embed/${movieId}`,
     },
     {
       id: "superembed",
       name: "SuperEmbed",
       icon: "📽️",
       quality: "FHD",
-      reliability: "high",
+      reliability: "medium",
       providerUrl: isTv
         ? `https://multiembed.mov/?video_id=${movieId}&tmdb=1&s=${season}&e=${episode}`
         : `https://multiembed.mov/?video_id=${movieId}&tmdb=1`,
     },
     {
-      id: "autoembed",
-      name: "AutoEmbed",
-      icon: "⚡",
+      id: "embed-su",
+      name: "Embed SU",
+      icon: "🎥",
       quality: "HD",
       reliability: "medium",
       providerUrl: isTv
-        ? `https://player.autoembed.cc/embed/tv/${movieId}/${season}/${episode}`
-        : `https://player.autoembed.cc/embed/movie/${movieId}`,
-    },
-    {
-      id: "smashystream",
-      name: "SmashyStream",
-      icon: "💥",
-      quality: "FHD",
-      reliability: "high",
-      providerUrl: isTv
-        ? `https://player.smashy.stream/tv/${movieId}?s=${season}&e=${episode}`
-        : `https://player.smashy.stream/movie/${movieId}`,
+        ? `https://embed.su/embed/tv/${movieId}/${season}/${episode}`
+        : `https://embed.su/embed/movie/${movieId}`,
     },
   ];
 
+  // Load providers directly (no sandbox — VidLink and others block sandboxed frames).
   return raw.map((s) => ({
     ...s,
-    url: wrapEmbedUrl(s.providerUrl),
+    url: s.providerUrl,
   }));
 }
 

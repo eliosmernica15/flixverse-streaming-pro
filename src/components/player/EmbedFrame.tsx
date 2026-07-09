@@ -1,8 +1,14 @@
 "use client";
 
-import { RefObject } from "react";
+import { RefObject, useCallback, useEffect, type MutableRefObject } from "react";
 import { RefreshCw, X, AlertCircle } from "lucide-react";
 import { StreamingSource } from "@/lib/streamingSources";
+
+/** VidLink and other providers refuse to play inside a sandboxed iframe. */
+function stripSandbox(iframe: HTMLIFrameElement | null) {
+  if (!iframe) return;
+  iframe.removeAttribute("sandbox");
+}
 
 interface EmbedFrameProps {
   currentSource: StreamingSource;
@@ -36,6 +42,32 @@ export function EmbedFrame({
   setShowHelpPrompt,
   isCinematic,
 }: EmbedFrameProps) {
+  const bindIframeRef = useCallback(
+    (node: HTMLIFrameElement | null) => {
+      if (iframeRef && "current" in iframeRef) {
+        (iframeRef as MutableRefObject<HTMLIFrameElement | null>).current = node;
+      }
+      stripSandbox(node);
+    },
+    [iframeRef]
+  );
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    stripSandbox(iframe);
+    const observer = new MutationObserver(() => {
+      if (iframe.hasAttribute("sandbox")) stripSandbox(iframe);
+    });
+    observer.observe(iframe, { attributes: true, attributeFilter: ["sandbox"] });
+    return () => observer.disconnect();
+  }, [iframeRef, currentSource.url, currentServer]);
+
+  const handleLoad = () => {
+    stripSandbox(iframeRef.current);
+    onIframeLoad();
+  };
+
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
       <div className="relative w-full h-full">
@@ -48,7 +80,8 @@ export function EmbedFrame({
               Server {currentServer + 1} of {streamingSourcesCount}
             </p>
             <p className="video-loading-tip">
-              Loading stream from {currentSource.name}. If it stays blank, switch servers.
+              Loading stream from {currentSource.name}. We&apos;ll switch servers
+              automatically if this one stalls.
             </p>
           </div>
         )}
@@ -106,18 +139,21 @@ export function EmbedFrame({
           </div>
         )}
 
-        {/* The actual iframe */}
+        {/* The actual iframe. Note: providers (VidLink & co.) detect the
+            sandbox attribute and refuse to play, so popup protection relies
+            on the browser's built-in blocker instead. */}
         <iframe
-          ref={iframeRef}
+          key={`${currentSource.id}-${currentServer}`}
+          ref={bindIframeRef}
           src={currentSource.url}
           title={`Watch ${currentSource.name}`}
           className={`absolute inset-0 w-full h-full border-0 ${
             embedState === "error" ? "pointer-events-none opacity-0" : ""
           } ${isCinematic ? "cinema-overlay" : ""}`}
           allowFullScreen
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerPolicy="strict-origin-when-cross-origin"
-          onLoad={onIframeLoad}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          referrerPolicy="origin"
+          onLoad={handleLoad}
           onError={onIframeError}
         />
       </div>

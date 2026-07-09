@@ -81,7 +81,18 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     }
   }, [autoplay, content, showPlayer]);
 
-  // No body scroll lock needed - component has its own scroll container
+  // Lock page scroll while the fullscreen player is open
+  useEffect(() => {
+    if (!showPlayer) return;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+    };
+  }, [showPlayer]);
 
   const handleClose = () => {
     setIsVisible(false);

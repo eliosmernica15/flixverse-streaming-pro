@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { buildStreamingSources, wrapEmbedUrl, pickServerByQuality } from "@/lib/streamingSources";
+import { buildStreamingSources, pickServerByQuality } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
 import { useTimelineComments } from "@/hooks/player/useTimelineComments";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
@@ -88,7 +88,7 @@ interface PlayerShellProps {
   onAdvanceEpisode?: (nextSeason: number, nextEpisode: number) => void;
 }
 
-const LOAD_TIMEOUT_MS = 22_000;
+const LOAD_TIMEOUT_MS = 15_000;
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) seconds = 0;
@@ -210,7 +210,14 @@ export function PlayerShell({
     updatePlaybackState,
   } = useFlixParty({ roomId: partyRoomId });
 
+  /** Consecutive automatic server failovers — resets once a stream loads. */
+  const autoFailoverRef = useRef(0);
+  /** True while the pointer is over the control dock (pauses auto-hide). */
+  const dockHoverRef = useRef(false);
+  /** True while a popover/panel is open (pauses auto-hide). */
+  const uiOpenRef = useRef(false);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controlsGraceUntil = useRef(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -357,7 +364,7 @@ export function PlayerShell({
       seekRelative(action.deltaSeconds);
     } else if (action.kind === "hard" && iframeRef.current) {
       setPartySyncStatus("drift");
-      iframeRef.current.src = wrapEmbedUrl(injectSeekParam(currentSource.providerUrl, partyRoom.lastKnownTime));
+      iframeRef.current.src = injectSeekParam(currentSource.providerUrl, partyRoom.lastKnownTime);
     }
   }, [
     partyRoom?.lastKnownTime,
@@ -475,9 +482,23 @@ export function PlayerShell({
 
   const bumpControls = useCallback(() => {
     setControlsVisible(true);
-    setShowSettings(false);
     if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-    hideControlsTimer.current = setTimeout(() => setControlsVisible(false), 3500);
+    const scheduleHide = () => {
+      hideControlsTimer.current = setTimeout(() => {
+        if (Date.now() < controlsGraceUntil.current) {
+          scheduleHide();
+          return;
+        }
+        // Never hide while the user is on the dock or a panel is open.
+        if (dockHoverRef.current || uiOpenRef.current) {
+          scheduleHide();
+          return;
+        }
+        setControlsVisible(false);
+        setShowSettings(false);
+      }, 4500);
+    };
+    scheduleHide();
   }, []);
 
   const handleClose = useCallback(() => {
@@ -516,6 +537,7 @@ export function PlayerShell({
 
   const switchServer = useCallback((index: number) => {
     clearTimers();
+    autoFailoverRef.current = 0;
     setCurrentServer(index);
     setShowServerSelector(false);
     setEmbedState("loading");
@@ -823,24 +845,50 @@ export function PlayerShell({
 
   useEffect(() => {
     bumpControls();
-    return () => { document.body.style.overflow = ""; };
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+    };
   }, [bumpControls]);
+
+  // Pause the auto-hide timer while any panel/dialog is open, and keep the
+  // controls visible when a panel opens.
+  useEffect(() => {
+    uiOpenRef.current =
+      showSettings || showServerSelector || showShortcuts || showCommentDialog || showInviteDialog;
+    if (uiOpenRef.current) setControlsVisible(true);
+  }, [showSettings, showServerSelector, showShortcuts, showCommentDialog, showInviteDialog]);
 
   useEffect(() => {
     setEmbedState("loading");
     setShowHelpPrompt(false);
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     loadTimeoutRef.current = setTimeout(() => {
+      // Auto-failover: try the next server before surfacing an error.
+      if (autoFailoverRef.current < streamingSources.length - 1) {
+        autoFailoverRef.current += 1;
+        setLiveDuration(0);
+        setReady(false);
+        setCurrentServer((prev) => (prev + 1) % streamingSources.length);
+        return;
+      }
       setEmbedState("error");
       setShowHelpPrompt(false);
     }, LOAD_TIMEOUT_MS);
     return () => clearTimers();
-  }, [currentServer, clearTimers]);
+  }, [currentServer, clearTimers, streamingSources.length, setReady]);
 
   const onIframeLoad = () => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    autoFailoverRef.current = 0;
     setEmbedState("ready");
     setReady(true);
+    controlsGraceUntil.current = Date.now() + 12_000;
+    setControlsVisible(true);
     if (playbackRate !== 1) setPlaybackRate(playbackRate);
     trackPlaybackStart(movieId, mediaType, currentSource.id);
     playUiSound("success");
@@ -921,7 +969,7 @@ export function PlayerShell({
   return (
     <div
       ref={containerRef}
-      className="player-shell fixed inset-0 z-[9999] bg-black flex flex-col"
+      className="player-shell fixed inset-0 z-[9999] bg-black flex flex-col overflow-hidden"
       onMouseMove={bumpControls}
       onTouchStart={handleTap}
     >
@@ -972,6 +1020,32 @@ export function PlayerShell({
         isCinematic={isCinematic}
       />
 
+      {/* Tap zone — sits above the iframe so play/pause works without hitting embed UI */}
+      {embedState === "ready" && (
+        <button
+          type="button"
+          className="video-tap-zone"
+          onClick={togglePlayPause}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            void toggleTheaterMode();
+          }}
+          aria-label={isPlaying ? "Pause" : "Play"}
+        />
+      )}
+
+      {/* Reveal layer — only active while controls are hidden. The iframe
+          swallows mouse events, so without this the controls could never be
+          brought back while the cursor is over the video. */}
+      {!controlsVisible && (
+        <div
+          className="video-reveal-layer"
+          onMouseMove={bumpControls}
+          onClick={bumpControls}
+          aria-hidden="true"
+        />
+      )}
+
       {showCenterPlay && embedState === "ready" && (
         <div className="video-center-play">
           <div className="video-center-play-circle">
@@ -1000,6 +1074,8 @@ export function PlayerShell({
       <div
         className={`video-dock-wrap ${controlsVisible ? "" : "video-hidden"}`}
         onTouchStart={(e) => e.stopPropagation()}
+        onMouseEnter={() => { dockHoverRef.current = true; }}
+        onMouseLeave={() => { dockHoverRef.current = false; }}
       >
         <div className="video-dock">
           {/* Centerpiece scrubber + comment markers */}
@@ -1030,6 +1106,7 @@ export function PlayerShell({
               <button
                 type="button"
                 onClick={togglePlayPause}
+                disabled={embedState !== "ready"}
                 className="video-btn video-btn-primary video-btn-shine focus-ring"
                 aria-label={isPlaying ? "Pause" : "Play"}
                 title="Play / Pause (Space)"
@@ -1041,6 +1118,7 @@ export function PlayerShell({
               <button
                 type="button"
                 onClick={() => handleSeek("back")}
+                disabled={embedState !== "ready"}
                 className="video-btn video-btn-icon video-hide-sm"
                 aria-label="Seek back 10 seconds"
                 title="Seek back 10s"
@@ -1050,6 +1128,7 @@ export function PlayerShell({
               <button
                 type="button"
                 onClick={() => handleSeek("forward")}
+                disabled={embedState !== "ready"}
                 className="video-btn video-btn-icon video-hide-sm"
                 aria-label="Seek forward 10 seconds"
                 title="Seek forward 10s"
@@ -1058,7 +1137,11 @@ export function PlayerShell({
               </button>
 
               {/* Volume */}
-              <div className="video-volume-wrap video-hide-sm">
+              <div
+                className="video-volume-wrap video-hide-sm"
+                onMouseEnter={() => setShowVolumeSlider(true)}
+                onMouseLeave={() => setShowVolumeSlider(false)}
+              >
                 <button
                   type="button"
                   onClick={handleToggleMute}
@@ -1419,38 +1502,40 @@ export function PlayerShell({
         />
       )}
 
-      <PaywallGate feature="FlixParty" locked={!hasStandard}>
-        <FlixPartySidebar
-          isOpen={showPartySidebar}
-          onClose={() => setShowPartySidebar(false)}
-          roomId={partyRoomId}
-          syncStatus={partySyncStatus}
-          driftMs={partyDriftMs}
-          onLeaveRoom={() => {
-            void leavePartyRoom();
-            setPartyRoomId(null);
-            setPartyRoomKey(null);
-            setShowPartySidebar(false);
-          }}
-          onStartParty={handleStartParty}
-          movieId={movieId}
-          mediaType={mediaType}
-          season={season}
-          episode={episode}
-          title={title}
-          posterPath={posterPath || null}
-          currentTime={currentTime}
-          isPlaying={isPlaying}
-          onSyncToPosition={seekTo}
-          partyJoinUrl={
-            partyRoomId && partyRoomKey
-              ? buildPartyJoinUrl(partyRoomId, partyRoomKey)
-              : partyRoom?.code
-                ? `${typeof window !== "undefined" ? window.location.origin : ""}/party/join?code=${partyRoom.code}`
-                : null
-          }
-        />
-      </PaywallGate>
+      {showPartySidebar && (
+        <PaywallGate feature="FlixParty" locked={!hasStandard}>
+          <FlixPartySidebar
+            isOpen={showPartySidebar}
+            onClose={() => setShowPartySidebar(false)}
+            roomId={partyRoomId}
+            syncStatus={partySyncStatus}
+            driftMs={partyDriftMs}
+            onLeaveRoom={() => {
+              void leavePartyRoom();
+              setPartyRoomId(null);
+              setPartyRoomKey(null);
+              setShowPartySidebar(false);
+            }}
+            onStartParty={handleStartParty}
+            movieId={movieId}
+            mediaType={mediaType}
+            season={season}
+            episode={episode}
+            title={title}
+            posterPath={posterPath || null}
+            currentTime={currentTime}
+            isPlaying={isPlaying}
+            onSyncToPosition={seekTo}
+            partyJoinUrl={
+              partyRoomId && partyRoomKey
+                ? buildPartyJoinUrl(partyRoomId, partyRoomKey)
+                : partyRoom?.code
+                  ? `${typeof window !== "undefined" ? window.location.origin : ""}/party/join?code=${partyRoom.code}`
+                  : null
+            }
+          />
+        </PaywallGate>
+      )}
 
       <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
 

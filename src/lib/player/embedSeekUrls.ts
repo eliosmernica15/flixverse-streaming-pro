@@ -44,20 +44,8 @@ export function computeResync(
 export function injectSeekParam(url: string, startSeconds: number): string {
   const t = Math.max(0, Math.floor(startSeconds));
 
-  // VidSrc CC: add &t= param
-  if (url.includes("vidsrc.cc")) {
-    const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}t=${t}`;
-  }
-
-  // VidSrc XYZ (vidsrc.pro): add &t= param
-  if (url.includes("vidsrc.xyz")) {
-    const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}t=${t}`;
-  }
-
-  // VidSrc ICU: add &t= param
-  if (url.includes("vidsrc.icu")) {
+  // VidSrc family (vidsrc.me / .net / .xyz / .cc / .icu): add &t= param
+  if (/vidsrc\.(me|net|in|pm|xyz|cc|icu)/.test(url)) {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}t=${t}`;
   }
@@ -67,28 +55,22 @@ export function injectSeekParam(url: string, startSeconds: number): string {
     return `${url}#t=${t}`;
   }
 
-  // Embed SU: add &start= param
-  if (url.includes("embed.su")) {
+  // Videasy: add &progress= param (seconds)
+  if (url.includes("videasy.net")) {
     const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}start=${t}`;
+    return `${url}${sep}progress=${t}`;
   }
 
-  // SuperEmbed (multiembed): add &start= param
-  if (url.includes("multiembed.mov")) {
+  // VidFast: add &startAt= param
+  if (url.includes("vidfast.pro")) {
     const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}start=${t}`;
+    return `${url}${sep}startAt=${t}`;
   }
 
-  // AutoEmbed: add &start= param
-  if (url.includes("autoembed.cc")) {
+  // Embed SU / SuperEmbed (multiembed): add &start= param
+  if (url.includes("embed.su") || url.includes("multiembed.mov")) {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}start=${t}`;
-  }
-
-  // SmashyStream: add &t= param
-  if (url.includes("smashy.stream")) {
-    const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}t=${t}`;
   }
 
   // Unknown provider: best effort with &start=

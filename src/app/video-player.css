@@ -18,6 +18,14 @@
   --video-danger: #ff4d4f;
 }
 
+/* Full-viewport shell — prevents controls from sitting below the fold */
+.player-shell {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    TOP BAR — refined auto-hiding glass chrome
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -26,7 +34,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 40;
+  z-index: 50;
   padding-top: max(0.5rem, env(safe-area-inset-top));
   transform: translateY(0);
   opacity: 1;
@@ -38,6 +46,16 @@
   opacity: 0;
   transform: translateY(-110%);
   pointer-events: none;
+}
+/* Keep a slim hit-area so moving the mouse to the top edge still reveals chrome */
+.video-chrome.video-hidden::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5rem;
+  pointer-events: auto;
 }
 .video-chrome-inner {
   margin: 0 auto;
@@ -116,7 +134,7 @@
   left: 0.6rem;
   right: 0.6rem;
   bottom: max(0.9rem, env(safe-area-inset-bottom));
-  z-index: 40;
+  z-index: 50;
   display: flex;
   justify-content: center;
   transform: translateY(0);
@@ -129,6 +147,17 @@
   opacity: 0;
   transform: translateY(140%);
   pointer-events: none;
+}
+/* Peek zone — hover near bottom edge to bring controls back */
+.video-dock-wrap.video-hidden::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3.5rem;
+  pointer-events: auto;
+  transform: translateY(-100%);
 }
 @media (min-width: 768px) {
   .video-dock-wrap {
@@ -220,6 +249,19 @@
 .video-btn:focus-visible {
   outline: 2px solid hsl(var(--video-red));
   outline-offset: 2px;
+}
+.video-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+.video-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: none;
+  box-shadow: none;
+}
+.video-btn-primary:disabled:hover {
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
 }
 .video-btn.is-active {
   background: rgba(239, 68, 68, 0.22);
@@ -458,7 +500,8 @@
   margin: 0 0.1rem 0 0.2rem;
 }
 @media (min-width: 640px) {
-  .video-volume {
+  .video-volume,
+  .video-volume.is-open {
     width: 84px;
     opacity: 1;
     margin: 0 0.1rem 0 0.2rem;
@@ -602,6 +645,35 @@
 @keyframes video-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Reveal layer — captures the first pointer interaction while controls are
+   hidden (the cross-origin iframe swallows mouse events otherwise). */
+.video-reveal-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: transparent;
+  cursor: none;
+}
+
+/* Center tap target — above iframe, below chrome/dock */
+.video-tap-zone {
+  position: absolute;
+  top: 4.25rem;
+  left: 0;
+  right: 0;
+  bottom: 6.5rem;
+  z-index: 18;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+.video-tap-zone:focus-visible {
+  outline: 2px solid hsl(var(--video-red));
+  outline-offset: -4px;
 }
 
 /* Center tap play indicator */

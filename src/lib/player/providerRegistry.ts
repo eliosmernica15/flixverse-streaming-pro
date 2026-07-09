@@ -10,10 +10,11 @@
 export type EmbedProvider =
   | "vidsrc"
   | "vidlink"
+  | "videasy"
+  | "vidfast"
+  | "twoembed"
   | "embedsu"
   | "superembed"
-  | "autoembed"
-  | "smashystream"
   | "generic";
 
 export interface ProviderCommands {
@@ -95,14 +96,13 @@ export const PROVIDERS: ProviderConfig[] = [
     id: "vidsrc",
     name: "VidSrc",
     origins: [
-      "vidsrc.cc",
+      "vidsrc.me",
+      "vidsrc.net",
+      "vidsrc.in",
+      "vidsrc.pm",
       "vidsrc.xyz",
+      "vidsrc.cc",
       "vidsrc.icu",
-      "vidsrc.fyi",
-      "vidsrc.wiki",
-      "vidsrc-embed.ru",
-      "vidsrcme.su",
-      "vsrc.su",
     ],
     keyboardShortcuts: VIDSRC_KEYBOARD,
     commands: VIDSRC_COMMANDS,
@@ -192,9 +192,9 @@ export const PROVIDERS: ProviderConfig[] = [
     supportsPostMessage: true,
   },
   {
-    id: "autoembed",
-    name: "AutoEmbed",
-    origins: ["autoembed.cc", "player.autoembed.cc"],
+    id: "videasy",
+    name: "Videasy",
+    origins: ["videasy.net", "player.videasy.net"],
     keyboardShortcuts: VIDSRC_KEYBOARD,
     commands: {
       toggle: { type: "toggle" },
@@ -209,38 +209,60 @@ export const PROVIDERS: ProviderConfig[] = [
       seekTo: (seconds: number) => ({ type: "seek", time: Math.max(0, seconds) }),
       setVolume: (volume: number) => ({ type: "volume", value: volume }),
     },
+    // Videasy emits watch-progress payloads as JSON strings:
+    // { id, type, progress (percent), timestamp (s), duration (s) }
     events: {
       play: ["play"],
       pause: ["pause"],
-      time: ["timeupdate"],
-      ended: ["ended"],
+      time: ["timeupdate", "time"],
+      ended: ["ended", "complete"],
     },
     supportsPostMessage: true,
   },
   {
-    id: "smashystream",
-    name: "SmashyStream",
-    origins: ["smashy.stream", "player.smashy.stream"],
-    keyboardShortcuts: {
-      playToggle: " ",
-      muteToggle: "m",
-      volumeUp: "ArrowUp",
-      volumeDown: "ArrowDown",
-      seekBack: "ArrowLeft",
-      seekForward: "ArrowRight",
-    },
+    id: "vidfast",
+    name: "VidFast",
+    origins: ["vidfast.pro"],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
     commands: {
-      toggle: { cmd: "pause" },
-      play: { cmd: "play" },
-      pause: { cmd: "pause" },
-      mute: { cmd: "mute" },
-      unmute: { cmd: "unmute" },
-      volumeUp: { cmd: "volumeUp" },
-      volumeDown: { cmd: "volumeDown" },
-      seekForward: { cmd: "seek", param: 10 },
-      seekBack: { cmd: "seek", param: -10 },
-      seekTo: (seconds: number) => ({ cmd: "seek", param: seconds }),
-      setVolume: (volume: number) => ({ cmd: "volume", param: volume }),
+      toggle: { method: "togglePlay" },
+      play: { method: "play" },
+      pause: { method: "pause" },
+      mute: { method: "mute" },
+      unmute: { method: "unmute" },
+      volumeUp: { method: "volumeUp" },
+      volumeDown: { method: "volumeDown" },
+      seekForward: { method: "seek", value: 10 },
+      seekBack: { method: "seek", value: -10 },
+      seekTo: (seconds: number) => ({ method: "seek", value: seconds }),
+      setVolume: (volume: number) => ({ method: "setVolume", value: volume }),
+      setPlaybackRate: (rate: number) => ({ method: "setPlaybackRate", value: rate }),
+    },
+    // VidFast emits { type: "PLAYER_EVENT", data: { event, currentTime, duration } }
+    // with events "play" | "pause" | "seeked" | "ended" | "timeupdate".
+    events: {
+      play: ["play", "playing"],
+      pause: ["pause", "paused"],
+      time: ["timeupdate", "time", "seeked"],
+      ended: ["ended", "complete"],
+    },
+    supportsPostMessage: true,
+  },
+  {
+    id: "twoembed",
+    name: "2Embed",
+    origins: ["2embed.cc", "www.2embed.cc", "2embed.skin"],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
+    commands: {
+      toggle: { action: "toggle" },
+      play: { action: "play" },
+      pause: { action: "pause" },
+      mute: { action: "mute" },
+      unmute: { action: "unmute" },
+      seekForward: { action: "seek", seconds: 10 },
+      seekBack: { action: "seek", seconds: -10 },
+      seekTo: (seconds: number) => ({ action: "seek", seconds }),
+      setVolume: (volume: number) => ({ action: "volume", value: volume }),
     },
     events: {
       play: ["play"],

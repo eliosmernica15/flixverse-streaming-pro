@@ -234,6 +234,34 @@ export function useEmbedBridge({
           }
           return;
         }
+        // Videasy-style watch progress: { id, type: "movie"|"tv", progress (%),
+        // timestamp (s), duration (s) } — sent as a JSON string.
+        const videasyTime = extractNumber(dataObj.timestamp);
+        const videasyDuration = extractNumber(dataObj.duration);
+        if (
+          videasyTime !== undefined &&
+          videasyDuration !== undefined &&
+          videasyDuration > 0 &&
+          dataObj.event === undefined &&
+          dataObj.method === undefined &&
+          dataObj.action === undefined
+        ) {
+          const prev = stateRef.current;
+          const next: PlayerState = {
+            ...prev,
+            currentTime: videasyTime,
+            duration: videasyDuration,
+            isLiveSynced: true,
+          };
+          setState(next);
+          if (videasyDuration !== prev.duration) {
+            callbacksRef.current.onDurationChange?.(videasyDuration);
+          }
+          if (videasyTime !== prev.currentTime) {
+            callbacksRef.current.onTimeUpdate?.(videasyTime);
+          }
+          return;
+        }
         payload =
           dataObj.type === "PLAYER_EVENT" && typeof dataObj.data === "object" && dataObj.data !== null
             ? (dataObj.data as Record<string, unknown>)
