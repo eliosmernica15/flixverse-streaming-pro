@@ -25,9 +25,15 @@ import {
   CAPTION_SIZE_STORAGE_KEY,
   CAPTION_STYLE_STORAGE_KEY,
   CAPTION_POSITION_STORAGE_KEY,
+  CAPTION_OPACITY_STORAGE_KEY,
+  CAPTION_OPACITY_MIN,
+  CAPTION_OPACITY_MAX,
   loadCaptionSize,
   loadCaptionStyle,
   loadCaptionPosition,
+  loadCaptionOpacity,
+  opacityToPercent,
+  percentToOpacity,
   type CaptionSize,
   type CaptionStyle,
   type CaptionPosition,
@@ -179,6 +185,7 @@ export function PlayerShell({
   const [captionSize, setCaptionSize] = useState<CaptionSize>("medium");
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>("boxed");
   const [captionPosition, setCaptionPosition] = useState<CaptionPosition>("bottom");
+  const [captionOpacity, setCaptionOpacity] = useState(0.92);
 
   useEffect(() => {
     const saved = localStorage.getItem(CAPTION_LANG_STORAGE_KEY);
@@ -188,6 +195,7 @@ export function PlayerShell({
     setCaptionSize(loadCaptionSize());
     setCaptionStyle(loadCaptionStyle());
     setCaptionPosition(loadCaptionPosition());
+    setCaptionOpacity(loadCaptionOpacity());
   }, []);
 
   // Timeline comments state
@@ -642,6 +650,13 @@ export function PlayerShell({
     setCaptionPosition(position);
     localStorage.setItem(CAPTION_POSITION_STORAGE_KEY, position);
     playUiSound("tap");
+    bumpControls();
+  }, [bumpControls]);
+
+  const changeCaptionOpacity = useCallback((percent: number) => {
+    const opacity = percentToOpacity(percent);
+    setCaptionOpacity(opacity);
+    localStorage.setItem(CAPTION_OPACITY_STORAGE_KEY, String(opacity));
     bumpControls();
   }, [bumpControls]);
 
@@ -1213,6 +1228,21 @@ export function PlayerShell({
                               </button>
                             ))}
                           </div>
+                          <div className="video-settings-opacity">
+                            <label className="video-settings-head" htmlFor="caption-opacity">
+                              Caption opacity · {opacityToPercent(captionOpacity)}%
+                            </label>
+                            <input
+                              id="caption-opacity"
+                              type="range"
+                              min={opacityToPercent(CAPTION_OPACITY_MIN)}
+                              max={opacityToPercent(CAPTION_OPACITY_MAX)}
+                              value={opacityToPercent(captionOpacity)}
+                              onChange={(e) => changeCaptionOpacity(parseInt(e.target.value, 10))}
+                              className="video-settings-range"
+                              aria-label="Caption opacity"
+                            />
+                          </div>
                         </div>
                       )}
                       <SettingsToggle
@@ -1400,6 +1430,7 @@ export function PlayerShell({
         size={captionSize}
         style={captionStyle}
         position={captionPosition}
+        opacity={captionOpacity}
       />
       {showCaptions && captionsLoading && embedState === "ready" && (
         <div className="video-caption" role="status">

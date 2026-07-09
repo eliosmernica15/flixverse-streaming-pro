@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useToast } from "@/hooks/use-toast";
+import { SubscriptionBilling } from "@/components/SubscriptionBilling";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 
@@ -61,6 +62,8 @@ export default function ProfileSettings() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <SubscriptionBilling />
+
       <section className="glass-card rounded-2xl border border-white/10 p-6">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/20 to-orange-500/10 flex items-center justify-center border border-white/10">

@@ -1014,6 +1014,37 @@
   font-size: 0.65rem;
   color: var(--video-text-dim);
 }
+.video-settings-opacity {
+  margin-top: 0.5rem;
+}
+.video-settings-range {
+  width: 100%;
+  height: 4px;
+  margin-top: 0.35rem;
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+.video-settings-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--video-accent, #e50914);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 8px rgba(229, 9, 20, 0.45);
+}
+.video-settings-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--video-accent, #e50914);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 8px rgba(229, 9, 20, 0.45);
+}
 .video-quality,
 .video-chip-btn {
   flex: 1 1 auto;

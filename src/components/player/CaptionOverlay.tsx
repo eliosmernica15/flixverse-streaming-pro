@@ -10,6 +10,7 @@ interface CaptionOverlayProps {
   size?: CaptionSize;
   style?: CaptionStyle;
   position?: CaptionPosition;
+  opacity?: number;
 }
 
 export function CaptionOverlay({
@@ -19,12 +20,14 @@ export function CaptionOverlay({
   size = "medium",
   style = "boxed",
   position = "bottom",
+  opacity = 0.92,
 }: CaptionOverlayProps) {
   if (!visible || !cue) return null;
 
   return (
     <div
       className={`video-caption video-caption--${size} video-caption--${style} video-caption--${position}`}
+      style={{ opacity }}
       role="status"
       aria-live="polite"
     >
