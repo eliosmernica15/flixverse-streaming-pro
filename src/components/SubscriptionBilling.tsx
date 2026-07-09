@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { CreditCard, Crown, Loader2, Sparkles, Zap } from "lucide-react";
+import { CreditCard, Crown, ExternalLink, Loader2, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthHeaders } from "@/lib/firebase/clientAuth";
 import {
   formatBillingDate,
   formatPlanLabel,
@@ -13,19 +15,60 @@ import {
   statusBadgeClass,
 } from "@/lib/billing/format";
 
+interface InvoiceRow {
+  id: string;
+  number: string | null;
+  status: string | null;
+  amountDue: number;
+  currency: string;
+  created: number | null;
+  hostedInvoiceUrl: string | null;
+}
+
+function formatMoney(amount: number, currency: string) {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amount / 100);
+}
+
 export function SubscriptionBilling() {
+  const { user } = useAuth();
   const { subscription, loading, isPaid, hasPremium } = useSubscription();
   const { toast } = useToast();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user || !subscription.stripeCustomerId) return;
+
+    async function loadInvoices() {
+      setInvoicesLoading(true);
+      try {
+        const headers = await getAuthHeaders(user);
+        const res = await fetch("/api/billing/invoices", { headers });
+        const data = await res.json();
+        if (res.ok) setInvoices(data.invoices || []);
+      } catch {
+        // optional
+      } finally {
+        setInvoicesLoading(false);
+      }
+    }
+
+    void loadInvoices();
+  }, [user, subscription.stripeCustomerId]);
 
   const handleManageBilling = async () => {
-    if (!subscription.stripeCustomerId) return;
+    if (!user) return;
     setPortalLoading(true);
     try {
+      const headers = await getAuthHeaders(user);
       const res = await fetch("/api/billing/portal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: subscription.stripeCustomerId }),
+        headers,
+        body: JSON.stringify({}),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -111,12 +154,6 @@ export function SubscriptionBilling() {
             )}
           </div>
 
-          {subscription.stripeSubscriptionId && (
-            <p className="text-[10px] text-gray-600 font-mono truncate">
-              Sub: {subscription.stripeSubscriptionId}
-            </p>
-          )}
-
           <div className="flex flex-wrap gap-3">
             {subscription.stripeCustomerId ? (
               <Button
@@ -151,6 +188,54 @@ export function SubscriptionBilling() {
             <p className="text-xs text-amber-400/90 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
               Your last payment failed. Update your payment method to keep your subscription active.
             </p>
+          )}
+
+          {subscription.stripeCustomerId && (
+            <div className="pt-2 border-t border-white/5">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Recent invoices</p>
+              {invoicesLoading ? (
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading…
+                </div>
+              ) : invoices.length === 0 ? (
+                <p className="text-sm text-gray-600">No invoices yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {invoices.map((inv) => (
+                    <li
+                      key={inv.id}
+                      className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white/5 text-sm"
+                    >
+                      <div>
+                        <p className="text-white font-medium">
+                          {inv.number || inv.id.slice(-8)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {inv.created ? formatBillingDate(inv.created) : "—"} · {inv.status}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-gray-300">
+                          {formatMoney(inv.amountDue, inv.currency)}
+                        </span>
+                        {inv.hostedInvoiceUrl && (
+                          <a
+                            href={inv.hostedInvoiceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-amber-400 hover:text-amber-300"
+                            aria-label="View invoice"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { syncSubscriptionToFirestore, type BillingPlan } from "@/lib/billing/subscriptionSync";
+import { verifyAuthHeader } from "@/lib/firebase/verifyAuth";
 
 export const runtime = "nodejs";
 
@@ -23,14 +24,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "session_id required" }, { status: 400 });
   }
 
+  const auth = await verifyAuthHeader(request);
+
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.payment_status !== "paid" && session.status !== "complete") {
       return NextResponse.json({ error: "Session not complete" }, { status: 400 });
     }
 
-    const planId = (session.metadata?.planId as BillingPlan) || "standard";
     const userId = session.metadata?.userId;
+    const planId = (session.metadata?.planId as BillingPlan) || "standard";
+    if (auth && userId && auth.uid !== userId) {
+      return NextResponse.json({ error: "Session does not belong to this user" }, { status: 403 });
+    }
     let status = "trialing";
     let periodEndMs: number | undefined;
 

@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isRateLimited } from "@/lib/rateLimit";
 
 export interface FlixPartyParticipant {
   userId: string;
@@ -190,6 +191,47 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
     [user, generateCode]
   );
 
+  const joinRoomById = useCallback(
+    async (targetRoomId: string): Promise<boolean> => {
+      if (!user) return false;
+
+      const db = requireFirebaseDb();
+      const roomRef = doc(db, "flix_parties", targetRoomId);
+      const snap = await import("firebase/firestore").then((m) => m.getDoc(roomRef));
+      if (!snap.exists()) return false;
+
+      const data = snap.data();
+      const participants: FlixPartyParticipant[] = data.participants || [];
+
+      if (participants.find((p) => p.userId === user.uid)) {
+        const updated = participants.map((p) =>
+          p.userId === user.uid ? { ...p, lastSeenAt: Date.now() } : p
+        );
+        await updateDoc(roomRef, { participants: updated, updatedAt: Date.now() });
+        return true;
+      }
+
+      if (participants.length >= 20) {
+        throw new Error("Room is full (max 20 participants)");
+      }
+
+      const newParticipant: FlixPartyParticipant = {
+        userId: user.uid,
+        displayName: user.displayName || "Guest",
+        avatarUrl: user.photoURL,
+        lastSeenAt: Date.now(),
+        role: "guest",
+      };
+
+      await updateDoc(roomRef, {
+        participants: [...participants, newParticipant],
+        updatedAt: Date.now(),
+      });
+      return true;
+    },
+    [user]
+  );
+
   const joinRoom = useCallback(
     async (roomCode: string): Promise<string | null> => {
       if (!user) throw new Error("Must be signed in to join a party");
@@ -283,6 +325,9 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
   const sendMessage = useCallback(
     async (text: string, emoji?: string) => {
       if (!roomId || !user) return;
+      if (isRateLimited("PARTY_CHAT", user.uid)) {
+        throw new Error("Slow down — too many messages");
+      }
 
       const db = requireFirebaseDb();
       const messagesRef = collection(db, "flix_parties", roomId, "messages");
@@ -322,6 +367,7 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
     isHost,
     createRoom,
     joinRoom,
+    joinRoomById,
     leaveRoom,
     sendMessage,
     updatePlaybackState,

@@ -1,5 +1,8 @@
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+
+export { getAuth };
 
 let adminApp: App | undefined;
 let adminDb: Firestore | undefined;

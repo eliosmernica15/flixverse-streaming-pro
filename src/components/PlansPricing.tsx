@@ -10,6 +10,7 @@ import { Reveal } from "@/components/Reveal";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthHeaders } from "@/lib/firebase/clientAuth";
 
 type PlanId = "free" | "standard" | "premium";
 
@@ -109,14 +110,13 @@ export function PlansPricing() {
 
     setLoadingPlan(plan.id);
     try {
+      const headers = await getAuthHeaders(user);
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           planId: plan.id,
           billingPeriod: yearly ? "yearly" : "monthly",
-          userId: user.uid,
-          email: user.email,
         }),
       });
       const data = await res.json();
@@ -137,11 +137,12 @@ export function PlansPricing() {
   };
 
   const handleManage = async () => {
-    if (!subscription.stripeCustomerId) return;
+    if (!user) return;
+    const headers = await getAuthHeaders(user);
     const res = await fetch("/api/billing/portal", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customerId: subscription.stripeCustomerId }),
+      headers,
+      body: JSON.stringify({}),
     });
     const data = await res.json();
     if (data.url) window.location.href = data.url;

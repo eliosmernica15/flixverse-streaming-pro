@@ -89,8 +89,10 @@ export async function GET(request: NextRequest) {
     });
   } catch (err) {
     console.error("Embed proxy error:", err);
-    // Fallback: redirect to provider directly so playback still works
-    return NextResponse.redirect(targetUrl);
+    return NextResponse.json(
+      { error: "Failed to load embed. Try another server." },
+      { status: 502 }
+    );
   }
 }
 

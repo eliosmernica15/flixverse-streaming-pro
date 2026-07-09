@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isRateLimited } from "@/lib/rateLimit";
 
 export interface TimelineComment {
   id: string;
@@ -103,6 +104,9 @@ export function useTimelineComments({
   const addComment = useCallback(
     async (timestampSeconds: number, text: string) => {
       if (!user) throw new Error("Must be signed in to comment");
+      if (isRateLimited("TIMELINE_COMMENT", user.uid)) {
+        throw new Error("Comment limit reached. Try again later.");
+      }
 
       const db = requireFirebaseDb();
       const commentsRef = collection(db, "timeline_comments");

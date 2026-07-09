@@ -17,7 +17,7 @@ export default function PartyJoinClient() {
   const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState("Preparing your party…");
   const [error, setError] = useState<string | null>(null);
-  const { joinRoom } = useFlixParty({ roomId: null });
+  const { joinRoom, joinRoomById } = useFlixParty({ roomId: null });
 
   useEffect(() => {
     if (authLoading) return;
@@ -46,6 +46,13 @@ export default function PartyJoinClient() {
             return;
           }
           targetRoomId = joinedId;
+        } else if (targetRoomId) {
+          setStatus("Joining party…");
+          const joined = await joinRoomById(targetRoomId);
+          if (!joined) {
+            setError("Party not found or has ended.");
+            return;
+          }
         }
 
         if (!targetRoomId) {
@@ -76,7 +83,7 @@ export default function PartyJoinClient() {
     }
 
     void join();
-  }, [authLoading, user, searchParams, joinRoom, router]);
+  }, [authLoading, user, searchParams, joinRoom, joinRoomById, router]);
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 p-6">

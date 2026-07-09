@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { User, LogOut, Menu, X, Sparkles, ChevronDown } from "lucide-react";
+import { User, LogOut, Menu, X, Sparkles, ChevronDown, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { TMDBMovie, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
+import { formatPlanLabel } from "@/lib/billing/format";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useToast } from "@/hooks/use-toast";
 import { useThrottledScroll } from "@/hooks/useThrottledScroll";
@@ -42,6 +44,7 @@ const Navigation = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, signOut } = useAuth();
+  const { subscription, isPaid } = useSubscription();
   const { profile } = useUserProfileContext();
   const { toast } = useToast();
   const prefetchRoute = useRoutePrefetch();
@@ -76,6 +79,7 @@ const Navigation = () => {
     { path: "/movies", label: "Movies" },
     { path: "/new-and-popular", label: "New & Popular" },
     { path: "/my-list", label: "My List" },
+    { path: "/plans", label: "Plans" },
     { path: "/offline-library", label: "Offline" },
   ];
 
@@ -204,8 +208,20 @@ const Navigation = () => {
                       {profile?.display_name || user?.email?.split("@")[0]}
                     </p>
                     <p className="truncate text-xs text-gray-400">{user?.email}</p>
+                    {isPaid && (
+                      <p className="truncate text-[10px] text-amber-400/90 mt-0.5">
+                        {formatPlanLabel(subscription.plan)} plan
+                      </p>
+                    )}
                   </div>
 
+                  <DropdownMenuItem
+                    onClick={() => router.push("/profile?tab=billing")}
+                    className="cursor-pointer rounded-xl py-3 text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                  >
+                    <CreditCard className="mr-3 h-4 w-4" />
+                    Billing
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => router.push("/profile")}
                     className="cursor-pointer rounded-xl py-3 text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"

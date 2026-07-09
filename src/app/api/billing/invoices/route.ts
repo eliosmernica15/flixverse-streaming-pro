@@ -12,7 +12,8 @@ function getStripe() {
 
 export const runtime = "nodejs";
 
-export async function POST(request: NextRequest) {
+/** List recent invoices for the authenticated subscriber. */
+export async function GET(request: NextRequest) {
   const stripe = getStripe();
   if (!stripe) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
@@ -31,19 +32,30 @@ export async function POST(request: NextRequest) {
   const subSnap = await db.collection("subscriptions").doc(auth.uid).get();
   const customerId = subSnap.data()?.stripeCustomerId as string | undefined;
   if (!customerId) {
-    return NextResponse.json({ error: "No billing account found" }, { status: 404 });
+    return NextResponse.json({ invoices: [] });
   }
 
-  const origin = request.nextUrl.origin;
-
   try {
-    const session = await stripe.billingPortal.sessions.create({
+    const invoices = await stripe.invoices.list({
       customer: customerId,
-      return_url: `${origin}/profile?tab=billing`,
+      limit: 8,
     });
-    return NextResponse.json({ url: session.url });
+
+    return NextResponse.json({
+      invoices: invoices.data.map((inv) => ({
+        id: inv.id,
+        number: inv.number,
+        status: inv.status,
+        amountDue: inv.amount_due,
+        currency: inv.currency,
+        created: inv.created ? inv.created * 1000 : null,
+        periodEnd: inv.period_end ? inv.period_end * 1000 : null,
+        hostedInvoiceUrl: inv.hosted_invoice_url,
+        pdfUrl: inv.invoice_pdf,
+      })),
+    });
   } catch (err) {
-    console.error("Portal session error:", err);
-    return NextResponse.json({ error: "Failed to create portal session" }, { status: 500 });
+    console.error("Invoice list error:", err);
+    return NextResponse.json({ error: "Failed to fetch invoices" }, { status: 500 });
   }
 }

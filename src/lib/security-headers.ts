@@ -36,7 +36,7 @@ export const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev",
       "font-src 'self' data:",
-      "connect-src 'self' https://api.themoviedb.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://*.firebaseio.com",
+      "connect-src 'self' https://api.themoviedb.org https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://*.firebaseio.com",
       // Player iframes load via /api/embed (same-origin 'self'); external hosts kept as fallback.
       "frame-src 'self' blob: https://vidsrc.cc https://vidsrc.xyz https://vidsrc.icu https://vidlink.pro https://embed.su https://multiembed.mov https://player.autoembed.cc https://player.smashy.stream https://www.youtube.com https://www.youtube-nocookie.com",
       "upgrade-insecure-requests",

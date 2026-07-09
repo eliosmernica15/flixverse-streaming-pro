@@ -1,6 +1,15 @@
-import { getEnv } from "@/utils/env";
 import { MutationAction, saveMutationToOutbox, getOutboxMutations, clearOutboxMutation } from "@/lib/offlineStorage";
-// In a real implementation, we would import Firestore methods here.
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  query,
+  where,
+  getDocs,
+  setDoc,
+} from "firebase/firestore";
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -9,12 +18,16 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+function getDb() {
+  return getFirestore();
+}
+
 export class MutationDispatcher {
   private static isOnline(): boolean {
     return typeof navigator !== "undefined" && navigator.onLine;
   }
 
-  static async dispatch(type: MutationAction["type"], payload: any): Promise<void> {
+  static async dispatch(type: MutationAction["type"], payload: Record<string, unknown>): Promise<void> {
     const action: MutationAction = {
       id: generateId(),
       type,
@@ -30,7 +43,6 @@ export class MutationDispatcher {
         await saveMutationToOutbox(action);
       }
     } else {
-      console.log("Offline: Saving mutation to outbox", action.type);
       await saveMutationToOutbox(action);
     }
   }
@@ -41,28 +53,99 @@ export class MutationDispatcher {
     const mutations = await getOutboxMutations();
     if (mutations.length === 0) return;
 
-    console.log(`Syncing ${mutations.length} mutations from outbox...`);
-
     for (const action of mutations) {
       try {
         await this.processAction(action);
         await clearOutboxMutation(action.id);
       } catch (error) {
         console.error(`Failed to sync mutation ${action.id}`, error);
-        // Will retry on next sync
       }
     }
   }
 
   private static async processAction(action: MutationAction): Promise<void> {
-    // Here we would use the actual Firestore functions based on action.type
-    // For now, we will just log the simulated execution
-    console.log(`Processing action to Firebase: ${action.type}`, action.payload);
-    
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    
-    // TODO: implement actual Firestore mutation calls.
-    // e.g. switch(action.type) { case 'ADD_WATCHLIST': await addToFirestoreWatchlist(action.payload); break; }
+    const db = getDb();
+    const p = action.payload as Record<string, unknown>;
+
+    switch (action.type) {
+      case "ADD_WATCHLIST": {
+        const userId = p.userId as string;
+        if (!userId) throw new Error("userId required");
+        await addDoc(collection(db, "user_movie_lists"), {
+          user_id: userId,
+          movie_id: p.movieId,
+          movie_title: p.movieTitle,
+          movie_poster_path: p.posterPath ?? null,
+          media_type: p.mediaType ?? "movie",
+          added_at: Date.now(),
+        });
+        break;
+      }
+      case "REMOVE_WATCHLIST": {
+        const userId = p.userId as string;
+        const movieId = p.movieId as number;
+        const q = query(
+          collection(db, "user_movie_lists"),
+          where("user_id", "==", userId),
+          where("movie_id", "==", movieId)
+        );
+        const snap = await getDocs(q);
+        await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+        break;
+      }
+      case "RATE_CONTENT": {
+        const userId = p.userId as string;
+        const contentId = p.contentId as number;
+        const q = query(
+          collection(db, "content_ratings"),
+          where("user_id", "==", userId),
+          where("content_id", "==", contentId)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          await addDoc(collection(db, "content_ratings"), {
+            user_id: userId,
+            content_id: contentId,
+            content_type: p.contentType ?? "movie",
+            rating: p.rating,
+            created_at: Date.now(),
+          });
+        } else {
+          await setDoc(snap.docs[0].ref, { rating: p.rating, updated_at: Date.now() }, { merge: true });
+        }
+        break;
+      }
+      case "UPDATE_PROGRESS": {
+        const userId = p.userId as string;
+        const contentId = p.contentId as number;
+        const q = query(
+          collection(db, "watch_history"),
+          where("user_id", "==", userId),
+          where("content_id", "==", contentId)
+        );
+        const snap = await getDocs(q);
+        const data = {
+          user_id: userId,
+          content_id: contentId,
+          content_type: p.contentType ?? "movie",
+          content_title: p.contentTitle,
+          content_poster_path: p.posterPath ?? null,
+          progress_seconds: p.progressSeconds ?? 0,
+          total_duration_seconds: p.totalDurationSeconds ?? 0,
+          completed: p.completed ?? false,
+          watched_at: Date.now(),
+          season: p.season ?? null,
+          episode: p.episode ?? null,
+        };
+        if (snap.empty) {
+          await addDoc(collection(db, "watch_history"), data);
+        } else {
+          await setDoc(snap.docs[0].ref, data, { merge: true });
+        }
+        break;
+      }
+      default:
+        console.warn("Unknown mutation type:", action.type);
+    }
   }
 }

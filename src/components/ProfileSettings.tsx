@@ -7,6 +7,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { useSyncedCaptionPreferences } from "@/hooks/player/useSyncedCaptionPreferences";
 
 interface ProfileSettingsProps {
   onOpenTab?: (tab: string) => void;
@@ -18,14 +19,14 @@ export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
     useNotifications();
   const { toast } = useToast();
 
+  const { spoilerGuard, setSpoilerGuard } = useSyncedCaptionPreferences();
+
   // Ambient glow toggle (persisted in localStorage)
   const [ambientGlow, setAmbientGlow] = useState(true);
-  const [spoilerGuard, setSpoilerGuard] = useState(true);
 
   useEffect(() => {
     try {
       setAmbientGlow(localStorage.getItem("flixverse-ambient-glow") !== "false");
-      setSpoilerGuard(localStorage.getItem("flixverse-spoiler-guard") !== "false");
     } catch {}
   }, []);
 
@@ -38,7 +39,6 @@ export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
 
   const toggleSpoilerGuard = (checked: boolean) => {
     setSpoilerGuard(checked);
-    localStorage.setItem("flixverse-spoiler-guard", String(checked));
     toast({ title: checked ? "Spoiler guard on" : "Spoiler guard off" });
   };
 

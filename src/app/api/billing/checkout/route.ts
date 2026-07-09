@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { verifyAuthHeader } from "@/lib/firebase/verifyAuth";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -15,6 +16,8 @@ const PRICE_MAP: Record<string, string | undefined> = {
   premium_yearly: process.env.STRIPE_PRICE_PREMIUM_YEARLY,
 };
 
+export const runtime = "nodejs";
+
 export async function POST(request: NextRequest) {
   const stripe = getStripe();
   if (!stripe) {
@@ -24,15 +27,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const auth = await verifyAuthHeader(request);
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
-  const { planId, billingPeriod, userId, email } = body as {
+  const { planId, billingPeriod } = body as {
     planId: "standard" | "premium";
     billingPeriod: "monthly" | "yearly";
-    userId: string;
-    email: string;
   };
 
-  if (!userId || !email || !planId) {
+  if (!planId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -48,12 +54,12 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      customer_email: email,
+      customer_email: auth.email,
       line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { userId, planId },
+      metadata: { userId: auth.uid, planId },
       subscription_data: {
         trial_period_days: 7,
-        metadata: { userId, planId },
+        metadata: { userId: auth.uid, planId },
       },
       success_url: `${origin}/plans?success=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/plans?canceled=1`,

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { EyeOff } from "lucide-react";
 import { useSpoilerProgress } from "@/hooks/player/useSpoilerProgress";
+import { isSpoilerGuardEnabled } from "@/lib/player/spoilerGuard";
 
 interface SpoilerProtectedEpisodeProps {
   contentId: number;
@@ -21,13 +22,11 @@ export function SpoilerProtectedEpisode({
 }: SpoilerProtectedEpisodeProps) {
   const { isSpoiler, loading } = useSpoilerProgress(contentId, season, episode);
   const [isRevealed, setIsRevealed] = useState(false);
+  const guardEnabled = isSpoilerGuardEnabled();
 
-  // If loading or not a spoiler, render the children normally
-  if (loading || (!isSpoiler || isRevealed)) {
+  if (!guardEnabled || loading || !isSpoiler || isRevealed) {
     return <>{children}</>;
   }
-
-  // Render spoiler overlay over the blurred content
   return (
     <div className={`relative overflow-hidden rounded-xl border border-white/5 ${className}`}>
       <div 

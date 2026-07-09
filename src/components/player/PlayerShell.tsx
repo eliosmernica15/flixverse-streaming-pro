@@ -153,7 +153,6 @@ export function PlayerShell({
 
   // Advanced settings panel state
   const [quality, setQuality] = useState<string>("Auto");
-  const [showCaptions, setShowCaptions] = useState(false);
   const [ambientEnabled, setAmbientEnabled] = useState(true);
   const [uiSounds, setUiSounds] = useState(true);
   const [liveDuration, setLiveDuration] = useState(0);
@@ -182,6 +181,8 @@ export function PlayerShell({
     setCaptionStyle,
     setCaptionPosition,
     setCaptionOpacity,
+    showCaptions,
+    setShowCaptions,
     cloudSynced: captionsCloudSynced,
   } = useSyncedCaptionPreferences();
 
@@ -197,6 +198,7 @@ export function PlayerShell({
     isHost: isPartyHost,
     createRoom: createPartyRoom,
     joinRoom: joinPartyRoom,
+    joinRoomById: joinPartyById,
     leaveRoom: leavePartyRoom,
     updatePlaybackState,
   } = useFlixParty({ roomId: partyRoomId });
@@ -363,12 +365,18 @@ export function PlayerShell({
   }, [partyRoomId, rtcConnected, partyRoom]);
 
   // Auto-join party from URL ?party=ROOM_ID
+  const partyJoinAttempted = useRef(false);
   useEffect(() => {
-    if (partyRoomId || !user) return;
+    if (partyRoomId || !user || partyJoinAttempted.current) return;
     const params = new URLSearchParams(window.location.search);
     const joinId = params.get("party");
-    if (joinId) setPartyRoomId(joinId);
-  }, [partyRoomId, user]);
+    if (!joinId) return;
+
+    partyJoinAttempted.current = true;
+    void joinPartyById(joinId).then((ok) => {
+      if (ok) setPartyRoomId(joinId);
+    });
+  }, [partyRoomId, user, joinPartyById]);
 
   const broadcastPartyState = useCallback(
     (state: "playing" | "paused", time: number) => {
@@ -608,9 +616,9 @@ export function PlayerShell({
   }, [bumpControls]);
 
   const toggleCaptions = useCallback(() => {
-    setShowCaptions((p) => !p);
+    setShowCaptions(!showCaptions);
     bumpControls();
-  }, [bumpControls]);
+  }, [showCaptions, setShowCaptions, bumpControls]);
 
   const changeCaptionLang = useCallback((lang: string) => {
     setCaptionLang(lang);
@@ -1381,6 +1389,13 @@ export function PlayerShell({
           currentTime={currentTime}
           isPlaying={isPlaying}
           onSyncToPosition={seekTo}
+          partyJoinUrl={
+            partyRoomId && partyRoomKey
+              ? buildPartyJoinUrl(partyRoomId, partyRoomKey)
+              : partyRoom?.code
+                ? `${typeof window !== "undefined" ? window.location.origin : ""}/party/join?code=${partyRoom.code}`
+                : null
+          }
         />
       </PaywallGate>
 

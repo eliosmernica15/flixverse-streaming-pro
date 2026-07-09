@@ -5,6 +5,8 @@ import { Plus, Settings, User, Shield } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
+import { getMaxProfiles } from "@/lib/billing/planLimits";
 import { useToast } from "@/hooks/use-toast";
 import { MemberProfile, ProfileType } from "@/integrations/firebase/types";
 
@@ -27,6 +29,8 @@ interface ProfilePickerProps {
 
 export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
   const { user } = useAuth();
+  const { subscription } = useSubscription();
+  const maxProfiles = getMaxProfiles(subscription.plan);
   const { toast } = useToast();
   const router = useRouter();
   const [profiles, setProfiles] = useState<MemberProfile[]>([]);
@@ -89,8 +93,12 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
 
   const handleCreateProfile = useCallback(async () => {
     if (!newName.trim() || !user) return;
-    if (profiles.length >= 5) {
-      toast({ title: "Max profiles reached", description: "You can create up to 5 profiles.", variant: "destructive" });
+    if (profiles.length >= maxProfiles) {
+      toast({
+        title: "Max profiles reached",
+        description: `Your plan allows up to ${maxProfiles} profile${maxProfiles === 1 ? "" : "s"}.`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -115,7 +123,7 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
     } catch (err) {
       toast({ title: "Error", description: "Failed to create profile.", variant: "destructive" });
     }
-  }, [newName, newType, user, profiles.length, toast]);
+  }, [newName, newType, user, profiles.length, maxProfiles, toast]);
 
   if (loading) {
     return (

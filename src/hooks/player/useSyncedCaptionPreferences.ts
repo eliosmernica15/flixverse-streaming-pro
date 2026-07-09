@@ -20,18 +20,27 @@ import {
   type CaptionStyle,
   type CaptionPosition,
 } from "@/lib/player/captionPreferences";
+import { isSpoilerGuardEnabled, setSpoilerGuardEnabled } from "@/lib/player/spoilerGuard";
 
 const LOCAL_UPDATED_KEY = "flixverse-caption-local-updated";
+const SHOW_CAPTIONS_KEY = "flixverse-show-captions";
 
-export interface SyncedCaptionPreferences {
+export interface SyncedPlayerSettings {
   lang: string;
   size: CaptionSize;
   style: CaptionStyle;
   position: CaptionPosition;
   opacity: number;
+  showCaptions: boolean;
+  spoilerGuard: boolean;
 }
 
-function loadFromLocalStorage(): SyncedCaptionPreferences {
+function loadShowCaptions(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(SHOW_CAPTIONS_KEY) === "true";
+}
+
+function loadFromLocalStorage(): SyncedPlayerSettings {
   const savedLang = localStorage.getItem(CAPTION_LANG_STORAGE_KEY);
   return {
     lang:
@@ -40,26 +49,48 @@ function loadFromLocalStorage(): SyncedCaptionPreferences {
     style: loadCaptionStyle(),
     position: loadCaptionPosition(),
     opacity: loadCaptionOpacity(),
+    showCaptions: loadShowCaptions(),
+    spoilerGuard: isSpoilerGuardEnabled(),
   };
 }
 
-function saveToLocalStorage(prefs: SyncedCaptionPreferences) {
+function saveToLocalStorage(prefs: SyncedPlayerSettings) {
   localStorage.setItem(CAPTION_LANG_STORAGE_KEY, prefs.lang);
   localStorage.setItem(CAPTION_SIZE_STORAGE_KEY, prefs.size);
   localStorage.setItem(CAPTION_STYLE_STORAGE_KEY, prefs.style);
   localStorage.setItem(CAPTION_POSITION_STORAGE_KEY, prefs.position);
   localStorage.setItem(CAPTION_OPACITY_STORAGE_KEY, String(prefs.opacity));
+  localStorage.setItem(SHOW_CAPTIONS_KEY, String(prefs.showCaptions));
+  setSpoilerGuardEnabled(prefs.spoilerGuard);
   localStorage.setItem(LOCAL_UPDATED_KEY, String(Date.now()));
 }
 
-function parseRemote(data: Record<string, unknown>): SyncedCaptionPreferences | null {
+function toFirestorePayload(prefs: SyncedPlayerSettings) {
+  return {
+    captionLang: prefs.lang,
+    captionSize: prefs.size,
+    captionStyle: prefs.style,
+    captionPosition: prefs.position,
+    captionOpacity: prefs.opacity,
+    showCaptions: prefs.showCaptions,
+    spoilerGuardEnabled: prefs.spoilerGuard,
+    updatedAt: Date.now(),
+  };
+}
+
+function parseRemote(data: Record<string, unknown>): SyncedPlayerSettings | null {
   const lang = typeof data.captionLang === "string" ? data.captionLang : null;
   const size = typeof data.captionSize === "string" ? data.captionSize : null;
   const style = typeof data.captionStyle === "string" ? data.captionStyle : null;
   const position = typeof data.captionPosition === "string" ? data.captionPosition : null;
   const opacity = typeof data.captionOpacity === "number" ? data.captionOpacity : null;
+  const showCaptions = typeof data.showCaptions === "boolean" ? data.showCaptions : null;
+  const spoilerGuard =
+    typeof data.spoilerGuardEnabled === "boolean" ? data.spoilerGuardEnabled : null;
 
-  if (!lang && !size && !style && !position && opacity === null) return null;
+  if (!lang && !size && !style && !position && opacity === null && showCaptions === null && spoilerGuard === null) {
+    return null;
+  }
 
   const local = loadFromLocalStorage();
   return {
@@ -74,13 +105,15 @@ function parseRemote(data: Record<string, unknown>): SyncedCaptionPreferences | 
         ? (position as CaptionPosition)
         : local.position,
     opacity: opacity ?? local.opacity ?? CAPTION_OPACITY_DEFAULT,
+    showCaptions: showCaptions ?? local.showCaptions,
+    spoilerGuard: spoilerGuard ?? local.spoilerGuard,
   };
 }
 
-/** Caption prefs with localStorage + Firestore sync for signed-in users. */
+/** Player prefs with localStorage + Firestore sync for signed-in users. */
 export function useSyncedCaptionPreferences() {
   const { user } = useAuth();
-  const [prefs, setPrefs] = useState<SyncedCaptionPreferences>(loadFromLocalStorage);
+  const [prefs, setPrefs] = useState<SyncedPlayerSettings>(loadFromLocalStorage);
   const [cloudSynced, setCloudSynced] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seededRef = useRef(false);
@@ -106,18 +139,7 @@ export function useSyncedCaptionPreferences() {
           if (!seededRef.current) {
             seededRef.current = true;
             const local = loadFromLocalStorage();
-            void setDoc(
-              ref,
-              {
-                captionLang: local.lang,
-                captionSize: local.size,
-                captionStyle: local.style,
-                captionPosition: local.position,
-                captionOpacity: local.opacity,
-                updatedAt: Date.now(),
-              },
-              { merge: true }
-            );
+            void setDoc(ref, toFirestorePayload(local), { merge: true });
           }
           setCloudSynced(true);
           return;
@@ -149,7 +171,7 @@ export function useSyncedCaptionPreferences() {
   }, [user]);
 
   const persist = useCallback(
-    (next: SyncedCaptionPreferences) => {
+    (next: SyncedPlayerSettings) => {
       saveToLocalStorage(next);
 
       if (!user) return;
@@ -158,18 +180,7 @@ export function useSyncedCaptionPreferences() {
       saveTimerRef.current = setTimeout(() => {
         try {
           const db = requireFirebaseDb();
-          void setDoc(
-            doc(db, "user_settings", user.uid),
-            {
-              captionLang: next.lang,
-              captionSize: next.size,
-              captionStyle: next.style,
-              captionPosition: next.position,
-              captionOpacity: next.opacity,
-              updatedAt: Date.now(),
-            },
-            { merge: true }
-          );
+          void setDoc(doc(db, "user_settings", user.uid), toFirestorePayload(next), { merge: true });
         } catch {
           // Firebase unavailable — local prefs still work
         }
@@ -179,7 +190,7 @@ export function useSyncedCaptionPreferences() {
   );
 
   const update = useCallback(
-    (updates: Partial<SyncedCaptionPreferences>) => {
+    (updates: Partial<SyncedPlayerSettings>) => {
       setPrefs((prev) => {
         const next = { ...prev, ...updates };
         persist(next);
@@ -201,11 +212,15 @@ export function useSyncedCaptionPreferences() {
     captionStyle: prefs.style,
     captionPosition: prefs.position,
     captionOpacity: prefs.opacity,
+    showCaptions: prefs.showCaptions,
+    spoilerGuard: prefs.spoilerGuard,
     setCaptionLang: (lang: string) => update({ lang }),
     setCaptionSize: (size: CaptionSize) => update({ size }),
     setCaptionStyle: (style: CaptionStyle) => update({ style }),
     setCaptionPosition: (position: CaptionPosition) => update({ position }),
     setCaptionOpacity: (opacity: number) => update({ opacity }),
+    setShowCaptions: (showCaptions: boolean) => update({ showCaptions }),
+    setSpoilerGuard: (spoilerGuard: boolean) => update({ spoilerGuard }),
     cloudSynced,
   };
 }

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { SectionHeader } from "@/components/SectionHeader";
 import PlansPricing from "@/components/PlansPricing";
 import { PlansCheckoutSuccess } from "@/components/PlansCheckoutSuccess";
+import { PlansCheckoutCanceled } from "@/components/PlansCheckoutCanceled";
 
 export const metadata: Metadata = {
   title: "Plans — FlixVerse",
@@ -19,6 +20,7 @@ export default function PlansPage() {
         </p>
         <PlansPricing />
         <Suspense fallback={null}>
+          <PlansCheckoutCanceled />
           <PlansCheckoutSuccess />
         </Suspense>
       </div>

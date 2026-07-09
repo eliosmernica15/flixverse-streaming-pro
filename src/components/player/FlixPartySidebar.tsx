@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useFlixParty, type FlixPartyParticipant } from "@/hooks/player/useFlixParty";
 import { useFriends, type Friend } from "@/hooks/useFriends";
+import { useToast } from "@/hooks/use-toast";
 import { FriendsList } from "@/components/FriendsList";
 import { WatchParty } from "./WatchParty";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge";
@@ -28,6 +29,7 @@ interface FlixPartySidebarProps {
   currentTime?: number;
   isPlaying?: boolean;
   onSyncToPosition?: (position: number) => void;
+  partyJoinUrl?: string | null;
 }
 
 type SidebarTab = "chat" | "friends" | "party";
@@ -49,9 +51,11 @@ export function FlixPartySidebar({
   currentTime,
   isPlaying,
   onSyncToPosition,
+  partyJoinUrl,
 }: FlixPartySidebarProps) {
   const { room, messages, isHost, sendMessage } = useFlixParty({ roomId });
   const { friends, incomingRequests } = useFriends();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<SidebarTab>("friends");
   const [input, setInput] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
@@ -97,10 +101,19 @@ export function FlixPartySidebar({
     [handleSend]
   );
 
-  const handleInviteFriend = useCallback((friend: Friend) => {
-    // This would trigger WatchParty invite
-    setActiveTab("party");
-  }, []);
+  const handleInviteFriend = useCallback(
+    (friend: Friend) => {
+      if (partyJoinUrl) {
+        void navigator.clipboard.writeText(partyJoinUrl);
+        toast({
+          title: "Invite link copied",
+          description: `Share with ${friend.displayName || "your friend"}`,
+        });
+      }
+      setActiveTab("party");
+    },
+    [partyJoinUrl, toast]
+  );
 
   if (!isOpen) return null;
 
