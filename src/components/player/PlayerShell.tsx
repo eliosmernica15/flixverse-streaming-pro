@@ -21,12 +21,16 @@ import {
 import {
   CAPTION_SIZES,
   CAPTION_STYLES,
+  CAPTION_POSITIONS,
   CAPTION_SIZE_STORAGE_KEY,
   CAPTION_STYLE_STORAGE_KEY,
+  CAPTION_POSITION_STORAGE_KEY,
   loadCaptionSize,
   loadCaptionStyle,
+  loadCaptionPosition,
   type CaptionSize,
   type CaptionStyle,
+  type CaptionPosition,
 } from "@/lib/player/captionPreferences";
 import {
   encryptPayload,
@@ -174,6 +178,7 @@ export function PlayerShell({
   const [captionLang, setCaptionLang] = useState("en");
   const [captionSize, setCaptionSize] = useState<CaptionSize>("medium");
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>("boxed");
+  const [captionPosition, setCaptionPosition] = useState<CaptionPosition>("bottom");
 
   useEffect(() => {
     const saved = localStorage.getItem(CAPTION_LANG_STORAGE_KEY);
@@ -182,6 +187,7 @@ export function PlayerShell({
     }
     setCaptionSize(loadCaptionSize());
     setCaptionStyle(loadCaptionStyle());
+    setCaptionPosition(loadCaptionPosition());
   }, []);
 
   // Timeline comments state
@@ -628,6 +634,13 @@ export function PlayerShell({
   const changeCaptionStyle = useCallback((style: CaptionStyle) => {
     setCaptionStyle(style);
     localStorage.setItem(CAPTION_STYLE_STORAGE_KEY, style);
+    playUiSound("tap");
+    bumpControls();
+  }, [bumpControls]);
+
+  const changeCaptionPosition = useCallback((position: CaptionPosition) => {
+    setCaptionPosition(position);
+    localStorage.setItem(CAPTION_POSITION_STORAGE_KEY, position);
     playUiSound("tap");
     bumpControls();
   }, [bumpControls]);
@@ -1185,6 +1198,21 @@ export function PlayerShell({
                               </button>
                             ))}
                           </div>
+                          <p className="video-settings-head">Caption position</p>
+                          <div className="video-settings-grid">
+                            {CAPTION_POSITIONS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={captionPosition === opt.value}
+                                onClick={() => changeCaptionPosition(opt.value)}
+                                className={`video-quality ${captionPosition === opt.value ? "is-selected" : ""}`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
                       <SettingsToggle
@@ -1371,6 +1399,7 @@ export function PlayerShell({
         source={captionSource}
         size={captionSize}
         style={captionStyle}
+        position={captionPosition}
       />
       {showCaptions && captionsLoading && embedState === "ready" && (
         <div className="video-caption" role="status">
@@ -1387,7 +1416,7 @@ export function PlayerShell({
           <div className="video-stats-row"><span>Server</span><span>{currentSource.name}</span></div>
           <div className="video-stats-row"><span>Provider</span><span>{providerName}</span></div>
           <div className="video-stats-row"><span>Sync</span><span>{isLiveSynced ? "Live (postMessage)" : "Estimated clock"}</span></div>
-          <div className="video-stats-row"><span>Captions</span><span>{showCaptions ? `${getCaptionLanguageLabel(captionLang)} · ${captionSize}` : "Off"}</span></div>
+          <div className="video-stats-row"><span>Captions</span><span>{showCaptions ? `${getCaptionLanguageLabel(captionLang)} · ${captionSize} · ${captionPosition}` : "Off"}</span></div>
           <div className="video-stats-row"><span>Quality</span><span>{quality}</span></div>
           <div className="video-stats-row"><span>Buffered</span><span>{formatTime(buffered)}</span></div>
         </div>

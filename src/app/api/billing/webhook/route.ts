@@ -129,3 +129,33 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ received: true });
 }
+
+/** Configuration health check — no secrets exposed. */
+export async function GET() {
+  const hasStripe = !!process.env.STRIPE_SECRET_KEY;
+  const hasWebhookSecret = !!process.env.STRIPE_WEBHOOK_SECRET;
+  const hasAdmin =
+    !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+    (!!process.env.FIREBASE_CLIENT_EMAIL && !!process.env.FIREBASE_PRIVATE_KEY);
+  const hasPrices = !!(
+    process.env.STRIPE_PRICE_STANDARD_MONTHLY || process.env.STRIPE_PRICE_STANDARD_YEARLY
+  );
+
+  return NextResponse.json({
+    endpoint: "/api/billing/webhook",
+    configured: hasStripe && hasWebhookSecret && hasAdmin,
+    checks: {
+      stripeSecret: hasStripe,
+      webhookSecret: hasWebhookSecret,
+      firebaseAdmin: hasAdmin,
+      priceIds: hasPrices,
+    },
+    events: [
+      "checkout.session.completed",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+      "invoice.payment_failed",
+    ],
+    docs: "/docs/STRIPE_WEBHOOK.md",
+  });
+}

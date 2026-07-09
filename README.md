@@ -71,3 +71,7 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Stripe billing (optional)
+
+Paid plans use Stripe Checkout. To enable subscriptions and webhook sync to Firestore, see [docs/STRIPE_WEBHOOK.md](docs/STRIPE_WEBHOOK.md).

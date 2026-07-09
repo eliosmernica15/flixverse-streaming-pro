@@ -1,7 +1,7 @@
 "use client";
 
 import type { CaptionCue } from "@/lib/player/captionParser";
-import type { CaptionSize, CaptionStyle } from "@/lib/player/captionPreferences";
+import type { CaptionSize, CaptionStyle, CaptionPosition } from "@/lib/player/captionPreferences";
 
 interface CaptionOverlayProps {
   cue: CaptionCue | null;
@@ -9,6 +9,7 @@ interface CaptionOverlayProps {
   source?: "external" | "fallback" | null;
   size?: CaptionSize;
   style?: CaptionStyle;
+  position?: CaptionPosition;
 }
 
 export function CaptionOverlay({
@@ -17,12 +18,13 @@ export function CaptionOverlay({
   source,
   size = "medium",
   style = "boxed",
+  position = "bottom",
 }: CaptionOverlayProps) {
   if (!visible || !cue) return null;
 
   return (
     <div
-      className={`video-caption video-caption--${size} video-caption--${style}`}
+      className={`video-caption video-caption--${size} video-caption--${style} video-caption--${position}`}
       role="status"
       aria-live="polite"
     >
