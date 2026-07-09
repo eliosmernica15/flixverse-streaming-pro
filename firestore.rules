@@ -263,6 +263,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Stripe webhook idempotency — server-only via Admin SDK
+    match /stripe_webhook_events/{eventId} {
+      allow read, write: if false;
+    }
+
     // ── Watch Parties ─────────────────────────────────────────
     match /watch_parties/{roomId} {
       allow read: if isAuthenticated()

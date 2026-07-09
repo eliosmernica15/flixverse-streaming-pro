@@ -32,6 +32,7 @@ export function PlansCheckoutSuccess() {
             status: data.status || "trialing",
             stripeCustomerId: data.customerId,
             stripeSubscriptionId: data.subscriptionId,
+            currentPeriodEnd: data.currentPeriodEnd,
             updatedAt: Date.now(),
           },
           { merge: true }

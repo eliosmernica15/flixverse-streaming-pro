@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { doc, setDoc } from "firebase/firestore";
-import { getFirestore } from "firebase/firestore";
-import { initializeApp, getApps } from "firebase/app";
+import {
+  syncSubscriptionToFirestore,
+  cancelSubscriptionInFirestore,
+  markWebhookEventProcessed,
+  type BillingPlan,
+} from "@/lib/billing/subscriptionSync";
+
+export const runtime = "nodejs";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -12,38 +17,32 @@ function getStripe() {
   return new Stripe(stripeSecret, { apiVersion: "2026-06-24.dahlia" });
 }
 
-function getDb() {
-  if (!getApps().length) {
-    initializeApp({
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    });
-  }
-  return getFirestore();
+function getPeriodEndMs(sub: Stripe.Subscription): number {
+  const end = (sub as unknown as { current_period_end?: number }).current_period_end;
+  return end ? end * 1000 : Date.now() + 30 * 24 * 60 * 60 * 1000;
 }
 
-async function syncSubscriptionToFirestore(
-  userId: string,
-  plan: "standard" | "premium",
-  status: string,
-  customerId: string,
-  subscriptionId: string,
-  periodEnd: number
+function getPlanFromMetadata(metadata: Stripe.Metadata | null | undefined): BillingPlan {
+  const plan = metadata?.planId;
+  return plan === "premium" ? "premium" : "standard";
+}
+
+async function handleSubscription(
+  sub: Stripe.Subscription,
+  fallbackPlan?: BillingPlan
 ) {
-  const db = getDb();
-  await setDoc(
-    doc(db, "subscriptions", userId),
-    {
-      plan,
-      status,
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: subscriptionId,
-      currentPeriodEnd: periodEnd,
-      updatedAt: Date.now(),
-    },
-    { merge: true }
-  );
+  const userId = sub.metadata?.userId;
+  if (!userId) return;
+
+  const plan = fallbackPlan ?? getPlanFromMetadata(sub.metadata);
+  await syncSubscriptionToFirestore({
+    userId,
+    plan,
+    stripeStatus: sub.status,
+    customerId: String(sub.customer),
+    subscriptionId: sub.id,
+    periodEndMs: getPeriodEndMs(sub),
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -66,44 +65,62 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  try {
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const userId = session.metadata?.userId;
-      const planId = session.metadata?.planId as "standard" | "premium" | undefined;
-      if (userId && planId && session.subscription) {
-        const sub = await stripe.subscriptions.retrieve(session.subscription as string);
-        const periodEnd =
-          (sub as unknown as { current_period_end?: number }).current_period_end ??
-          Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-        await syncSubscriptionToFirestore(
-          userId,
-          planId,
-          sub.status,
-          session.customer as string,
-          sub.id,
-          periodEnd * 1000
-        );
-      }
-    }
+  const isNew = await markWebhookEventProcessed(event.id);
+  if (!isNew) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
 
-    if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
-      const sub = event.data.object as Stripe.Subscription;
-      const userId = sub.metadata?.userId;
-      const planId = (sub.metadata?.planId as "standard" | "premium") || "standard";
-      if (userId) {
-        const periodEnd =
-          (sub as unknown as { current_period_end?: number }).current_period_end ??
-          Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-        await syncSubscriptionToFirestore(
-          userId,
-          planId,
-          sub.status,
-          sub.customer as string,
-          sub.id,
-          periodEnd * 1000
-        );
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const userId = session.metadata?.userId;
+        const planId = getPlanFromMetadata(session.metadata);
+        if (userId && session.subscription) {
+          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+          await syncSubscriptionToFirestore({
+            userId,
+            plan: planId,
+            stripeStatus: sub.status,
+            customerId: String(session.customer),
+            subscriptionId: sub.id,
+            periodEndMs: getPeriodEndMs(sub),
+          });
+        }
+        break;
       }
+
+      case "customer.subscription.updated": {
+        const sub = event.data.object as Stripe.Subscription;
+        await handleSubscription(sub);
+        break;
+      }
+
+      case "customer.subscription.deleted": {
+        const sub = event.data.object as Stripe.Subscription;
+        const userId = sub.metadata?.userId;
+        if (userId) {
+          await cancelSubscriptionInFirestore(
+            userId,
+            String(sub.customer),
+            sub.id
+          );
+        }
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subId = (invoice as unknown as { subscription?: string | null }).subscription;
+        if (subId) {
+          const sub = await stripe.subscriptions.retrieve(subId);
+          await handleSubscription(sub);
+        }
+        break;
+      }
+
+      default:
+        break;
     }
   } catch (err) {
     console.error("Webhook handler error:", err);

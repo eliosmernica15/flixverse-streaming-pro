@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { syncSubscriptionToFirestore, type BillingPlan } from "@/lib/billing/subscriptionSync";
+
+export const runtime = "nodejs";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -26,12 +29,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Session not complete" }, { status: 400 });
     }
 
+    const planId = (session.metadata?.planId as BillingPlan) || "standard";
+    const userId = session.metadata?.userId;
+    let status = "trialing";
+    let periodEndMs: number | undefined;
+
+    if (session.subscription) {
+      const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+      status = sub.status;
+      const end = (sub as unknown as { current_period_end?: number }).current_period_end;
+      if (end) periodEndMs = end * 1000;
+
+      if (userId) {
+        await syncSubscriptionToFirestore({
+          userId,
+          plan: planId,
+          stripeStatus: sub.status,
+          customerId: String(session.customer),
+          subscriptionId: sub.id,
+          periodEndMs: periodEndMs ?? Date.now() + 30 * 24 * 60 * 60 * 1000,
+        });
+      }
+    }
+
     return NextResponse.json({
-      planId: session.metadata?.planId || "standard",
-      userId: session.metadata?.userId,
+      planId,
+      userId,
       customerId: session.customer,
       subscriptionId: session.subscription,
-      status: "trialing",
+      status,
+      currentPeriodEnd: periodEndMs,
     });
   } catch (err) {
     console.error("Session verify error:", err);

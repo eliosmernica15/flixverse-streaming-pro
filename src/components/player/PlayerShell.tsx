@@ -19,6 +19,16 @@ import {
   getCaptionLanguageLabel,
 } from "@/lib/player/captionLanguages";
 import {
+  CAPTION_SIZES,
+  CAPTION_STYLES,
+  CAPTION_SIZE_STORAGE_KEY,
+  CAPTION_STYLE_STORAGE_KEY,
+  loadCaptionSize,
+  loadCaptionStyle,
+  type CaptionSize,
+  type CaptionStyle,
+} from "@/lib/player/captionPreferences";
+import {
   encryptPayload,
   generateRoomKey,
   buildPartyJoinUrl,
@@ -162,12 +172,16 @@ export function PlayerShell({
   const [partySyncStatus, setPartySyncStatus] = useState<SyncStatus>("disconnected");
   const [partyDriftMs, setPartyDriftMs] = useState(0);
   const [captionLang, setCaptionLang] = useState("en");
+  const [captionSize, setCaptionSize] = useState<CaptionSize>("medium");
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>("boxed");
 
   useEffect(() => {
     const saved = localStorage.getItem(CAPTION_LANG_STORAGE_KEY);
     if (saved && CAPTION_LANGUAGES.some((l) => l.code === saved)) {
       setCaptionLang(saved);
     }
+    setCaptionSize(loadCaptionSize());
+    setCaptionStyle(loadCaptionStyle());
   }, []);
 
   // Timeline comments state
@@ -600,6 +614,20 @@ export function PlayerShell({
   const changeCaptionLang = useCallback((lang: string) => {
     setCaptionLang(lang);
     localStorage.setItem(CAPTION_LANG_STORAGE_KEY, lang);
+    playUiSound("tap");
+    bumpControls();
+  }, [bumpControls]);
+
+  const changeCaptionSize = useCallback((size: CaptionSize) => {
+    setCaptionSize(size);
+    localStorage.setItem(CAPTION_SIZE_STORAGE_KEY, size);
+    playUiSound("tap");
+    bumpControls();
+  }, [bumpControls]);
+
+  const changeCaptionStyle = useCallback((style: CaptionStyle) => {
+    setCaptionStyle(style);
+    localStorage.setItem(CAPTION_STYLE_STORAGE_KEY, style);
     playUiSound("tap");
     bumpControls();
   }, [bumpControls]);
@@ -1127,6 +1155,36 @@ export function PlayerShell({
                           {captionsLoading && (
                             <p className="video-settings-caption-status">Loading subtitles…</p>
                           )}
+                          <p className="video-settings-head">Caption size</p>
+                          <div className="video-settings-grid">
+                            {CAPTION_SIZES.map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={captionSize === opt.value}
+                                onClick={() => changeCaptionSize(opt.value)}
+                                className={`video-quality ${captionSize === opt.value ? "is-selected" : ""}`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="video-settings-head">Caption style</p>
+                          <div className="video-settings-grid">
+                            {CAPTION_STYLES.map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={captionStyle === opt.value}
+                                onClick={() => changeCaptionStyle(opt.value)}
+                                className={`video-quality ${captionStyle === opt.value ? "is-selected" : ""}`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
                       <SettingsToggle
@@ -1307,7 +1365,13 @@ export function PlayerShell({
       )}
 
       {/* Real caption overlay synced to playback clock */}
-      <CaptionOverlay cue={activeCaption} visible={showCaptions && embedState === "ready"} source={captionSource} />
+      <CaptionOverlay
+        cue={activeCaption}
+        visible={showCaptions && embedState === "ready"}
+        source={captionSource}
+        size={captionSize}
+        style={captionStyle}
+      />
       {showCaptions && captionsLoading && embedState === "ready" && (
         <div className="video-caption" role="status">
           <span className="video-caption-demo">Loading subtitles…</span>
@@ -1323,7 +1387,7 @@ export function PlayerShell({
           <div className="video-stats-row"><span>Server</span><span>{currentSource.name}</span></div>
           <div className="video-stats-row"><span>Provider</span><span>{providerName}</span></div>
           <div className="video-stats-row"><span>Sync</span><span>{isLiveSynced ? "Live (postMessage)" : "Estimated clock"}</span></div>
-          <div className="video-stats-row"><span>Captions</span><span>{showCaptions ? getCaptionLanguageLabel(captionLang) : "Off"}</span></div>
+          <div className="video-stats-row"><span>Captions</span><span>{showCaptions ? `${getCaptionLanguageLabel(captionLang)} · ${captionSize}` : "Off"}</span></div>
           <div className="video-stats-row"><span>Quality</span><span>{quality}</span></div>
           <div className="video-stats-row"><span>Buffered</span><span>{formatTime(buffered)}</span></div>
         </div>

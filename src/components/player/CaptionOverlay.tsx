@@ -1,18 +1,31 @@
 "use client";
 
 import type { CaptionCue } from "@/lib/player/captionParser";
+import type { CaptionSize, CaptionStyle } from "@/lib/player/captionPreferences";
 
 interface CaptionOverlayProps {
   cue: CaptionCue | null;
   visible: boolean;
   source?: "external" | "fallback" | null;
+  size?: CaptionSize;
+  style?: CaptionStyle;
 }
 
-export function CaptionOverlay({ cue, visible, source }: CaptionOverlayProps) {
+export function CaptionOverlay({
+  cue,
+  visible,
+  source,
+  size = "medium",
+  style = "boxed",
+}: CaptionOverlayProps) {
   if (!visible || !cue) return null;
 
   return (
-    <div className="video-caption" role="status" aria-live="polite">
+    <div
+      className={`video-caption video-caption--${size} video-caption--${style}`}
+      role="status"
+      aria-live="polite"
+    >
       {source === "fallback" && (
         <span className="video-caption-demo" aria-hidden="true">
           CC
