@@ -15,28 +15,17 @@ import { CaptionOverlay } from "./CaptionOverlay";
 import { computeResync, sendSoftSeek, injectSeekParam } from "@/lib/player/embedSeekUrls";
 import {
   CAPTION_LANGUAGES,
-  CAPTION_LANG_STORAGE_KEY,
   getCaptionLanguageLabel,
 } from "@/lib/player/captionLanguages";
+import { useSyncedCaptionPreferences } from "@/hooks/player/useSyncedCaptionPreferences";
 import {
   CAPTION_SIZES,
   CAPTION_STYLES,
   CAPTION_POSITIONS,
-  CAPTION_SIZE_STORAGE_KEY,
-  CAPTION_STYLE_STORAGE_KEY,
-  CAPTION_POSITION_STORAGE_KEY,
-  CAPTION_OPACITY_STORAGE_KEY,
   CAPTION_OPACITY_MIN,
   CAPTION_OPACITY_MAX,
-  loadCaptionSize,
-  loadCaptionStyle,
-  loadCaptionPosition,
-  loadCaptionOpacity,
   opacityToPercent,
   percentToOpacity,
-  type CaptionSize,
-  type CaptionStyle,
-  type CaptionPosition,
 } from "@/lib/player/captionPreferences";
 import {
   encryptPayload,
@@ -181,22 +170,20 @@ export function PlayerShell({
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [partySyncStatus, setPartySyncStatus] = useState<SyncStatus>("disconnected");
   const [partyDriftMs, setPartyDriftMs] = useState(0);
-  const [captionLang, setCaptionLang] = useState("en");
-  const [captionSize, setCaptionSize] = useState<CaptionSize>("medium");
-  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>("boxed");
-  const [captionPosition, setCaptionPosition] = useState<CaptionPosition>("bottom");
-  const [captionOpacity, setCaptionOpacity] = useState(0.92);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(CAPTION_LANG_STORAGE_KEY);
-    if (saved && CAPTION_LANGUAGES.some((l) => l.code === saved)) {
-      setCaptionLang(saved);
-    }
-    setCaptionSize(loadCaptionSize());
-    setCaptionStyle(loadCaptionStyle());
-    setCaptionPosition(loadCaptionPosition());
-    setCaptionOpacity(loadCaptionOpacity());
-  }, []);
+  const {
+    captionLang,
+    captionSize,
+    captionStyle,
+    captionPosition,
+    captionOpacity,
+    setCaptionLang,
+    setCaptionSize,
+    setCaptionStyle,
+    setCaptionPosition,
+    setCaptionOpacity,
+    cloudSynced: captionsCloudSynced,
+  } = useSyncedCaptionPreferences();
 
   // Timeline comments state
   const [showTimelineControls, setShowTimelineControls] = useState(false);
@@ -627,38 +614,32 @@ export function PlayerShell({
 
   const changeCaptionLang = useCallback((lang: string) => {
     setCaptionLang(lang);
-    localStorage.setItem(CAPTION_LANG_STORAGE_KEY, lang);
     playUiSound("tap");
     bumpControls();
-  }, [bumpControls]);
+  }, [setCaptionLang, bumpControls]);
 
-  const changeCaptionSize = useCallback((size: CaptionSize) => {
+  const changeCaptionSize = useCallback((size: Parameters<typeof setCaptionSize>[0]) => {
     setCaptionSize(size);
-    localStorage.setItem(CAPTION_SIZE_STORAGE_KEY, size);
     playUiSound("tap");
     bumpControls();
-  }, [bumpControls]);
+  }, [setCaptionSize, bumpControls]);
 
-  const changeCaptionStyle = useCallback((style: CaptionStyle) => {
+  const changeCaptionStyle = useCallback((style: Parameters<typeof setCaptionStyle>[0]) => {
     setCaptionStyle(style);
-    localStorage.setItem(CAPTION_STYLE_STORAGE_KEY, style);
     playUiSound("tap");
     bumpControls();
-  }, [bumpControls]);
+  }, [setCaptionStyle, bumpControls]);
 
-  const changeCaptionPosition = useCallback((position: CaptionPosition) => {
+  const changeCaptionPosition = useCallback((position: Parameters<typeof setCaptionPosition>[0]) => {
     setCaptionPosition(position);
-    localStorage.setItem(CAPTION_POSITION_STORAGE_KEY, position);
     playUiSound("tap");
     bumpControls();
-  }, [bumpControls]);
+  }, [setCaptionPosition, bumpControls]);
 
   const changeCaptionOpacity = useCallback((percent: number) => {
-    const opacity = percentToOpacity(percent);
-    setCaptionOpacity(opacity);
-    localStorage.setItem(CAPTION_OPACITY_STORAGE_KEY, String(opacity));
+    setCaptionOpacity(percentToOpacity(percent));
     bumpControls();
-  }, [bumpControls]);
+  }, [setCaptionOpacity, bumpControls]);
 
   const toggleAutoNext = useCallback(() => {
     setAutoplayNext((p) => !p);
@@ -1182,6 +1163,9 @@ export function PlayerShell({
                           </select>
                           {captionsLoading && (
                             <p className="video-settings-caption-status">Loading subtitles…</p>
+                          )}
+                          {captionsCloudSynced && user && (
+                            <p className="video-settings-caption-status">Synced to your account</p>
                           )}
                           <p className="video-settings-head">Caption size</p>
                           <div className="video-settings-grid">

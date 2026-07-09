@@ -268,6 +268,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ── User settings (player prefs, synced across devices) ───
+    match /user_settings/{userId} {
+      allow read, create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
     // ── Watch Parties ─────────────────────────────────────────
     match /watch_parties/{roomId} {
       allow read: if isAuthenticated()

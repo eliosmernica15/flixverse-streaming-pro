@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User, Settings, Film, Tv, Star, Heart, Clock,
   Calendar, Edit2, Camera, LogOut, ChevronRight, Trash2,
-  MessageCircle, TrendingUp, Award, Filter
+  MessageCircle, TrendingUp, Award, Filter, CreditCard
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
@@ -25,6 +25,7 @@ import { getImageUrl } from '@/utils/tmdbApi';
 import { uploadToCloudinary } from '@/utils/cloudinary';
 import Image from 'next/image';
 import ProfileSettings from '@/components/ProfileSettings';
+import { ProfileBillingTab } from '@/components/ProfileBillingTab';
 import { PosterGridSkeleton } from '@/components/skeletons/ContentSkeletons';
 import {
   AlertDialog,
@@ -41,6 +42,7 @@ const ImageCropper = dynamic(() => import('@/components/ImageCropper'), { ssr: f
 
 const Profile = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated, loading: authLoading, signOut } = useAuth();
   const { profile, loading: profileLoading, updateProfile } = useUserProfileContext();
   const { movieList, loading: listLoading } = useUserMovieListContext();
@@ -157,6 +159,13 @@ const Profile = () => {
       setUploading(false);
     }
   };
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['watchlist', 'history', 'activity', 'settings', 'billing'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -445,6 +454,10 @@ const Profile = () => {
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Activity
               </TabsTrigger>
+              <TabsTrigger value="billing" className="data-[state=active]:bg-red-500 rounded-lg">
+                <CreditCard className="w-4 h-4 mr-2" />
+                Billing
+              </TabsTrigger>
               <TabsTrigger value="settings" className="data-[state=active]:bg-red-500 rounded-lg">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
@@ -650,8 +663,12 @@ const Profile = () => {
               />
             </TabsContent>
 
+            <TabsContent value="billing">
+              <ProfileBillingTab />
+            </TabsContent>
+
             <TabsContent value="settings">
-              <ProfileSettings />
+              <ProfileSettings onOpenTab={setActiveTab} />
             </TabsContent>
           </Tabs>
         </div>

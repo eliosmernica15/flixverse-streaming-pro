@@ -1,15 +1,18 @@
 "use client";
 
-import { Bell, Globe, Sparkles, Trash2, Palette, Shield } from "lucide-react";
+import { Bell, Globe, Sparkles, Trash2, Palette, Shield, CreditCard, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useToast } from "@/hooks/use-toast";
-import { SubscriptionBilling } from "@/components/SubscriptionBilling";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 
-export default function ProfileSettings() {
+interface ProfileSettingsProps {
+  onOpenTab?: (tab: string) => void;
+}
+
+export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
   const { preferences, updatePreferences } = useUserPreferencesContext();
   const { hasPermission, preferences: notifPrefs, requestPermission, updatePreferences: updateNotif } =
     useNotifications();
@@ -62,7 +65,29 @@ export default function ProfileSettings() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <SubscriptionBilling />
+      <section className="glass-card rounded-2xl border border-white/10 p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 flex items-center justify-center border border-white/10">
+              <CreditCard className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Subscription</h3>
+              <p className="text-sm text-gray-500">Plan, renewal, and payment methods</p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-white/10 text-gray-300 shrink-0"
+            onClick={() => onOpenTab?.("billing")}
+          >
+            Billing
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      </section>
 
       <section className="glass-card rounded-2xl border border-white/10 p-6">
         <div className="flex items-center gap-3 mb-5">
