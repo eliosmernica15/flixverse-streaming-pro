@@ -27,7 +27,9 @@ export default function MoviesPage() {
         description="Browse and stream free HD movies — trending, top-rated, genre collections, and new releases on FlixVerse."
         url={`${SITE_URL}/movies`}
       />
-      <LazyMovies />
+      <div className="page-enter">
+        <LazyMovies />
+      </div>
     </>
   );
 }

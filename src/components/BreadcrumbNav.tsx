@@ -17,25 +17,27 @@ export function BreadcrumbNav({ items, className = "" }: BreadcrumbNavProps) {
   return (
     <nav
       aria-label="Breadcrumb"
-      className={`flex items-center gap-1.5 text-xs text-gray-500 overflow-x-auto scrollbar-hide ${className}`}
+      className={`flex items-center gap-1.5 overflow-x-auto text-xs text-gray-500 scrollbar-thin ${className}`}
     >
       <Link
         href="/"
-        className="flex items-center gap-1 hover:text-white transition-colors shrink-0"
+        className="flex shrink-0 items-center gap-1 rounded-md transition-colors hover:text-white focus-ring"
       >
-        <Home className="w-3 h-3" />
+        <Home className="h-3 w-3" />
         <span>Home</span>
       </Link>
 
       {items.map((item, i) => (
-        <span key={i} className="flex items-center gap-1.5 shrink-0">
-          <ChevronRight className="w-3 h-3 text-gray-600" />
+        <span key={i} className="flex shrink-0 items-center gap-1.5">
+          <span className="chip px-1.5 py-0.5 text-gray-600" aria-hidden>
+            <ChevronRight className="h-3 w-3" />
+          </span>
           {item.href ? (
-            <Link href={item.href} className="hover:text-white transition-colors">
+            <Link href={item.href} className="rounded-md transition-colors hover:text-white focus-ring">
               {item.label}
             </Link>
           ) : (
-            <span className="text-gray-300 font-medium">{item.label}</span>
+            <span className="font-medium text-gradient">{item.label}</span>
           )}
         </span>
       ))}

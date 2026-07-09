@@ -34,7 +34,7 @@ const NotificationSettings = () => {
         <Button
           variant="ghost"
           size="sm"
-          className="p-2 hover:bg-gray-800 rounded-full transition-colors relative"
+          className="relative rounded-full p-2 transition-colors hover:bg-gray-800 focus-ring"
         >
           {hasPermission && preferences.allNotifications ? (
             <Bell className="w-5 h-5" />
@@ -47,7 +47,7 @@ const NotificationSettings = () => {
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="glass-card border-white/10 text-white max-w-md mx-auto rounded-2xl">
+      <DialogContent className="glass-strong text-white max-w-md mx-auto rounded-2xl border-white/10">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white">
             <Settings className="w-5 h-5 text-red-400" />
@@ -60,7 +60,7 @@ const NotificationSettings = () => {
 
         <div className="space-y-6">
           {!hasPermission ? (
-            <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
+            <Card className="glass-panel border-white/10">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg text-white">Enable Notifications</CardTitle>
                 <CardDescription className="text-gray-400">
@@ -68,9 +68,9 @@ const NotificationSettings = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button 
+                <Button
                   onClick={handleEnableNotifications}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                  className="w-full bg-red-600 text-white hover:bg-red-700 focus-ring"
                 >
                   <Bell className="w-4 h-4 mr-2" />
                   Allow Notifications
@@ -147,7 +147,7 @@ const NotificationSettings = () => {
                   <Button
                     onClick={handleTestNotification}
                     variant="outline"
-                    className="w-full border-white/10 text-gray-300 hover:bg-white/10"
+                    className="w-full border-white/10 text-gray-300 hover:bg-white/10 focus-ring"
                   >
                     <TestTube className="w-4 h-4 mr-2" />
                     Send Test Notification

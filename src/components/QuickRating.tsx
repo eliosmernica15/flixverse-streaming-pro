@@ -92,7 +92,7 @@ const QuickRating = ({
               onClick={() => handleRate(starRating)}
               onMouseEnter={() => setHoverRating(starRating)}
               onMouseLeave={() => setHoverRating(0)}
-              className="transition-transform duration-150 hover:scale-110 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/50 rounded"
+              className="press-effect rounded transition-transform duration-150 hover:scale-110 active:scale-95 focus-ring"
               title={`Rate ${starRating}/10`}
             >
               <Star

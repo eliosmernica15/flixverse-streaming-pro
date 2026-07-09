@@ -95,14 +95,14 @@ export function BrowseMegaMenu({ isOpen, onClose }: BrowseMegaMenuProps) {
       ref={menuRef}
       className="absolute top-full left-0 right-0 z-50 animate-fade-in-up"
     >
-      <div className="bg-zinc-950/95 backdrop-blur-xl border-b border-white/5 shadow-2xl">
+      <div className="glass-strong border-b border-white/5 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
             {MENU_SECTIONS.map((section) => (
               <div key={section.title}>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="mb-3 flex items-center gap-2">
                   <span className="text-red-400">{section.icon}</span>
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">
                     {section.title}
                   </h3>
                 </div>
@@ -112,7 +112,7 @@ export function BrowseMegaMenu({ isOpen, onClose }: BrowseMegaMenuProps) {
                       <Link
                         href={item.href}
                         onClick={onClose}
-                        className="block px-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                        className="block rounded-lg px-3 py-1.5 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-white hover-lift-sm glow-hover focus-ring"
                       >
                         {item.label}
                       </Link>

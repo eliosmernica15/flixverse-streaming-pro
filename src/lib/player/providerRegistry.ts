@@ -79,10 +79,12 @@ const VIDSRC_COMMANDS: ProviderCommands = {
   setVolume: (volume: number) => ({ event: "command", func: "setVolume", args: [volume] }),
 };
 
+// Documented: VidSrc CC emits { type: "PLAYER_EVENT", data: { event, currentTime, duration } }
+// with events "play" | "pause" | "time" (every 5s) | "complete".
 const VIDSRC_EVENTS: ProviderEvents = {
-  play: ["play"],
-  pause: ["pause"],
-  time: ["time"],
+  play: ["play", "playing"],
+  pause: ["pause", "paused"],
+  time: ["time", "timeupdate"],
   ended: ["complete", "ended"],
 };
 
@@ -123,10 +125,13 @@ export const PROVIDERS: ProviderConfig[] = [
       seekTo: (seconds: number) => ({ method: "seek", value: seconds }),
       setVolume: (volume: number) => ({ method: "setVolume", value: volume }),
     },
+    // Documented: VidLink emits { type: "PLAYER_EVENT", data: { event, currentTime, duration } }
+    // with events "play" | "pause" | "seeked" | "ended" | "timeupdate",
+    // plus { type: "MEDIA_DATA" } watch-progress payloads.
     events: {
       play: ["play", "playing"],
       pause: ["pause", "paused"],
-      time: ["timeupdate", "time"],
+      time: ["timeupdate", "time", "seeked"],
       ended: ["ended", "complete"],
     },
     supportsPostMessage: true,
@@ -198,11 +203,7 @@ export const PROVIDERS: ProviderConfig[] = [
       volumeDown: { type: "volumeDown" },
       seekForward: { type: "seek", direction: "forward", amount: 10 },
       seekBack: { type: "seek", direction: "back", amount: 10 },
-      seekTo: (seconds: number) => ({
-        type: "seek",
-        direction: seconds >= 0 ? "forward" : "back",
-        amount: Math.abs(seconds),
-      }),
+      seekTo: (seconds: number) => ({ type: "seek", time: Math.max(0, seconds) }),
       setVolume: (volume: number) => ({ type: "volume", value: volume }),
     },
     events: {

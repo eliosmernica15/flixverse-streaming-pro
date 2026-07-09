@@ -63,9 +63,9 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
               <button
                 key={`${person.id}-${person.order}`}
                 onClick={() => handlePersonClick(person.id)}
-                className="group flex flex-col items-center p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all hover:scale-105"
+                className="group glass-panel hover-lift-sm focus-ring flex flex-col items-center p-3 rounded-xl"
               >
-                <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden mb-2">
+                <div className="relative mb-2 h-16 w-16 rounded-full overflow-hidden ring-2 ring-white/15 sm:h-20 sm:w-20">
                   {person.profile_path ? (
                     <Image
                       src={getImageUrl(person.profile_path, "small")}
@@ -104,9 +104,9 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
               <button
                 key={person.id}
                 onClick={() => handlePersonClick(person.id)}
-                className="group flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left"
+                className="group glass-panel hover-lift-sm focus-ring flex items-center gap-3 p-3 rounded-xl text-left"
               >
-                <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0">
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full ring-2 ring-white/15">
                   {person.profile_path ? (
                     <Image
                       src={getImageUrl(person.profile_path, "small")}

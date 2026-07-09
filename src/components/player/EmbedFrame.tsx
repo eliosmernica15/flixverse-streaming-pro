@@ -1,7 +1,7 @@
 "use client";
 
 import { RefObject } from "react";
-import { RefreshCw, X, Loader2, AlertCircle } from "lucide-react";
+import { RefreshCw, X, AlertCircle } from "lucide-react";
 import { StreamingSource } from "@/lib/streamingSources";
 
 interface EmbedFrameProps {
@@ -29,13 +29,11 @@ export function EmbedFrame({
   embedState,
   showHelpPrompt,
   flashIcon,
-  title,
   iframeRef,
   onIframeLoad,
   onIframeError,
   handleRetry,
   setShowHelpPrompt,
-  isTheaterMode,
   isCinematic,
 }: EmbedFrameProps) {
   return (
@@ -43,16 +41,13 @@ export function EmbedFrame({
       <div className="relative w-full h-full">
         {/* Loading state */}
         {embedState === "loading" && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950/95 backdrop-blur-sm">
-            <div className="relative mb-6">
-              <div className="absolute inset-0 rounded-full bg-red-500/20 blur-xl animate-pulse" />
-              <Loader2 className="w-12 h-12 text-red-500 animate-spin relative" />
-            </div>
-            <p className="text-white font-semibold text-sm animate-pulse">{currentSource.name}</p>
-            <p className="text-gray-500 text-xs mt-2">
+          <div className="video-overlay video-overlay-loading">
+            <div className="video-spinner" role="status" aria-label={`Loading ${currentSource.name}`} />
+            <p className="video-loading-name">{currentSource.name}</p>
+            <p className="video-loading-sub">
               Server {currentServer + 1} of {streamingSourcesCount}
             </p>
-            <p className="text-gray-600 text-[10px] mt-4 max-w-xs text-center px-6">
+            <p className="video-loading-tip">
               Loading stream from {currentSource.name}. If it stays blank, switch servers.
             </p>
           </div>
@@ -60,57 +55,52 @@ export function EmbedFrame({
 
         {/* Error state */}
         {embedState === "error" && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center">
-            <div className="relative mb-5">
-              <div className="absolute inset-0 rounded-full bg-red-500/20 blur-lg animate-pulse" />
-              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center relative border border-red-500/20">
-                <AlertCircle className="w-7 h-7 text-red-500" />
-              </div>
+          <div className="video-overlay video-overlay-error">
+            <div className="video-error-icon" aria-hidden="true">
+              <AlertCircle className="w-8 h-8 text-red-400" />
             </div>
-            <p className="text-white font-bold mb-1 text-base">Stream unavailable</p>
-            <p className="text-gray-500 text-xs mb-6 max-w-xs">
+            <p className="video-error-title">Stream unavailable</p>
+            <p className="video-error-sub">
               This server couldn&apos;t load the stream. Try the next server or check your connection.
             </p>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 transition-all active:scale-95"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Try next server
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="video-retry-btn"
+              aria-label="Try next server"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Try next server
+            </button>
           </div>
         )}
 
         {/* Help prompt */}
         {embedState === "ready" && showHelpPrompt && (
-          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 p-3 rounded-xl bg-black/85 border border-white/15 backdrop-blur-md animate-fade-in-up max-w-md shadow-2xl">
-            <p className="text-xs text-gray-300">
-              Video blank? Try switching servers with the button above.
-            </p>
+          <div className="video-help-prompt" role="status">
+            <p>Video blank? Try switching servers with the button above.</p>
             <button
               type="button"
               onClick={() => setShowHelpPrompt(false)}
-              className="shrink-0 p-1 rounded-lg hover:bg-white/10 text-gray-500 transition-colors"
+              className="video-help-close"
+              aria-label="Dismiss hint"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        {/* Play/pause flash overlay */}
+        {/* Play/pause flash overlay — big crisp glass circle */}
         {embedState === "ready" && flashIcon && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-            <div className="w-20 h-20 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center border border-white/20 animate-scale-in">
+          <div className="video-flash">
+            <div className="video-flash-circle">
               {flashIcon === "pause" ? (
                 <div className="flex gap-2">
                   <div className="w-2.5 h-7 bg-white rounded-sm" />
                   <div className="w-2.5 h-7 bg-white rounded-sm" />
                 </div>
               ) : (
-                <div className="w-0 h-0 border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent border-l-[18px] border-l-white ml-1" />
+                <div className="w-0 h-0 border-t-[11px] border-t-transparent border-b-[11px] border-b-transparent border-l-[20px] border-l-white ml-1.5" />
               )}
             </div>
           </div>
@@ -120,7 +110,7 @@ export function EmbedFrame({
         <iframe
           ref={iframeRef}
           src={currentSource.url}
-          title={`Watch ${title}`}
+          title={`Watch ${currentSource.name}`}
           className={`absolute inset-0 w-full h-full border-0 ${
             embedState === "error" ? "pointer-events-none opacity-0" : ""
           } ${isCinematic ? "cinema-overlay" : ""}`}

@@ -32,7 +32,9 @@ export default function NewAndPopularPage() {
         description="Trending and newly released titles to stream free on FlixVerse."
         url={url}
       />
-      <LazyNewAndPopular />
+      <div className="page-enter">
+        <LazyNewAndPopular />
+      </div>
     </>
   );
 }

@@ -23,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const SearchBar = dynamic(() => import("./SearchBar"), {
   ssr: false,
-  loading: () => <div className="hidden sm:block w-48 lg:w-64 h-9 rounded-lg bg-white/5 animate-pulse" />,
+  loading: () => <div className="hidden sm:block w-48 lg:w-64 h-9 rounded-xl bg-white/5 animate-pulse" />,
 });
 
 const NotificationSettings = dynamic(() => import("./NotificationSettings"), {
@@ -96,29 +96,32 @@ const Navigation = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-[background,box-shadow] duration-500 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-[background,box-shadow,border-color] duration-500 ${
         isScrolled
-          ? "glass-premium shadow-2xl shadow-black/40"
-          : "bg-gradient-to-b from-black/90 via-black/50 to-transparent"
+          ? "glass-strong shadow-2xl shadow-black/40 border-b border-white/10"
+          : "bg-gradient-to-b from-black/90 via-black/45 to-transparent border-b border-transparent"
       }`}
     >
-      <div
-        className={`absolute bottom-0 left-0 right-0 h-px transition-opacity duration-500 ${
-          isScrolled ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        <div className="h-full bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
-      </div>
+      <div aria-hidden className="absolute inset-x-0 bottom-0 divider-glow" />
 
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 lg:h-20">
+      <div className="mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between lg:h-20">
           <div className="flex items-center">
-            <Link href="/" className="flex-shrink-0 group" onMouseEnter={() => prefetchRoute("/")} onFocus={() => prefetchRoute("/")}>
+            <Link
+              href="/"
+              className="group flex-shrink-0 rounded-xl focus-ring magnetic"
+              onMouseEnter={() => prefetchRoute("/")}
+              onFocus={() => prefetchRoute("/")}
+            >
               <div className="flex items-center space-x-2.5">
-                <div className="relative">
-                  <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-red-500 group-hover:text-red-400 transition-colors duration-200 group-hover:rotate-12" />
+                <div className="relative grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-red-500/20 to-purple-500/20 ring-1 ring-white/10">
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-xl bg-red-500/40 opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-60"
+                  />
+                  <Sparkles className="relative h-5 w-5 text-red-500 transition-all duration-200 group-hover:-rotate-12 group-hover:scale-110 group-hover:text-red-400 sm:h-6 sm:w-6" />
                 </div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight">
+                <h1 className="font-black tracking-tight text-xl lg:text-2xl">
                   <span className="text-gradient-primary">Flix</span>
                   <span className="text-white">Verse</span>
                 </h1>
@@ -126,7 +129,7 @@ const Navigation = () => {
             </Link>
           </div>
 
-          <div className="hidden md:flex items-center space-x-1 lg:space-x-2">
+          <div className="hidden items-center gap-1 md:flex lg:gap-2">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
@@ -135,7 +138,7 @@ const Navigation = () => {
                 onMouseEnter={() => prefetchRoute(link.path)}
                 onFocus={() => prefetchRoute(link.path)}
                 aria-current={isActive(link.path) ? "page" : undefined}
-                className={`relative px-4 py-2.5 text-sm lg:text-base font-medium transition-colors duration-200 rounded-xl group ${
+                className={`group relative flex min-h-[44px] items-center rounded-xl px-4 text-sm font-medium transition-colors duration-200 focus-ring lg:text-base ${
                   isActive(link.path) ? "text-white" : "text-gray-400 hover:text-white"
                 }`}
               >
@@ -145,15 +148,19 @@ const Navigation = () => {
                   }`}
                 />
                 <span className="relative z-10">{link.label}</span>
-                {isActive(link.path) && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-full" />
-                )}
+                <span
+                  className={`absolute -bottom-1 left-1/2 h-[3px] -translate-x-1/2 rounded-full bg-gradient-to-r from-red-500 via-orange-500 to-red-500 transition-all duration-300 ${
+                    isActive(link.path)
+                      ? "w-6 opacity-100 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
+                      : "w-0 opacity-0 group-hover:w-4 group-hover:opacity-70"
+                  }`}
+                />
               </Link>
             ))}
           </div>
 
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="hidden sm:block">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden glow-hover rounded-xl sm:block">
               <SearchBar onMovieSelect={handleMovieSelect} />
             </div>
 
@@ -167,66 +174,65 @@ const Navigation = () => {
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center space-x-2 hover:bg-white/10 rounded-xl px-2 sm:px-3 py-2 transition-colors duration-200 group">
+                  <button className="group flex min-h-[44px] items-center space-x-2 rounded-xl px-2 py-2 transition-colors duration-200 hover:bg-white/10 focus-ring sm:px-3">
                     <div className="relative">
-                      <Avatar className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-white/10 overflow-hidden">
+                      <Avatar className="h-9 w-9 overflow-hidden rounded-xl border border-white/10 sm:h-10 sm:w-10">
                         <AvatarImage
                           src={profile?.avatar_url || undefined}
-                          className="object-cover w-full h-full"
+                          className="h-full w-full object-cover"
                         />
-                        <AvatarFallback className="bg-gradient-to-br from-red-500 via-red-600 to-orange-500 text-white text-xs font-bold">
+                        <AvatarFallback className="bg-gradient-to-br from-red-500 via-red-600 to-orange-500 text-xs font-bold text-white">
                           {profile?.display_name?.charAt(0).toUpperCase() ||
                             user?.email?.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      {/* Online dot removed — no real presence tracking yet */}
                     </div>
-                    <div className="hidden lg:flex items-center space-x-1">
+                    <div className="hidden items-center space-x-1 lg:flex">
                       <span className="text-sm font-medium text-white">
                         {profile?.display_name || user?.email?.split("@")[0]}
                       </span>
-                      <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                      <ChevronDown className="h-4 w-4 text-gray-400 transition-transform duration-200 group-hover:rotate-180 group-hover:text-white" />
                     </div>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="w-60 glass-premium rounded-2xl p-2 border-white/10 mt-2"
+                  className="glass-strong w-60 rounded-2xl border-white/10 p-2 shadow-2xl shadow-black/50"
                 >
-                  <div className="px-3 py-3 mb-2 bg-white/5 rounded-xl">
-                    <p className="text-sm font-semibold text-white truncate">
+                  <div className="mb-2 rounded-xl bg-white/5 px-3 py-3">
+                    <p className="truncate text-sm font-semibold text-white">
                       {profile?.display_name || user?.email?.split("@")[0]}
                     </p>
-                    <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                    <p className="truncate text-xs text-gray-400">{user?.email}</p>
                   </div>
 
                   <DropdownMenuItem
                     onClick={() => router.push("/profile")}
-                    className="text-gray-300 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer py-3"
+                    className="cursor-pointer rounded-xl py-3 text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
                   >
-                    <User className="w-4 h-4 mr-3" />
+                    <User className="mr-3 h-4 w-4" />
                     My Profile
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => router.push("/my-list")}
-                    className="text-gray-300 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer py-3"
+                    className="cursor-pointer rounded-xl py-3 text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
                   >
-                    <Sparkles className="w-4 h-4 mr-3" />
+                    <Sparkles className="mr-3 h-4 w-4" />
                     My Watchlist
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10 my-2" />
+                  <DropdownMenuSeparator className="my-2 bg-white/10" />
                   <DropdownMenuItem
                     onClick={handleSignOut}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl cursor-pointer py-3"
+                    className="cursor-pointer rounded-xl py-3 text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300"
                   >
-                    <LogOut className="w-4 h-4 mr-3" />
+                    <LogOut className="mr-3 h-4 w-4" />
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <Link href="/auth">
-                <Button className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-red-500/20 transition-transform duration-200 hover:scale-105 btn-shine">
+                <Button className="btn-shine min-h-[44px] rounded-xl bg-gradient-to-r from-red-600 to-red-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition-transform duration-200 hover:scale-105 hover:from-red-500 hover:to-red-400 press-effect focus-ring">
                   Sign In
                 </Button>
               </Link>
@@ -234,43 +240,46 @@ const Navigation = () => {
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2.5 hover:bg-white/10 rounded-xl transition-colors duration-200"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl transition-colors duration-200 hover:bg-white/10 focus-ring md:hidden"
               aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isMobileMenuOpen}
             >
               {isMobileMenuOpen ? (
-                <X className="w-5 h-5 text-white" />
+                <X className="h-5 w-5 text-white" />
               ) : (
-                <Menu className="w-5 h-5 text-white" />
+                <Menu className="h-5 w-5 text-white" />
               )}
             </button>
           </div>
         </div>
 
         {isMobileMenuOpen && (
-          <div className="md:hidden overflow-hidden animate-fade-in border-t border-white/10">
-            <div className="py-4 space-y-2">
+          <div className="animate-fade-in-up border-t border-white/10 md:hidden">
+            <div className="glass-panel mb-4 mt-3 rounded-2xl p-3">
               <div className="px-2 py-2">
                 <SearchBar onMovieSelect={handleMovieSelect} />
               </div>
 
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  href={link.path}
-                  prefetch
-                  onMouseEnter={() => prefetchRoute(link.path)}
-                  onFocus={() => prefetchRoute(link.path)}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  aria-current={isActive(link.path) ? "page" : undefined}
-                  className={`block px-4 py-3.5 rounded-xl text-base font-medium transition-colors duration-200 ${
-                    isActive(link.path)
-                      ? "text-white bg-gradient-to-r from-red-500/20 to-orange-500/10 border-l-2 border-red-500"
-                      : "text-gray-400 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              <div className="mt-1 space-y-1">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.path}
+                    href={link.path}
+                    prefetch
+                    onMouseEnter={() => prefetchRoute(link.path)}
+                    onFocus={() => prefetchRoute(link.path)}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    aria-current={isActive(link.path) ? "page" : undefined}
+                    className={`block min-h-[44px] rounded-xl px-4 py-3 text-base font-medium transition-colors duration-200 focus-ring ${
+                      isActive(link.path)
+                        ? "border-l-2 border-red-500 bg-gradient-to-r from-red-500/20 to-orange-500/10 text-white"
+                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         )}

@@ -21,13 +21,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Sparkles, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 
-const LoadingSpinner = ({ label }: { label: string }) => (
-  <span className="inline-flex items-center gap-2">
-    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-    {label}
-  </span>
-);
-
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -176,7 +169,7 @@ const Auth = () => {
       <div className="w-full max-w-md relative z-10 animate-fade-in-up">
         <Link
           href="/"
-          className="inline-flex items-center space-x-2 text-gray-400 hover:text-white mb-8 transition-colors group"
+          className="inline-flex items-center space-x-2 text-gray-400 hover:text-white mb-8 transition-colors focus-ring rounded group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           <span className="text-sm">Back to FlixVerse</span>
@@ -184,16 +177,16 @@ const Auth = () => {
 
         <div className="text-center mb-10">
           <div className="flex items-center justify-center mb-6">
-            <Sparkles className="w-12 h-12 text-red-500" />
+            <Sparkles className="w-12 h-12 text-red-500 animate-pulse-glow" />
             <h1 className="text-4xl font-black ml-3">
               <span className="text-gradient-primary">Flix</span>
-              <span className="text-white">Verse</span>
+              <span className="gradient-text">Verse</span>
             </h1>
           </div>
           <p className="text-gray-400 text-lg">Your gateway to unlimited entertainment</p>
         </div>
 
-        <Card className="glass-premium border-white/10 rounded-3xl overflow-hidden">
+        <Card className="glass-panel glass-strong rounded-3xl overflow-hidden glow-ring">
             <CardHeader className="pb-2 pt-8">
               <CardTitle className="text-white text-center text-2xl font-bold">
                 {activeTab === 'signin' ? 'Welcome Back' : 'Join FlixVerse'}
@@ -241,7 +234,7 @@ const Auth = () => {
                           placeholder="you@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300"
+                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
                         />
                       </div>
                       <div className="space-y-2">
@@ -256,12 +249,13 @@ const Auth = () => {
                             placeholder="Enter your password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl pr-14 focus:border-red-500 focus:ring-red-500/20 transition-all duration-300"
+                            className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl pr-14 focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1"
+                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1 focus-ring rounded"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                           >
                             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                           </button>
@@ -270,9 +264,11 @@ const Auth = () => {
                       <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
+                        variant="gradient"
+                        loading={loading}
+                        className="w-full h-14 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
                       >
-                        {loading ? <LoadingSpinner label="Signing in..." /> : "Sign In"}
+                        Sign In
                       </Button>
 
                       {/* Divider */}
@@ -289,8 +285,9 @@ const Auth = () => {
                       <Button
                         onClick={signInWithGoogle}
                         disabled={loading}
-                        variant="outline"
-                        className="w-full h-14 glass-card border-white/10 text-white font-semibold text-base rounded-xl hover:bg-white/10 transition-all duration-300 flex items-center justify-center space-x-3"
+                        variant="outline-glow"
+                        loading={loading}
+                        className="w-full h-14 glass-card border-white/10 text-white font-semibold text-base rounded-xl hover:bg-white/10 transition-all duration-300 flex items-center justify-center space-x-3 press-effect"
                       >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
                           <path
@@ -334,7 +331,7 @@ const Auth = () => {
                           placeholder="How should we call you?"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
-                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300"
+                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
                         />
                       </div>
                       <div className="space-y-2">
@@ -348,7 +345,7 @@ const Auth = () => {
                           placeholder="you@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300"
+                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
                         />
                       </div>
                       <div className="space-y-2">
@@ -363,12 +360,13 @@ const Auth = () => {
                             placeholder="Create a secure password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl pr-14 focus:border-red-500 focus:ring-red-500/20 transition-all duration-300"
+                            className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl pr-14 focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1"
+                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1 focus-ring rounded"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                           >
                             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                           </button>
@@ -377,9 +375,11 @@ const Auth = () => {
                       <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
+                        variant="gradient"
+                        loading={loading}
+                        className="w-full h-14 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
                       >
-                        {loading ? <LoadingSpinner label="Creating account..." /> : "Create Account"}
+                        Create Account
                       </Button>
 
                       {/* Divider */}
@@ -396,8 +396,9 @@ const Auth = () => {
                       <Button
                         onClick={signInWithGoogle}
                         disabled={loading}
-                        variant="outline"
-                        className="w-full h-14 glass-card border-white/10 text-white font-semibold text-base rounded-xl hover:bg-white/10 transition-all duration-300 flex items-center justify-center space-x-3"
+                        variant="outline-glow"
+                        loading={loading}
+                        className="w-full h-14 glass-card border-white/10 text-white font-semibold text-base rounded-xl hover:bg-white/10 transition-all duration-300 flex items-center justify-center space-x-3 press-effect"
                       >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
                           <path
@@ -426,9 +427,9 @@ const Auth = () => {
               {/* Terms */}
               <p className="text-xs text-gray-500 text-center mt-6">
                 By continuing, you agree to FlixVerse's{' '}
-                <a href="#" className="text-red-400 hover:text-red-300">Terms of Service</a>
+                <a href="#" className="text-red-400 hover:text-red-300 focus-ring rounded">Terms of Service</a>
                 {' '}and{' '}
-                <a href="#" className="text-red-400 hover:text-red-300">Privacy Policy</a>
+                <a href="#" className="text-red-400 hover:text-red-300 focus-ring rounded">Privacy Policy</a>
               </p>
             </CardContent>
           </Card>

@@ -10,6 +10,7 @@ interface KeyboardShortcutsHelpProps {
 const SHORTCUTS = [
   { keys: ["Space", "K"], action: "Play / Pause" },
   { keys: ["←", "→"], action: "Seek backward / forward 10s" },
+  { keys: ["0-9"], action: "Jump to 0–90% of the video" },
   { keys: ["↑", "↓"], action: "Volume up / down" },
   { keys: ["M"], action: "Mute / unmute" },
   { keys: ["F", "T"], action: "Toggle fullscreen" },

@@ -90,7 +90,9 @@ export default async function BrowsePage({ params }: PageProps) {
           )}
         </>
       )}
-      <LazyBrowse />
+      <div className="page-enter">
+        <LazyBrowse />
+      </div>
     </>
   );
 }

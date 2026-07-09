@@ -1,4 +1,7 @@
 import "./globals.css";
+import "./advanced-ui.css";
+import "./video-player.css";
+import "./ui-polish.css";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import { WebsiteJsonLd, OrganizationJsonLd } from "@/components/seo/JsonLd";
@@ -9,6 +12,8 @@ import { DEFAULT_DESCRIPTION, DEFAULT_KEYWORDS, SITE_NAME, SITE_URL } from "@/li
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
+  preload: true,
+  adjustFontFallback: true,
   variable: "--font-inter",
 });
 
@@ -95,6 +100,7 @@ export default function RootLayout({
     return (
         <html lang="en" className={inter.variable}>
             <head>
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
                 <link rel="preconnect" href="https://api.themoviedb.org" />
                 <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />
                 <link rel="dns-prefetch" href="https://api.themoviedb.org" />

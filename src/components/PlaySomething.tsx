@@ -81,7 +81,7 @@ export function PlaySomething() {
     <button
       onClick={pickRandom}
       disabled={loading}
-      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-sm font-bold text-white shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+      className="btn-primary magnetic press-effect inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-500/20 transition-transform disabled:opacity-50 focus-ring"
     >
       {loading ? (
         <Loader2 className="w-4 h-4 animate-spin" />

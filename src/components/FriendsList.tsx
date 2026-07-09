@@ -53,9 +53,9 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
   }, [onInvite]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="glass-panel flex h-full flex-col overflow-hidden rounded-2xl">
       {/* Tabs */}
-      <div className="flex border-b border-white/10 shrink-0">
+      <div className="flex shrink-0 border-b border-white/10">
         {[
           { id: "friends" as const, label: "Friends", count: friends.length },
           { id: "requests" as const, label: "Requests", count: incomingRequests.length },
@@ -64,10 +64,10 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-medium transition-colors border-b-2 ${
+            className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-xs font-medium transition-colors focus-ring ${
               activeTab === tab.id
-                ? "text-white border-red-500"
-                : "text-gray-500 border-transparent hover:text-gray-300"
+                ? "border-red-500 text-white"
+                : "border-transparent text-gray-500 hover:text-gray-300"
             }`}
           >
             {tab.icon && <tab.icon className="w-3.5 h-3.5" />}
@@ -104,9 +104,9 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
                 className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors group"
               >
                 {friend.avatarUrl ? (
-                  <img src={friend.avatarUrl} alt={friend.displayName} className="w-9 h-9 rounded-full object-cover" />
+                  <img src={friend.avatarUrl} alt={friend.displayName} loading="lazy" decoding="async" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/15" />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-sm font-bold text-white">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-600 text-sm font-bold text-white">
                     {friend.displayName.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -116,7 +116,7 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
                 {inviteMode && (
                   <button
                     onClick={() => handleInvite(friend)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-[11px] font-semibold text-white transition-colors opacity-0 group-hover:opacity-100"
+                    className="flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 transition-colors hover:bg-red-500 focus-ring group-hover:opacity-100"
                   >
                     <Send className="w-3 h-3" />
                     Invite
@@ -138,9 +138,9 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
             {incomingRequests.map((req) => (
               <div key={req.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/5">
                 {req.fromAvatarUrl ? (
-                  <img src={req.fromAvatarUrl} alt={req.fromDisplayName} className="w-9 h-9 rounded-full object-cover" />
+                  <img src={req.fromAvatarUrl} alt={req.fromDisplayName} loading="lazy" decoding="async" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/15" />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-sm font-bold text-white">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 text-sm font-bold text-white">
                     {req.fromDisplayName.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -151,14 +151,14 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => acceptFriendRequest(req)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-500/20 text-green-400 transition-colors hover:bg-green-500/30 focus-ring"
                     aria-label="Accept"
                   >
                     <Check className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => declineFriendRequest(req)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500/20 text-red-400 transition-colors hover:bg-red-500/30 focus-ring"
                     aria-label="Decline"
                   >
                     <X className="w-4 h-4" />
@@ -175,20 +175,20 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
             <div className="flex items-center gap-2 mb-3">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  placeholder="Search by username..."
-                  className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20"
-                />
-              </div>
-              <button
-                onClick={handleSearch}
-                disabled={searchQuery.length < 2 || searching}
-                className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-30 text-xs font-semibold text-white transition-colors"
-              >
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    placeholder="Search by username..."
+                    className="focus-ring w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-8 pr-3 text-xs text-white placeholder:text-gray-600 focus:border-white/20"
+                  />
+                </div>
+                <button
+                  onClick={handleSearch}
+                  disabled={searchQuery.length < 2 || searching}
+                  className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-30 focus-ring"
+                >
                 {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Search"}
               </button>
             </div>
@@ -197,9 +197,9 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
               {searchResults.map((u) => (
                 <div key={u.uid} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors">
                   {u.photoURL ? (
-                    <img src={u.photoURL} alt={u.displayName} className="w-9 h-9 rounded-full object-cover" />
+                    <img src={u.photoURL} alt={u.displayName} loading="lazy" decoding="async" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/15" />
                   ) : (
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-sm font-bold text-white">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-600 text-sm font-bold text-white">
                       {u.displayName.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -209,7 +209,7 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
                   <button
                     onClick={() => handleSendRequest(u)}
                     disabled={sendingTo === u.uid}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-medium text-white transition-colors disabled:opacity-30"
+                    className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-30 focus-ring"
                   >
                     {sendingTo === u.uid ? (
                       <Loader2 className="w-3 h-3 animate-spin" />

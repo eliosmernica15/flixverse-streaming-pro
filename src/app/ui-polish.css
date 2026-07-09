@@ -1,0 +1,69 @@
+/* ─────────────────────────────────────────────────────────────
+   UI Polish — shared premium component styles
+   Imported in layout.tsx (DESIGN agent). Reuses globals.css
+   utilities (glass-effect, glass-card, glass-premium, btn-primary,
+   skeleton-shimmer, skeleton-card, skeleton-text, section-divider-glow,
+   hover-lift, glow-border, card-glow, press-effect, text-gradient, …).
+   ───────────────────────────────────────────────────────────── */
+
+/* Secondary "glass" CTA — pairs with .btn-primary in hero/sections */
+.btn-glass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border-radius: var(--radius);
+  color: #fff;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    rgba(239, 68, 68, 0.02) 100%
+  );
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-glass:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: scale(1.02);
+}
+
+.btn-glass:active {
+  transform: scale(0.98);
+}
+
+.btn-glass:focus-visible {
+  outline: 2px solid rgba(239, 68, 68, 0.7);
+  outline-offset: 2px;
+}
+
+.btn-glass:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Consistent, rounded poster media wrapper for cards */
+.poster-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Below-the-fold heavy section opt-in (reuses .content-auto concept) */
+.section-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 480px;
+}
+
+/* Respect reduced-motion for any transform-based polish added here */
+@media (prefers-reduced-motion: reduce) {
+  .btn-glass:hover,
+  .btn-glass:active {
+    transform: none;
+  }
+}

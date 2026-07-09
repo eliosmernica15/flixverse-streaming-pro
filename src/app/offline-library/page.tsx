@@ -8,5 +8,9 @@ export const metadata = buildPrivatePageMetadata({
 });
 
 export default function OfflineLibraryPage() {
-  return <LazyOfflineLibrary />;
+  return (
+    <div className="page-enter">
+      <LazyOfflineLibrary />
+    </div>
+  );
 }

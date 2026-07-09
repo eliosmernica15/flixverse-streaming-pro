@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { WifiOff, Download, Film, Play, Clock, Info } from "lucide-react";
+import { WifiOff, Download, Film, Info } from "lucide-react";
 import { loadOfflineCache, type OfflineCachePayload } from "@/lib/offlineStorage";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getImageUrl } from "@/utils/tmdbApi";
 import PageContainer from "@/components/PageContainer";
 import PageHero from "@/components/PageHero";
+import SectionHeader from "@/components/SectionHeader";
+import Reveal from "@/components/Reveal";
 import EmptyState from "@/components/EmptyState";
 
 const OfflineLibrary = () => {
@@ -43,7 +45,7 @@ const OfflineLibrary = () => {
           </div>
         )}
 
-        <section className="mb-12 p-6 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-red-950/20">
+        <section className="mb-12 p-6 rounded-2xl glass-panel">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
               <Download className="w-6 h-6 text-blue-400" />
@@ -74,17 +76,14 @@ const OfflineLibrary = () => {
         ) : (
           <div className="space-y-12">
             {cache?.continueWatching && cache.continueWatching.length > 0 && (
-              <section>
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Play className="w-5 h-5 text-red-500" />
-                  Continue watching (cached)
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <Reveal as="section" className="mb-12">
+                <SectionHeader title="Continue watching" eyebrow="Cached" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-2">
                   {cache.continueWatching.map((item) => (
                     <Link
                       key={`cw-${item.id}-${item.media_type}`}
                       href={`/movie/${item.id}?type=${item.media_type}`}
-                      className="group block"
+                      className="group block hover-lift-sm rounded-2xl focus-ring"
                     >
                       <div className="aspect-[2/3] rounded-2xl overflow-hidden border border-white/10 group-hover:border-red-500/40 transition-colors relative">
                         {item.poster_path ? (
@@ -105,22 +104,19 @@ const OfflineLibrary = () => {
                     </Link>
                   ))}
                 </div>
-              </section>
+              </Reveal>
             )}
 
             {cache?.watchlist && cache.watchlist.length > 0 && (
-              <section>
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-pink-500" />
-                  My List (cached)
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {cache.watchlist.map((item) => (
-                    <Link
-                      key={`wl-${item.id}-${item.media_type}`}
-                      href={`/movie/${item.id}?type=${item.media_type}`}
-                      className="group block"
-                    >
+                <Reveal as="section" className="mb-12">
+                  <SectionHeader title="My List" eyebrow="Cached" />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-2">
+                    {cache.watchlist.map((item) => (
+                      <Link
+                        key={`wl-${item.id}-${item.media_type}`}
+                        href={`/movie/${item.id}?type=${item.media_type}`}
+                        className="group block hover-lift-sm rounded-2xl focus-ring"
+                      >
                       <div className="aspect-[2/3] rounded-2xl overflow-hidden border border-white/10 group-hover:border-red-500/40 transition-colors relative">
                         {item.poster_path ? (
                           <Image
@@ -140,7 +136,7 @@ const OfflineLibrary = () => {
                     </Link>
                   ))}
                 </div>
-              </section>
+              </Reveal>
             )}
           </div>
         )}

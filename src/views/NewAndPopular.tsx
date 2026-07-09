@@ -3,6 +3,7 @@
 import MovieCarousel from "@/components/MovieCarousel";
 import PageHero from "@/components/PageHero";
 import PageContainer from "@/components/PageContainer";
+import Reveal from "@/components/Reveal";
 import { useNewAndPopularCatalog } from "@/hooks/queries/useNewAndPopularCatalog";
 import { Flame, TrendingUp, Clock, Calendar, Star, Tv, Radio, AlertCircle } from "lucide-react";
 
@@ -36,69 +37,83 @@ const NewAndPopular = () => {
 
       <PageContainer>
         <div className="space-y-10">
-          <MovieCarousel
-            title="Coming Soon"
-            movies={data?.upcomingMovies || []}
-            loading={loading && !data?.upcomingMovies?.length}
-            icon={<Clock className="w-5 h-5 text-blue-400" />}
-            exploreAllPath="/browse/coming-soon"
-            comingSoon
-            showWhenEmpty
-          />
-          <div className="section-divider" />
+          <Reveal>
+            <MovieCarousel
+              title="Coming Soon"
+              movies={data?.upcomingMovies || []}
+              loading={loading && !data?.upcomingMovies?.length}
+              icon={<Clock className="w-5 h-5 text-blue-400" />}
+              exploreAllPath="/browse/coming-soon"
+              comingSoon
+              showWhenEmpty
+            />
+          </Reveal>
+          <div className="divider-glow" />
 
-          <MovieCarousel
-            title="New Releases"
-            movies={data?.newReleases || []}
-            loading={loading && !data?.newReleases?.length}
-            icon={<Star className="w-5 h-5 text-yellow-400" />}
-            exploreAllPath="/browse/new-releases"
-          />
-          <div className="section-divider" />
+          <Reveal delay={60}>
+            <MovieCarousel
+              title="New Releases"
+              movies={data?.newReleases || []}
+              loading={loading && !data?.newReleases?.length}
+              icon={<Star className="w-5 h-5 text-yellow-400" />}
+              exploreAllPath="/browse/new-releases"
+            />
+          </Reveal>
+          <div className="divider-glow" />
 
-          <MovieCarousel
-            title="Now Playing in Theaters"
-            movies={data?.nowPlaying || []}
-            loading={loading && !data?.nowPlaying?.length}
-            icon={<Star className="w-5 h-5 text-purple-400" />}
-            exploreAllPath="/browse/now-playing-theaters"
-          />
-          <div className="section-divider" />
+          <Reveal delay={120}>
+            <MovieCarousel
+              title="Now Playing in Theaters"
+              movies={data?.nowPlaying || []}
+              loading={loading && !data?.nowPlaying?.length}
+              icon={<Star className="w-5 h-5 text-purple-400" />}
+              exploreAllPath="/browse/now-playing-theaters"
+            />
+          </Reveal>
+          <div className="divider-glow" />
 
-          <MovieCarousel
-            title="Airing Today"
-            movies={data?.airingToday || []}
-            loading={loading && !data?.airingToday?.length}
-            icon={<Calendar className="w-5 h-5 text-green-400" />}
-            exploreAllPath="/browse/airing-today"
-          />
-          <div className="section-divider" />
+          <Reveal delay={180}>
+            <MovieCarousel
+              title="Airing Today"
+              movies={data?.airingToday || []}
+              loading={loading && !data?.airingToday?.length}
+              icon={<Calendar className="w-5 h-5 text-green-400" />}
+              exploreAllPath="/browse/airing-today"
+            />
+          </Reveal>
+          <div className="divider-glow" />
 
-          <MovieCarousel
-            title="Popular This Week"
-            movies={data?.popularContent || []}
-            loading={loading && !data?.popularContent?.length}
-            icon={<Flame className="w-5 h-5 text-orange-400" />}
-            exploreAllPath="/browse/popular-this-week"
-          />
-          <div className="section-divider" />
+          <Reveal delay={240}>
+            <MovieCarousel
+              title="Popular This Week"
+              movies={data?.popularContent || []}
+              loading={loading && !data?.popularContent?.length}
+              icon={<Flame className="w-5 h-5 text-orange-400" />}
+              exploreAllPath="/browse/popular-this-week"
+            />
+          </Reveal>
+          <div className="divider-glow" />
 
-          <MovieCarousel
-            title="Trending TV Shows"
-            movies={data?.trendingShows || []}
-            loading={loading && !data?.trendingShows?.length}
-            icon={<Tv className="w-5 h-5 text-cyan-400" />}
-            exploreAllPath="/browse/trending-tv"
-          />
-          <div className="section-divider" />
+          <Reveal delay={300}>
+            <MovieCarousel
+              title="Trending TV Shows"
+              movies={data?.trendingShows || []}
+              loading={loading && !data?.trendingShows?.length}
+              icon={<Tv className="w-5 h-5 text-cyan-400" />}
+              exploreAllPath="/browse/trending-tv"
+            />
+          </Reveal>
+          <div className="divider-glow" />
 
-          <MovieCarousel
-            title="On The Air"
-            movies={data?.onTheAir || []}
-            loading={loading && !data?.onTheAir?.length}
-            icon={<Radio className="w-5 h-5 text-pink-400" />}
-            exploreAllPath="/browse/on-the-air"
-          />
+          <Reveal delay={360}>
+            <MovieCarousel
+              title="On The Air"
+              movies={data?.onTheAir || []}
+              loading={loading && !data?.onTheAir?.length}
+              icon={<Radio className="w-5 h-5 text-pink-400" />}
+              exploreAllPath="/browse/on-the-air"
+            />
+          </Reveal>
         </div>
       </PageContainer>
     </>

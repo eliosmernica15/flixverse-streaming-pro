@@ -13,6 +13,7 @@ import {
   Youtube,
   WifiOff,
   ArrowUpRight,
+  Send,
 } from "lucide-react";
 
 const Footer = () => {
@@ -42,65 +43,93 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="relative border-t border-white/5 mt-20 overflow-hidden">
+    <footer className="relative mt-20 overflow-hidden border-t border-white/5">
+      <div aria-hidden className="divider-glow" />
+
       {/* Ambient background glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-red-600/8 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-600/6 rounded-full blur-[100px]" />
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute bottom-0 left-1/4 h-96 w-96 rounded-full bg-red-600/8 blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 h-80 w-80 rounded-full bg-purple-600/6 blur-[100px]" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/95 to-black/80" />
       </div>
 
-      <div className="relative max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
+      <div className="relative mx-auto max-w-[1800px] px-4 py-14 sm:px-6 lg:py-20 lg:px-8">
         {/* Top CTA */}
-        <div className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-8 lg:p-12 mb-16 overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-[80px] pointer-events-none" />
-          <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="glass-panel relative mb-16 overflow-hidden rounded-3xl p-8 lg:p-12">
+          <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-red-500/10 blur-[80px]" />
+          <div className="relative flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
             <div>
-              <h2 className="text-2xl lg:text-4xl font-black text-white tracking-tight mb-2">
+              <h2 className="mb-2 text-2xl font-black tracking-tight text-white lg:text-4xl">
                 Ready to start watching?
               </h2>
-              <p className="text-gray-400 max-w-lg">
-                Join FlixVerse today and unlock thousands of movies and TV shows, personalized recommendations, and offline viewing.
+              <p className="max-w-lg text-gray-400">
+                Join FlixVerse today and unlock thousands of movies and TV shows, personalized
+                recommendations, and offline viewing.
               </p>
             </div>
             <Link
               href="/auth"
-              className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white font-bold hover:from-red-500 hover:to-red-400 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-red-500/20"
+              className="group inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-500 px-8 py-4 font-bold text-white shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] hover:from-red-500 hover:to-red-400 active:scale-[0.98] focus-ring"
             >
               <span>Get Started</span>
-              <ArrowUpRight className="w-5 h-5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              <ArrowUpRight className="h-5 w-5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </Link>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 mb-12">
+        <div className="mb-12 grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4 lg:gap-12">
           <div className="lg:col-span-1">
-            <Link href="/" prefetch className="inline-flex items-center space-x-2.5 group mb-5">
+            <Link
+              href="/"
+              prefetch
+              className="group mb-5 inline-flex items-center space-x-2.5 rounded-lg focus-ring"
+            >
               <div className="relative">
-                <div className="absolute inset-0 bg-red-500/30 rounded-lg blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
-                <Sparkles className="w-7 h-7 text-red-500 group-hover:text-red-400 transition-colors relative" />
+                <span className="absolute inset-0 rounded-lg bg-red-500/30 opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-100" />
+                <Sparkles className="relative h-7 w-7 text-red-500 transition-colors group-hover:text-red-400" />
               </div>
               <h2 className="text-xl font-black tracking-tight">
                 <span className="text-gradient-primary">Flix</span>
                 <span className="text-white">Verse</span>
               </h2>
             </Link>
-            <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-              Watch free movies and TV shows online in HD. Stream trending films, build your watchlist, and browse offline with FlixVerse.
+            <p className="max-w-xs text-sm leading-relaxed text-gray-400">
+              Watch free movies and TV shows online in HD. Stream trending films, build your
+              watchlist, and browse offline with FlixVerse.
             </p>
+
+            {/* Newsletter */}
+            <form
+              className="mt-6 flex items-center gap-2"
+              onSubmit={(e) => e.preventDefault()}
+            >
+              <input
+                type="email"
+                placeholder="Your email"
+                aria-label="Email address for newsletter"
+                className="input-field min-h-[44px] flex-1 px-3 text-sm"
+              />
+              <button
+                type="submit"
+                aria-label="Subscribe"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20 transition-all hover:from-red-500 hover:to-red-400 focus-ring glow-hover"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </form>
           </div>
 
           <div>
-            <h3 className="text-white font-semibold mb-5 text-sm uppercase tracking-wider">Navigate</h3>
-            <ul className="space-y-3">
+            <h3 className="eyebrow mb-5">Navigate</h3>
+            <ul className="space-y-1">
               {navLinks.map((link) => (
                 <li key={link.path}>
                   <Link
                     href={link.path}
                     prefetch
-                    className="group flex items-center space-x-3 text-gray-400 hover:text-white transition-colors"
+                    className="group flex min-h-[44px] items-center space-x-3 rounded-lg text-gray-400 transition-colors hover:text-white focus-ring"
                   >
-                    <link.icon className="w-4 h-4 text-gray-500 group-hover:text-red-500 transition-colors" />
+                    <link.icon className="h-4 w-4 text-gray-500 transition-colors group-hover:text-red-500" />
                     <span className="text-sm">{link.label}</span>
                   </Link>
                 </li>
@@ -109,16 +138,16 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="text-white font-semibold mb-5 text-sm uppercase tracking-wider">Legal</h3>
-            <ul className="space-y-3">
+            <h3 className="eyebrow mb-5">Legal</h3>
+            <ul className="space-y-1">
               {legalLinks.map((link) => (
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="group inline-flex items-center text-gray-400 hover:text-white text-sm transition-colors"
+                    className="group inline-flex min-h-[44px] items-center text-sm text-gray-400 transition-colors hover:text-white focus-ring"
                   >
                     <span>{link.label}</span>
-                    <ArrowUpRight className="w-3 h-3 ml-1 opacity-0 -translate-y-0.5 translate-x-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:translate-y-0 transition-all" />
+                    <ArrowUpRight className="ml-1 h-3 w-3 -translate-y-0.5 translate-x-0.5 opacity-0 transition-all group-hover:translate-x-0 group-hover:translate-y-0 group-hover:opacity-100" />
                   </a>
                 </li>
               ))}
@@ -126,22 +155,22 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="text-white font-semibold mb-5 text-sm uppercase tracking-wider">Connect</h3>
-            <div className="flex items-center gap-3 mb-5">
+            <h3 className="eyebrow mb-5">Connect</h3>
+            <div className="mb-5 flex items-center gap-3">
               {socialLinks.map((social) => (
                 <a
                   key={social.label}
                   href={social.href}
-                  className="group relative w-11 h-11 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all duration-200 hover:-translate-y-1 overflow-hidden"
+                  className="group relative grid h-11 w-11 place-items-center overflow-hidden rounded-xl border border-white/10 bg-white/5 text-gray-400 transition-all duration-200 hover:-translate-y-1 hover:text-white focus-ring glow-ring"
                   title={social.label}
                   aria-label={social.label}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <social.icon className="w-4 h-4 relative" />
+                  <span className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-purple-500/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                  <social.icon className="relative h-4 w-4" />
                 </a>
               ))}
             </div>
-            <p className="text-gray-500 text-xs leading-relaxed">
+            <p className="max-w-[14rem] text-xs leading-relaxed text-gray-500">
               Stay updated with the latest releases and exclusive content.
             </p>
           </div>
@@ -149,11 +178,11 @@ const Footer = () => {
 
         <div className="section-divider mb-6" />
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
+        <div className="flex flex-col items-center justify-between gap-4 text-sm sm:flex-row">
           <p className="text-gray-500">© {currentYear} FlixVerse. All rights reserved.</p>
-          <div className="flex items-center gap-4 text-gray-600 text-xs">
+          <div className="flex items-center gap-4 text-xs text-gray-600">
             <span>Powered by TMDB API</span>
-            <span className="w-1 h-1 bg-gray-700 rounded-full" />
+            <span className="h-1 w-1 rounded-full bg-gray-700" />
             <span>Made for movie lovers</span>
           </div>
         </div>

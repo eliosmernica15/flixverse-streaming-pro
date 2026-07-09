@@ -64,7 +64,7 @@ const ImageCropper = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md bg-black/95 border-white/10 text-white">
+            <DialogContent className="glass-panel border-white/10 text-white sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Edit Profile Picture</DialogTitle>
                     <DialogDescription className="hidden">
@@ -72,7 +72,7 @@ const ImageCropper = ({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="relative w-full h-80 bg-black/50 rounded-md overflow-hidden mt-4">
+                <div className="relative mt-4 h-80 w-full overflow-hidden rounded-xl bg-black/40">
                     {imageSrc && (
                         <Cropper
                             image={imageSrc}
@@ -88,9 +88,9 @@ const ImageCropper = ({
                     )}
                 </div>
 
-                <div className="py-4 space-y-4">
+                <div className="space-y-4 py-4">
                     <div className="flex items-center space-x-4">
-                        <span className="text-sm text-gray-400 w-12">Zoom</span>
+                        <span className="w-12 text-sm text-gray-400">Zoom</span>
                         <Slider
                             value={[zoom]}
                             min={1}
@@ -106,14 +106,14 @@ const ImageCropper = ({
                     <Button
                         variant="ghost"
                         onClick={() => onOpenChange(false)}
-                        className="text-gray-400 hover:text-white hover:bg-white/10"
+                        className="text-gray-400 hover:bg-white/10 hover:text-white focus-ring"
                     >
                         Cancel
                     </Button>
                     <Button
                         onClick={handleSave}
                         disabled={loading}
-                        className="bg-red-600 hover:bg-red-700 text-white"
+                        className="btn-primary focus-ring"
                     >
                         {loading ? 'Processing...' : 'Save Picture'}
                     </Button>

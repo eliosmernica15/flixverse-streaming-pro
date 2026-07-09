@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import {
-  MessageCircle,
-  Plus,
-} from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { MessageCircle, Plus } from "lucide-react";
 import type { TimelineComment } from "@/hooks/player/useTimelineComments";
 import { TimelineCommentPopup } from "./TimelineCommentPopup";
 
@@ -24,9 +21,11 @@ interface PlayerOverlayControlsProps {
   onLikeComment: (commentId: string) => void;
   isPlaying: boolean;
   controlsVisible: boolean;
+  buffered?: number;
 }
 
 function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) seconds = 0;
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
@@ -44,8 +43,9 @@ export function PlayerOverlayControls({
   onSeek,
   onAddComment,
   onLikeComment,
-  isPlaying,
-  controlsVisible,
+  isPlaying: _isPlaying,
+  controlsVisible: _controlsVisible,
+  buffered,
 }: PlayerOverlayControlsProps) {
   const [isHovering, setIsHovering] = useState(false);
   const [hoverProgress, setHoverProgress] = useState(0);
@@ -54,6 +54,8 @@ export function PlayerOverlayControls({
   const scrubberRef = useRef<HTMLDivElement>(null);
 
   const progress = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
+  const bufferedProgress =
+    buffered && totalDuration > 0 ? Math.min(100, (buffered / totalDuration) * 100) : Math.min(100, progress + 6);
 
   const handleScrubberMove = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
@@ -82,131 +84,129 @@ export function PlayerOverlayControls({
     [totalDuration, onSeek]
   );
 
-  const handleMarkerHover = useCallback((marker: Marker) => {
-    setActiveMarker(marker);
-  }, []);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (totalDuration <= 0) return;
+      const step = e.shiftKey ? 10 : 5;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        onSeek(Math.min(totalDuration, currentTime + step));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        onSeek(Math.max(0, currentTime - step));
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        onSeek(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        onSeek(totalDuration);
+      }
+    },
+    [totalDuration, currentTime, onSeek]
+  );
 
   return (
-    <div
-      className={`absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${
-        controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-      }`}
-    >
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
-
-      <div className="relative px-4 pb-4 pt-12">
-        {/* Scrubber */}
-        <div
-          ref={scrubberRef}
-          className="relative h-8 cursor-pointer group"
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => {
-            setIsHovering(false);
-            setActiveMarker(null);
-          }}
-          onMouseMove={handleScrubberMove}
-          onClick={handleScrubberClick}
-          onTouchStart={(e) => {
-            setIsHovering(true);
-            handleScrubberMove(e);
-          }}
-          onTouchEnd={(e) => {
-            handleScrubberClick(e);
-            setIsHovering(false);
-          }}
-          role="slider"
-          aria-label="Video progress"
-          aria-valuemin={0}
-          aria-valuemax={totalDuration}
-          aria-valuenow={currentTime}
-          tabIndex={0}
-        >
-          {/* Track background */}
-          <div className="absolute bottom-3 left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden group-hover:h-1.5 transition-all">
-            {/* Progress fill */}
-            <div
-              className="h-full bg-red-500 rounded-full transition-[width] duration-75"
-              style={{ width: `${progress}%` }}
-            />
-
-            {/* Hover preview */}
-            {isHovering && (
-              <div
-                className="absolute inset-0 bg-white/30 rounded-full"
-                style={{ width: `${hoverProgress}%` }}
-              />
-            )}
-          </div>
-
-          {/* Comment markers */}
-          {markers.map((marker, i) => (
-            <div
-              key={`${marker.timestamp}-${i}`}
-              className="absolute bottom-2 -translate-x-1/2 group/marker"
-              style={{ left: `${marker.progress * 100}%` }}
-              onMouseEnter={() => handleMarkerHover(marker)}
-            >
-              <div
-                className={`w-2.5 h-2.5 rounded-full border-2 border-zinc-900 transition-colors ${
-                  marker.count > 5
-                    ? "bg-red-500"
-                    : marker.count > 2
-                      ? "bg-amber-500"
-                      : "bg-gray-400"
-                }`}
-              />
-            </div>
-          ))}
-
-          {/* Playhead */}
-          <div
-            className="absolute bottom-1.5 -translate-x-1/2 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ left: `${progress}%` }}
-          />
-
-          {/* Hover time tooltip */}
-          {isHovering && !activeMarker && (
-            <div
-              className="absolute -top-8 -translate-x-1/2 px-2 py-1 rounded bg-black/90 text-[11px] font-mono text-white border border-white/10 pointer-events-none"
-              style={{ left: `${hoverProgress}%` }}
-            >
-              {formatTime(hoverTime)}
-            </div>
+    <div className="video-scrubber-row">
+      <div
+        ref={scrubberRef}
+        className="video-scrubber"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => {
+          setIsHovering(false);
+          setActiveMarker(null);
+        }}
+        onMouseMove={handleScrubberMove}
+        onClick={handleScrubberClick}
+        onTouchStart={(e) => {
+          setIsHovering(true);
+          handleScrubberMove(e);
+        }}
+        onTouchEnd={(e) => {
+          handleScrubberClick(e);
+          setIsHovering(false);
+        }}
+        onKeyDown={handleKeyDown}
+        role="slider"
+        aria-label="Seek video"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(totalDuration)}
+        aria-valuenow={Math.round(currentTime)}
+        aria-valuetext={`${formatTime(currentTime)} of ${formatTime(totalDuration)}`}
+        tabIndex={0}
+      >
+        <div className="video-scrubber-track">
+          {/* Buffered / loaded look */}
+          <div className="video-scrubber-buffered" style={{ width: `${bufferedProgress}%` }} />
+          {/* Progress fill */}
+          <div className="video-scrubber-fill" style={{ width: `${progress}%` }} />
+          {/* Hover preview */}
+          {isHovering && (
+            <div className="video-scrubber-hover" style={{ width: `${hoverProgress}%` }} />
           )}
         </div>
 
-        {/* Time display */}
-        <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mt-0.5">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(totalDuration)}</span>
-        </div>
+        {/* Comment markers */}
+        {markers.map((marker, i) => {
+          const level = marker.count > 5 ? "high" : marker.count > 2 ? "mid" : "low";
+          return (
+            <div
+              key={`${marker.timestamp}-${i}`}
+              className={`video-marker video-marker-count-${level} ${
+                activeMarker === marker ? "is-active" : ""
+              }`}
+              style={{ left: `${marker.progress * 100}%` }}
+              onMouseEnter={() => setActiveMarker(marker)}
+              onMouseLeave={() => setActiveMarker(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSeek(marker.timestamp);
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Jump to comment at ${formatTime(marker.timestamp)} (${marker.count} comments)`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onSeek(marker.timestamp);
+                }
+              }}
+            />
+          );
+        })}
+
+        {/* Playhead */}
+        <div className="video-scrubber-playhead" style={{ left: `${progress}%` }} />
+
+        {/* Hover time tooltip */}
+        {isHovering && !activeMarker && (
+          <div className="video-scrubber-tooltip" style={{ left: `${hoverProgress}%` }}>
+            {formatTime(hoverTime)}
+          </div>
+        )}
 
         {/* Comment popup on marker hover */}
         {activeMarker && nearbyComments.length > 0 && (
           <div
-            className="absolute bottom-20 -translate-x-1/2"
-            style={{ left: `${activeMarker.progress * 100}%` }}
+            className="absolute z-50"
+            style={{ left: `${activeMarker.progress * 100}%`, bottom: "calc(100% + 8px)", transform: "translateX(-50%)" }}
           >
-            <TimelineCommentPopup
-              comments={nearbyComments}
-              onLike={onLikeComment}
-              position="top"
-            />
+            <TimelineCommentPopup comments={nearbyComments} onLike={onLikeComment} position="top" />
           </div>
         )}
-
-        {/* Add comment button */}
-        <button
-          type="button"
-          onClick={() => onAddComment(currentTime)}
-          className="absolute right-4 bottom-16 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs text-gray-300 hover:bg-white/20 hover:text-white transition-colors backdrop-blur-sm"
-          aria-label="Add comment at current time"
-        >
-          <MessageCircle className="w-3.5 h-3.5" />
-          <Plus className="w-3 h-3" />
-        </button>
       </div>
+
+      {/* Add comment at current time */}
+      <button
+        type="button"
+        className="video-add-comment"
+        onClick={() => onAddComment(currentTime)}
+        aria-label="Add comment at current time"
+        title="Add comment (L)"
+      >
+        <MessageCircle className="w-3.5 h-3.5" />
+        <Plus className="w-3 h-3" />
+      </button>
     </div>
   );
 }

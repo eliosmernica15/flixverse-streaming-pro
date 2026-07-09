@@ -20,7 +20,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="flex min-h-screen flex-col bg-black text-white">
       <a href="#main-content" className="skip-link">
         Skip to content
       </a>
@@ -28,8 +28,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         Skip to search
       </a>
       <Navigation />
-      <main id="main-content" className="outline-none">
-        {children}
+      <main
+        id="main-content"
+        className="scrollbar-thin flex-1 outline-none"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="page-enter mx-auto w-full max-w-[1800px]">{children}</div>
       </main>
       <Footer />
     </div>

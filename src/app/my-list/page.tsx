@@ -8,5 +8,9 @@ export const metadata = buildPrivatePageMetadata({
 });
 
 export default function MyListPage() {
-  return <LazyMyList />;
+  return (
+    <div className="page-enter">
+      <LazyMyList />
+    </div>
+  );
 }

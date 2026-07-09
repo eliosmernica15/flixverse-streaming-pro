@@ -53,7 +53,7 @@ const shortcuts = [
 
 function KeyBadge({ children }: { children: string }) {
   return (
-    <kbd className="inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-white/15 bg-white/10 px-2 py-1 text-xs font-semibold text-gray-200 shadow-sm">
+    <kbd className="chip inline-flex min-w-[1.75rem] justify-center px-2 py-1 font-semibold text-gray-200">
       {children}
     </kbd>
   );
@@ -70,34 +70,34 @@ export default function KeyboardShortcutsHelp() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-lg border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl text-white">
+      <DialogContent className="glass-strong max-w-lg animate-scale-in rounded-2xl border border-white/10 text-white shadow-2xl shadow-black/60">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <Keyboard className="w-5 h-5 text-red-500" />
-            Keyboard shortcuts
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-white">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-red-500/15">
+              <Keyboard className="h-5 w-5 text-red-500" />
+            </span>
+            <span className="eyebrow !text-white/90">Keyboard shortcuts</span>
           </DialogTitle>
           <DialogDescription className="text-gray-400">
             Power-user controls across FlixVerse. Shortcuts are disabled while typing in inputs.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1">
+        <div className="scrollbar-thin max-h-[60vh] space-y-6 overflow-y-auto pr-1">
           {shortcuts.map((section) => (
             <div key={section.group}>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
-                {section.group}
-              </h3>
+              <h3 className="eyebrow mb-3 text-red-400/90">{section.group}</h3>
               <ul className="space-y-2">
                 {section.items.map((item) => (
                   <li
                     key={item.label}
-                    className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0"
+                    className="flex items-center justify-between gap-4 rounded-lg border border-white/5 py-2 pl-3 pr-2 transition-colors hover:bg-white/5"
                   >
                     <span className="text-sm text-gray-300">{item.label}</span>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex shrink-0 items-center gap-1.5">
                       {item.keys.map((key, i) => (
                         <span key={`${item.label}-${key}`} className="flex items-center gap-1.5">
-                          {i > 0 && <span className="text-gray-600 text-xs">/</span>}
+                          {i > 0 && <span className="text-xs text-gray-600">/</span>}
                           <KeyBadge>{key}</KeyBadge>
                         </span>
                       ))}

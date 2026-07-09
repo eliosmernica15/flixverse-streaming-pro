@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import Reveal from "./Reveal";
 
 type Accent = "red" | "purple" | "orange" | "rose" | "amber";
 
@@ -47,20 +48,21 @@ export default function PageHero({ title, subtitle, icon, accent = "red", meta }
       <div className={`absolute top-16 left-1/4 w-72 h-72 ${styles.glow} rounded-full blur-3xl pointer-events-none`} />
 
       <div className="relative z-10 max-w-[1800px] mx-auto">
-        <div className="flex items-center gap-4">
-          <div
-            className={`w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br ${styles.icon} rounded-2xl flex items-center justify-center shadow-lg shadow-black/30 shrink-0`}
-          >
-            {icon}
+        <Reveal className="glass-panel surface-elevated rounded-2xl p-5 sm:p-6">
+          <div className="flex items-center gap-4">
+            <div
+              className={`gradient-border w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br ${styles.icon} rounded-2xl flex items-center justify-center shadow-lg shadow-black/30 shrink-0`}
+            >
+              {icon}
+            </div>
+            <div className="min-w-0">
+              <span className="eyebrow">{accent}</span>
+              <h1 className="display-title text-balance truncate">{title}</h1>
+              <p className="text-gray-400 text-sm sm:text-base mt-1">{subtitle}</p>
+              {meta && <p className="text-gray-500 text-xs sm:text-sm mt-0.5">{meta}</p>}
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight truncate">
-              {title}
-            </h1>
-            <p className="text-gray-400 text-sm sm:text-base mt-1">{subtitle}</p>
-            {meta && <p className="text-gray-500 text-xs sm:text-sm mt-0.5">{meta}</p>}
-          </div>
-        </div>
+        </Reveal>
       </div>
     </header>
   );

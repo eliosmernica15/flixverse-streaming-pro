@@ -44,19 +44,19 @@ export class FeatureErrorBoundary extends Component<FeatureErrorBoundaryProps, S
       }
 
       return (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-center">
-          <AlertTriangle className="w-6 h-6 text-red-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-300 font-medium mb-1">
+        <div className="glass-panel rounded-xl border border-red-500/20 p-4 text-center">
+          <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-red-400" />
+          <p className="mb-1 text-sm font-medium text-gray-300">
             {this.props.featureName} encountered an error
           </p>
-          <p className="text-xs text-gray-500 mb-3">
+          <p className="mb-3 text-xs text-gray-500">
             {this.state.error?.message || "Something went wrong"}
           </p>
           <button
             onClick={this.handleReset}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-400 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:text-white focus-ring"
           >
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw className="h-3 w-3" />
             Try again
           </button>
         </div>

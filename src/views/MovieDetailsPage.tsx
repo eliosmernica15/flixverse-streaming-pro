@@ -39,8 +39,11 @@ const MovieDetailsPage = () => {
 
   if (!movieId) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-2xl">Movie not found</div>
+      <div className="min-h-screen bg-black flex items-center justify-center px-4">
+        <div className="glass-panel rounded-3xl p-10 text-center max-w-md w-full">
+          <h2 className="text-2xl font-bold text-white mb-2">Title not found</h2>
+          <p className="text-gray-400">We couldn&apos;t find the movie or show you were looking for.</p>
+        </div>
       </div>
     );
   }

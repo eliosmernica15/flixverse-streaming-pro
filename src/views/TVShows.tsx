@@ -4,6 +4,7 @@ import MovieCarousel from "@/components/MovieCarousel";
 import PageHero from "@/components/PageHero";
 import PageContainer from "@/components/PageContainer";
 import { useTVShowsCatalog } from "@/hooks/queries/useTVShowsCatalog";
+import Reveal from "@/components/Reveal";
 import { Tv, Flame, Trophy, Calendar, Radio, Zap, Laugh, Drama, Search, Rocket, FileText } from "lucide-react";
 import { TMDBMovie } from "@/utils/tmdbApi";
 
@@ -40,7 +41,7 @@ const TVShows = () => {
           {SECTIONS.map((section, index) => {
             const shows = (data as Record<string, TMDBMovie[]>)[section.key];
             return (
-              <div key={section.key}>
+              <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
                 <MovieCarousel
                   title={section.title}
                   movies={shows || []}
@@ -48,8 +49,8 @@ const TVShows = () => {
                   icon={section.icon}
                   exploreAllPath={section.exploreAllPath}
                 />
-                {index < SECTIONS.length - 1 && <div className="section-divider mt-10" />}
-              </div>
+                {index < SECTIONS.length - 1 && <div className="divider-glow mt-10" />}
+              </Reveal>
             );
           })}
 

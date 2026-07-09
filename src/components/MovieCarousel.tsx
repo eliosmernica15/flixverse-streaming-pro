@@ -4,6 +4,7 @@ import { useState, useMemo, memo } from "react";
 import Link from "next/link";
 import { ChevronRight, Sparkles } from "lucide-react";
 import MovieCard from "./MovieCard";
+import SectionHeader from "./SectionHeader";
 import { TMDBMovie } from "@/utils/tmdbApi";
 import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
 import {
@@ -84,37 +85,32 @@ const MovieCarousel = memo(
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="flex items-center justify-between mb-6 sm:mb-8">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            {icon && (
-              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-red-500/15 to-purple-500/10 rounded-xl border border-white/8 shrink-0">
-                {icon}
-              </div>
-            )}
-            <div className="min-w-0">
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight truncate">
-                {title}
-              </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {validMovies.length > 0 ? `${validMovies.length} titles` : "Upcoming releases"}
-                <span className="hidden sm:inline"> · Updated daily</span>
-              </p>
+        <div className="flex items-center gap-3 sm:gap-4">
+          {icon && (
+            <div className="gradient-border flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-gradient-to-br from-red-500/15 to-purple-500/10">
+              {icon}
             </div>
-          </div>
-
-          {exploreAllPath && (
-            <Link
-              href={exploreAllPath}
-              prefetch
-              onMouseEnter={() => prefetchRoute(exploreAllPath)}
-              onFocus={() => prefetchRoute(exploreAllPath)}
-              className="hidden sm:flex items-center space-x-2 text-sm text-gray-400 hover:text-white transition-all duration-200 group/btn glass-card glass-sheen px-4 py-2 rounded-xl hover:translate-x-0.5 hover-lift-sm"
-            >
-              <Sparkles className="w-4 h-4 text-red-500" />
-              <span>Explore All</span>
-              <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-            </Link>
           )}
+          <SectionHeader
+            className="min-w-0 flex-1"
+            title={title}
+            eyebrow={validMovies.length > 0 ? `${validMovies.length} titles` : undefined}
+            action={
+              exploreAllPath ? (
+                <Link
+                  href={exploreAllPath}
+                  prefetch
+                  onMouseEnter={() => prefetchRoute(exploreAllPath)}
+                  onFocus={() => prefetchRoute(exploreAllPath)}
+                  className="group/btn glass-card glass-sheen hover-lift-sm flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-gray-400 transition-all duration-200 hover:translate-x-0.5 hover:text-white focus-ring"
+                >
+                  <Sparkles className="h-4 w-4 text-red-500" />
+                  <span>Explore All</span>
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                </Link>
+              ) : undefined
+            }
+          />
         </div>
 
         {validMovies.length > 0 ? (
@@ -141,21 +137,21 @@ const MovieCarousel = memo(
             {validMovies.length > 4 && (
               <>
                 <CarouselPrevious
-                  className={`absolute -left-5 top-1/2 -translate-y-1/2 w-14 h-14 glass-premium border-white/10 text-white hover:bg-red-600 hover:border-red-600 transition-all duration-300 hidden lg:flex shadow-2xl ${
-                    isHovered ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4 pointer-events-none"
+                  className={`glow-hover glass-premium press-effect absolute -left-5 top-1/2 z-10 hidden h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white transition-all duration-300 hover:bg-red-600 hover:border-red-600 shadow-2xl focus-ring lg:flex ${
+                    isHovered ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0 pointer-events-none"
                   }`}
                 />
                 <CarouselNext
-                  className={`absolute -right-5 top-1/2 -translate-y-1/2 w-14 h-14 glass-premium border-white/10 text-white hover:bg-red-600 hover:border-red-600 transition-all duration-300 hidden lg:flex shadow-2xl ${
-                    isHovered ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"
+                  className={`glow-hover glass-premium press-effect absolute -right-5 top-1/2 z-10 hidden h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white transition-all duration-300 hover:bg-red-600 hover:border-red-600 shadow-2xl focus-ring lg:flex ${
+                    isHovered ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0 pointer-events-none"
                   }`}
                 />
               </>
             )}
           </Carousel>
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-white/5 py-16 px-8 text-center">
-            <p className="text-gray-400 text-lg">
+          <div className="glass-panel rounded-2xl py-16 px-8 text-center">
+            <p className="text-gray-300 text-lg">
               New movies and series will appear here before they’re released.
             </p>
             <p className="text-gray-500 text-sm mt-2">Check back for upcoming releases.</p>

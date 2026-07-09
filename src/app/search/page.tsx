@@ -33,7 +33,9 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
 export default function SearchPage() {
   return (
     <Suspense fallback={<SearchPageSkeleton />}>
-      <LazySearchResults />
+      <div className="page-enter">
+        <LazySearchResults />
+      </div>
     </Suspense>
   );
 }

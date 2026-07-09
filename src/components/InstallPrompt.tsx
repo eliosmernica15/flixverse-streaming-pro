@@ -43,25 +43,40 @@ export default function InstallPrompt() {
   if (dismissed || !deferredPrompt) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm z-[90] animate-fade-in-up">
-      <div className="glass-premium rounded-2xl p-4 border border-white/10 shadow-2xl flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shrink-0">
-          <Download className="w-5 h-5 text-white" />
+    <div className="fixed bottom-4 left-4 right-4 z-[90] animate-slide-up sm:left-auto sm:right-6 sm:max-w-sm">
+      <div className="glass-strong flex items-start gap-3 rounded-2xl border border-white/10 p-4 shadow-2xl shadow-black/50">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-red-500 to-orange-600">
+          <Download className="h-5 w-5 text-white" />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-white text-sm">Install FlixVerse</p>
-          <p className="text-xs text-gray-400 mt-0.5">Add to your home screen for offline browsing and faster launch.</p>
-          <div className="flex gap-2 mt-3">
-            <button type="button" onClick={handleInstall} className="btn-primary text-xs px-4 py-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-white">Install FlixVerse</p>
+          <p className="mt-0.5 text-xs text-gray-400">
+            Add to your home screen for offline browsing and faster launch.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={handleInstall}
+              className="btn-primary min-h-[36px] px-4 py-2 text-xs focus-ring"
+            >
               Install app
             </button>
-            <button type="button" onClick={handleDismiss} className="text-xs text-gray-400 hover:text-white px-2">
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="rounded-xl px-2 py-2 text-xs text-gray-400 transition-colors hover:text-white focus-ring"
+            >
               Not now
             </button>
           </div>
         </div>
-        <button type="button" onClick={handleDismiss} className="p-1 hover:bg-white/10 rounded-lg shrink-0" aria-label="Dismiss">
-          <X className="w-4 h-4 text-gray-400" />
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="shrink-0 rounded-lg p-1 transition-colors hover:bg-white/10 focus-ring"
+          aria-label="Dismiss"
+        >
+          <X className="h-4 w-4 text-gray-400" />
         </button>
       </div>
     </div>

@@ -75,20 +75,20 @@ export function ReportDialog({
   return (
     <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-zinc-950 border border-white/10 rounded-2xl shadow-2xl animate-scale-in overflow-hidden">
-        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+      <div className="relative w-full max-w-sm animate-scale-in overflow-hidden rounded-2xl border-white/10 glass-strong">
+        <div className="flex items-center justify-between border-b border-white/10 p-5">
           <div className="flex items-center gap-2">
             <Flag className="w-5 h-5 text-red-400" />
-            <h2 className="font-bold text-white text-sm">Report Content</h2>
+            <h2 className="text-sm font-bold text-white">Report Content</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg" aria-label="Close">
+          <button onClick={onClose} className="rounded-lg p-2 transition-colors hover:bg-white/10 focus-ring" aria-label="Close">
             <X className="w-4 h-4 text-gray-400" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="space-y-4 p-5">
           <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 block">
+            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-gray-500">
               Reason
             </label>
             <div className="space-y-1.5">
@@ -96,10 +96,10 @@ export function ReportDialog({
                 <button
                   key={r}
                   onClick={() => setReason(r)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  className={`w-full rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors focus-ring ${
                     reason === r
-                      ? "bg-red-500/20 border border-red-500/30 text-red-400"
-                      : "bg-white/5 border border-white/5 text-gray-400 hover:text-white"
+                      ? "border-red-500/30 bg-red-500/20 text-red-400"
+                      : "border-white/5 bg-white/5 text-gray-400 hover:text-white"
                   }`}
                 >
                   {r}
@@ -109,7 +109,7 @@ export function ReportDialog({
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 block">
+            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-gray-500">
               Additional details (optional)
             </label>
             <textarea
@@ -118,22 +118,22 @@ export function ReportDialog({
               rows={3}
               maxLength={500}
               placeholder="Provide more context…"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20 resize-none"
+              className="focus-ring w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-gray-600 focus:border-white/20"
             />
           </div>
         </div>
 
-        <div className="p-5 pt-0 flex gap-2">
+        <div className="flex gap-2 p-5 pt-0">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-400 hover:text-white transition-colors"
+            className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs text-gray-400 transition-colors hover:text-white focus-ring"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!reason || submitting}
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-30 text-xs font-semibold text-white transition-colors"
+            className="btn-primary flex flex-1 items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold text-white transition-colors disabled:opacity-30 focus-ring"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             {submitting ? "Submitting…" : "Submit Report"}

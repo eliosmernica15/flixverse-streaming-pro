@@ -26,7 +26,9 @@ export default function TVShowsPage() {
         description="Stream free TV series in HD — trending shows, dramas, comedies, and documentaries on FlixVerse."
         url={`${SITE_URL}/tv-shows`}
       />
-      <LazyTVShows />
+      <div className="page-enter">
+        <LazyTVShows />
+      </div>
     </>
   );
 }

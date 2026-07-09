@@ -89,7 +89,7 @@ export function TrendingDiscussions({ tmdbId }: TrendingDiscussionsProps) {
   if (loading || items.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+    <div className="glass-panel rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-3">
         <TrendingUp className="w-4 h-4 text-red-400" />
         <h3 className="text-sm font-bold text-white">Trending Discussions</h3>
@@ -98,7 +98,7 @@ export function TrendingDiscussions({ tmdbId }: TrendingDiscussionsProps) {
         {items.map((item) => (
           <div
             key={item.id}
-            className="flex items-start gap-2 p-2 rounded-lg hover:bg-white/5 transition-colors"
+            className="flex items-start gap-2 rounded-lg p-2 transition-colors hover:bg-white/10 hover-lift-sm"
           >
             <MessageCircle className="w-3.5 h-3.5 text-gray-500 shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1">

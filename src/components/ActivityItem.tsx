@@ -68,15 +68,24 @@ const ActivityItem = ({ activity }: ActivityItemProps) => {
     return (
         <div
             onClick={handleClick}
-            className="flex items-start space-x-4 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group animate-fade-in"
+            className="glass-panel hover-lift-sm focus-ring group flex cursor-pointer items-start space-x-4 rounded-xl p-4 animate-fade-in"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleClick();
+                }
+            }}
         >
             {activity.contentPosterPath ? (
-                <div className="relative w-14 h-20 flex-shrink-0 rounded-lg overflow-hidden transition-transform duration-200 group-hover:scale-105">
+                <div className="relative h-20 w-14 flex-shrink-0 overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-105">
                     <img
                         src={getImageUrl(activity.contentPosterPath, 'medium')}
                         alt={activity.contentTitle || 'Content'}
                         loading="lazy"
-                        className="w-full h-full object-cover"
+                        decoding="async"
+                        className="h-full w-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className="absolute bottom-1 left-1">

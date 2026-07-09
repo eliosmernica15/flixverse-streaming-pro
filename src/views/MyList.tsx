@@ -5,6 +5,7 @@ import MovieCarousel from "@/components/MovieCarousel";
 import PageHero from "@/components/PageHero";
 import PageContainer from "@/components/PageContainer";
 import EmptyState from "@/components/EmptyState";
+import Reveal from "@/components/Reveal";
 import { TMDBMovie } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
@@ -61,11 +62,13 @@ const MyList = () => {
             ))}
           </div>
         ) : myMovies.length > 0 ? (
-          <MovieCarousel
-            title="Your Saved Titles"
-            movies={myMovies}
-            icon={<Sparkles className="w-5 h-5 text-yellow-400" />}
-          />
+          <Reveal>
+            <MovieCarousel
+              title="Your Saved Titles"
+              movies={myMovies}
+              icon={<Sparkles className="w-5 h-5 text-yellow-400" />}
+            />
+          </Reveal>
         ) : (
           <EmptyState
             icon={<Film className="w-10 h-10 text-gray-500" />}

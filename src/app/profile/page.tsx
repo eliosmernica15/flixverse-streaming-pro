@@ -8,5 +8,9 @@ export const metadata = buildPrivatePageMetadata({
 });
 
 export default function ProfilePage() {
-  return <LazyProfile />;
+  return (
+    <div className="page-enter">
+      <LazyProfile />
+    </div>
+  );
 }

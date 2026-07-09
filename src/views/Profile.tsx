@@ -15,6 +15,7 @@ import { useWatchHistoryContext } from '@/contexts/WatchHistoryContext';
 import { useUserActivity, ActivityType } from '@/hooks/useUserActivity';
 import { useToast } from '@/hooks/use-toast';
 import { ActivityFeed } from '@/components/ActivityItem';
+import Reveal from '@/components/Reveal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -417,7 +418,7 @@ const Profile = () => {
                   key={stat.label}
                   type="button"
                   onClick={() => setActiveTab(stat.tab)}
-                  className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-center hover:bg-white/10 hover:border-white/20 transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500"
+                  className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10 text-center hover:surface-elevated hover:border-white/20 transition-all duration-200 glow-hover focus-ring min-h-[88px] flex flex-col justify-center"
                 >
                   <stat.icon className={`w-6 h-6 mx-auto mb-2 ${stat.color}`} />
                   <p className="text-2xl font-bold text-white">{stat.value}</p>
@@ -466,7 +467,7 @@ const Profile = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                <Reveal as="div" className="stagger grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                   {movieList.map((item) => (
                     <div
                       key={item.id}
@@ -487,7 +488,7 @@ const Profile = () => {
                       </div>
                     </div>
                   ))}
-                </div>
+                </Reveal>
               )}
             </TabsContent>
 
@@ -518,9 +519,9 @@ const Profile = () => {
                         {continueWatching.map((item, index) => {
                           const progressPercentage = Math.round((item.progress_seconds / item.total_duration_seconds) * 100);
                           return (
-                            <div
-                              key={item.id}
-                              className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+                      <div
+                        key={item.id}
+                        className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:surface-elevated hover:border-white/20 transition-all cursor-pointer hover-lift-sm"
                               onClick={() => {
                                 const resumeParam = item.progress_seconds > 0 ? `&resume=${item.progress_seconds}` : '';
                                 const url = item.content_type === 'tv' && item.season && item.episode
@@ -609,7 +610,7 @@ const Profile = () => {
                   <button
                     key={filter}
                     onClick={() => setActivityFilter(filter)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activityFilter === filter
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all focus-ring min-h-[40px] ${activityFilter === filter
                       ? 'bg-red-500 text-white'
                       : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'
                       }`}
@@ -629,7 +630,7 @@ const Profile = () => {
                   { label: 'Comments', value: getStats().totalComments, icon: MessageCircle, color: 'text-blue-400' },
                   { label: 'Watched', value: getStats().totalWatched, icon: Award, color: 'text-green-400' },
                 ].map((stat) => (
-                  <div key={stat.label} className="bg-white/5 rounded-lg p-3 border border-white/10 text-center">
+                  <div key={stat.label} className="bg-white/5 rounded-lg p-3 border border-white/10 text-center glow-hover">
                     <stat.icon className={`w-5 h-5 mx-auto mb-1 ${stat.color}`} />
                     <p className="text-xl font-bold text-white">{stat.value}</p>
                     <p className="text-xs text-gray-500">{stat.label}</p>

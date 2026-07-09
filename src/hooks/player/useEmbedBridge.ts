@@ -1,9 +1,14 @@
 /**
  * Two-way bridge for embedded video players.
  *
- * Listens to provider postMessage events (where supported) to keep the local
- * UI state in sync, and provides command helpers that dispatch actions through
- * the provider-aware control layer.
+ * Inbound: parses documented provider postMessage events (VidSrc CC and
+ * VidLink both emit `{ type: "PLAYER_EVENT", data: { event, currentTime,
+ * duration } }`, VidLink additionally emits `MEDIA_DATA` watch-progress
+ * payloads) and keeps the local UI state in sync — play state, time,
+ * duration, volume.
+ *
+ * Outbound: dispatches commands through the provider-aware control layer
+ * with optimistic local updates so the UI always responds instantly.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,6 +30,8 @@ export type PlayerState = {
   isReady: boolean;
   provider: ProviderConfig["id"];
   providerName: string;
+  /** True once real playback events have been received from the embed. */
+  isLiveSynced: boolean;
 };
 
 interface UseEmbedBridgeProps {
@@ -33,6 +40,8 @@ interface UseEmbedBridgeProps {
   totalDuration: number;
   onTimeUpdate?: (time: number) => void;
   onPlayStateChange?: (playing: boolean) => void;
+  onDurationChange?: (duration: number) => void;
+  onEnded?: () => void;
 }
 
 function parseMessageData(event: MessageEvent): unknown {
@@ -62,12 +71,53 @@ function matchesEvent(
 }
 
 function extractNumber(value: unknown): number | undefined {
-  if (typeof value === "number") return value;
+  if (typeof value === "number" && isFinite(value)) return value;
   if (typeof value === "string") {
     const parsed = parseFloat(value);
     if (!isNaN(parsed)) return parsed;
   }
   return undefined;
+}
+
+function hostMatchesProvider(host: string, provider: ProviderConfig): boolean {
+  return provider.origins.some((o) => host === o || host.endsWith(`.${o}`));
+}
+
+/**
+ * Extract `{ watched, duration }` from a VidLink-style MEDIA_DATA payload.
+ * Shape: `{ [id]: { progress: { watched, duration }, ... }, ... }` or a
+ * flat `{ progress: { watched, duration } }`.
+ */
+function extractMediaProgress(
+  data: Record<string, unknown>
+): { watched: number; duration: number } | null {
+  const tryProgress = (obj: Record<string, unknown>) => {
+    const progress = obj.progress;
+    if (progress && typeof progress === "object") {
+      const p = progress as Record<string, unknown>;
+      const watched = extractNumber(p.watched);
+      const duration = extractNumber(p.duration);
+      if (watched !== undefined && duration !== undefined) {
+        return { watched, duration };
+      }
+    }
+    return null;
+  };
+
+  const direct = tryProgress(data);
+  if (direct) return direct;
+
+  let latest: { watched: number; duration: number; ts: number } | null = null;
+  for (const value of Object.values(data)) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Record<string, unknown>;
+    const found = tryProgress(entry);
+    if (found) {
+      const ts = extractNumber(entry.last_updated) ?? 0;
+      if (!latest || ts >= latest.ts) latest = { ...found, ts };
+    }
+  }
+  return latest ? { watched: latest.watched, duration: latest.duration } : null;
 }
 
 export function useEmbedBridge({
@@ -76,6 +126,8 @@ export function useEmbedBridge({
   totalDuration,
   onTimeUpdate,
   onPlayStateChange,
+  onDurationChange,
+  onEnded,
 }: UseEmbedBridgeProps) {
   const [state, setState] = useState<PlayerState>({
     isPlaying: true,
@@ -86,12 +138,15 @@ export function useEmbedBridge({
     isReady: false,
     provider: "generic",
     providerName: "Generic",
+    isLiveSynced: false,
   });
 
   const stateRef = useRef(state);
   stateRef.current = state;
 
   const providerRef = useRef<ProviderConfig | null>(null);
+  const callbacksRef = useRef({ onTimeUpdate, onPlayStateChange, onDurationChange, onEnded });
+  callbacksRef.current = { onTimeUpdate, onPlayStateChange, onDurationChange, onEnded };
 
   // Detect provider when iframe src changes
   useEffect(() => {
@@ -103,6 +158,7 @@ export function useEmbedBridge({
       ...prev,
       provider: provider.id,
       providerName: provider.name,
+      isLiveSynced: false,
     }));
   }, [iframeRef]);
 
@@ -118,23 +174,59 @@ export function useEmbedBridge({
       const provider = detectProvider(iframe.src || "");
       providerRef.current = provider;
       if (provider.id !== stateRef.current.provider) {
-        setState((prev) => ({ ...prev, provider: provider.id, providerName: provider.name }));
+        setState((prev) => ({
+          ...prev,
+          provider: provider.id,
+          providerName: provider.name,
+          isLiveSynced: false,
+        }));
       }
       if (provider.id === "generic") return;
 
-      // Security: only trust messages from the iframe's origin
-      const iframeOrigin = new URL(iframe.src || window.location.href).origin;
-      if (event.source !== iframe.contentWindow) return;
-      if (event.origin !== iframeOrigin && event.origin !== "*") return;
+      // Security: only trust messages coming from the embed itself — either
+      // directly from the iframe window, or from an origin that belongs to
+      // the detected provider (embeds often relay events from nested frames).
+      let originHost = "";
+      try {
+        originHost = new URL(event.origin).hostname.toLowerCase();
+      } catch {
+        return;
+      }
+      const fromIframeWindow = event.source === iframe.contentWindow;
+      const fromProviderOrigin = hostMatchesProvider(originHost, provider);
+      if (!fromIframeWindow && !fromProviderOrigin) return;
 
       const data = parseMessageData(event);
-      
-      // Handle providers that just send string events (like VidLink)
+
+      // Normalize the payload. Documented wrapper shapes:
+      //   { type: "PLAYER_EVENT", data: { event, currentTime, duration } }
+      //   { type: "MEDIA_DATA", data: { [id]: { progress: { watched, duration } } } }
+      // Plus string events and flat objects for undocumented providers.
       let payload: Record<string, unknown>;
       if (typeof data === "string") {
         payload = { event: data };
       } else if (data && typeof data === "object") {
         const dataObj = data as Record<string, unknown>;
+        if (dataObj.type === "MEDIA_DATA" && dataObj.data && typeof dataObj.data === "object") {
+          const progress = extractMediaProgress(dataObj.data as Record<string, unknown>);
+          if (progress) {
+            const prev = stateRef.current;
+            const next: PlayerState = {
+              ...prev,
+              currentTime: progress.watched,
+              duration: progress.duration > 0 ? progress.duration : prev.duration,
+              isLiveSynced: true,
+            };
+            setState(next);
+            if (progress.duration > 0 && progress.duration !== prev.duration) {
+              callbacksRef.current.onDurationChange?.(progress.duration);
+            }
+            if (progress.watched !== prev.currentTime) {
+              callbacksRef.current.onTimeUpdate?.(progress.watched);
+            }
+          }
+          return;
+        }
         payload =
           dataObj.type === "PLAYER_EVENT" && typeof dataObj.data === "object" && dataObj.data !== null
             ? (dataObj.data as Record<string, unknown>)
@@ -143,84 +235,100 @@ export function useEmbedBridge({
         return;
       }
 
-      let nextState = { ...stateRef.current };
+      const prev = stateRef.current;
+      const next = { ...prev };
       let changed = false;
+      let recognized = false;
 
       if (matchesEvent(payload, provider.events.play)) {
-        nextState.isPlaying = true;
+        next.isPlaying = true;
         changed = true;
+        recognized = true;
       } else if (matchesEvent(payload, provider.events.pause)) {
-        nextState.isPlaying = false;
+        next.isPlaying = false;
         changed = true;
+        recognized = true;
       }
 
       if (matchesEvent(payload, provider.events.ended)) {
-        nextState.isPlaying = false;
+        next.isPlaying = false;
         changed = true;
+        recognized = true;
+        callbacksRef.current.onEnded?.();
       }
 
-      if (matchesEvent(payload, provider.events.time)) {
-        const nestedData = typeof payload.data === "object" && payload.data ? (payload.data as Record<string, unknown>) : {};
-        const t =
-          extractNumber(payload.currentTime) ??
-          extractNumber(payload.time) ??
-          extractNumber(payload.current_time) ??
-          extractNumber(payload.position) ??
-          extractNumber(nestedData.currentTime) ??
-          extractNumber(nestedData.time) ??
-          extractNumber(nestedData.position);
-        if (t !== undefined && isFinite(t)) {
-          nextState.currentTime = Math.min(t, totalDuration || Infinity);
-          changed = true;
-        }
-        const d =
-          extractNumber(payload.duration) ??
-          extractNumber(payload.totalDuration) ??
-          extractNumber(payload.total) ??
-          extractNumber(nestedData.duration) ??
-          extractNumber(nestedData.totalDuration);
-        if (d !== undefined && isFinite(d) && d > 0) {
-          nextState.duration = d;
-          changed = true;
-        }
+      // Providers include currentTime/duration on every PLAYER_EVENT (play,
+      // pause, time, seeked, ended) — extract them regardless of event name.
+      const nestedData =
+        typeof payload.data === "object" && payload.data
+          ? (payload.data as Record<string, unknown>)
+          : {};
+      const isTimeEvent =
+        matchesEvent(payload, provider.events.time) ||
+        matchesEvent(payload, ["seeked", "seek"]);
+      const t =
+        extractNumber(payload.currentTime) ??
+        extractNumber(payload.time) ??
+        extractNumber(payload.current_time) ??
+        extractNumber(payload.position) ??
+        extractNumber(nestedData.currentTime) ??
+        extractNumber(nestedData.time) ??
+        extractNumber(nestedData.position);
+      if (t !== undefined && (isTimeEvent || recognized)) {
+        next.currentTime = t;
+        changed = true;
+        recognized = true;
+      }
+
+      const d =
+        extractNumber(payload.duration) ??
+        extractNumber(payload.totalDuration) ??
+        extractNumber(payload.total) ??
+        extractNumber(nestedData.duration) ??
+        extractNumber(nestedData.totalDuration);
+      if (d !== undefined && d > 0 && d !== prev.duration) {
+        next.duration = d;
+        changed = true;
+        recognized = true;
       }
 
       if (matchesEvent(payload, provider.events.volume)) {
-        const nestedData = typeof payload.data === "object" && payload.data ? (payload.data as Record<string, unknown>) : {};
         const v = extractNumber(payload.volume) ?? extractNumber(nestedData.volume);
-        if (v !== undefined && isFinite(v)) {
-          nextState.volume = Math.max(0, Math.min(1, v));
+        if (v !== undefined) {
+          next.volume = Math.max(0, Math.min(1, v > 1 ? v / 100 : v));
           changed = true;
+          recognized = true;
         }
       }
 
       if (matchesEvent(payload, provider.events.muted)) {
-        const nestedData = typeof payload.data === "object" && payload.data ? (payload.data as Record<string, unknown>) : {};
         let m = payload.muted;
         if (m === undefined) m = nestedData.muted;
         if (typeof m === "boolean") {
-          nextState.isMuted = m;
+          next.isMuted = m;
           changed = true;
+          recognized = true;
         }
       }
 
-      if (changed) {
-        setState(nextState);
-        if (onTimeUpdate && nextState.currentTime !== stateRef.current.currentTime) {
-          onTimeUpdate(nextState.currentTime);
-        }
-        if (
-          onPlayStateChange &&
-          nextState.isPlaying !== stateRef.current.isPlaying
-        ) {
-          onPlayStateChange(nextState.isPlaying);
-        }
+      if (!changed) return;
+      if (recognized) next.isLiveSynced = true;
+
+      setState(next);
+      if (next.duration !== prev.duration && next.duration > 0) {
+        callbacksRef.current.onDurationChange?.(next.duration);
+      }
+      if (next.currentTime !== prev.currentTime) {
+        callbacksRef.current.onTimeUpdate?.(next.currentTime);
+      }
+      if (next.isPlaying !== prev.isPlaying) {
+        callbacksRef.current.onPlayStateChange?.(next.isPlaying);
       }
     };
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [enabled, iframeRef, totalDuration, onTimeUpdate, onPlayStateChange]);
+  }, [enabled, iframeRef]);
 
   const sendAction = useCallback(
     (action: EmbedAction, opts?: { seekSeconds?: number; volume?: number; steps?: number }) => {
@@ -251,9 +359,8 @@ export function useEmbedBridge({
   const pause = useCallback(() => sendAction("pause"), [sendAction]);
 
   const toggleMute = useCallback(() => {
-    sendAction(state.isMuted ? "unmute" : "mute");
-    setState((prev) => ({ ...prev, isMuted: !prev.isMuted }));
-  }, [sendAction, state.isMuted]);
+    sendAction(stateRef.current.isMuted ? "unmute" : "mute");
+  }, [sendAction]);
 
   const setVolume = useCallback(
     (volume: number) => {
@@ -289,20 +396,23 @@ export function useEmbedBridge({
       const direction = delta > 0 ? "forward" : "back";
       const steps = Math.max(1, Math.round(Math.abs(delta) / 5));
       sendAction(direction === "forward" ? "seekForward" : "seekBack", { steps });
-      setState((prev) => ({
-        ...prev,
-        currentTime: Math.max(0, Math.min(totalDuration, prev.currentTime + delta)),
-      }));
+      setState((prev) => {
+        const max = prev.duration > 0 ? prev.duration : totalDuration;
+        return {
+          ...prev,
+          currentTime: Math.max(0, Math.min(max, prev.currentTime + delta)),
+        };
+      });
     },
     [sendAction, totalDuration]
   );
 
   const setReady = useCallback((ready: boolean) => {
-    setState((prev) => ({ ...prev, isReady: ready }));
+    setState((prev) => ({ ...prev, isReady: ready, isLiveSynced: ready ? prev.isLiveSynced : false }));
   }, []);
 
   const setPlaying = useCallback((playing: boolean) => {
-    setState((prev) => ({ ...prev, isPlaying: playing }));
+    setState((prev) => (prev.isPlaying === playing ? prev : { ...prev, isPlaying: playing }));
   }, []);
 
   return {

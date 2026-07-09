@@ -138,11 +138,11 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
           <button
             key={profile.id}
             onClick={() => onSelectProfile(profile)}
-            className="group flex flex-col items-center gap-3"
+            className="group flex flex-col items-center gap-3 focus-ring"
           >
             <div className="relative">
               {profile.avatarUrl ? (
-                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl overflow-hidden border-2 border-transparent group-hover:border-white transition-all group-hover:scale-105">
+                <div className="overflow-hidden rounded-2xl border-2 border-transparent transition-all group-hover:scale-105 group-hover:border-white hover-lift-sm ring-2 ring-white/10">
                   <Image
                     src={profile.avatarUrl}
                     alt={profile.displayName}
@@ -152,8 +152,8 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
                   />
                 </div>
               ) : (
-                <div className={`w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-gradient-to-br ${getAvatarColor(index)} flex items-center justify-center border-2 border-transparent group-hover:border-white transition-all group-hover:scale-105`}>
-                  <span className="text-3xl sm:text-4xl font-black text-white">
+                <div className={`flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-2 border-transparent bg-gradient-to-br transition-all group-hover:scale-105 group-hover:border-white hover-lift-sm ring-2 ring-white/10 sm:h-32 sm:w-32 ${getAvatarColor(index)}`}>
+                  <span className="text-3xl font-black text-white sm:text-4xl">
                     {profile.displayName.charAt(0).toUpperCase()}
                   </span>
                 </div>
@@ -174,12 +174,12 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
         {profiles.length < 5 && (
           <button
             onClick={() => setShowCreate(true)}
-            className="group flex flex-col items-center gap-3"
+            className="group flex flex-col items-center gap-3 focus-ring"
           >
-            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white/5 border-2 border-dashed border-white/20 flex items-center justify-center group-hover:border-white/40 transition-all group-hover:scale-105">
-              <Plus className="w-8 h-8 text-gray-500 group-hover:text-white transition-colors" />
+            <div className="flex h-24 w-24 items-center justify-center rounded-2xl border-2 border-dashed border-white/20 bg-white/5 transition-all group-hover:scale-105 group-hover:border-white/40 hover-lift-sm sm:h-32 sm:w-32">
+              <Plus className="h-8 w-8 text-gray-500 transition-colors group-hover:text-white" />
             </div>
-            <span className="text-sm text-gray-500 group-hover:text-white transition-colors">
+            <span className="text-sm text-gray-500 transition-colors group-hover:text-white">
               Add Profile
             </span>
           </button>
@@ -189,7 +189,7 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
       {/* Manage profiles link */}
       <button
         onClick={() => router.push("/profile/settings")}
-        className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/20 text-sm text-gray-400 hover:text-white hover:border-white/40 transition-colors"
+        className="flex items-center gap-2 rounded-xl border border-white/20 px-6 py-2.5 text-sm text-gray-400 transition-colors hover:border-white/40 hover:text-white focus-ring"
       >
         <Settings className="w-4 h-4" />
         Manage Profiles
@@ -199,14 +199,14 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
       {showCreate && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowCreate(false)} />
-          <div className="relative w-full max-w-sm bg-zinc-950 border border-white/10 rounded-2xl shadow-2xl animate-scale-in overflow-hidden">
-            <div className="p-5 border-b border-white/10">
+          <div className="relative w-full max-w-sm animate-scale-in overflow-hidden rounded-2xl border-white/10 glass-strong">
+            <div className="border-b border-white/10 p-5">
               <h2 className="font-bold text-white">Create Profile</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Add a new profile to this account</p>
+              <p className="mt-0.5 text-xs text-gray-500">Add a new profile to this account</p>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="space-y-4 p-5">
               <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-gray-400">
                   Name
                 </label>
                 <input
@@ -215,7 +215,7 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Enter name"
                   maxLength={24}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20"
+                  className="focus-ring w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-white/20"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void handleCreateProfile();
                   }}
@@ -223,16 +223,16 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-gray-400">
                   Profile Type
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setNewType("standard")}
-                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors focus-ring ${
                       newType === "standard"
-                        ? "bg-white/10 border-white/20 text-white"
-                        : "bg-white/5 border-white/5 text-gray-500 hover:text-white"
+                        ? "border-white/20 bg-white/10 text-white"
+                        : "border-white/5 bg-white/5 text-gray-500 hover:text-white"
                     }`}
                   >
                     <User className="w-4 h-4" />
@@ -240,10 +240,10 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
                   </button>
                   <button
                     onClick={() => setNewType("kids")}
-                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors focus-ring ${
                       newType === "kids"
-                        ? "bg-blue-500/20 border-blue-500/30 text-blue-400"
-                        : "bg-white/5 border-white/5 text-gray-500 hover:text-white"
+                        ? "border-blue-500/30 bg-blue-500/20 text-blue-400"
+                        : "border-white/5 bg-white/5 text-gray-500 hover:text-white"
                     }`}
                   >
                     <Shield className="w-4 h-4" />
@@ -252,17 +252,17 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
                 </div>
               </div>
             </div>
-            <div className="p-5 pt-0 flex gap-2">
+            <div className="flex gap-2 p-5 pt-0">
               <button
                 onClick={() => setShowCreate(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-400 hover:text-white transition-colors"
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-gray-400 transition-colors hover:text-white focus-ring"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateProfile}
                 disabled={!newName.trim()}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-30 text-sm font-semibold text-white transition-colors"
+                className="btn-primary flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-30 focus-ring"
               >
                 Create
               </button>

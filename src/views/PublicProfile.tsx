@@ -8,6 +8,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getFirestore, collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { MemberProfile, ActivityFeedItem } from "@/integrations/firebase/types";
 import MovieCard from "@/components/MovieCard";
+import SectionHeader from "@/components/SectionHeader";
+import Reveal from "@/components/Reveal";
 import { TMDBMovie } from "@/utils/tmdbApi";
 
 interface PublicProfileProps {
@@ -94,10 +96,15 @@ export default function PublicProfile({ username }: PublicProfileProps) {
   if (!profile) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
-        <p className="text-white text-lg font-semibold">Profile not found</p>
-        <button onClick={() => router.back()} className="text-red-400 text-sm hover:underline">
-          Go back
-        </button>
+        <div className="glass-panel rounded-3xl p-10 max-w-md w-full text-center">
+          <p className="text-white text-lg font-semibold mb-4">Profile not found</p>
+          <button
+            onClick={() => router.back()}
+            className="btn-primary min-h-[44px] px-6 py-3 focus-ring"
+          >
+            Go back
+          </button>
+        </div>
       </div>
     );
   }
@@ -112,9 +119,9 @@ export default function PublicProfile({ username }: PublicProfileProps) {
 
   return (
     <div className="min-h-screen bg-black">
-      <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5">
+      <div className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 rounded-lg hover:bg-white/10" aria-label="Go back">
+          <button onClick={() => router.back()} className="p-2 rounded-lg hover:bg-white/10 focus-ring min-w-[44px] min-h-[44px]" aria-label="Go back">
             <ArrowLeft className="w-5 h-5 text-white" />
           </button>
           <h1 className="text-white font-bold truncate">{profile.displayName}</h1>
@@ -123,55 +130,57 @@ export default function PublicProfile({ username }: PublicProfileProps) {
 
       <div className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
         {/* Profile header */}
-        <div className="flex items-center gap-6 mb-10">
+        <Reveal className="flex items-center gap-6 mb-10">
           {profile.avatarUrl ? (
-            <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-white/10">
-              <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="object-cover" />
+            <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-white/10 glow-ring shrink-0">
+              <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="object-cover w-full h-full" />
             </div>
           ) : (
-            <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${AVATAR_COLORS[colorIndex]} flex items-center justify-center`}>
+            <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${AVATAR_COLORS[colorIndex]} flex items-center justify-center glow-ring shrink-0`}>
               <span className="text-3xl font-black text-white">{profile.displayName.charAt(0).toUpperCase()}</span>
             </div>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-white">{profile.displayName}</h1>
-            <p className="text-sm text-gray-500">
-              {profile.type === "kids" ? "Kids Profile" : "Member"}
-              {profile.isPrimary && " · Primary"}
-            </p>
+            <h1 className="display-title text-2xl font-bold text-white">{profile.displayName}</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <span className="chip">
+                {profile.type === "kids" ? "Kids Profile" : "Member"}
+                {profile.isPrimary && " · Primary"}
+              </span>
+            </div>
           </div>
-        </div>
+        </Reveal>
+
+        <div className="divider-glow mb-10" />
 
         {/* Watchlist */}
         {watchlist.length > 0 ? (
-          <section>
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Film className="w-5 h-5 text-red-500" />
-              My List
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <Reveal className="mb-12">
+            <SectionHeader title="My List" eyebrow="Watchlist" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mt-2 content-auto">
               {watchlist.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} />
+                <div key={movie.id} className="hover-lift-sm rounded-2xl">
+                  <MovieCard movie={movie} />
+                </div>
               ))}
             </div>
-          </section>
+          </Reveal>
         ) : (
           <div className="text-center py-16">
-            <Film className="w-12 h-12 text-gray-700 mx-auto mb-4" />
-            <p className="text-gray-500 text-sm">This profile&apos;s list is private or empty.</p>
+            <div className="glass-panel rounded-3xl p-10 max-w-md mx-auto">
+              <Film className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-300 text-sm">This profile&apos;s list is private or empty.</p>
+            </div>
           </div>
         )}
 
         {/* Activity Feed */}
         {activity.length > 0 && (
-          <section className="mt-10">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-red-500" />
-              Recent Activity
-            </h2>
-            <div className="space-y-3">
+          <Reveal className="mb-12">
+            <SectionHeader title="Recent Activity" eyebrow="Feed" />
+            <div className="space-y-3 mt-2">
               {activity.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                <div key={item.id} className="flex items-center gap-3 p-3 rounded-2xl surface hover:surface-elevated border border-white/10 hover-lift-sm transition-all">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
                     {item.type === "review" && <Star className="w-4 h-4 text-yellow-400" />}
                     {item.type === "rating" && <Star className="w-4 h-4 text-yellow-400" />}
@@ -194,7 +203,7 @@ export default function PublicProfile({ username }: PublicProfileProps) {
                 </div>
               ))}
             </div>
-          </section>
+          </Reveal>
         )}
       </div>
     </div>

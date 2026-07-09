@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { useRouter } from 'next/navigation';
 import { ContinueWatchingSkeleton } from '@/components/skeletons/ContentSkeletons';
+import SectionHeader from './SectionHeader';
 import {
   Carousel,
   CarouselContent,
@@ -57,17 +58,10 @@ const ContinueWatching = () => {
 
   return (
     <section className="relative mb-10 content-auto animate-fade-in-up">
-      <div className="flex items-center space-x-4 mb-6">
-        <div className="p-2.5 bg-gradient-to-br from-red-500/20 to-orange-500/10 rounded-xl border border-white/5">
-          <Clock className="w-5 h-5 text-red-500" />
-        </div>
-        <div>
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">
-            Continue Watching
-          </h2>
-          <p className="text-sm text-gray-500 mt-0.5">Pick up where you left off</p>
-        </div>
-      </div>
+      <SectionHeader
+        title="Continue Watching"
+        eyebrow="Pick up where you left off"
+      />
 
       <Carousel
         opts={{ align: 'start', loop: false, skipSnaps: false, dragFree: true }}
@@ -84,21 +78,32 @@ const ContinueWatching = () => {
                 className="pl-3 md:pl-5 basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
               >
                 <div
-                  className="relative group cursor-pointer"
+                  className="group glass-panel relative cursor-pointer overflow-hidden rounded-xl hover-lift-sm focus-ring"
                   onClick={() => handleContinue(item)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleContinue(item);
+                    }
+                  }}
+                  aria-label={`Continue watching ${item.content_title}`}
                 >
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-800/80 border border-white/5 shadow-lg hover:border-white/10 transition-all duration-300 movie-card-inner">
+                  <div className="relative aspect-video overflow-hidden bg-gray-800/80">
                     <Image
                       src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
                       alt={item.content_title}
                       fill
                       sizes="(max-width: 640px) 45vw, 20vw"
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      loading="lazy"
+                      decoding="async"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
                     <div className="continue-watching-play absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-14 h-14 bg-white/95 rounded-full flex items-center justify-center shadow-xl">
-                        <Play className="w-6 h-6 text-black fill-black ml-0.5" />
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/95 shadow-xl">
+                        <Play className="h-6 w-6 fill-black text-black ml-0.5" />
                       </div>
                     </div>
                     <button
@@ -107,22 +112,22 @@ const ContinueWatching = () => {
                         e.stopPropagation();
                         removeFromHistory(item.id);
                       }}
-                      className="continue-watching-remove absolute top-2 right-2 p-2 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 z-10"
+                      className="continue-watching-remove absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 opacity-0 transition-opacity hover:bg-red-500/80 focus-ring group-hover:opacity-100"
                       aria-label="Remove from continue watching"
                     >
-                      <X className="w-3.5 h-3.5 text-white" />
+                      <X className="h-3.5 w-3.5 text-white" />
                     </button>
-                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-800">
+                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-800/80">
                       <div
-                        className="h-full bg-gradient-to-r from-red-500 to-red-400 rounded-r transition-all duration-300"
+                        className="h-full rounded-r bg-gradient-to-r from-red-500 via-red-500 to-orange-400 shadow-[0_0_10px_rgba(239,68,68,0.6)] transition-all duration-300"
                         style={{ width: `${progressPercentage}%` }}
                       />
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 p-3 pt-6">
-                      <p className="text-white text-sm font-semibold truncate drop-shadow-lg">
+                      <p className="text-sm font-semibold text-white truncate drop-shadow-lg">
                         {item.content_title}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="mt-1 flex items-center gap-2">
                         {item.season != null && item.episode != null && (
                           <span className="text-xs text-gray-300">S{item.season} E{item.episode}</span>
                         )}
@@ -137,8 +142,8 @@ const ContinueWatching = () => {
         </CarouselContent>
         {items.length > 3 && (
           <>
-            <CarouselPrevious className="-left-2 sm:-left-5 top-1/2 -translate-y-1/2 w-12 h-12 glass-premium border-white/10 text-white hover:bg-red-600/20 hover:border-red-500/30 hidden lg:flex" />
-            <CarouselNext className="-right-2 sm:-right-5 top-1/2 -translate-y-1/2 w-12 h-12 glass-premium border-white/10 text-white hover:bg-red-600/20 hover:border-red-500/30 hidden lg:flex" />
+            <CarouselPrevious className="glow-hover press-effect -left-2 sm:-left-5 top-1/2 -translate-y-1/2 hidden h-12 w-12 items-center justify-center rounded-full glass-premium border-white/10 text-white hover:bg-red-600/20 hover:border-red-500/30 focus-ring lg:flex" />
+            <CarouselNext className="-right-2 sm:-right-5 top-1/2 -translate-y-1/2 glow-hover press-effect hidden h-12 w-12 items-center justify-center rounded-full glass-premium border-white/10 text-white hover:bg-red-600/20 hover:border-red-500/30 focus-ring lg:flex" />
           </>
         )}
       </Carousel>

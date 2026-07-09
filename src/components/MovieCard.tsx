@@ -184,7 +184,10 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   return (
     <div
       ref={cardRef}
-      className="relative group cursor-pointer movie-card"
+      className="group relative movie-card content-auto cursor-pointer rounded-2xl outline-none focus-ring"
+      role="button"
+      tabIndex={0}
+      aria-label={`${displayTitle}${year ? ` (${year})` : ""}`}
       onMouseEnter={() => {
         setIsHovered(true);
         schedulePrefetch();
@@ -199,14 +202,20 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
         previewTimerRef.current = setTimeout(() => setShowPreview(false), 200);
       }}
       onClick={handleCardClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
     >
-      <div className="relative overflow-hidden rounded-2xl bg-gray-900/50 movie-card-inner">
+      <div className="relative overflow-hidden rounded-2xl bg-gray-900/50 movie-card-inner card-glow hover-lift-sm glow-border">
         <div
-          className={`absolute -inset-1 rounded-2xl blur-md bg-gradient-to-r from-red-600/25 to-purple-600/25 transition-opacity duration-300 pointer-events-none ${isHovered ? "opacity-100" : "opacity-0"}`}
+          className={`pointer-events-none absolute -inset-1 rounded-2xl blur-md bg-gradient-to-r from-red-600/25 to-purple-600/25 transition-opacity duration-300 ${isHovered ? "opacity-100" : "opacity-0"}`}
         />
 
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl">
-          {!imageLoaded && <div className="absolute inset-0 bg-gray-800/80 skeleton-shimmer" />}
+          {!imageLoaded && <div className="absolute inset-0 skeleton-shimmer bg-gray-800/80" />}
 
           <Image
             src={finalPosterUrl}
@@ -215,6 +224,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
             className={`object-cover transition-transform duration-500 ease-out ${isHovered ? "scale-105" : "scale-100"}`}
             loading="lazy"
+            decoding="async"
             onError={() => setImageError(true)}
             onLoad={() => setImageLoaded(true)}
           />
@@ -223,31 +233,31 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
             className={`absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent transition-opacity duration-300 ${isHovered ? "opacity-95" : "opacity-55"}`}
           />
 
-          <div className="absolute top-3 left-3 flex items-center space-x-1.5 glass-card text-white text-[10px] font-bold px-2 py-1 rounded-md">
-            {contentType === "tv" ? <Tv className="w-3 h-3" /> : <Film className="w-3 h-3" />}
+          <div className="absolute left-3 top-3 flex items-center space-x-1.5 rounded-md bg-white/10 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-md badge-shine">
+            {contentType === "tv" ? <Tv className="h-3 w-3" /> : <Film className="h-3 w-3" />}
             <span>{contentType === "tv" ? "SERIES" : "MOVIE"}</span>
           </div>
 
           {hasValidRating && (
             <div
-              className={`absolute top-3 right-3 flex items-center space-x-1 bg-gradient-to-r ${getRatingColor(rating)} text-white text-[10px] font-black px-2 py-1 rounded-md shadow-lg`}
+              className={`absolute right-3 top-3 flex items-center space-x-1 rounded-md bg-gradient-to-r px-2 py-1 text-[10px] font-black text-white shadow-lg badge-shine ${getRatingColor(rating)}`}
             >
-              <Star className="w-3 h-3 fill-current" />
+              <Star className="h-3 w-3 fill-current" />
               <span>{rating.toFixed(1)}</span>
             </div>
           )}
 
           <div
-            className={`movie-card-actions absolute inset-x-0 bottom-0 p-4 z-10 transition-all duration-200 ${isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"}`}
+            className={`movie-card-actions absolute inset-x-0 bottom-0 z-10 p-4 transition-all duration-200 ${isHovered ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"} [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:translate-y-0 [@media(hover:none)]:opacity-100`}
           >
-            <h3 className="text-white font-black text-base mb-1 line-clamp-1 drop-shadow-md">
+            <h3 className="mb-1 line-clamp-1 text-base font-black text-white drop-shadow-md">
               {displayTitle}
             </h3>
 
-            <div className="flex items-center space-x-2 mb-3">
-              {year && <span className="text-gray-300 text-xs font-medium">{year}</span>}
+            <div className="mb-3 flex items-center space-x-2">
+              {year && <span className="text-xs font-medium text-gray-300">{year}</span>}
               {primaryGenre && (
-                <span className="text-red-500 text-[10px] font-bold uppercase tracking-wider">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-red-400">
                   {primaryGenre}
                 </span>
               )}
@@ -255,33 +265,46 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
 
             <div className="flex items-center gap-2">
               {comingSoon ? (
-                <div className="flex-1 bg-amber-500/20 text-amber-400 py-2 rounded-lg font-bold text-[10px] text-center border border-amber-500/30">
+                <div className="flex-1 border border-amber-500/30 bg-amber-500/20 py-2 text-center text-[10px] font-bold text-amber-400">
                   COMING SOON
                 </div>
               ) : (
                 <button
-                  className="flex-1 flex items-center justify-center space-x-2 bg-white text-black py-2 rounded-lg font-bold text-xs hover:bg-gray-100 transition-colors"
+                  className="press-effect flex min-h-[44px] flex-1 items-center justify-center space-x-2 rounded-lg bg-white py-2 font-bold text-xs text-black transition-colors hover:bg-gray-100 focus-ring"
                   onClick={handlePlayClick}
                 >
-                  <Play className="w-3 h-3 fill-current" />
+                  <Play className="h-3 w-3 fill-current" />
                   <span>PLAY</span>
                 </button>
               )}
 
               <button
                 type="button"
-                className={`p-2 rounded-lg transition-colors ${isInMyList ? "bg-red-500 text-white" : "glass-card text-white"} ${listBusy ? "opacity-70" : ""}`}
+                className={`press-effect flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg transition-colors focus-ring ${isInMyList ? "bg-red-500 text-white" : "glass-card text-white"} ${listBusy ? "opacity-70" : ""}`}
                 onClick={handleAddToListClick}
                 disabled={listBusy}
                 aria-label={isInMyList ? "Remove from list" : "Add to list"}
               >
                 {listBusy ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : isInMyList ? (
-                  <Heart className="w-3.5 h-3.5 fill-current" />
+                  <Heart className="h-3.5 w-3.5 fill-current" />
                 ) : (
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="h-3.5 w-3.5" />
                 )}
+              </button>
+
+              <button
+                type="button"
+                className="press-effect flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg glass-card text-white transition-colors hover:bg-white/20 focus-ring"
+                onClick={handleCardClick}
+                aria-label={`More about ${displayTitle}`}
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
+                  <circle cx="12" cy="5" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="12" cy="19" r="2" />
+                </svg>
               </button>
             </div>
           </div>

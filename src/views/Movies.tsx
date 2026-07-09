@@ -4,6 +4,7 @@ import MovieCarousel from "@/components/MovieCarousel";
 import PageHero from "@/components/PageHero";
 import PageContainer from "@/components/PageContainer";
 import LazySection from "@/components/LazySection";
+import Reveal from "@/components/Reveal";
 import { useMoviesCatalog } from "@/hooks/queries/useMoviesCatalog";
 import {
   Film,
@@ -49,7 +50,7 @@ const Movies = () => {
   const renderSection = (section: (typeof SECTIONS)[number], index: number) => {
     const movies = (data as Record<string, TMDBMovie[]>)[section.key];
     return (
-      <div key={section.key}>
+      <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
         <MovieCarousel
           title={section.title}
           movies={movies || []}
@@ -58,8 +59,8 @@ const Movies = () => {
           exploreAllPath={section.exploreAllPath}
           comingSoon={section.comingSoon}
         />
-        {index < SECTIONS.length - 1 && <div className="section-divider mt-10" />}
-      </div>
+        {index < SECTIONS.length - 1 && <div className="divider-glow mt-10" />}
+      </Reveal>
     );
   };
 
@@ -82,7 +83,7 @@ const Movies = () => {
 
           <LazySection minHeight={480} className="space-y-10">
             <>
-              <div className="section-divider" />
+              <div className="divider-glow" />
               {deferredSections.map((section, index) =>
                 renderSection(section, prioritySections.length + index)
               )}

@@ -4,6 +4,7 @@ import { memo, useState, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getImageUrl, TMDBMovie, getContentTitle, getContentType } from "@/utils/tmdbApi";
+import SectionHeader from "./SectionHeader";
 
 interface Top10RowProps {
   movies: TMDBMovie[];
@@ -28,11 +29,7 @@ const Top10Row = memo(({ movies, title = "Top 10 Today" }: Top10RowProps) => {
 
   return (
     <section className="content-auto">
-      <div className="flex items-center gap-3 mb-6 sm:mb-8">
-        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">
-          {title}
-        </h2>
-      </div>
+      <SectionHeader title={title} eyebrow="Most popular right now" />
 
       <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-4 scrollbar-hide">
         {top10.map((movie, index) => {
@@ -54,9 +51,9 @@ const Top10Row = memo(({ movies, title = "Top 10 Today" }: Top10RowProps) => {
             >
               {/* Oversized rank number */}
               <div
-                className={`absolute -left-4 sm:-left-6 bottom-0 z-10 transition-all duration-300 select-none ${
-                  isHovered ? "scale-110" : "scale-100"
-                }`}
+              className={`gradient-text absolute -left-4 sm:-left-6 bottom-0 z-10 select-none transition-all duration-300 ${
+                   isHovered ? "scale-110" : "scale-100"
+                 }`}
                 style={{
                   fontFamily: "'Bebas Neue', 'Impact', sans-serif",
                   fontSize: "clamp(60px, 10vw, 120px)",
@@ -71,11 +68,11 @@ const Top10Row = memo(({ movies, title = "Top 10 Today" }: Top10RowProps) => {
 
               {/* Poster */}
               <div
-                className={`relative w-24 sm:w-28 md:w-32 aspect-[2/3] rounded-xl overflow-hidden transition-all duration-300 ${
-                  isHovered
-                    ? "scale-105 shadow-2xl shadow-red-500/20 z-20"
-                    : "scale-100"
-                }`}
+                className={`hover-lift-sm relative aspect-[2/3] w-24 rounded-xl overflow-hidden transition-all duration-300 sm:w-28 md:w-32 ${
+                   isHovered
+                     ? "scale-105 shadow-2xl shadow-red-500/20 z-20"
+                     : "scale-100"
+                 }`}
                 style={{
                   marginLeft: `${rank === 1 ? 24 : rank >= 10 ? 8 : 16}px`,
                 }}

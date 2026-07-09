@@ -12,6 +12,7 @@ import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { TrendingUp, Star, Play, Tv, Film, Calendar } from "lucide-react";
+import Reveal from "@/components/Reveal";
 
 const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), {
   ssr: false,
@@ -30,93 +31,111 @@ const Index = () => {
   }, [data?.hero, queryClient]);
 
   return (
-    <div>
+    <div className="page-enter">
       {data?.hero ? (
         <HeroBanner movie={data.hero} />
       ) : isLoading ? (
-        <div className="h-[88vh] lg:h-[92vh] bg-zinc-950 skeleton-shimmer" />
+        <div className="h-[88vh] lg:h-[92vh] bg-zinc-950 skeleton shimmer-overlay" />
       ) : null}
 
-      <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8 flex items-center gap-3">
+      <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8 flex items-center gap-3 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
         <PersonalizedWelcome />
         <PlaySomething />
       </div>
 
       <div className="relative z-10">
         <div className="space-y-14 lg:space-y-20 pb-20 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
-          {isAuthenticated && <ContinueWatching />}
+          {isAuthenticated && (
+            <Reveal>
+              <ContinueWatching />
+            </Reveal>
+          )}
 
-          <MovieCarousel
-            title="Trending Now"
-            movies={data?.trendingMovies || []}
-            loading={!data?.trendingMovies?.length && (isLoading || isFetching)}
-            icon={<TrendingUp className="w-5 h-5 text-red-500" />}
-            exploreAllPath="/browse/trending-now"
-          />
+          <Reveal>
+            <MovieCarousel
+              title="Trending Now"
+              movies={data?.trendingMovies || []}
+              loading={!data?.trendingMovies?.length && (isLoading || isFetching)}
+              icon={<TrendingUp className="w-5 h-5 text-red-500" />}
+              exploreAllPath="/browse/trending-now"
+            />
+          </Reveal>
 
-          <div className="section-divider-glow" aria-hidden />
+          <div className="divider-glow" aria-hidden />
 
-          <MovieCarousel
-            title="Now Playing"
-            movies={data?.nowPlayingMovies || []}
-            loading={!data?.nowPlayingMovies?.length && (isLoading || isFetching)}
-            icon={<Play className="w-5 h-5 text-green-500" />}
-            exploreAllPath="/browse/now-playing"
-          />
+          <Reveal delay={80}>
+            <MovieCarousel
+              title="Now Playing"
+              movies={data?.nowPlayingMovies || []}
+              loading={!data?.nowPlayingMovies?.length && (isLoading || isFetching)}
+              icon={<Play className="w-5 h-5 text-green-500" />}
+              exploreAllPath="/browse/now-playing"
+            />
+          </Reveal>
 
           <LazySection minHeight={360}>
             <>
-              <div className="section-divider" aria-hidden />
+              <div className="divider-glow" aria-hidden />
 
-              <MovieCarousel
-                title="Top Rated"
-                movies={data?.topRatedMovies || []}
-                loading={!data?.topRatedMovies?.length && (isLoading || isFetching)}
-                icon={<Star className="w-5 h-5 text-yellow-500" />}
-                exploreAllPath="/browse/top-rated"
-              />
+              <Reveal delay={0}>
+                <MovieCarousel
+                  title="Top Rated"
+                  movies={data?.topRatedMovies || []}
+                  loading={!data?.topRatedMovies?.length && (isLoading || isFetching)}
+                  icon={<Star className="w-5 h-5 text-yellow-500" />}
+                  exploreAllPath="/browse/top-rated"
+                />
+              </Reveal>
 
-              <div className="section-divider" aria-hidden />
+              <div className="divider-glow" aria-hidden />
 
-              <MovieCarousel
-                title="Popular Movies"
-                movies={data?.popularMovies || []}
-                loading={!data?.popularMovies?.length && (isLoading || isFetching)}
-                icon={<Film className="w-5 h-5 text-blue-500" />}
-                exploreAllPath="/browse/popular-movies"
-              />
+              <Reveal delay={80}>
+                <MovieCarousel
+                  title="Popular Movies"
+                  movies={data?.popularMovies || []}
+                  loading={!data?.popularMovies?.length && (isLoading || isFetching)}
+                  icon={<Film className="w-5 h-5 text-blue-500" />}
+                  exploreAllPath="/browse/popular-movies"
+                />
+              </Reveal>
 
-              <div className="section-divider" aria-hidden />
+              <div className="divider-glow" aria-hidden />
 
-              <MovieCarousel
-                title="Trending TV Shows"
-                movies={data?.trendingTVShows || []}
-                loading={!data?.trendingTVShows?.length && (isLoading || isFetching)}
-                icon={<Tv className="w-5 h-5 text-purple-500" />}
-                exploreAllPath="/browse/trending-tv"
-              />
+              <Reveal delay={160}>
+                <MovieCarousel
+                  title="Trending TV Shows"
+                  movies={data?.trendingTVShows || []}
+                  loading={!data?.trendingTVShows?.length && (isLoading || isFetching)}
+                  icon={<Tv className="w-5 h-5 text-purple-500" />}
+                  exploreAllPath="/browse/trending-tv"
+                />
+              </Reveal>
 
-              <div className="section-divider" aria-hidden />
+              <div className="divider-glow" aria-hidden />
 
-              <MovieCarousel
-                title="Popular TV Shows"
-                movies={data?.popularTVShows || []}
-                loading={!data?.popularTVShows?.length && (isLoading || isFetching)}
-                icon={<Tv className="w-5 h-5 text-pink-500" />}
-                exploreAllPath="/browse/popular-tv"
-              />
+              <Reveal delay={240}>
+                <MovieCarousel
+                  title="Popular TV Shows"
+                  movies={data?.popularTVShows || []}
+                  loading={!data?.popularTVShows?.length && (isLoading || isFetching)}
+                  icon={<Tv className="w-5 h-5 text-pink-500" />}
+                  exploreAllPath="/browse/popular-tv"
+                />
+              </Reveal>
 
-              <div className="section-divider" aria-hidden />
+              <div className="divider-glow" aria-hidden />
 
-              <MovieCarousel
-                title="Coming soon"
-                movies={data?.comingSoon || []}
-                loading={!data?.comingSoon?.length && (isLoading || isFetching)}
-                icon={<Calendar className="w-5 h-5 text-amber-500" />}
-                showWhenEmpty
-                exploreAllPath="/browse/coming-soon"
-                comingSoon
-              />
+              <Reveal delay={320}>
+                <MovieCarousel
+                  title="Coming soon"
+                  movies={data?.comingSoon || []}
+                  loading={!data?.comingSoon?.length && (isLoading || isFetching)}
+                  icon={<Calendar className="w-5 h-5 text-amber-500" />}
+                  showWhenEmpty
+                  exploreAllPath="/browse/coming-soon"
+                  comingSoon
+                />
+              </Reveal>
             </>
           </LazySection>
         </div>

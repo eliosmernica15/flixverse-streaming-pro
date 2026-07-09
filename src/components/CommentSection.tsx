@@ -50,7 +50,7 @@ const CommentCard = ({
 
   return (
     <div className={`animate-fade-in ${depth > 0 ? 'ml-8 border-l-2 border-white/10 pl-4' : ''}`}>
-      <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+      <div className="glass-panel rounded-xl p-4">
         <div className="flex items-start space-x-3">
           <Avatar className="w-8 h-8">
             <AvatarImage src={comment.user_avatar_url || undefined} />
@@ -66,43 +66,43 @@ const CommentCard = ({
                 <span className="text-xs text-gray-500">{timeAgo(comment.created_at)}</span>
               </div>
               {isOwner && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(comment.id)}
-                  aria-label="Delete comment"
-                  className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                </button>
+              <button
+                type="button"
+                onClick={() => onDelete(comment.id)}
+                aria-label="Delete comment"
+                className="rounded p-1 transition-colors hover:bg-red-500/20 focus-ring"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+              </button>
               )}
             </div>
 
             <p className="text-gray-300 text-sm leading-relaxed">{comment.text}</p>
 
             <div className="flex items-center space-x-4 mt-2">
+            <button
+              type="button"
+              onClick={() => isAuthenticated && onLike(comment.id)}
+              disabled={isLiking || !isAuthenticated}
+              aria-label={`Like comment${isLiked ? ' (liked)' : ''}`}
+              className={`flex items-center space-x-1 text-xs transition-colors focus-ring ${
+                isLiked ? 'text-red-400 hover:text-red-300' : 'text-gray-500 hover:text-white'
+              } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''} ${isLiking ? 'opacity-50' : ''}`}
+            >
+              <ThumbsUp className={`w-3.5 h-3.5 ${isLiked ? 'fill-current' : ''}`} />
+              <span>{comment.likes_count}</span>
+            </button>
+
+            {depth < 2 && (
               <button
                 type="button"
-                onClick={() => isAuthenticated && onLike(comment.id)}
-                disabled={isLiking || !isAuthenticated}
-                aria-label={`Like comment${isLiked ? ' (liked)' : ''}`}
-                className={`flex items-center space-x-1 transition-colors text-xs ${
-                  isLiked ? 'text-red-400 hover:text-red-300' : 'text-gray-500 hover:text-white'
-                } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''} ${isLiking ? 'opacity-50' : ''}`}
+                onClick={() => onReply(comment.id)}
+                className="flex items-center space-x-1 text-gray-500 text-xs transition-colors hover:text-white focus-ring"
               >
-                <ThumbsUp className={`w-3.5 h-3.5 ${isLiked ? 'fill-current' : ''}`} />
-                <span>{comment.likes_count}</span>
+                <Reply className="w-3.5 h-3.5" />
+                <span>Reply</span>
               </button>
-
-              {depth < 2 && (
-                <button
-                  type="button"
-                  onClick={() => onReply(comment.id)}
-                  className="flex items-center space-x-1 text-gray-500 hover:text-white transition-colors text-xs"
-                >
-                  <Reply className="w-3.5 h-3.5" />
-                  <span>Reply</span>
-                </button>
-              )}
+            )}
 
               {replies.length > 0 && (
                 <button
@@ -220,8 +220,7 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
         </div>
 
         {isAuthenticated ? (
-          <div className="mb-8">
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+            <div className="glass-panel mb-8 rounded-xl p-4">
               {replyingTo && (
                 <div className="flex items-center justify-between mb-2 px-3 py-2 bg-blue-500/10 rounded-lg">
                   <span className="text-sm text-blue-400">Replying to a comment</span>
@@ -262,9 +261,8 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="mb-8 text-center p-6 bg-white/5 rounded-xl border border-white/10">
+          ) : (
+          <div className="glass-panel mb-8 rounded-xl p-6 text-center">
             <p className="text-gray-400 mb-3">Sign in to join the conversation</p>
             <Button
               onClick={() => (window.location.href = '/auth')}

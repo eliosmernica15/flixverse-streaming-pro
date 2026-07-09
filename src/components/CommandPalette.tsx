@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/command";
 import { Film, Tv, Home, Search, Heart, Sparkles, TrendingUp, User, WifiOff } from "lucide-react";
 import { searchMulti, TMDBMovie } from "@/utils/tmdbApi";
+import { playUiSound } from "@/lib/uiSound";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "flixverse:open-command";
 
@@ -29,6 +30,9 @@ const pages = [
   { href: "/auth", label: "Sign In", icon: Sparkles },
 ];
 
+const itemClass =
+  "group flex min-h-[44px] cursor-pointer items-center rounded-xl px-3 text-sm text-gray-300 transition-colors data-[selected=true]:bg-gradient-to-r data-[selected=true]:from-red-500/15 data-[selected=true]:to-orange-500/5 data-[selected=true]:text-white";
+
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -38,12 +42,18 @@ export default function CommandPalette() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((prev) => !prev);
+        setOpen((prev) => {
+          playUiSound(prev ? "close" : "open");
+          return !prev;
+        });
       }
     };
-    const onOpen = () => setOpen(true);
+    const onOpen = () => {
+      playUiSound("open");
+      setOpen(true);
+    };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen);
     return () => {
@@ -104,68 +114,85 @@ export default function CommandPalette() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <div className="bg-zinc-950 border border-white/10 text-white">
-      <CommandInput
-        placeholder="Search pages, movies, TV shows..."
-        className="text-white"
-        value={query}
-        onValueChange={setQuery}
-      />
-      <CommandList>
-        <CommandEmpty>
-          {searching ? "Searching..." : "No results found."}
-        </CommandEmpty>
+      <div className="glass-strong animate-scale-in overflow-hidden rounded-2xl text-white shadow-2xl shadow-black/60">
+        <CommandInput
+          placeholder="Search pages, movies, TV shows..."
+          className="text-white"
+          value={query}
+          onValueChange={setQuery}
+        />
+        <CommandList className="scrollbar-thin">
+          <CommandEmpty>{searching ? "Searching..." : "No results found."}</CommandEmpty>
 
-        {/* TMDB Content Results */}
-        {results.length > 0 && (
-          <CommandGroup heading="Content">
-            {results.map((item) => {
-              const title = item.title || item.name || "Unknown";
-              const year = (item.release_date || item.first_air_date || "").slice(0, 4);
-              const isTv = item.media_type === "tv" || !!item.first_air_date;
-              return (
-                <CommandItem
-                  key={`${item.id}-${item.media_type}`}
-                  onSelect={() => handleContentSelect(item)}
-                >
-                  {isTv ? (
-                    <Tv className="mr-2 h-4 w-4 text-blue-400" />
-                  ) : (
-                    <Film className="mr-2 h-4 w-4 text-red-400" />
-                  )}
-                  <span>{title}</span>
-                  {year && (
-                    <span className="ml-2 text-xs text-gray-500">{year}</span>
-                  )}
-                  {item.vote_average ? (
-                    <span className="ml-auto text-xs text-gray-500">
-                      {item.vote_average.toFixed(1)}
-                    </span>
-                  ) : null}
-                </CommandItem>
-              );
-            })}
+          {/* TMDB Content Results */}
+          {results.length > 0 && (
+            <CommandGroup
+              heading="Content"
+              className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.16em] [&_[cmdk-group-heading]]:text-red-400/90"
+            >
+              {results.map((item) => {
+                const title = item.title || item.name || "Unknown";
+                const year = (item.release_date || item.first_air_date || "").slice(0, 4);
+                const isTv = item.media_type === "tv" || !!item.first_air_date;
+                return (
+                  <CommandItem key={`${item.id}-${item.media_type}`} onSelect={() => handleContentSelect(item)} className={itemClass}>
+                    {isTv ? (
+                      <Tv className="mr-2 h-4 w-4 text-blue-400" />
+                    ) : (
+                      <Film className="mr-2 h-4 w-4 text-red-400" />
+                    )}
+                    <span className="truncate">{title}</span>
+                    {year && <span className="ml-2 text-xs text-gray-500">{year}</span>}
+                    {item.vote_average ? (
+                      <span className="ml-auto text-xs text-gray-500">
+                        {item.vote_average.toFixed(1)}
+                      </span>
+                    ) : null}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          )}
+
+          {/* Page Navigation */}
+          <CommandGroup
+            heading="Navigate"
+            className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.16em] [&_[cmdk-group-heading]]:text-red-400/90"
+          >
+            {pages.map((page) => (
+              <CommandItem key={page.href} onSelect={() => navigate(page.href)} className={itemClass}>
+                <page.icon className="mr-2 h-4 w-4 text-red-400" />
+                {page.label}
+              </CommandItem>
+            ))}
           </CommandGroup>
-        )}
-
-        {/* Page Navigation */}
-        <CommandGroup heading="Navigate">
-          {pages.map((page) => (
-            <CommandItem key={page.href} onSelect={() => navigate(page.href)}>
-              <page.icon className="mr-2 h-4 w-4 text-red-400" />
-              {page.label}
+          <CommandSeparator className="bg-white/10" />
+          <CommandGroup
+            heading="Shortcuts"
+            className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.16em] [&_[cmdk-group-heading]]:text-red-400/90"
+          >
+            <CommandItem
+              onSelect={() => {
+                setOpen(false);
+                window.dispatchEvent(new CustomEvent("flixverse:focus-search"));
+              }}
+              className={itemClass}
+            >
+              <Search className="mr-2 h-4 w-4 text-gray-400" />
+              Focus search
+              <CommandShortcut className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.65rem]">
+                /
+              </CommandShortcut>
             </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandSeparator />
-        <CommandGroup heading="Shortcuts">
-          <CommandItem onSelect={() => { setOpen(false); window.dispatchEvent(new CustomEvent("flixverse:focus-search")); }}>
-            <Search className="mr-2 h-4 w-4" />
-            Focus search
-            <CommandShortcut>/</CommandShortcut>
-          </CommandItem>
-        </CommandGroup>
-      </CommandList>
+          </CommandGroup>
+        </CommandList>
+
+        {/* Keyboard hint footer */}
+        <div className="flex items-center gap-3 border-t border-white/10 px-4 py-2.5 text-[0.7rem] text-gray-500">
+          <span className="chip">↑↓ Navigate</span>
+          <span className="chip">↵ Select</span>
+          <span className="chip">Esc Close</span>
+        </div>
       </div>
     </CommandDialog>
   );

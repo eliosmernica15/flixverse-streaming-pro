@@ -119,9 +119,22 @@ export function usePlaybackClock({
     void persistProgress(bounded);
   }, [persistProgress]);
 
+  /**
+   * Correct the clock from a live embed event without forcing an immediate
+   * Firestore persist (providers can emit timeupdate several times a second;
+   * the regular 5s persist cadence picks the value up).
+   */
+  const syncTo = useCallback((seconds: number) => {
+    const bounded = Math.max(0, Math.min(seconds, totalDurationRef.current));
+    currentTimeRef.current = bounded;
+    setCurrentTime(bounded);
+    lastTickRef.current = isPlayingRef.current ? performance.now() : null;
+  }, []);
+
   return {
     currentTime,
     totalDuration,
     seekTo,
+    syncTo,
   };
 }

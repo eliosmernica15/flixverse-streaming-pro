@@ -114,11 +114,11 @@ export default function ProfileSettings() {
               <Globe className="w-4 h-4 text-gray-400" />
               Preferred language
             </label>
-            <select
-              value={preferences.preferredLanguage}
-              onChange={(e) => updatePreferences({ preferredLanguage: e.target.value })}
-              className="input-field w-full rounded-xl bg-black/40 border border-white/10 text-white text-sm px-3 py-2.5"
-            >
+              <select
+                value={preferences.preferredLanguage}
+                onChange={(e) => updatePreferences({ preferredLanguage: e.target.value })}
+                className="focus-ring input-field w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white"
+              >
               {languages.map((lang) => (
                 <option key={lang.code} value={lang.code} className="bg-zinc-900">
                   {lang.label}
@@ -157,7 +157,7 @@ export default function ProfileSettings() {
         </div>
 
         {!hasPermission ? (
-          <Button onClick={() => void requestPermission()} className="btn-primary w-full">
+          <Button onClick={() => void requestPermission()} className="btn-primary w-full focus-ring">
             Enable browser notifications
           </Button>
         ) : (
@@ -191,11 +191,11 @@ export default function ProfileSettings() {
         <p className="text-sm text-gray-500 mb-4">
           Clear locally stored preferences and guest watchlist cache on this device.
         </p>
-        <Button
-          variant="outline"
-          onClick={clearLocalData}
-          className="border-white/10 text-gray-300 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30"
-        >
+          <Button
+            variant="outline"
+            onClick={clearLocalData}
+            className="border-white/10 text-gray-300 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300 focus-ring"
+          >
           <Trash2 className="w-4 h-4 mr-2" />
           Clear local data
         </Button>

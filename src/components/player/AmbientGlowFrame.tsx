@@ -62,7 +62,7 @@ export function AmbientGlowFrame({
 
   return (
     <div
-      className={`absolute inset-0 -z-10 overflow-hidden pointer-events-none filter blur-[120px] transition-opacity duration-800 ${
+      className={`video-ambient absolute inset-0 -z-10 overflow-hidden pointer-events-none filter blur-[120px] transition-opacity duration-800 ${
         reducedMotion ? "" : "animate-ambient-glow-pulse"
       }`}
       style={gradientStyle}

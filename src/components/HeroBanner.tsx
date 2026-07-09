@@ -143,7 +143,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
             key={m.id}
             className={`absolute inset-0 transition-opacity duration-800 ${isActive && !isTransitioning ? "opacity-100" : "opacity-0"}`}
           >
-            <div className={`absolute inset-0 ${isActive && !reducedMotion ? "hero-ken-burns" : ""}`}>
+            <div className={`absolute inset-0 ${isActive && !reducedMotion ? "animate-ken-burns" : ""}`}>
               {url ? (
                 <Image src={url} alt={getContentTitle(m)} fill priority={i === 0} sizes="100vw" className="object-cover object-center" />
               ) : (
@@ -156,6 +156,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
       <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-black/20" />
       <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-black/85 via-black/25 to-transparent" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,transparent,rgba(0,0,0,0.45))]" />
 
       {!reducedMotion && (
@@ -167,49 +168,47 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
       <div className="relative z-10 flex items-end lg:items-center h-full pb-28 lg:pb-0">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div className="max-w-3xl animate-fade-in-up" key={currentMovie.id}>
-            <div className="flex flex-wrap items-center gap-3 mb-5">
-              <span className="px-4 py-1.5 bg-gradient-to-r from-red-600 to-red-500 text-white text-xs font-bold rounded-lg uppercase tracking-wider shadow-lg shadow-red-500/20">
-                {currentMovie.media_type === "tv" ? "Series" : "Movie"}
-              </span>
-              <span className="px-4 py-1.5 glass-card text-white text-xs font-medium rounded-lg flex items-center space-x-1.5">
-                <span className="w-2 h-2 bg-green-500 rounded-full" />
-                <span>Featured</span>
-              </span>
-              {releaseYear && (
-                <span className="px-4 py-1.5 glass-card text-white text-xs font-medium rounded-lg">{releaseYear}</span>
-              )}
-            </div>
+           <div className="max-w-3xl animate-fade-in-up" key={currentMovie.id}>
+             <div className="flex flex-wrap items-center gap-3 mb-5">
+               <span className="eyebrow">{releaseYear ? `${releaseYear}` : "Now Streaming"}</span>
+               <span className="chip bg-gradient-to-r from-red-600 to-red-500 text-white border-0 shadow-lg shadow-red-500/20">
+                 {currentMovie.media_type === "tv" ? "Series" : "Movie"}
+               </span>
+               <span className="chip glass-card">
+                 <span className="h-2 w-2 rounded-full bg-green-500" />
+                 <span>Featured</span>
+               </span>
+             </div>
 
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-5 text-white leading-[1.05] tracking-tight">
-              {title}
-            </h1>
+             <h1 className="display-title gradient-text text-balance mb-5">
+               {title}
+             </h1>
 
-            <div className="flex flex-wrap items-center gap-4 mb-6">
-              <div className="flex items-center space-x-2 bg-yellow-500/15 px-4 py-2 rounded-xl border border-yellow-500/20">
-                <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                <span className="text-yellow-400 font-bold text-lg">{currentMovie.vote_average?.toFixed(1)}</span>
-              </div>
-              <span className="px-4 py-2 glass-card text-white text-sm font-medium rounded-xl">
-                {currentMovie.media_type === "tv" ? "TV Series" : "Feature Film"}
-              </span>
-              <span className="text-gray-400 text-sm hidden sm:inline">HD Available</span>
-            </div>
+             <div className="flex flex-wrap items-center gap-3 mb-6">
+               <span className="chip bg-yellow-500/15 border-yellow-500/20 font-bold text-yellow-400">
+                 <Star className="h-3.5 w-3.5 fill-current" />
+                 <span>{currentMovie.vote_average?.toFixed(1)}</span>
+               </span>
+               <span className="chip glass-card">
+                 {currentMovie.media_type === "tv" ? "TV Series" : "Feature Film"}
+               </span>
+               <span className="chip glass-card">HD Available</span>
+             </div>
 
             <p className="text-base sm:text-lg md:text-xl mb-8 text-gray-300 leading-relaxed line-clamp-3 max-w-2xl">
               {currentMovie.overview}
             </p>
 
             <div className="flex flex-wrap items-center gap-4">
-              <button onClick={handlePlayClick} className="group flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition-transform duration-200 shadow-2xl shadow-white/15 hover:scale-[1.02] active:scale-[0.98] btn-shine">
+              <button onClick={handlePlayClick} className="btn-primary group flex items-center space-x-3 px-8 py-4 text-lg hover:scale-[1.02] active:scale-[0.98] press-effect btn-shine focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
                 <Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
                 <span>Play Now</span>
               </button>
-              <button onClick={handleAddToList} className="group flex items-center space-x-3 glass-premium text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white/15 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]">
+              <button onClick={handleAddToList} className="btn-glass group flex items-center space-x-3 px-8 py-4 text-lg font-semibold hover:scale-[1.02] active:scale-[0.98] press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70">
                 {isInMyList ? <Check className="w-6 h-6 text-green-400" /> : <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />}
                 <span>{isInMyList ? "In My List" : "Add to List"}</span>
               </button>
-              <button onClick={handleMoreInfo} className="group p-4 glass-card rounded-xl hover:bg-white/15 transition-transform duration-200 hover:scale-105 active:scale-95" title="More Info">
+              <button onClick={handleMoreInfo} className="group p-4 glass-card rounded-xl hover:bg-white/15 transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black" title="More Info">
                 <Info className="w-6 h-6 text-white" />
               </button>
             </div>
@@ -225,10 +224,10 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
           <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
             {/* Prev/Next arrows */}
             <div className="hidden sm:flex items-center gap-2">
-              <button onClick={goPrev} className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors" aria-label="Previous title">
+              <button onClick={goPrev} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label="Previous title">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button onClick={goNext} className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors" aria-label="Next title">
+              <button onClick={goNext} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label="Next title">
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -239,7 +238,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
                 <button
                   key={m.id}
                   onClick={() => goToSlide(i)}
-                  className={`h-1 rounded-full transition-all duration-300 ${
+                  className={`h-1 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 ${
                     i === activeIndex ? "w-8 bg-red-500" : "w-2 bg-white/30 hover:bg-white/50"
                   }`}
                   aria-label={`Go to ${getContentTitle(m)}`}

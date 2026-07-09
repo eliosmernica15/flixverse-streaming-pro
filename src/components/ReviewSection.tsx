@@ -53,7 +53,7 @@ const StarRating = ({
           >
             <Star
               className={`${sizeClasses[size]} ${isFilled
-                  ? 'text-yellow-400 fill-yellow-400'
+                  ? 'text-yellow-400 fill-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.55)]'
                   : 'text-gray-500'
                 }`}
             />
@@ -97,7 +97,7 @@ const ReviewCard = ({
   };
 
   return (
-    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 animate-fade-in">
+    <div className="glass-panel animate-fade-in rounded-xl p-4">
       <div className="flex items-start space-x-3">
         <Avatar className="w-10 h-10">
           <AvatarImage src={review.user_avatar_url || undefined} />
@@ -112,22 +112,22 @@ const ReviewCard = ({
               <span className="font-semibold text-white">{review.user_display_name}</span>
               <span className="text-xs text-gray-500">{timeAgo(review.created_at)}</span>
             </div>
-            {isOwner && (
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={onEdit}
-                  className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-4 h-4 text-gray-400" />
-                </button>
-                <button
-                  onClick={onDelete}
-                  className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4 text-red-400" />
-                </button>
-              </div>
-            )}
+                {isOwner && (
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={onEdit}
+                      className="rounded-lg p-1.5 transition-colors hover:bg-white/10 focus-ring"
+                    >
+                      <Edit2 className="w-4 h-4 text-gray-400" />
+                    </button>
+                    <button
+                      onClick={onDelete}
+                      className="rounded-lg p-1.5 transition-colors hover:bg-red-500/20 focus-ring"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-400" />
+                    </button>
+                  </div>
+                )}
           </div>
 
           <StarRating rating={review.rating} size="sm" />
@@ -140,7 +140,7 @@ const ReviewCard = ({
             <button
               onClick={onLike}
               disabled={isLiking || !isAuthenticated}
-              className={`flex items-center space-x-1 transition-colors text-sm ${isLiked
+              className={`flex items-center space-x-1 text-sm transition-colors focus-ring ${isLiked
                   ? 'text-red-400 hover:text-red-300'
                   : 'text-gray-400 hover:text-white'
                 } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''} ${isLiking ? 'opacity-50' : ''}`}
@@ -148,7 +148,7 @@ const ReviewCard = ({
               <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
               <span>{review.likes_count}</span>
             </button>
-            <button className="flex items-center space-x-1 text-gray-400 hover:text-white transition-colors text-sm">
+            <button className="flex items-center space-x-1 text-gray-400 text-sm transition-colors hover:text-white focus-ring">
               <MessageCircle className="w-4 h-4" />
               <span>Reply</span>
             </button>
@@ -305,25 +305,25 @@ const ReviewSection = ({ contentId, contentType, contentTitle, contentPosterPath
         {/* Write Review Form */}
         {showWriteReview && (
             <div className="mb-8 animate-fade-in">
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4">
-                  {isEditing ? 'Edit Your Review' : 'Write a Review'}
-                </h3>
+               <div className="glass-panel mb-8 animate-fade-in rounded-xl p-6">
+                 <h3 className="text-lg font-semibold text-white mb-4">
+                   {isEditing ? 'Edit Your Review' : 'Write a Review'}
+                 </h3>
 
-                <div className="mb-4">
-                  <label className="text-sm text-gray-400 mb-2 block">Your Rating</label>
-                  <StarRating rating={rating} onRate={setRating} editable size="lg" />
-                </div>
+                 <div className="mb-4">
+                   <label className="text-sm text-gray-400 mb-2 block">Your Rating</label>
+                   <StarRating rating={rating} onRate={setRating} editable size="lg" />
+                 </div>
 
-                <div className="mb-4">
-                  <label className="text-sm text-gray-400 mb-2 block">Your Review</label>
-                  <Textarea
-                    value={reviewText}
-                    onChange={(e) => setReviewText(e.target.value)}
-                    placeholder="Share your thoughts about this content..."
-                    className="bg-white/5 border-white/10 text-white min-h-[120px] resize-none"
-                  />
-                </div>
+                 <div className="mb-4">
+                   <label className="text-sm text-gray-400 mb-2 block">Your Review</label>
+                   <Textarea
+                     value={reviewText}
+                     onChange={(e) => setReviewText(e.target.value)}
+                     placeholder="Share your thoughts about this content..."
+                     className="bg-white/5 border-white/10 text-white min-h-[120px] resize-none focus-ring"
+                   />
+                 </div>
 
                 <div className="flex items-center space-x-3">
                   <Button

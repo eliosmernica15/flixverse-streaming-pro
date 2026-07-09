@@ -115,10 +115,10 @@ function CardPreviewPanel({ movie, anchorEl, isVisible, onClose }: CardPreviewPa
     <div
       ref={panelRef}
       style={panelStyle}
-      className="card-preview-panel pointer-events-auto animate-scale-in"
+      className="card-preview-panel pointer-events-auto animate-scale-in glass-strong rounded-2xl"
       onMouseLeave={onClose}
     >
-      <div className="bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="rounded-2xl border border-white/10 shadow-2xl overflow-hidden bg-transparent">
         {/* Backdrop */}
         <div className="relative h-40 overflow-hidden">
           {backdropUrl ? (
@@ -160,28 +160,28 @@ function CardPreviewPanel({ movie, anchorEl, isVisible, onClose }: CardPreviewPa
           <div className="flex items-center gap-2 mb-3">
             <button
               onClick={handlePlay}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-white text-black py-2 rounded-lg font-bold text-xs hover:bg-gray-100 transition-colors"
+              className="press-effect flex-1 flex items-center justify-center gap-1.5 bg-white py-2 rounded-lg font-bold text-xs text-black transition-colors hover:bg-gray-100 focus-ring"
             >
-              <Play className="w-3.5 h-3.5 fill-current" />
+              <Play className="h-3.5 w-3.5 fill-current" />
               Play
             </button>
             <button
               onClick={handleToggleList}
-              className={`p-2 rounded-lg border transition-colors ${
+              className={`press-effect p-2 rounded-lg border transition-colors focus-ring ${
                 isInMyList
-                  ? "bg-red-500/20 border-red-500/30 text-red-400"
-                  : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
+                  ? "border-red-500/30 bg-red-500/20 text-red-400"
+                  : "border-white/10 bg-white/5 text-gray-400 hover:text-white"
               }`}
               aria-label={isInMyList ? "Remove from list" : "Add to list"}
             >
-              {isInMyList ? <Heart className="w-4 h-4 fill-current" /> : <Plus className="w-4 h-4" />}
+              {isInMyList ? <Heart className="h-4 w-4 fill-current" /> : <Plus className="h-4 w-4" />}
             </button>
             <button
               onClick={handleShare}
-              className="p-2 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-colors"
+              className="press-effect p-2 rounded-lg border border-white/10 bg-white/5 text-gray-400 transition-colors hover:text-white focus-ring"
               aria-label="Share"
             >
-              <Share2 className="w-4 h-4" />
+              <Share2 className="h-4 w-4" />
             </button>
           </div>
 

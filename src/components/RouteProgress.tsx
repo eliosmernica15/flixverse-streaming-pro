@@ -16,8 +16,20 @@ export default function RouteProgress() {
   if (!active) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] h-0.5 overflow-hidden pointer-events-none">
-      <div className="h-full w-1/3 bg-gradient-to-r from-red-500 via-orange-400 to-red-500 route-progress-bar" />
+    <div
+      className="pointer-events-none fixed inset-x-0 top-0 z-[200] h-[3px] overflow-hidden"
+      style={{ boxShadow: "0 0 12px rgba(239,68,68,0.45)" }}
+    >
+      <div
+        className="route-progress-bar h-full w-1/3"
+        style={{
+          background:
+            "linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--gold)) 50%, hsl(var(--primary)) 100%)",
+          backgroundSize: "200% 100%",
+          animation:
+            "route-progress 0.4s ease-out forwards, gradient-shift 1.6s linear infinite",
+        }}
+      />
     </div>
   );
 }
