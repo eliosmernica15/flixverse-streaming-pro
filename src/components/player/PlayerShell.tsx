@@ -14,6 +14,11 @@ import { PaywallGate } from "@/components/PaywallGate";
 import { CaptionOverlay } from "./CaptionOverlay";
 import { computeResync, sendSoftSeek, injectSeekParam } from "@/lib/player/embedSeekUrls";
 import {
+  CAPTION_LANGUAGES,
+  CAPTION_LANG_STORAGE_KEY,
+  getCaptionLanguageLabel,
+} from "@/lib/player/captionLanguages";
+import {
   encryptPayload,
   generateRoomKey,
   buildPartyJoinUrl,
@@ -157,6 +162,13 @@ export function PlayerShell({
   const [partySyncStatus, setPartySyncStatus] = useState<SyncStatus>("disconnected");
   const [partyDriftMs, setPartyDriftMs] = useState(0);
   const [captionLang, setCaptionLang] = useState("en");
+
+  useEffect(() => {
+    const saved = localStorage.getItem(CAPTION_LANG_STORAGE_KEY);
+    if (saved && CAPTION_LANGUAGES.some((l) => l.code === saved)) {
+      setCaptionLang(saved);
+    }
+  }, []);
 
   // Timeline comments state
   const [showTimelineControls, setShowTimelineControls] = useState(false);
@@ -351,6 +363,28 @@ export function PlayerShell({
     },
     [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage]
   );
+
+  // Host heartbeat — keeps guests in sync via WebRTC + Firestore fallback
+  const partyTimeRef = useRef(currentTime);
+  const partyPlayingRef = useRef(isPlaying);
+  partyTimeRef.current = currentTime;
+  partyPlayingRef.current = isPlaying;
+
+  useEffect(() => {
+    if (!partyRoomId || !isPartyHost) return;
+
+    const HEARTBEAT_MS = 2500;
+    const tick = () => {
+      const time = partyTimeRef.current;
+      const playing = partyPlayingRef.current;
+      void updatePlaybackState(playing ? "playing" : "paused", time);
+      sendRtcMessage("heartbeat", { currentTime: time });
+    };
+
+    tick();
+    const id = setInterval(tick, HEARTBEAT_MS);
+    return () => clearInterval(id);
+  }, [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage]);
 
   const handleStartParty = useCallback(async () => {
     if (!user || !hasStandard) {
@@ -560,6 +594,13 @@ export function PlayerShell({
 
   const toggleCaptions = useCallback(() => {
     setShowCaptions((p) => !p);
+    bumpControls();
+  }, [bumpControls]);
+
+  const changeCaptionLang = useCallback((lang: string) => {
+    setCaptionLang(lang);
+    localStorage.setItem(CAPTION_LANG_STORAGE_KEY, lang);
+    playUiSound("tap");
     bumpControls();
   }, [bumpControls]);
 
@@ -1065,6 +1106,29 @@ export function PlayerShell({
                         checked={showCaptions}
                         onChange={toggleCaptions}
                       />
+                      {showCaptions && (
+                        <div className="video-settings-caption-lang">
+                          <label className="video-settings-head" htmlFor="caption-lang-select">
+                            Subtitle language
+                          </label>
+                          <select
+                            id="caption-lang-select"
+                            value={captionLang}
+                            onChange={(e) => changeCaptionLang(e.target.value)}
+                            className="video-settings-select"
+                            aria-label="Subtitle language"
+                          >
+                            {CAPTION_LANGUAGES.map((lang) => (
+                              <option key={lang.code} value={lang.code}>
+                                {lang.label}
+                              </option>
+                            ))}
+                          </select>
+                          {captionsLoading && (
+                            <p className="video-settings-caption-status">Loading subtitles…</p>
+                          )}
+                        </div>
+                      )}
                       <SettingsToggle
                         label="Ambient light"
                         icon={<Sparkles className="w-4 h-4" />}
@@ -1259,6 +1323,7 @@ export function PlayerShell({
           <div className="video-stats-row"><span>Server</span><span>{currentSource.name}</span></div>
           <div className="video-stats-row"><span>Provider</span><span>{providerName}</span></div>
           <div className="video-stats-row"><span>Sync</span><span>{isLiveSynced ? "Live (postMessage)" : "Estimated clock"}</span></div>
+          <div className="video-stats-row"><span>Captions</span><span>{showCaptions ? getCaptionLanguageLabel(captionLang) : "Off"}</span></div>
           <div className="video-stats-row"><span>Quality</span><span>{quality}</span></div>
           <div className="video-stats-row"><span>Buffered</span><span>{formatTime(buffered)}</span></div>
         </div>

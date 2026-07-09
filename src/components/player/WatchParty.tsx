@@ -187,14 +187,24 @@ export function WatchParty({
     setActiveRoom(null);
   }, [activeRoom, user, endParty]);
 
-  // Copy invite link
+  // Copy invite link (FlixParty external room or legacy watch_parties room)
   const copyInviteLink = useCallback(() => {
-    if (!activeRoom) return;
-    const link = `${window.location.origin}/movie/${activeRoom.movieId}?type=${activeRoom.mediaType}&party=${activeRoom.id}`;
+    const roomId = activeRoom?.id ?? externalRoomId;
+    if (!roomId) return;
+
+    const mid = activeRoom?.movieId ?? movieId;
+    const mtype = activeRoom?.mediaType ?? mediaType;
+    const params = new URLSearchParams({ type: mtype, party: roomId });
+    const s = activeRoom?.season ?? season;
+    const e = activeRoom?.episode ?? episode;
+    if (s) params.set("season", String(s));
+    if (e) params.set("episode", String(e));
+
+    const link = `${window.location.origin}/movie/${mid}?${params}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
-  }, [activeRoom]);
+  }, [activeRoom, externalRoomId, movieId, mediaType, season, episode]);
 
   // Cleanup
   useEffect(() => {

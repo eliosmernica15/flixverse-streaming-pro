@@ -985,6 +985,35 @@
 .video-settings-toggles {
   gap: 0.2rem;
 }
+.video-settings-caption-lang {
+  padding: 0.35rem 0.25rem 0.15rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--video-stroke);
+}
+.video-settings-caption-lang .video-settings-head {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+.video-settings-select {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--video-stroke);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--video-text);
+  font-size: 0.75rem;
+  outline: none;
+  cursor: pointer;
+}
+.video-settings-select:focus-visible {
+  border-color: var(--video-accent, #e50914);
+  box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.25);
+}
+.video-settings-caption-status {
+  margin-top: 0.4rem;
+  font-size: 0.65rem;
+  color: var(--video-text-dim);
+}
 .video-quality,
 .video-chip-btn {
   flex: 1 1 auto;
