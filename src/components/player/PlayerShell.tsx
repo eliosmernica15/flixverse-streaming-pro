@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Maximize2, Minimize2, X, Users, LogOut } from "lucide-react";
+import { Maximize2, Minimize2, X, Users, LogOut, GripVertical } from "lucide-react";
 import { buildStreamingSources } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
 import { usePlayerPartySync } from "@/hooks/player/usePlayerPartySync";
 import { usePartyLayout } from "@/hooks/player/usePartyLayout";
+import { usePlayerWindowDrag } from "@/hooks/player/usePlayerWindowDrag";
 import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { EmbedFrame } from "./EmbedFrame";
@@ -88,8 +89,11 @@ export function PlayerShell({
 
   const autoFailoverRef = useRef(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const windowRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const playerDrag = usePlayerWindowDrag(shellRef, windowRef);
 
   const streamingSources = useMemo(
     () => buildStreamingSources(movieId, mediaType, season, episode),
@@ -517,12 +521,14 @@ export function PlayerShell({
     inParty ? `player-shell--cam-${effectiveCameraLayout}` : "",
     party.guestSplashVisible ? "player-shell--guest-splash" : "",
     isMobile ? "player-shell--mobile" : "",
+    playerDrag.isFloating ? "player-shell--window-floating" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <div
+      ref={shellRef}
       className={shellClasses}
       role="dialog"
       aria-label={`Watching ${title}`}
@@ -538,22 +544,36 @@ export function PlayerShell({
         <div className="player-layout-main">
           <div
             ref={windowRef}
-            className={`player-window is-framed player-window--boost-${layout.focusLevel}`}
+            style={playerDrag.windowStyle}
+            className={`player-window is-framed player-window--boost-${layout.focusLevel} ${playerDrag.isFloating ? "is-floating" : ""} ${playerDrag.isDragging ? "is-dragging" : ""}`}
           >
           <header className="player-window-bar">
-            <div className="player-window-meta">
-              <p className="player-window-title">{title}</p>
-              <p className="player-window-sub">
-                {currentSource.name} · {currentServer + 1}/{streamingSources.length}
-                {party.partyRoomId && (
-                  <span className={partyStatusClass(party.partySyncStatus)}>
-                    {" "}
-                    · {partyStatusLabel(party.partySyncStatus)}
-                  </span>
-                )}
-              </p>
+            <div
+              className="player-window-drag-zone"
+              onPointerDown={playerDrag.onDragZonePointerDown}
+              onDoubleClick={playerDrag.resetPosition}
+              title="Drag anywhere here to move · double-click to re-center"
+            >
+              <span className="player-window-drag-grip" aria-hidden>
+                <GripVertical className="w-3.5 h-3.5" />
+              </span>
+              <div className="player-window-meta">
+                <p className="player-window-title">{title}</p>
+                <p className="player-window-sub">
+                  {currentSource.name} · {currentServer + 1}/{streamingSources.length}
+                  {party.partyRoomId && (
+                    <span className={partyStatusClass(party.partySyncStatus)}>
+                      {" "}
+                      · {partyStatusLabel(party.partySyncStatus)}
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
-            <div className="player-window-actions">
+            <div
+              className="player-window-actions"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               {flixPartyEnabled && inParty && (
                 <button
                   type="button"
