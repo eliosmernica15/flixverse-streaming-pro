@@ -1,23 +1,25 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { doc, getDoc } from "firebase/firestore";
 import { AtSign, Check, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { getAuthHeaders } from "@/lib/firebase/clientAuth";
 import { getFirebaseDb } from "@/integrations/firebase/client";
 import { normalizeUsername, validateUsername } from "@/lib/username";
+import {
+  checkUsernameAvailability,
+  claimUsername,
+} from "@/lib/username/claimUsername";
 
 interface UsernameSettingsProps {
   /** When true, hide after user already has a username (for global reminders only). */
   compact?: boolean;
 }
 
-type AvailabilityState = "idle" | "checking" | "available" | "taken" | "invalid" | "error";
+type AvailabilityState = "idle" | "checking" | "available" | "taken" | "invalid" | "unknown";
 
 export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
   const { profile, updateProfile } = useUserProfileContext();
@@ -54,53 +56,35 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
         return;
       }
 
+      const db = getFirebaseDb();
+      if (!db) {
+        setAvailability("unknown");
+        setAvailabilityError(null);
+        return;
+      }
+
       setAvailability("checking");
       setAvailabilityError(null);
 
       try {
-        const db = getFirebaseDb();
-        if (db) {
-          const snap = await getDoc(doc(db, "usernames", parsed.value));
-          if (!snap.exists()) {
-            setAvailability("available");
-            return;
-          }
-          const ownerUid = snap.data()?.uid as string | undefined;
-          if (ownerUid === user.uid) {
-            setAvailability("available");
-            return;
-          }
+        const result = await checkUsernameAvailability(db, parsed.value, user.uid);
+        if (result === "available" || result === "owned") {
+          setAvailability("available");
+          setAvailabilityError(null);
+        } else if (result === "taken") {
           setAvailability("taken");
-          return;
+        } else {
+          setAvailability("unknown");
         }
-
-        const headers = await getAuthHeaders(user);
-        const res = await fetch(
-          `/api/profile/username?username=${encodeURIComponent(parsed.value)}`,
-          { headers }
-        );
-        if (res.ok) {
-          const data = (await res.json().catch(() => ({ available: true }))) as {
-            available?: boolean;
-          };
-          setAvailability(data.available === false ? "taken" : "available");
-          return;
+      } catch (err) {
+        const code = (err as { code?: string })?.code;
+        if (code === "permission-denied") {
+          setAvailability("unknown");
+          setAvailabilityError("Live check unavailable — you can still try to claim.");
+        } else {
+          setAvailability("unknown");
+          setAvailabilityError(null);
         }
-        if (res.status === 409) {
-          setAvailability("taken");
-          return;
-        }
-        if (res.status === 400) {
-          const data = (await res.json().catch(() => ({}))) as { error?: string };
-          setAvailability("invalid");
-          setAvailabilityError(data.error || "Invalid username");
-          return;
-        }
-        setAvailability("error");
-        setAvailabilityError("Could not check availability. Try again.");
-      } catch {
-        setAvailability("error");
-        setAvailabilityError("Network error. Try again.");
       }
     },
     [profile?.username, user]
@@ -118,34 +102,38 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
   }, [value, checkAvailability, profile?.username, user]);
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     const parsed = validateUsername(value);
     if (parsed.ok === false) {
       toast({ title: "Invalid username", description: parsed.error, variant: "destructive" });
       return;
     }
-    if (parsed.value === profile?.username) return;
+    if (parsed.value === profile.username) return;
+
+    const db = getFirebaseDb();
+    if (!db) {
+      toast({
+        title: "Firebase not configured",
+        description: "Cannot save username right now.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setSaving(true);
     try {
-      const headers = await getAuthHeaders(user);
-      const res = await fetch("/api/profile/username", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ username: parsed.value }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; username?: string };
-      if (!res.ok) {
+      const result = await claimUsername(db, user.uid, parsed.value, profile, user.email);
+      if (result.ok === false) {
         toast({
           title: "Could not save username",
-          description: data.error || "Try another handle",
+          description: result.error,
           variant: "destructive",
         });
-        if (res.status === 409) setAvailability("taken");
+        if (result.error.includes("taken")) setAvailability("taken");
         return;
       }
 
-      await updateProfile({ username: parsed.value });
+      await updateProfile({ username: result.username });
       setAvailability("available");
       setAvailabilityError(null);
       try {
@@ -155,10 +143,10 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
       }
       toast({
         title: "Username saved",
-        description: `Friends can find you as @${parsed.value}`,
+        description: `Friends can find you as @${result.username}`,
       });
     } catch {
-      toast({ title: "Network error", variant: "destructive" });
+      toast({ title: "Could not save username", description: "Please try again.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -168,7 +156,8 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
   const isUnchanged = value === profile?.username;
   const canSave =
     validation?.ok === true &&
-    availability === "available" &&
+    availability !== "taken" &&
+    availability !== "invalid" &&
     !isUnchanged &&
     !saving &&
     Boolean(user);
@@ -218,7 +207,7 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
               <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
             ) : availability === "available" && validation?.ok === true ? (
               <Check className="w-4 h-4 text-emerald-400" />
-            ) : (availability === "invalid" || availability === "taken" || availability === "error") ? (
+            ) : availability === "invalid" || availability === "taken" ? (
               <AlertCircle className="w-4 h-4 text-red-400" />
             ) : null}
           </div>
@@ -240,7 +229,7 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
         {availability === "taken" && (
           <p className="text-xs text-red-400">Username is already taken — try another handle</p>
         )}
-        {availability === "error" && availabilityError && (
+        {availability === "unknown" && availabilityError && (
           <p className="text-xs text-amber-400">{availabilityError}</p>
         )}
 
