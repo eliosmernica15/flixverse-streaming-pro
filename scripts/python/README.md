@@ -30,7 +30,7 @@ Project defaults to `streaming-web-2272d`. Override with `FIREBASE_PROJECT_ID`.
 
 | Script | Purpose |
 |--------|---------|
-| `process_jobs.py` | Drains `pending_jobs` → `notifications` + `activity_feed` |
+| `process_jobs.py` | Drains `pending_jobs` → `notifications` + `activity_feed` (poll every 10s) |
 | `process_reports.py` | Copies new `reports` → `moderation_queue` |
 
 ### Run once
@@ -43,17 +43,19 @@ python process_reports.py
 ### Run as background worker (follow/review notifications)
 
 ```bash
-python process_jobs.py --interval 30
+python process_jobs.py --interval 10
 ```
 
-Use Windows Task Scheduler or cron to run `process_reports.py` every few minutes.
+Use Windows Task Scheduler, cron, or a free host (Railway/Render) to keep this running.  
+For **instant** notifications on Vercel, set `FIREBASE_SERVICE_ACCOUNT_JSON` in Vercel env — the app will use `/api/notifications/dispatch` (Admin SDK) first and only fall back to `pending_jobs` if the API is unavailable.
 
 ## How the app enqueues work
 
-The Next.js app writes to `pending_jobs` (allowed by Firestore rules) when users:
+The Next.js app:
 
-- **Follow** someone → `follow_notify`
-- **Post a review** → `activity_review`
+- **Friend / party notifications** → `POST /api/notifications/dispatch` (verified token + Admin SDK), or `pending_jobs` type `social_notify` as fallback
+- **Follow** someone → `follow_notify` job (or API when configured)
+- **Post a review** → `activity_review` job
 
 Reports still go to `reports`; Python syncs them to `moderation_queue`.
 

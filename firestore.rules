@@ -148,25 +148,10 @@ service cloud.firestore {
       allow delete: if false; // watch history is never deleted via client
     }
 
-    // Notifications — recipient reads/updates own; senders may create social alerts
+    // Notifications — recipients manage own inbox; creation is server-only (Admin SDK / worker)
     match /notifications/{notificationId} {
       allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
-      allow create: if isAuthenticated()
-        && hasString(request.resource.data.title)
-        && hasString(request.resource.data.message)
-        && hasString(request.resource.data.user_id)
-        && request.resource.data.type in [
-          'like', 'comment', 'follow', 'review', 'new_episode', 'recommendation',
-          'friend_request', 'friend_accepted', 'watch_party_invite', 'watch_party_invite_declined'
-        ]
-        && (
-          request.auth.uid == request.resource.data.user_id
-          || (
-            hasString(request.resource.data.from_user_id)
-            && request.resource.data.from_user_id == request.auth.uid
-            && request.resource.data.user_id != request.auth.uid
-          )
-        );
+      allow create: if false;
     }
 
     // Activity feed - anyone authenticated can read
@@ -299,12 +284,27 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // ── Pending jobs (client enqueues, Python worker processes — Spark-safe)
+    // Pending jobs (client enqueues, Python worker / API processes — Spark-safe)
     match /pending_jobs/{jobId} {
       allow create: if isAuthenticated()
         && request.auth.uid == request.resource.data.requestedBy
-        && request.resource.data.type in ['follow_notify', 'activity_review', 'moderation_report']
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        && (
+          (
+            request.resource.data.type in ['follow_notify', 'activity_review', 'moderation_report']
+          )
+          || (
+            request.resource.data.type == 'social_notify'
+            && request.resource.data.payload is map
+            && hasString(request.resource.data.payload.recipientId)
+            && hasString(request.resource.data.payload.title)
+            && hasString(request.resource.data.payload.message)
+            && request.resource.data.payload.type in [
+              'friend_request', 'friend_accepted', 'watch_party_invite', 'watch_party_invite_declined', 'follow'
+            ]
+            && request.resource.data.requestedBy != request.resource.data.payload.recipientId
+          )
+        );
       allow read, update, delete: if false;
     }
 
