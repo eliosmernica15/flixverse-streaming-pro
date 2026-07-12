@@ -13,11 +13,15 @@ function parseServiceAccount():
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (raw) {
     try {
-      return JSON.parse(raw) as {
+      const parsed = JSON.parse(raw) as {
         project_id: string;
         client_email: string;
         private_key: string;
       };
+      if (parsed.private_key) {
+        parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+      }
+      return parsed;
     } catch {
       return null;
     }
