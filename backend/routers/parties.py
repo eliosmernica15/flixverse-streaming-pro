@@ -71,6 +71,58 @@ class SignalBody(BaseModel):
     payload: str
 
 
+class JoinByCodeBody(BaseModel):
+    code: str
+    displayName: str = "Guest"
+    avatarUrl: str | None = None
+
+
+def _join_room_user(
+    conn,
+    room_id: str,
+    uid: str,
+    display_name: str,
+    avatar_url: str | None,
+) -> dict[str, Any]:
+    ts = int(time.time() * 1000)
+    room = _room_doc(conn, room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    existing = db_fetchone(
+        conn,
+        "SELECT 1 FROM party_participants WHERE room_id = ? AND user_id = ?",
+        (room_id, uid),
+    )
+
+    if existing:
+        db_execute(
+            conn,
+            "UPDATE party_participants SET last_seen_at = ?, display_name = ? WHERE room_id = ? AND user_id = ?",
+            (ts, display_name, room_id, uid),
+        )
+    else:
+        count_row = db_fetchone(
+            conn,
+            "SELECT COUNT(*) AS c FROM party_participants WHERE room_id = ?",
+            (room_id,),
+        )
+        count = row_get(count_row, "c") if count_row else 0
+        if count >= 20:
+            raise HTTPException(status_code=400, detail="Room is full")
+        db_execute(
+            conn,
+            """
+            INSERT INTO party_participants (room_id, user_id, display_name, avatar_url, role, last_seen_at)
+            VALUES (?, ?, ?, ?, 'guest', ?)
+            """,
+            (room_id, uid, display_name, avatar_url, ts),
+        )
+        db_execute(conn, "UPDATE party_rooms SET updated_at = ? WHERE id = ?", (iso_now(), room_id))
+
+    return _room_doc(conn, room_id) or room
+
+
 def _room_participants(conn, room_id: str) -> list[dict[str, Any]]:
     rows = db_fetchall(
         conn,
@@ -167,6 +219,23 @@ def _upsert_invite(
         )
 
 
+@router.get("/parties/{room_id}/public-meta")
+def public_party_meta(room_id: str) -> dict[str, Any]:
+    """Encrypted payload only — safe without auth (key stays in URL hash)."""
+    with get_conn() as conn:
+        row = db_fetchone(
+            conn,
+            "SELECT encrypted_payload, code FROM party_rooms WHERE id = ?",
+            (room_id,),
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="Room not found")
+    return {
+        "encryptedPayload": row_get(row, "encrypted_payload"),
+        "code": row_get(row, "code"),
+    }
+
+
 @router.post("/parties")
 def create_party(body: CreatePartyBody, auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
     uid = uid_from_auth(auth)
@@ -210,47 +279,26 @@ def get_party(room_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, An
 @router.post("/parties/{room_id}/join")
 def join_party(room_id: str, body: JoinPartyBody, auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
     uid = uid_from_auth(auth)
-    ts = int(time.time() * 1000)
+    with get_conn() as conn:
+        room = _join_room_user(conn, room_id, uid, body.displayName, body.avatarUrl)
+    return {"ok": True, "room": room}
+
+
+@router.post("/parties/join-by-code")
+def join_party_by_code(body: JoinByCodeBody, auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
+    uid = uid_from_auth(auth)
+    code = body.code.strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Code required")
 
     with get_conn() as conn:
-        room = _room_doc(conn, room_id)
-        if not room:
-            raise HTTPException(status_code=404, detail="Room not found")
+        row = db_fetchone(conn, "SELECT id FROM party_rooms WHERE code = ?", (code,))
+        if not row:
+            raise HTTPException(status_code=404, detail="Party not found")
+        room_id = row_get(row, "id")
+        room = _join_room_user(conn, room_id, uid, body.displayName, body.avatarUrl)
 
-        existing = db_fetchone(
-            conn,
-            "SELECT 1 FROM party_participants WHERE room_id = ? AND user_id = ?",
-            (room_id, uid),
-        )
-
-        if existing:
-            db_execute(
-                conn,
-                "UPDATE party_participants SET last_seen_at = ?, display_name = ? WHERE room_id = ? AND user_id = ?",
-                (ts, body.displayName, room_id, uid),
-            )
-        else:
-            count_row = db_fetchone(
-                conn,
-                "SELECT COUNT(*) AS c FROM party_participants WHERE room_id = ?",
-                (room_id,),
-            )
-            count = row_get(count_row, "c") if count_row else 0
-            if count >= 20:
-                raise HTTPException(status_code=400, detail="Room is full")
-            db_execute(
-                conn,
-                """
-                INSERT INTO party_participants (room_id, user_id, display_name, avatar_url, role, last_seen_at)
-                VALUES (?, ?, ?, ?, 'guest', ?)
-                """,
-                (room_id, uid, body.displayName, body.avatarUrl, ts),
-            )
-            db_execute(conn, "UPDATE party_rooms SET updated_at = ? WHERE id = ?", (iso_now(), room_id))
-
-        room = _room_doc(conn, room_id)
-
-    return {"ok": True, "room": room}
+    return {"ok": True, "roomId": room_id, "room": room}
 
 
 @router.post("/parties/{room_id}/leave")

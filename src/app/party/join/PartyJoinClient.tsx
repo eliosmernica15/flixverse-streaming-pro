@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, PartyPopper } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useFlixParty } from "@/hooks/player/useFlixParty";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { pythonFetch } from "@/lib/pythonApi/client";
 import {
   decryptPayload,
   extractRoomKeyFromHash,
@@ -62,9 +64,24 @@ export default function PartyJoinClient() {
 
         if (roomKey) {
           setStatus("Decrypting party details…");
-          const res = await fetch(`/api/party/room?id=${targetRoomId}`);
-          if (res.ok) {
-            const { encryptedPayload } = await res.json();
+          let encryptedPayload: string | null = null;
+          if (isPythonBackendEnabled()) {
+            try {
+              const meta = await pythonFetch<{ encryptedPayload: string }>(
+                `/parties/${targetRoomId}/public-meta`
+              );
+              encryptedPayload = meta.encryptedPayload;
+            } catch {
+              encryptedPayload = null;
+            }
+          } else {
+            const res = await fetch(`/api/party/room?id=${targetRoomId}`);
+            if (res.ok) {
+              const data = (await res.json()) as { encryptedPayload: string };
+              encryptedPayload = data.encryptedPayload;
+            }
+          }
+          if (encryptedPayload) {
             payload = await decryptPayload(encryptedPayload, roomKey);
           }
         }

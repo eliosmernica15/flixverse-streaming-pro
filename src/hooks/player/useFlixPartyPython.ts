@@ -107,9 +107,30 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     [user]
   );
 
-  const joinRoom = useCallback(async (_code: string): Promise<string | null> => {
-    return null;
-  }, []);
+  const joinRoom = useCallback(
+    async (code: string): Promise<string | null> => {
+      if (!user) return null;
+      try {
+        const data = await pythonFetch<{ roomId: string; room: FlixPartyRoom }>(
+          "/parties/join-by-code",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              code: code.trim().toUpperCase(),
+              displayName: user.displayName || "Guest",
+              avatarUrl: user.photoURL,
+            }),
+          }
+        );
+        setRoom(data.room);
+        trackPartyJoin(data.roomId);
+        return data.roomId;
+      } catch {
+        return null;
+      }
+    },
+    [user]
+  );
 
   const leaveRoom = useCallback(async () => {
     if (!roomId) return;
