@@ -60,6 +60,7 @@ export function useWebRTCSync({
       setIsConnected(false);
       return;
     }
+    if (!isHost && !hostId) return;
 
     let sync: WebRTCPartySync | PartySyncTransport | null = null;
     let cancelled = false;

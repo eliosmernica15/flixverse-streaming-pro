@@ -87,6 +87,8 @@ export function PlayerShell({
     seekRelative,
     setReady,
     setPlaying,
+    play,
+    pause,
   } = useEmbedBridge({
     iframeRef,
     enabled: embedState === "ready",
@@ -107,6 +109,9 @@ export function PlayerShell({
     isPlaying,
     iframeRef,
     setPlaying,
+    playEmbed: play,
+    pauseEmbed: pause,
+    seekEmbed: seek,
     seekTo,
     seekRelative,
   });
@@ -120,7 +125,7 @@ export function PlayerShell({
     setVolume,
   });
 
-  const cameraLayout = media.cameraMode && party.partyRoomId;
+  const cameraLayout = !!party.partyRoomId;
 
   const switchServer = useCallback((index: number) => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -433,7 +438,11 @@ export function PlayerShell({
         </div>
 
         {cameraLayout && (
-          <PartyCameraGrid participants={media.participants} voiceVolume={media.voiceVolume} />
+          <PartyCameraGrid
+            participants={media.participants}
+            voiceVolume={media.voiceVolume}
+            roomParticipants={party.partyRoom?.participants}
+          />
         )}
         </div>
 

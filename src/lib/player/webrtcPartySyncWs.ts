@@ -81,6 +81,19 @@ abstract class WebRTCPartySyncBase implements PartySyncTransport {
     this.localStream = stream;
     for (const [peerId, pc] of this.peers) {
       await this.syncLocalTracks(peerId, pc);
+      await this.renegotiate(peerId, pc);
+    }
+  }
+
+  protected async renegotiate(peerId: string, pc: RTCPeerConnection) {
+    if (!this.localStream?.getTracks().length) return;
+    if (pc.signalingState !== "stable") return;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await this.sendSignal(peerId, "offer", offer);
+    } catch {
+      /* ICE may still be negotiating */
     }
   }
 
@@ -271,7 +284,8 @@ export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
     mediaCallbacks: MediaCallbacks = {}
   ) {
     super(roomId, userId, isHost, hostId, onMessage, mediaCallbacks);
-    this.pollTimer = setInterval(() => void this.pollSignals(), 800);
+    this.pollTimer = setInterval(() => void this.pollSignals(), 300);
+    void this.pollSignals();
   }
 
   private async pollSignals() {
@@ -299,6 +313,7 @@ export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
           payload: JSON.stringify(payload),
         }),
       });
+      void this.pollSignals();
     } catch (err) {
       console.warn("HTTP signal send failed:", err);
     }

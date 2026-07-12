@@ -343,6 +343,70 @@ def leave_party(room_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, 
     return {"ok": True}
 
 
+class ParticipantPatchBody(BaseModel):
+    micMutedByHost: bool | None = None
+    camDisabledByHost: bool | None = None
+
+
+@router.delete("/parties/{room_id}/participants/{target_user_id}")
+def kick_participant(
+    room_id: str,
+    target_user_id: str,
+    auth: dict = Depends(verify_bearer),
+) -> dict[str, Any]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        row = db_fetchone(conn, "SELECT host_id FROM party_rooms WHERE id = ?", (room_id,))
+        if not row or row_get(row, "host_id") != uid:
+            raise HTTPException(status_code=403, detail="Host only")
+        if target_user_id == uid:
+            raise HTTPException(status_code=400, detail="Cannot kick yourself")
+
+        db_execute(
+            conn,
+            "DELETE FROM party_participants WHERE room_id = ? AND user_id = ?",
+            (room_id, target_user_id),
+        )
+        db_execute(
+            conn,
+            "DELETE FROM party_signals WHERE room_id = ? AND (sender_id = ? OR target_id = ?)",
+            (room_id, target_user_id, target_user_id),
+        )
+        room = _room_doc(conn, room_id)
+
+    return {"ok": True, "room": room}
+
+
+@router.patch("/parties/{room_id}/participants/{target_user_id}")
+def patch_participant(
+    room_id: str,
+    target_user_id: str,
+    body: ParticipantPatchBody,
+    auth: dict = Depends(verify_bearer),
+) -> dict[str, Any]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        row = db_fetchone(conn, "SELECT host_id FROM party_rooms WHERE id = ?", (room_id,))
+        if not row or row_get(row, "host_id") != uid:
+            raise HTTPException(status_code=403, detail="Host only")
+
+        if body.micMutedByHost is not None:
+            db_execute(
+                conn,
+                "UPDATE party_participants SET mic_muted_by_host = ? WHERE room_id = ? AND user_id = ?",
+                (1 if body.micMutedByHost else 0, room_id, target_user_id),
+            )
+        if body.camDisabledByHost is not None:
+            db_execute(
+                conn,
+                "UPDATE party_participants SET cam_disabled_by_host = ? WHERE room_id = ? AND user_id = ?",
+                (1 if body.camDisabledByHost else 0, room_id, target_user_id),
+            )
+        room = _room_doc(conn, room_id)
+
+    return {"ok": True, "room": room}
+
+
 @router.patch("/parties/{room_id}/playback")
 def update_playback(room_id: str, body: PlaybackBody, auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
     uid = uid_from_auth(auth)

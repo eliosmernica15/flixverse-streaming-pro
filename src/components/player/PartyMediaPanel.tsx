@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Crown } from "lucide-react";
 import type { PartyMediaParticipant } from "@/hooks/player/usePartyMedia";
+import type { FlixPartyParticipant } from "@/hooks/player/useFlixParty";
 import { VoiceVolumeSlider } from "./PartyMembersPanel";
 
 function RemoteAudioSink({ stream, volume }: { stream: MediaStream; volume: number }) {
@@ -23,9 +24,11 @@ function RemoteAudioSink({ stream, volume }: { stream: MediaStream; volume: numb
 function CameraTile({
   participant,
   voiceVolume,
+  isHost,
 }: {
   participant: PartyMediaParticipant;
   voiceVolume: number;
+  isHost?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -33,10 +36,13 @@ function CameraTile({
     const el = videoRef.current;
     if (!el) return;
     el.srcObject = participant.hasVideo ? participant.stream : null;
+    if (participant.hasVideo) void el.play().catch(() => undefined);
     return () => {
       el.srcObject = null;
     };
   }, [participant.stream, participant.hasVideo]);
+
+  const initial = participant.displayName.charAt(0).toUpperCase();
 
   return (
     <div
@@ -50,20 +56,26 @@ function CameraTile({
           muted={participant.isLocal}
           className="party-camera-video"
         />
-      ) : participant.isLocal ? (
-        <div className="party-camera-avatar">
-          <span>{participant.displayName.charAt(0).toUpperCase()}</span>
-        </div>
       ) : (
         <>
-          <RemoteAudioSink stream={participant.stream} volume={voiceVolume} />
+          {!participant.isLocal && participant.hasAudio && (
+            <RemoteAudioSink stream={participant.stream} volume={voiceVolume} />
+          )}
           <div className="party-camera-avatar">
-            <span>{participant.displayName.charAt(0).toUpperCase()}</span>
+            {participant.avatarUrl ? (
+              <img src={participant.avatarUrl} alt="" className="party-camera-avatar-img" />
+            ) : (
+              <span>{initial}</span>
+            )}
           </div>
         </>
       )}
       <div className="party-camera-tile-bar">
-        <span className="party-camera-name">{participant.displayName}</span>
+        <span className="party-camera-name">
+          {isHost && <Crown className="inline w-3 h-3 text-amber-400 mr-0.5" />}
+          {participant.displayName}
+          {participant.isLocal ? " (you)" : ""}
+        </span>
         {participant.micMutedByHost ? (
           <MicOff className="w-3 h-3 text-red-400/80" />
         ) : participant.hasAudio ? (
@@ -73,7 +85,7 @@ function CameraTile({
             <Mic className="w-3 h-3 text-white/50" />
           )
         ) : (
-          <MicOff className="w-3 h-3 text-red-400/80" />
+          <VideoOff className="w-3 h-3 text-white/30" />
         )}
       </div>
       {participant.isSpeaking && <span className="party-camera-speaking-ring" aria-hidden />}
@@ -84,20 +96,33 @@ function CameraTile({
 interface PartyCameraGridProps {
   participants: PartyMediaParticipant[];
   voiceVolume?: number;
+  roomParticipants?: FlixPartyParticipant[];
 }
 
-export function PartyCameraGrid({ participants, voiceVolume = 1 }: PartyCameraGridProps) {
-  const visible = participants.filter((p) => p.hasVideo || p.hasAudio);
+export function PartyCameraGrid({
+  participants,
+  voiceVolume = 1,
+  roomParticipants = [],
+}: PartyCameraGridProps) {
+  const hostId = roomParticipants.find((p) => p.role === "host")?.userId;
+  const visible = participants.length > 0 ? participants : [];
+
   if (!visible.length) return null;
 
   return (
     <aside className="party-camera-grid" aria-label="Party cameras">
-      <p className="party-camera-grid-label">Party ({visible.length})</p>
+      <p className="party-camera-grid-label">Watch together · {visible.length} here</p>
       <div className="party-camera-grid-scroll">
         {visible.map((p) => (
-          <CameraTile key={p.peerId} participant={p} voiceVolume={voiceVolume} />
+          <CameraTile
+            key={p.peerId}
+            participant={p}
+            voiceVolume={voiceVolume}
+            isHost={p.peerId === hostId}
+          />
         ))}
       </div>
+      <p className="party-camera-hint">Turn on cam/mic in the party panel →</p>
     </aside>
   );
 }

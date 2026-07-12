@@ -25,6 +25,9 @@ interface UsePlayerPartySyncOptions {
   isPlaying: boolean;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
   setPlaying: (playing: boolean) => void;
+  playEmbed: () => void;
+  pauseEmbed: () => void;
+  seekEmbed: (time: number) => void;
   seekTo: (time: number) => void;
   seekRelative: (delta: number) => void;
 }
@@ -41,6 +44,9 @@ export function usePlayerPartySync({
   isPlaying,
   iframeRef,
   setPlaying,
+  playEmbed,
+  pauseEmbed,
+  seekEmbed,
   seekTo,
   seekRelative,
 }: UsePlayerPartySyncOptions) {
@@ -71,17 +77,27 @@ export function usePlayerPartySync({
   const handlePartyPlaybackSync = useCallback(
     (msg: SyncMessage) => {
       if (isPartyHost) return;
-      if (msg.type === "play") setPlaying(true);
-      if (msg.type === "pause") setPlaying(false);
+      if (msg.type === "play") {
+        setPlaying(true);
+        playEmbed();
+      }
+      if (msg.type === "pause") {
+        setPlaying(false);
+        pauseEmbed();
+      }
       if (msg.type === "seek" && typeof msg.data.currentTime === "number") {
+        seekEmbed(msg.data.currentTime);
         seekTo(msg.data.currentTime);
       }
       if (msg.type === "heartbeat" && typeof msg.data.currentTime === "number") {
         const drift = Math.abs(currentTime - msg.data.currentTime);
-        if (drift > 3) seekTo(msg.data.currentTime);
+        if (drift > 3) {
+          seekEmbed(msg.data.currentTime);
+          seekTo(msg.data.currentTime);
+        }
       }
     },
-    [isPartyHost, setPlaying, seekTo, currentTime]
+    [isPartyHost, setPlaying, playEmbed, pauseEmbed, seekEmbed, seekTo, currentTime]
   );
 
   const onRemoteStreamRef = useRef<(peerId: string, stream: MediaStream) => void>(() => {});
@@ -110,6 +126,7 @@ export function usePlayerPartySync({
     setLocalStream,
     sendSpeakingState: (speaking) => sendRtcMessage("speaking", { speaking }),
     participantNames,
+    roomParticipants: partyRoom?.participants ?? [],
     localUserId: user?.uid ?? null,
     localDisplayName: user?.displayName || "You",
     hostMicForcedOff: partyRoom?.participants?.find((p) => p.userId === user?.uid)?.micMutedByHost ?? false,
@@ -129,8 +146,19 @@ export function usePlayerPartySync({
     const driftSec = Math.abs(currentTime - partyRoom.lastKnownTime);
     setPartyDriftMs(driftSec * 1000);
 
-    if (partyRoom.playbackState === "playing" && !isPlaying) setPlaying(true);
-    if (partyRoom.playbackState === "paused" && isPlaying) setPlaying(false);
+    if (partyRoom.playbackState === "playing" && !isPlaying) {
+      setPlaying(true);
+      playEmbed();
+    }
+    if (partyRoom.playbackState === "paused" && isPlaying) {
+      setPlaying(false);
+      pauseEmbed();
+    }
+
+    if (driftSec >= 1.5 && driftSec < 3) {
+      seekEmbed(partyRoom.lastKnownTime);
+      seekTo(partyRoom.lastKnownTime);
+    }
 
     if (driftSec < 3) {
       setPartySyncStatus(rtcConnected ? "connected" : "connecting");
@@ -166,6 +194,9 @@ export function usePlayerPartySync({
     currentSourceProviderUrl,
     rtcConnected,
     setPlaying,
+    playEmbed,
+    pauseEmbed,
+    seekEmbed,
     seekRelative,
     currentTime,
     iframeRef,
@@ -212,13 +243,15 @@ export function usePlayerPartySync({
 
     const tick = () => {
       const time = partyTimeRef.current;
+      const playing = partyPlayingRef.current;
       sendRtcMessage("heartbeat", { currentTime: time });
+      void updatePlaybackState(playing ? "playing" : "paused", time);
     };
 
     tick();
-    const id = setInterval(tick, 3000);
+    const id = setInterval(tick, 1500);
     return () => clearInterval(id);
-  }, [partyRoomId, isPartyHost, sendRtcMessage]);
+  }, [partyRoomId, isPartyHost, sendRtcMessage, updatePlaybackState]);
 
   const handleStartParty = useCallback(async (): Promise<{ roomId: string; joinUrl: string } | null> => {
     if (!user) {

@@ -36,6 +36,8 @@ function loadVoiceVolume(): number {
   }
 }
 
+import type { FlixPartyParticipant } from "@/hooks/player/useFlixParty";
+
 export interface PartyMediaParticipant {
   peerId: string;
   displayName: string;
@@ -53,6 +55,7 @@ interface UsePartyMediaOptions {
   setLocalStream: (stream: MediaStream | null) => Promise<void>;
   sendSpeakingState?: (speaking: boolean) => void;
   participantNames?: Map<string, string>;
+  roomParticipants?: FlixPartyParticipant[];
   localUserId?: string | null;
   localDisplayName?: string;
   hostMicForcedOff?: boolean;
@@ -64,6 +67,7 @@ export function usePartyMedia({
   setLocalStream,
   sendSpeakingState,
   participantNames,
+  roomParticipants = [],
   localUserId,
   localDisplayName = "You",
   hostMicForcedOff = false,
@@ -268,8 +272,10 @@ export function usePartyMedia({
   }, []);
 
   const participants: PartyMediaParticipant[] = [];
+  const seen = new Set<string>();
 
   if (localStream && localUserId && (micOn || cameraOn)) {
+    seen.add(localUserId);
     participants.push({
       peerId: localUserId,
       displayName: localDisplayName,
@@ -283,8 +289,8 @@ export function usePartyMedia({
   }
 
   for (const [peerId, stream] of remoteStreams) {
+    seen.add(peerId);
     const hasVideo = stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
-    if (!hasVideo && !stream.getAudioTracks().length) continue;
     participants.push({
       peerId,
       displayName: participantNames?.get(peerId) || "Friend",
@@ -296,7 +302,35 @@ export function usePartyMedia({
     });
   }
 
-  const cameraMode = (cameraOn && !hostCamForcedOff) || participants.some((p) => p.hasVideo);
+  for (const rp of roomParticipants) {
+    if (seen.has(rp.userId)) continue;
+    participants.push({
+      peerId: rp.userId,
+      displayName: rp.displayName,
+      avatarUrl: rp.avatarUrl,
+      stream: new MediaStream(),
+      hasVideo: false,
+      hasAudio: false,
+      isSpeaking: false,
+      isLocal: false,
+      micMutedByHost: rp.micMutedByHost,
+    });
+  }
+
+  if (localUserId && !seen.has(localUserId)) {
+    participants.unshift({
+      peerId: localUserId,
+      displayName: localDisplayName,
+      stream: localStream || new MediaStream(),
+      hasVideo: false,
+      hasAudio: false,
+      isSpeaking: localSpeaking,
+      isLocal: true,
+      micMutedByHost: hostMicForcedOff,
+    });
+  }
+
+  const cameraMode = !!roomId;
   const anyoneSpeaking = speakingPeers.size > 0;
 
   return {

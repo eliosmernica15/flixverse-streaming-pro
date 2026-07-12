@@ -13,24 +13,30 @@ interface UseFlixPartyOptions {
   roomId: string | null;
 }
 
+const ROOM_POLL_MS = 1200;
+const MESSAGE_POLL_MS = 2500;
+
 export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
   const { user } = useAuth();
   const [room, setRoom] = useState<FlixPartyRoom | null>(null);
   const [messages, setMessages] = useState<FlixPartyChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const roomPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const msgPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchRoom = useCallback(async () => {
     if (!roomId) {
       setRoom(null);
       setLoading(false);
-      return;
+      return null;
     }
     try {
       const data = await pythonFetch<{ room: FlixPartyRoom }>(`/parties/${roomId}`);
       setRoom(data.room);
+      return data.room;
     } catch {
       setRoom(null);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -56,13 +62,18 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     void fetchMessages();
     if (!roomId) return;
 
-    pollRef.current = setInterval(() => {
-      void fetchRoom();
-      void fetchMessages();
-    }, 4000);
+    roomPollRef.current = setInterval(() => void fetchRoom(), ROOM_POLL_MS);
+    msgPollRef.current = setInterval(() => void fetchMessages(), MESSAGE_POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void fetchRoom();
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (roomPollRef.current) clearInterval(roomPollRef.current);
+      if (msgPollRef.current) clearInterval(msgPollRef.current);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [roomId, fetchRoom, fetchMessages]);
 
@@ -164,21 +175,21 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
   const updatePlaybackState = useCallback(
     async (state: "playing" | "paused", currentTime: number) => {
       if (!roomId) return;
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              playbackState: state,
+              lastKnownTime: currentTime,
+              updatedAt: Date.now(),
+            }
+          : prev
+      );
       try {
         await pythonFetch(`/parties/${roomId}/playback`, {
           method: "PATCH",
           body: JSON.stringify({ state, currentTime }),
         });
-        setRoom((prev) =>
-          prev
-            ? {
-                ...prev,
-                playbackState: state,
-                lastKnownTime: currentTime,
-                updatedAt: Date.now(),
-              }
-            : prev
-        );
       } catch {
         /* host-only */
       }
@@ -186,17 +197,93 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     [roomId]
   );
 
-  const kickParticipant = useCallback(async (_targetUserId: string) => {
-    /* optional future */
-  }, []);
+  const kickParticipant = useCallback(
+    async (targetUserId: string) => {
+      if (!roomId || !user || room?.hostId !== user.uid || targetUserId === user.uid) return;
 
-  const setParticipantMicMuted = useCallback(async (_targetUserId: string, _muted: boolean) => {
-    /* optional future */
-  }, []);
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              participants: prev.participants.filter((p) => p.userId !== targetUserId),
+            }
+          : prev
+      );
 
-  const setParticipantCamDisabled = useCallback(async (_targetUserId: string, _disabled: boolean) => {
-    /* optional future */
-  }, []);
+      try {
+        const data = await pythonFetch<{ room: FlixPartyRoom }>(
+          `/parties/${roomId}/participants/${targetUserId}`,
+          { method: "DELETE" }
+        );
+        setRoom(data.room);
+      } catch {
+        void fetchRoom();
+      }
+    },
+    [roomId, user, room?.hostId, fetchRoom]
+  );
+
+  const setParticipantMicMuted = useCallback(
+    async (targetUserId: string, muted: boolean) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return;
+
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.userId === targetUserId ? { ...p, micMutedByHost: muted } : p
+              ),
+            }
+          : prev
+      );
+
+      try {
+        const data = await pythonFetch<{ room: FlixPartyRoom }>(
+          `/parties/${roomId}/participants/${targetUserId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ micMutedByHost: muted }),
+          }
+        );
+        setRoom(data.room);
+      } catch {
+        void fetchRoom();
+      }
+    },
+    [roomId, user, room?.hostId, fetchRoom]
+  );
+
+  const setParticipantCamDisabled = useCallback(
+    async (targetUserId: string, disabled: boolean) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return;
+
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.userId === targetUserId ? { ...p, camDisabledByHost: disabled } : p
+              ),
+            }
+          : prev
+      );
+
+      try {
+        const data = await pythonFetch<{ room: FlixPartyRoom }>(
+          `/parties/${roomId}/participants/${targetUserId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ camDisabledByHost: disabled }),
+          }
+        );
+        setRoom(data.room);
+      } catch {
+        void fetchRoom();
+      }
+    },
+    [roomId, user, room?.hostId, fetchRoom]
+  );
 
   const isHost = room?.hostId === user?.uid;
 
@@ -214,6 +301,7 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
+    refreshRoom: fetchRoom,
   };
 }
 
