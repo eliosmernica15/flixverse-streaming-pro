@@ -382,6 +382,9 @@ const Profile = () => {
                       <h1 className="text-2xl sm:text-3xl font-bold mb-1">
                         {profile.display_name || user?.email?.split('@')[0]}
                       </h1>
+                      {profile.username && (
+                        <p className="text-emerald-400/90 text-sm font-medium mb-1">@{profile.username}</p>
+                      )}
                       <p className="text-gray-400 mb-2">{user?.email}</p>
                       {profile.bio && (
                         <p className="text-gray-300 text-sm max-w-md">{profile.bio}</p>

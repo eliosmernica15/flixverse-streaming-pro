@@ -1,12 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { Maximize2, Minimize2, X, Users } from "lucide-react";
 import { buildStreamingSources } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
+import { usePlayerPartySync } from "@/hooks/player/usePlayerPartySync";
+import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 import { EmbedFrame } from "./EmbedFrame";
-import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
+import { PlayerShortcutsDropdown } from "./PlayerShortcutsDropdown";
+import { FlixPartySidebar } from "./FlixPartySidebar";
+import { FlixPartyInviteDialog } from "./FlixPartyInviteDialog";
+import { PartyCameraGrid } from "./PartyMediaPanel";
 import { trackPlaybackStart } from "@/lib/analytics";
 import "@/app/video-player.css";
 
@@ -42,8 +48,7 @@ export function PlayerShell({
   const [currentServer, setCurrentServer] = useState(0);
   const [embedState, setEmbedState] = useState<"loading" | "ready" | "error">("loading");
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showShortcutsMenu, setShowShortcutsMenu] = useState(false);
   const [showHint, setShowHint] = useState(true);
   const [liveDuration, setLiveDuration] = useState(0);
 
@@ -59,7 +64,7 @@ export function PlayerShell({
   const currentSource = streamingSources[currentServer];
   const effectiveDuration = liveDuration || totalDuration || 120 * 60;
 
-  const { syncTo } = usePlaybackClock({
+  const { currentTime, seekTo, syncTo } = usePlaybackClock({
     movieId,
     mediaType,
     title,
@@ -72,9 +77,12 @@ export function PlayerShell({
   });
 
   const {
+    isPlaying,
+    volume,
     togglePlay,
     toggleMute,
     adjustVolume,
+    setVolume,
     seek,
     seekRelative,
     setReady,
@@ -86,6 +94,33 @@ export function PlayerShell({
     onTimeUpdate: (time) => syncTo(time),
     onDurationChange: (duration) => setLiveDuration(duration),
   });
+
+  const party = usePlayerPartySync({
+    movieId,
+    mediaType,
+    season,
+    episode,
+    currentServer,
+    currentSourceUrl: currentSource.id,
+    currentSourceProviderUrl: currentSource.providerUrl,
+    currentTime,
+    isPlaying,
+    iframeRef,
+    setPlaying,
+    seekTo,
+    seekRelative,
+  });
+
+  const { media } = party;
+
+  useVolumeDucking({
+    enabled: !!party.partyRoomId && (media.micOn || media.anyoneSpeaking),
+    anyoneSpeaking: media.anyoneSpeaking,
+    baseVolume: volume,
+    setVolume,
+  });
+
+  const cameraLayout = media.cameraMode && party.partyRoomId;
 
   const switchServer = useCallback((index: number) => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -141,6 +176,12 @@ export function PlayerShell({
     [embedState, effectiveDuration, seek, syncTo]
   );
 
+  const togglePlayPause = useCallback(() => {
+    if (embedState !== "ready") return;
+    togglePlay();
+    party.broadcastPartyState(!isPlaying ? "playing" : "paused", currentTime);
+  }, [embedState, togglePlay, isPlaying, currentTime, party]);
+
   useEffect(() => {
     const prevBody = document.body.style.overflow;
     const prevHtml = document.documentElement.style.overflow;
@@ -155,14 +196,6 @@ export function PlayerShell({
       clearTimeout(hintTimer);
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     };
-  }, []);
-
-  useEffect(() => {
-    const onFullscreenChange = () => {
-      setIsBrowserFullscreen(document.fullscreenElement === windowRef.current);
-    };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
   useEffect(() => {
@@ -197,14 +230,14 @@ export function PlayerShell({
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      if (showShortcuts && e.key === "Escape") {
+      if (showShortcutsMenu && e.key === "Escape") {
         e.preventDefault();
-        setShowShortcuts(false);
+        setShowShortcutsMenu(false);
         return;
       }
 
       const handled = [
-        " ", "k", "K", "m", "M", "t", "T", "f", "F",
+        " ", "k", "K", "m", "M", "t", "T", "f", "F", "g", "G", "v", "V", "p", "P",
         "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
         "n", "N", "]", "[", "?", "/", "+", "=", "-", "_",
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -213,6 +246,14 @@ export function PlayerShell({
       if (handled.includes(e.key)) e.preventDefault();
 
       if (e.key === "Escape") {
+        if (showShortcutsMenu) {
+          setShowShortcutsMenu(false);
+          return;
+        }
+        if (party.showPartyPanel) {
+          party.setShowPartyPanel(false);
+          return;
+        }
         if (document.fullscreenElement) {
           void document.exitFullscreen();
           return;
@@ -225,7 +266,25 @@ export function PlayerShell({
         return;
       }
       if (e.key === "?" || e.key === "/") {
-        setShowShortcuts((p) => !p);
+        setShowShortcutsMenu((p) => !p);
+        return;
+      }
+      if (e.key === "g" || e.key === "G") {
+        if (isFeatureEnabled("flixparty")) {
+          party.setShowPartyPanel((p) => !p);
+        }
+        return;
+      }
+      if (e.key === "v" || e.key === "V") {
+        if (party.partyRoomId && isFeatureEnabled("flixparty")) {
+          void media.toggleCamera();
+        }
+        return;
+      }
+      if (e.key === "p" || e.key === "P") {
+        if (party.partyRoomId && isFeatureEnabled("flixparty")) {
+          void media.toggleMic();
+        }
         return;
       }
       if (e.key === "t" || e.key === "T") {
@@ -242,7 +301,7 @@ export function PlayerShell({
         return;
       }
 
-      if (e.key === " " || e.key === "k" || e.key === "K") togglePlay();
+      if (e.key === " " || e.key === "k" || e.key === "K") togglePlayPause();
       else if (e.key === "m" || e.key === "M") toggleMute();
       else if (e.key === "ArrowLeft") seekRelative(e.shiftKey ? -30 : -10);
       else if (e.key === "ArrowRight") seekRelative(e.shiftKey ? 30 : 10);
@@ -260,7 +319,7 @@ export function PlayerShell({
   }, [
     embedState,
     handleClose,
-    togglePlay,
+    togglePlayPause,
     toggleMute,
     adjustVolume,
     seekRelative,
@@ -269,8 +328,10 @@ export function PlayerShell({
     nextServer,
     prevServer,
     seekToPercent,
-    showShortcuts,
+    showShortcutsMenu,
     isExpanded,
+    party,
+    media,
   ]);
 
   const onIframeLoad = () => {
@@ -287,74 +348,129 @@ export function PlayerShell({
     setReady(false);
   };
 
-  const isMaximized = isExpanded || isBrowserFullscreen;
+  const flixPartyEnabled = isFeatureEnabled("flixparty");
 
   return (
-    <div className="player-shell" role="dialog" aria-label={`Watching ${title}`}>
-      <div
-        ref={windowRef}
-        className={`player-window ${isMaximized ? "is-maximized" : "is-framed"}`}
-      >
-        <header className="player-window-bar">
-          <div className="player-window-meta">
-            <p className="player-window-title">{title}</p>
-            <p className="player-window-sub">
-              {currentSource.name} · {currentServer + 1}/{streamingSources.length}
-            </p>
-          </div>
-          <div className="player-window-actions">
-            <button
-              type="button"
-              className="player-window-btn"
-              onClick={toggleExpanded}
-              aria-label={isExpanded ? "Restore player size" : "Maximize player"}
-              title={isExpanded ? "Restore (T)" : "Maximize (T)"}
-            >
-              {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-            <button
-              type="button"
-              className="player-window-btn"
-              onClick={() => void toggleBrowserFullscreen()}
-              aria-label={isBrowserFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              title="Fullscreen (F)"
-            >
-              {isBrowserFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-            <button
-              type="button"
-              className="player-window-btn player-window-btn--close"
-              onClick={handleClose}
-              aria-label="Close player"
-              title="Close (Esc)"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </header>
+    <div
+      className={`player-shell ${party.showPartyPanel ? "player-shell--party-open" : ""} ${cameraLayout ? "player-shell--camera" : ""}`}
+      role="dialog"
+      aria-label={`Watching ${title}`}
+    >
+      <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""}`}>
+        <div className="player-layout-main">
+          <div
+            ref={windowRef}
+            className={`player-window ${isExpanded ? "is-maximized" : "is-framed"}`}
+          >
+          <header className="player-window-bar">
+            <div className="player-window-meta">
+              <p className="player-window-title">{title}</p>
+              <p className="player-window-sub">
+                {currentSource.name} · {currentServer + 1}/{streamingSources.length}
+                {party.partyRoomId && (
+                  <span className="player-party-live"> · Party live</span>
+                )}
+              </p>
+            </div>
+            <div className="player-window-actions">
+              {flixPartyEnabled && (
+                <button
+                  type="button"
+                  className={`player-window-btn ${party.showPartyPanel ? "is-active" : ""}`}
+                  onClick={() => party.setShowPartyPanel((p) => !p)}
+                  aria-label="Watch together"
+                  aria-pressed={party.showPartyPanel}
+                  title="Watch together (G)"
+                >
+                  <Users className="w-4 h-4" />
+                </button>
+              )}
+              <PlayerShortcutsDropdown
+                open={showShortcutsMenu}
+                onToggle={() => setShowShortcutsMenu((p) => !p)}
+                onClose={() => setShowShortcutsMenu(false)}
+              />
+              <button
+                type="button"
+                className="player-window-btn"
+                onClick={toggleExpanded}
+                aria-label={isExpanded ? "Restore player size" : "Maximize player"}
+                title={isExpanded ? "Restore (T)" : "Maximize (T)"}
+              >
+                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+              <button
+                type="button"
+                className="player-window-btn player-window-btn--close"
+                onClick={handleClose}
+                aria-label="Close player"
+                title="Close (Esc)"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </header>
 
-        <div className="player-window-body">
-          <EmbedFrame
-            currentSource={currentSource}
-            currentServer={currentServer}
-            streamingSourcesCount={streamingSources.length}
-            embedState={embedState}
-            title={title}
-            iframeRef={iframeRef}
-            onIframeLoad={onIframeLoad}
-            onIframeError={onIframeError}
-            onRetry={nextServer}
-          />
+          <div className="player-window-body">
+            <EmbedFrame
+              currentSource={currentSource}
+              currentServer={currentServer}
+              streamingSourcesCount={streamingSources.length}
+              embedState={embedState}
+              title={title}
+              iframeRef={iframeRef}
+              onIframeLoad={onIframeLoad}
+              onIframeError={onIframeError}
+              onRetry={nextServer}
+            />
+          </div>
+
+          {showHint && embedState === "ready" && (
+            <p className="player-hint" aria-live="polite">
+              T maximize · G watch together · ↑↓ volume · ? shortcuts
+            </p>
+          )}
         </div>
 
-        {showHint && embedState === "ready" && (
-          <p className="player-hint" aria-live="polite">
-            T maximize · F fullscreen · ↑↓ volume · ? shortcuts
-          </p>
+        {cameraLayout && (
+          <PartyCameraGrid participants={media.participants} />
+        )}
+        </div>
+
+        {flixPartyEnabled && party.showPartyPanel && (
+          <FlixPartySidebar
+            embedded
+            isOpen={party.showPartyPanel}
+            onClose={() => party.setShowPartyPanel(false)}
+            roomId={party.partyRoomId}
+            syncStatus={party.partySyncStatus}
+            driftMs={party.partyDriftMs}
+            onLeaveRoom={party.handleLeaveParty}
+            onStartParty={party.handleStartParty}
+            movieId={movieId}
+            mediaType={mediaType}
+            season={season}
+            episode={episode}
+            title={title}
+            posterPath={posterPath || null}
+            currentTime={currentTime}
+            isPlaying={isPlaying}
+            onSyncToPosition={seekTo}
+            partyJoinUrl={party.partyJoinUrl}
+            hasStandard={party.hasStandard}
+            media={media}
+          />
         )}
       </div>
 
-      <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      {party.showInviteDialog && party.partyJoinUrl && (
+        <FlixPartyInviteDialog
+          isOpen={party.showInviteDialog}
+          onClose={() => party.setShowInviteDialog(false)}
+          roomCode={party.partyRoomCode}
+          roomUrl={party.partyJoinUrl}
+        />
+      )}
     </div>
   );
 }

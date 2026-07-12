@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useSyncedCaptionPreferences } from "@/hooks/player/useSyncedCaptionPreferences";
+import { UsernameSettings } from "@/components/UsernameSettings";
 
 interface ProfileSettingsProps {
   onOpenTab?: (tab: string) => void;
@@ -65,6 +66,8 @@ export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <UsernameSettings />
+
       <section className="glass-card rounded-2xl border border-white/10 p-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">

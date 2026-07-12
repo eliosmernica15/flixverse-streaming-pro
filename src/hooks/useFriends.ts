@@ -36,6 +36,8 @@ export interface UserProfile {
   uid: string;
   displayName: string;
   photoURL: string | null;
+  /** Public handle from member_profiles when available */
+  username?: string | null;
 }
 
 export function useFriends() {
@@ -109,30 +111,62 @@ export function useFriends() {
     return () => unsub();
   }, [user]);
 
-  // Search users by display name
+  // Search users by username via API (prefix) with local fallback
   const searchUsers = useCallback(async (searchQuery: string): Promise<UserProfile[]> => {
     if (!user || searchQuery.length < 2) return [];
 
+    try {
+      const headers = await import("@/lib/firebase/clientAuth").then((m) =>
+        m.getAuthHeaders(user)
+      );
+      const res = await fetch(`/api/profile/username?q=${encodeURIComponent(searchQuery)}`, {
+        headers,
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          results: Array<{
+            uid: string;
+            username: string;
+            displayName: string;
+            photoURL: string | null;
+          }>;
+        };
+        return data.results.map((r) => ({
+          uid: r.uid,
+          displayName: r.displayName,
+          photoURL: r.photoURL,
+          username: r.username,
+        }));
+      }
+    } catch {
+      // fall through to local scan
+    }
+
     const db = getFirestore();
-    const profilesRef = collection(db, "profiles");
-    const searchTerm = searchQuery.toLowerCase();
-
-    // Get all profiles and filter client-side (Firestore doesn't support partial string matching)
-    const snap = await getDocs(query(profilesRef, limit(50)));
+    const searchTerm = searchQuery.toLowerCase().trim();
     const results: UserProfile[] = [];
+    const seen = new Set<string>();
 
-    snap.forEach((d) => {
+    const addResult = (uid: string, displayName: string, photoURL: string | null, username?: string | null) => {
+      if (uid === user.uid || seen.has(uid)) return;
+      seen.add(uid);
+      results.push({ uid, displayName, photoURL, username });
+    };
+
+    const profilesSnap = await getDocs(query(collection(db, "profiles"), limit(80)));
+    profilesSnap.forEach((d) => {
       const data = d.data();
-      if (d.id !== user.uid && data.display_name?.toLowerCase().includes(searchTerm)) {
-        results.push({
-          uid: d.id,
-          displayName: data.display_name,
-          photoURL: data.avatar_url || null,
-        });
+      const name = (data.display_name as string) || "";
+      const handle = (data.username as string) || "";
+      if (
+        name.toLowerCase().includes(searchTerm) ||
+        handle.toLowerCase().includes(searchTerm)
+      ) {
+        addResult(d.id, name || handle, data.avatar_url || null, handle || null);
       }
     });
 
-    return results.slice(0, 10);
+    return results.slice(0, 12);
   }, [user]);
 
   // Send friend request

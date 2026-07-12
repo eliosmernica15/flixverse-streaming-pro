@@ -10,6 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { FriendsList } from "@/components/FriendsList";
 import { WatchParty } from "./WatchParty";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge";
+import { PartyMediaControls } from "./PartyMediaPanel";
+import type { usePartyMedia } from "@/hooks/player/usePartyMedia";
+
+type PartyMediaState = ReturnType<typeof usePartyMedia>;
 
 interface FlixPartySidebarProps {
   isOpen: boolean;
@@ -19,6 +23,9 @@ interface FlixPartySidebarProps {
   driftMs?: number;
   onLeaveRoom: () => void;
   onStartParty?: () => void;
+  /** Render beside the player window instead of full-screen overlay */
+  embedded?: boolean;
+  hasStandard?: boolean;
   /** Current playback context for WatchParty */
   movieId?: number;
   mediaType?: "movie" | "tv";
@@ -30,6 +37,7 @@ interface FlixPartySidebarProps {
   isPlaying?: boolean;
   onSyncToPosition?: (position: number) => void;
   partyJoinUrl?: string | null;
+  media?: PartyMediaState;
 }
 
 type SidebarTab = "chat" | "friends" | "party";
@@ -52,6 +60,9 @@ export function FlixPartySidebar({
   isPlaying,
   onSyncToPosition,
   partyJoinUrl,
+  embedded = false,
+  hasStandard = false,
+  media,
 }: FlixPartySidebarProps) {
   const { room, messages, isHost, sendMessage } = useFlixParty({ roomId });
   const { friends, incomingRequests } = useFriends();
@@ -104,15 +115,22 @@ export function FlixPartySidebar({
   const handleInviteFriend = useCallback(
     (friend: Friend) => {
       if (partyJoinUrl) {
-        void navigator.clipboard.writeText(partyJoinUrl);
+        const message = `Join me on FlixVerse to watch "${title || "this title"}" together!\n${partyJoinUrl}`;
+        void navigator.clipboard.writeText(message);
         toast({
-          title: "Invite link copied",
-          description: `Share with ${friend.displayName || "your friend"}`,
+          title: "Invite copied",
+          description: `Paste to ${friend.displayName} — they'll join synced to your playback.`,
         });
+      } else if (!roomId && onStartParty) {
+        toast({
+          title: "Start a party first",
+          description: "Create a watch party, then invite friends from this list.",
+        });
+        onStartParty();
       }
       setActiveTab("party");
     },
-    [partyJoinUrl, toast]
+    [partyJoinUrl, title, roomId, onStartParty, toast]
   );
 
   if (!isOpen) return null;
@@ -120,7 +138,13 @@ export function FlixPartySidebar({
   const participants: FlixPartyParticipant[] = room?.participants || [];
 
   return (
-    <div className="fixed inset-y-0 right-0 z-[10000] w-full sm:w-96 flex flex-col bg-zinc-950 border-l border-white/10 shadow-2xl animate-slide-in-right">
+    <div
+      className={
+        embedded
+          ? "player-party-panel"
+          : "fixed inset-y-0 right-0 z-[10000] w-full sm:w-96 flex flex-col bg-zinc-950 border-l border-white/10 shadow-2xl animate-slide-in-right"
+      }
+    >
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -173,7 +197,25 @@ export function FlixPartySidebar({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+        {roomId && media && (
+          <div className="shrink-0 border-b border-white/10 px-3 py-3">
+            <PartyMediaControls
+              micOn={media.micOn}
+              cameraOn={media.cameraOn}
+              cameraMode={media.cameraMode}
+              anyoneSpeaking={media.anyoneSpeaking}
+              mediaError={media.mediaError}
+              onToggleMic={() => void media.toggleMic()}
+              onToggleCamera={() => void media.toggleCamera()}
+            />
+          </div>
+        )}
+        {!hasStandard && !roomId && (
+          <div className="mx-3 mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[11px] text-amber-100/90">
+            Standard plan unlocks synced watch parties. You can still add friends and search users below.
+          </div>
+        )}
         {/* Friends tab */}
         {activeTab === "friends" && (
           <FriendsList inviteMode={true} onInvite={handleInviteFriend} />

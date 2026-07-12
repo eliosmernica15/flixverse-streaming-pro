@@ -4,13 +4,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
 
 export interface SyncMessage {
-  type: "play" | "pause" | "seek" | "heartbeat" | "chat";
+  type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";
   timestamp: number;
   data: {
     currentTime?: number;
     text?: string;
+    speaking?: boolean;
     [key: string]: unknown;
   };
+}
+
+export interface RemoteParticipantStream {
+  peerId: string;
+  stream: MediaStream;
 }
 
 interface UseWebRTCSyncOptions {
@@ -19,6 +25,8 @@ interface UseWebRTCSyncOptions {
   hostId?: string | null;
   participantIds?: string[];
   onPlaybackSync?: (msg: SyncMessage) => void;
+  onRemoteStream?: (peerId: string, stream: MediaStream) => void;
+  onRemoteStreamRemoved?: (peerId: string) => void;
 }
 
 export function useWebRTCSync({
@@ -27,13 +35,19 @@ export function useWebRTCSync({
   hostId = null,
   participantIds = [],
   onPlaybackSync,
+  onRemoteStream,
+  onRemoteStreamRemoved,
 }: UseWebRTCSyncOptions) {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
   const syncRef = useRef<WebRTCPartySync | null>(null);
   const onPlaybackSyncRef = useRef(onPlaybackSync);
+  const onRemoteStreamRef = useRef(onRemoteStream);
+  const onRemoteStreamRemovedRef = useRef(onRemoteStreamRemoved);
   onPlaybackSyncRef.current = onPlaybackSync;
+  onRemoteStreamRef.current = onRemoteStream;
+  onRemoteStreamRemovedRef.current = onRemoteStreamRemoved;
 
   useEffect(() => {
     void NTPClient.calibrate();
@@ -59,6 +73,10 @@ export function useWebRTCSync({
         if (["play", "pause", "seek", "heartbeat"].includes(msg.type)) {
           onPlaybackSyncRef.current?.(msg);
         }
+      },
+      {
+        onRemoteStream: (peerId, stream) => onRemoteStreamRef.current?.(peerId, stream),
+        onRemoteStreamRemoved: (peerId) => onRemoteStreamRemovedRef.current?.(peerId),
       }
     );
 
@@ -77,7 +95,6 @@ export function useWebRTCSync({
     };
   }, [roomId, user, isHost, hostId]);
 
-  // Host: maintain star connections for all guests
   useEffect(() => {
     if (!isHost || !syncRef.current) return;
     syncRef.current.syncParticipants(participantIds);
@@ -93,5 +110,9 @@ export function useWebRTCSync({
     syncRef.current.sendMessage(msg);
   }, []);
 
-  return { isConnected, sendMessage, messages };
+  const setLocalStream = useCallback(async (stream: MediaStream | null) => {
+    await syncRef.current?.setLocalStream(stream);
+  }, []);
+
+  return { isConnected, sendMessage, messages, setLocalStream, syncRef };
 }

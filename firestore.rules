@@ -33,11 +33,15 @@ service cloud.firestore {
     match /profiles/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId)
-        && hasString(request.resource.data.display_name)
-        && request.resource.data.user_id == request.auth.uid;
-      allow update: if isOwner(userId)
-        && request.resource.data.user_id == request.auth.uid;
-      allow delete: if false; // profiles are never deleted via client
+        && hasString(request.resource.data.display_name);
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // Unique username index — doc id is normalized handle
+    match /usernames/{handle} {
+      allow read: if isAuthenticated();
+      allow write: if false; // managed via API route with admin SDK
     }
     
     // User movie lists - users can only access their own movie list

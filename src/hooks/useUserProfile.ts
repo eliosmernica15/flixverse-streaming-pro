@@ -38,7 +38,7 @@ export const useUserProfile = () => {
           updated_at: new Date().toISOString()
         };
         try {
-          await setDoc(profileRef, newProfile);
+          await setDoc(profileRef, { ...newProfile, user_id: user.uid });
           setProfile(newProfile);
         } catch (error) {
           console.error('Error creating profile:', error);

@@ -2,6 +2,8 @@
 export interface UserProfile {
   id: string;
   display_name: string | null;
+  /** Unique public handle for friend search (@username) */
+  username?: string | null;
   avatar_url: string | null;
   bio?: string | null;
   favorite_genres?: string[];

@@ -205,6 +205,9 @@ export function FriendsList({ inviteMode = false, onInvite }: FriendsListProps) 
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{u.displayName}</p>
+                    {u.username && (
+                      <p className="text-[11px] text-gray-500 truncate">@{u.username}</p>
+                    )}
                   </div>
                   <button
                     onClick={() => handleSendRequest(u)}
