@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { WebRTCPartySync } from "@/lib/player/webrtcPartySync";
-import { WebRTCPartySyncWs, openPartyWebSocket } from "@/lib/player/webrtcPartySyncWs";
+import { createPartySyncTransport, type PartySyncTransport } from "@/lib/player/webrtcPartySyncWs";
 import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
-import { getFirebaseAuth } from "@/integrations/firebase/client";
 
 export interface SyncMessage {
   type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";
@@ -44,7 +43,7 @@ export function useWebRTCSync({
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
-  const syncRef = useRef<WebRTCPartySync | null>(null);
+  const syncRef = useRef<WebRTCPartySync | PartySyncTransport | null>(null);
   const onPlaybackSyncRef = useRef(onPlaybackSync);
   const onRemoteStreamRef = useRef(onRemoteStream);
   const onRemoteStreamRemovedRef = useRef(onRemoteStreamRemoved);
@@ -62,7 +61,7 @@ export function useWebRTCSync({
       return;
     }
 
-    let sync: WebRTCPartySync | WebRTCPartySyncWs | null = null;
+    let sync: WebRTCPartySync | PartySyncTransport | null = null;
     let cancelled = false;
 
     void (async () => {
@@ -85,24 +84,7 @@ export function useWebRTCSync({
       };
 
       if (isPythonBackendEnabled()) {
-        const token = await getFirebaseAuth()?.currentUser?.getIdToken();
-        if (!token || cancelled) return;
-        const ws = await openPartyWebSocket(roomId, token);
-        if (cancelled) {
-          ws.close();
-          return;
-        }
-        sync = new WebRTCPartySyncWs(
-          roomId,
-          user.uid,
-          isHost,
-          isHost ? null : hostId,
-          onMsg,
-          mediaCb,
-          ws
-        );
-      } else {
-        sync = new WebRTCPartySync(
+        sync = await createPartySyncTransport(
           roomId,
           user.uid,
           isHost,
@@ -110,10 +92,24 @@ export function useWebRTCSync({
           onMsg,
           mediaCb
         );
-        sync.start();
+        if (cancelled) {
+          sync.destroy();
+          return;
+        }
+      } else {
+        const firestoreSync = new WebRTCPartySync(
+          roomId,
+          user.uid,
+          isHost,
+          isHost ? null : hostId,
+          onMsg,
+          mediaCb
+        );
+        firestoreSync.start();
+        sync = firestoreSync;
       }
 
-      syncRef.current = sync as WebRTCPartySync;
+      syncRef.current = sync;
     })();
 
     const poll = setInterval(() => {

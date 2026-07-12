@@ -1,6 +1,6 @@
 # FlixVerse Python API
 
-SQLite + WebSockets backend for notifications, watch parties, chat, and invites.  
+Postgres + HTTP polling backend for notifications, watch parties, chat, and invites on **Vercel serverless**.  
 **No Firestore daily quota** for these features.
 
 ## Run locally
@@ -28,22 +28,23 @@ PYTHON_API_URL=http://127.0.0.1:8000
 NEXT_PUBLIC_PYTHON_WS_URL=ws://127.0.0.1:8000
 ```
 
-## Deploy (Render.com free)
+Local dev uses SQLite (`backend/data/flixverse.db`) and WebSockets for real-time signals.
 
-1. New **Web Service** → connect GitHub repo
-2. Root directory: `backend`
-3. Build: `pip install -r requirements.txt`
-4. Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. Env vars: `FIREBASE_SERVICE_ACCOUNT_JSON`, `FIREBASE_PROJECT_ID`, `CORS_ORIGINS`
+## Deploy (Vercel)
 
-On **Vercel**, set:
+Python runs as a serverless function at `/api/flixverse` via `api/flixverse.py` (FastAPI + Mangum).
 
-```
-NEXT_PUBLIC_USE_PYTHON_API=true
-PYTHON_API_URL=https://your-api.onrender.com
-NEXT_PUBLIC_PYTHON_WS_URL=wss://your-api.onrender.com
-```
+1. Link project: `npx vercel link`
+2. Add **Vercel Postgres** storage (provides `POSTGRES_URL`)
+3. Set env vars on Vercel:
+   - `NEXT_PUBLIC_USE_PYTHON_API=true`
+   - `FIREBASE_SERVICE_ACCOUNT_JSON` (full JSON, single line)
+   - `FIREBASE_PROJECT_ID=streaming-web-2272d`
+4. Deploy: `npx vercel --prod`
+
+On Vercel, WebSockets are unavailable — clients use HTTP polling for notifications and WebRTC signals.
 
 ## Storage
 
-SQLite file: `backend/data/flixverse.db` (override with `FLIXVERSE_DB_PATH`).
+- **Production (Vercel)**: Postgres via `POSTGRES_URL` / `DATABASE_URL`
+- **Local dev**: SQLite at `backend/data/flixverse.db` (override with `FLIXVERSE_DB_PATH`)

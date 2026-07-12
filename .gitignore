@@ -45,3 +45,6 @@ functions/
 
 
 .vercel
+
+.vercel
+.env*.local

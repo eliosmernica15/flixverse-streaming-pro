@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Notification } from "@/integrations/firebase/types";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { getPythonWsBase, isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { getPythonWsBase, isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
 import { getFirebaseAuth } from "@/integrations/firebase/client";
 
 export function usePythonNotifications() {
@@ -37,31 +37,34 @@ export function usePythonNotifications() {
 
     void refresh();
 
-    const poll = setInterval(() => void refresh(), 15000);
+    const pollMs = useHttpTransport() ? 5000 : 15000;
+    const poll = setInterval(() => void refresh(), pollMs);
 
-    void (async () => {
-      const auth = getFirebaseAuth();
-      const token = await auth?.currentUser?.getIdToken();
-      if (!token) return;
+    if (!useHttpTransport()) {
+      void (async () => {
+        const auth = getFirebaseAuth();
+        const token = await auth?.currentUser?.getIdToken();
+        if (!token) return;
 
-      const ws = new WebSocket(`${getPythonWsBase()}/ws/notifications?token=${encodeURIComponent(token)}`);
-      wsRef.current = ws;
+        const ws = new WebSocket(`${getPythonWsBase()}/ws/notifications?token=${encodeURIComponent(token)}`);
+        wsRef.current = ws;
 
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data as string) as {
-            type?: string;
-            notification?: Notification;
-          };
-          if (msg.type === "notification" && msg.notification) {
-            setNotifications((prev) => [msg.notification!, ...prev.filter((n) => n.id !== msg.notification!.id)].slice(0, 50));
-            setUnreadCount((c) => c + 1);
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data as string) as {
+              type?: string;
+              notification?: Notification;
+            };
+            if (msg.type === "notification" && msg.notification) {
+              setNotifications((prev) => [msg.notification!, ...prev.filter((n) => n.id !== msg.notification!.id)].slice(0, 50));
+              setUnreadCount((c) => c + 1);
+            }
+          } catch {
+            /* ignore */
           }
-        } catch {
-          /* ignore */
-        }
-      };
-    })();
+        };
+      })();
+    }
 
     return () => {
       clearInterval(poll);

@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from auth import uid_from_auth, verify_bearer
-from database import get_conn, iso_now, new_id, row_to_notification
-from ws.hub import notification_hub
+from database import get_conn, iso_now, new_id, row_to_notification, db_fetchall, db_fetchone, db_execute, row_get
+from notify_hub import notification_hub
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -36,7 +36,8 @@ class DispatchBody(BaseModel):
 def list_notifications(auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
     uid = uid_from_auth(auth)
     with get_conn() as conn:
-        rows = conn.execute(
+        rows = db_fetchall(
+            conn,
             """
             SELECT * FROM notifications
             WHERE user_id = ?
@@ -44,7 +45,7 @@ def list_notifications(auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
             LIMIT 50
             """,
             (uid,),
-        ).fetchall()
+        )
     items = [row_to_notification(r) for r in rows]
     unread = sum(1 for n in items if not n["read"])
     return {"notifications": items, "unreadCount": unread}
@@ -78,7 +79,8 @@ async def dispatch_notification(body: DispatchBody, auth: dict = Depends(verify_
     }
 
     with get_conn() as conn:
-        conn.execute(
+        db_execute(
+            conn,
             """
             INSERT INTO notifications (id, user_id, from_user_id, type, title, message, data_json, read, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
@@ -103,7 +105,8 @@ async def dispatch_notification(body: DispatchBody, auth: dict = Depends(verify_
 def mark_read(notif_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
     uid = uid_from_auth(auth)
     with get_conn() as conn:
-        cur = conn.execute(
+        cur = db_execute(
+            conn,
             "UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?",
             (notif_id, uid),
         )
@@ -116,7 +119,7 @@ def mark_read(notif_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, b
 def mark_all_read(auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
     uid = uid_from_auth(auth)
     with get_conn() as conn:
-        conn.execute("UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0", (uid,))
+        db_execute(conn, "UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0", (uid,))
     return {"ok": True}
 
 
@@ -124,7 +127,11 @@ def mark_all_read(auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
 def delete_notification(notif_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
     uid = uid_from_auth(auth)
     with get_conn() as conn:
-        cur = conn.execute("DELETE FROM notifications WHERE id = ? AND user_id = ?", (notif_id, uid))
+        cur = db_execute(
+            conn,
+            "DELETE FROM notifications WHERE id = ? AND user_id = ?",
+            (notif_id, uid),
+        )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Not found")
     return {"ok": True}
@@ -134,7 +141,7 @@ def delete_notification(notif_id: str, auth: dict = Depends(verify_bearer)) -> d
 def clear_all(auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
     uid = uid_from_auth(auth)
     with get_conn() as conn:
-        conn.execute("DELETE FROM notifications WHERE user_id = ?", (uid,))
+        db_execute(conn, "DELETE FROM notifications WHERE user_id = ?", (uid,))
     return {"ok": True}
 
 
@@ -146,21 +153,24 @@ class InviteActionBody(BaseModel):
 def accept_party_invite(body: InviteActionBody, auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
     uid = uid_from_auth(auth)
     with get_conn() as conn:
-        row = conn.execute(
+        row = db_fetchone(
+            conn,
             "SELECT * FROM notifications WHERE id = ? AND user_id = ?",
             (body.notificationId, uid),
-        ).fetchone()
+        )
         if not row:
             raise HTTPException(status_code=404, detail="Not found")
-        data = json.loads(row["data_json"] or "{}")
+        data = json.loads(row_get(row, "data_json") or "{}")
         data["invite_status"] = "accepted"
-        conn.execute(
+        db_execute(
+            conn,
             "UPDATE notifications SET read = 1, data_json = ? WHERE id = ?",
             (json.dumps(data), body.notificationId),
         )
         invite_id = data.get("invite_id")
         if invite_id:
-            conn.execute(
+            db_execute(
+                conn,
                 "UPDATE watch_party_invites SET status = 'accepted', responded_at = ? WHERE id = ? AND to_user_id = ?",
                 (iso_now(), invite_id, uid),
             )
@@ -173,28 +183,31 @@ async def decline_party_invite(body: InviteActionBody, auth: dict = Depends(veri
     sender_name = auth.get("name") or auth.get("email", "Someone").split("@")[0]
 
     with get_conn() as conn:
-        row = conn.execute(
+        row = db_fetchone(
+            conn,
             "SELECT * FROM notifications WHERE id = ? AND user_id = ?",
             (body.notificationId, uid),
-        ).fetchone()
+        )
         if not row:
             raise HTTPException(status_code=404, detail="Not found")
 
-        data = json.loads(row["data_json"] or "{}")
+        data = json.loads(row_get(row, "data_json") or "{}")
         data["invite_status"] = "declined"
-        conn.execute(
+        db_execute(
+            conn,
             "UPDATE notifications SET read = 1, data_json = ? WHERE id = ?",
             (json.dumps(data), body.notificationId),
         )
 
         invite_id = data.get("invite_id")
         if invite_id:
-            conn.execute(
+            db_execute(
+                conn,
                 "UPDATE watch_party_invites SET status = 'declined', responded_at = ? WHERE id = ? AND to_user_id = ?",
                 (iso_now(), invite_id, uid),
             )
 
-        host_id = row["from_user_id"]
+        host_id = row_get(row, "from_user_id")
         movie_title = data.get("movie_title") or "your watch party"
         if host_id and host_id != uid:
             notif_id = new_id()
@@ -205,7 +218,8 @@ async def decline_party_invite(body: InviteActionBody, auth: dict = Depends(veri
                 "from_user_id": uid,
                 "from_user_name": sender_name,
             }
-            conn.execute(
+            db_execute(
+                conn,
                 """
                 INSERT INTO notifications (id, user_id, from_user_id, type, title, message, data_json, read, created_at)
                 VALUES (?, ?, ?, 'watch_party_invite_declined', ?, ?, ?, 0, ?)
@@ -215,7 +229,7 @@ async def decline_party_invite(body: InviteActionBody, auth: dict = Depends(veri
                     host_id,
                     uid,
                     "Invite declined",
-                    f"{sender_name} declined your invite to watch \"{movie_title}\"",
+                    f'{sender_name} declined your invite to watch "{movie_title}"',
                     json.dumps(decline_data),
                     created,
                 ),
