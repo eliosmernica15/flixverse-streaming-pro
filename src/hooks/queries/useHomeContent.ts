@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { localeQueryKey } from "@/i18n/config";
+import { useLocale } from "@/hooks/useLocale";
 import {
   fetchTrendingMovies,
   fetchTopRatedMovies,
@@ -80,15 +82,17 @@ export async function loadHomeContent() {
 export type HomeContent = Awaited<ReturnType<typeof loadHomeContent>>;
 
 export function useHomeContent() {
+  const locale = useLocale();
+
   const priority = useQuery({
-    queryKey: HOME_PRIORITY_KEY,
+    queryKey: localeQueryKey(HOME_PRIORITY_KEY, locale),
     queryFn: loadHomePriority,
     staleTime: STALE,
     gcTime: GC,
   });
 
   const deferred = useQuery({
-    queryKey: HOME_DEFERRED_KEY,
+    queryKey: localeQueryKey(HOME_DEFERRED_KEY, locale),
     queryFn: loadHomeDeferred,
     enabled: priority.isSuccess,
     staleTime: STALE,

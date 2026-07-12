@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Home, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/Reveal";
 
 export default function NotFoundPage() {
   const pathname = usePathname();
+  const t = useTranslations("notFound");
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", pathname);
@@ -30,22 +32,22 @@ export default function NotFoundPage() {
             <Sparkles className="absolute -top-2 -right-2 w-10 h-10 text-red-500 animate-pulse-glow" />
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">Page not found</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">{t("title")}</h2>
           <p className="text-gray-400 mb-8 leading-relaxed text-balance">
-            The page you&apos;re looking for doesn&apos;t exist or may have been moved. Let&apos;s get you back to streaming.
+            {t("description")}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button asChild variant="gradient" className="min-h-[44px]">
               <Link href="/">
                 <Home className="h-4 w-4" />
-                Back to Home
+                {t("backHome")}
               </Link>
             </Button>
             <Button asChild variant="outline-glow" className="min-h-[44px]">
               <Link href="/search">
                 <Search className="h-4 w-4" />
-                Search Content
+                {t("searchContent")}
               </Link>
             </Button>
           </div>

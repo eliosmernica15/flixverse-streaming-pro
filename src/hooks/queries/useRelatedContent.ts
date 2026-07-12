@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { localeQueryKey } from "@/i18n/config";
+import { useLocale } from "@/hooks/useLocale";
 import {
   TMDBMovie,
   fetchSimilarTVShows,
@@ -35,11 +37,12 @@ async function loadRelatedContent(
 }
 
 export function useRelatedContent(content: TMDBMovie | null, mediaType?: "movie" | "tv") {
+  const locale = useLocale();
   const contentId = content?.id;
   const type = content?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
 
   return useQuery({
-    queryKey: ["related-content", contentId, type],
+    queryKey: localeQueryKey(["related-content", contentId, type], locale),
     queryFn: () => loadRelatedContent(content!, mediaType),
     enabled: Boolean(contentId),
     staleTime: 10 * 60 * 1000,

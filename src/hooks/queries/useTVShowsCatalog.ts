@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { localeQueryKey } from "@/i18n/config";
+import { useLocale } from "@/hooks/useLocale";
 import {
   fetchTrendingTVShows,
   fetchPopularTVShows,
@@ -46,8 +48,9 @@ export async function loadTVShowsCatalog(): Promise<Record<string, TMDBMovie[]>>
 }
 
 export function useTVShowsCatalog() {
+  const locale = useLocale();
   return useQuery({
-    queryKey: TV_SHOWS_CATALOG_KEY,
+    queryKey: localeQueryKey(TV_SHOWS_CATALOG_KEY, locale),
     queryFn: loadTVShowsCatalog,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

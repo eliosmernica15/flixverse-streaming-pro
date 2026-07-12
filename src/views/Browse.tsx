@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
 import PageContainer from "@/components/PageContainer";
 import Reveal from "@/components/Reveal";
@@ -10,19 +11,30 @@ import { useBrowseCategory, getBrowseCategoryConfig } from "@/hooks/queries/useB
 
 type SortKey = "featured" | "rating" | "newest" | "az";
 
-const SORTS: { key: SortKey; label: string; icon: ReactNode }[] = [
-  { key: "featured", label: "Featured", icon: <Sparkles className="w-3.5 h-3.5" /> },
-  { key: "rating", label: "Top Rated", icon: <Star className="w-3.5 h-3.5" /> },
-  { key: "newest", label: "Newest", icon: <CalendarDays className="w-3.5 h-3.5" /> },
-  { key: "az", label: "A–Z", icon: <ArrowDownAZ className="w-3.5 h-3.5" /> },
-];
-
 const Browse = () => {
   const { category } = useParams<{ category: string }>();
   const router = useRouter();
+  const t = useTranslations("browse");
+  const tc = useTranslations("common");
+  const tn = useTranslations("nav");
   const config = getBrowseCategoryConfig(category);
   const { data: movies = [], isLoading, isError, refetch } = useBrowseCategory(category);
   const [sort, setSort] = useState<SortKey>("featured");
+
+  const sorts = useMemo<{ key: SortKey; label: string; icon: ReactNode }[]>(
+    () => [
+      { key: "featured", label: t("featured"), icon: <Sparkles className="w-3.5 h-3.5" /> },
+      { key: "rating", label: t("topRated"), icon: <Star className="w-3.5 h-3.5" /> },
+      { key: "newest", label: t("newest"), icon: <CalendarDays className="w-3.5 h-3.5" /> },
+      { key: "az", label: t("az"), icon: <ArrowDownAZ className="w-3.5 h-3.5" /> },
+    ],
+    [t]
+  );
+
+  const categoryTitle = useMemo(() => {
+    if (!category || !config) return "";
+    return t.has(category as never) ? t(category as never) : config.title;
+  }, [category, config, t]);
 
   const sortedMovies = useMemo(() => {
     if (sort === "featured") return movies;
@@ -49,12 +61,12 @@ const Browse = () => {
     return (
       <div className="pt-24 px-4 flex flex-col items-center justify-center min-h-[60vh]">
         <div className="glass-panel p-10 rounded-3xl text-center max-w-md w-full">
-          <p className="text-gray-300 mb-4">No category specified.</p>
+          <p className="text-gray-300 mb-4">{t("noCategory")}</p>
           <button
             onClick={() => router.push("/")}
             className="btn-primary min-h-[44px] px-6 py-3 focus-ring"
           >
-            Go home
+            {tn("home")}
           </button>
         </div>
       </div>
@@ -66,12 +78,12 @@ const Browse = () => {
       <div className="pt-24 px-4 flex flex-col items-center justify-center min-h-[60vh]">
         <div className="glass-panel p-10 rounded-3xl text-center max-w-md w-full">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-gray-300 mb-4">Category not found.</p>
+          <p className="text-gray-300 mb-4">{t("noCategory")}</p>
           <button
             onClick={() => router.push("/")}
             className="btn-primary min-h-[44px] px-6 py-3 focus-ring"
           >
-            Go home
+            {tn("home")}
           </button>
         </div>
       </div>
@@ -86,9 +98,9 @@ const Browse = () => {
             <Sparkles className="w-6 h-6 text-red-500" />
           </div>
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{config.title}</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{categoryTitle}</h1>
             <p className="text-gray-500 text-sm mt-1">
-              {isLoading ? "Loading…" : `${movies.length} title${movies.length !== 1 ? "s" : ""}`}
+              {isLoading ? tc("loading") : t("titles", { count: movies.length })}
             </p>
           </div>
         </div>
@@ -102,7 +114,7 @@ const Browse = () => {
             <span className="hidden sm:inline">Sort by</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {SORTS.map((s) => (
+            {sorts.map((s) => (
               <button
                 key={s.key}
                 type="button"
@@ -132,12 +144,12 @@ const Browse = () => {
         {isError && !isLoading && (
           <div className="flex flex-col items-center justify-center py-20 text-center glass-panel rounded-2xl max-w-md mx-auto">
             <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-            <p className="text-gray-300 mb-4">Failed to load content.</p>
+            <p className="text-gray-300 mb-4">{tn("tryAgain")}</p>
             <button
               onClick={() => refetch()}
               className="btn-primary min-h-[44px] px-6 py-3 focus-ring"
             >
-              Try again
+              {t("retry")}
             </button>
           </div>
         )}
@@ -159,7 +171,7 @@ const Browse = () => {
           <div className="text-center py-20">
             <div className="glass-panel rounded-2xl border border-white/8 p-10 max-w-md mx-auto">
               <Sparkles className="w-10 h-10 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-300">No titles in this category right now.</p>
+              <p className="text-gray-300">{t("empty")}</p>
             </div>
           </div>
         )}

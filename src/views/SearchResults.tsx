@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
 import Reveal from "@/components/Reveal";
@@ -29,6 +30,7 @@ interface SearchResultItem {
 }
 
 const SearchResults = () => {
+  const t = useTranslations("search");
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const [page, setPage] = useState(1);
@@ -101,7 +103,6 @@ const SearchResults = () => {
   }, [data, page]);
 
   const totalPages = data?.total_pages ?? 1;
-  const totalResults = data?.total_results ?? 0;
   const loading = isLoading || isFetching;
   const hasMore = page < totalPages;
 
@@ -165,14 +166,14 @@ const SearchResults = () => {
   return (
     <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto page-enter">
       <div className="mb-8">
-        <span className="eyebrow">Search</span>
+        <span className="eyebrow">{t("results")}</span>
         <h1 className="display-title text-balance mt-1">
           {query ? (
             <>
-              Results for <span className="gradient-text">&quot;{query}&quot;</span>
+              {t("results")} <span className="gradient-text">&quot;{query}&quot;</span>
             </>
           ) : (
-            "Find your next favorite"
+            t("findFavorite")
           )}
         </h1>
       </div>
@@ -185,7 +186,7 @@ const SearchResults = () => {
             id="search-input"
             type="search"
             defaultValue={query}
-            placeholder="Search movies, TV shows, people..."
+            placeholder={t("placeholderLong")}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 const val = (e.target as HTMLInputElement).value;
@@ -237,7 +238,7 @@ const SearchResults = () => {
         <div className="text-center py-16">
           <div className="glass-panel rounded-3xl p-10 max-w-md mx-auto">
             <Search className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-gray-300">Enter a search term to find movies, TV shows, and more.</p>
+            <p className="text-gray-300">{t("findFavorite")}</p>
           </div>
         </div>
       ) : loading && allResults.length === 0 ? (
@@ -250,8 +251,8 @@ const SearchResults = () => {
           <div className="text-center py-16">
             <div className="glass-panel rounded-3xl p-10 max-w-md mx-auto">
               <Search className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-300">No results found for &quot;{query}&quot;</p>
-              <p className="mt-2 text-sm text-gray-500">Try a different keyword or check spelling.</p>
+              <p className="text-gray-300">{t("noResults")}</p>
+              <p className="mt-2 text-sm text-gray-500">{t("tryDifferent")}</p>
             </div>
           </div>
         ) : (
@@ -264,7 +265,7 @@ const SearchResults = () => {
 
             {sortedResults.length > 0 && (
               <Reveal as="section" className="stagger mb-12 content-auto">
-                <SectionHeader title="Movies & TV Shows" eyebrow="Results" />
+                <SectionHeader title={t("moviesAndTv")} eyebrow={t("results")} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 mt-2">
                   {sortedResults.map((item) => (
                     <div key={`${item.id}-${item.media_type}`} className="hover-lift-sm rounded-2xl">
@@ -277,7 +278,7 @@ const SearchResults = () => {
 
             {filteredPeople.length > 0 && (
               <Reveal as="section" className="mb-12 content-auto">
-                <SectionHeader title="People" eyebrow="Cast & Crew" />
+                <SectionHeader title={t("people")} eyebrow={t("castAndCrew")} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-2">
                   {filteredPeople.map((person) => (
                     <a

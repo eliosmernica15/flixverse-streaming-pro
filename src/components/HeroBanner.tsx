@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 import { useDominantColors } from "@/hooks/player/useDominantColors";
 import { rgbToCss } from "@/lib/player/extractDominantColors";
+import { useTranslations } from "next-intl";
 
 interface HeroBannerProps {
   /** Single movie or array for rotation */
@@ -31,6 +32,8 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const t = useTranslations("hero");
+  const tCommon = useTranslations("common");
   const { isAuthenticated } = useAuth();
   const { addToList, isInList } = useUserMovieListContext();
   const { toast } = useToast();
@@ -105,8 +108,8 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const handlePlayClick = () => {
     if (!isAuthenticated) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in or sign up to watch movies and TV shows.",
+        title: t("signInRequired"),
+        description: t("signInToWatch"),
         variant: "destructive",
       });
       setTimeout(() => router.push("/auth"), 1500);
@@ -121,14 +124,14 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
   const handleAddToList = async () => {
     if (!isAuthenticated) {
-      toast({ title: "Sign in required", description: "Please sign in to add movies to your list", variant: "destructive" });
+      toast({ title: t("signInRequired"), description: t("signInForList"), variant: "destructive" });
       return;
     }
     try {
       await addToList(currentMovie);
-      toast({ title: "Added to list", description: `${title} has been added to your list` });
+      toast({ title: t("addedToList"), description: t("addedDesc", { title }) });
     } catch (error: unknown) {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Something went wrong", variant: "destructive" });
+      toast({ title: t("error"), description: error instanceof Error ? error.message : t("somethingWrong"), variant: "destructive" });
     }
   };
 
@@ -170,13 +173,13 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
            <div className="max-w-3xl animate-fade-in-up" key={currentMovie.id}>
              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-5">
-               <span className="eyebrow">{releaseYear ? `${releaseYear}` : "Now Streaming"}</span>
+               <span className="eyebrow">{releaseYear ? `${releaseYear}` : t("nowStreaming")}</span>
                <span className="chip bg-gradient-to-r from-red-600 to-red-500 text-white border-0 shadow-lg shadow-red-500/20">
-                 {currentMovie.media_type === "tv" ? "Series" : "Movie"}
+                 {currentMovie.media_type === "tv" ? tCommon("series") : tCommon("movie")}
                </span>
                <span className="chip glass-card">
                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                 <span>Featured</span>
+                 <span>{t("featured")}</span>
                </span>
              </div>
 
@@ -190,9 +193,9 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
                  <span>{currentMovie.vote_average?.toFixed(1)}</span>
                </span>
                <span className="chip glass-card">
-                 {currentMovie.media_type === "tv" ? "TV Series" : "Feature Film"}
+                 {currentMovie.media_type === "tv" ? t("tvSeries") : t("featureFilm")}
                </span>
-               <span className="chip glass-card">HD Available</span>
+               <span className="chip glass-card">{t("hdAvailable")}</span>
              </div>
 
             <p className="text-sm sm:text-base md:text-lg mb-6 sm:mb-8 text-gray-300 leading-relaxed line-clamp-3 max-w-2xl">
@@ -202,13 +205,13 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
             <div className="flex flex-wrap items-center gap-2 sm:gap-4">
               <button onClick={handlePlayClick} className="btn-primary group flex items-center space-x-2 sm:space-x-3 px-5 py-3 sm:px-8 sm:py-4 text-base sm:text-lg hover:scale-[1.02] active:scale-[0.98] press-effect btn-shine focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
                 <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-current group-hover:scale-110 transition-transform" />
-                <span>Play Now</span>
+                <span>{t("playNow")}</span>
               </button>
               <button onClick={handleAddToList} className="btn-glass group flex items-center space-x-2 sm:space-x-3 px-5 py-3 sm:px-8 sm:py-4 text-base sm:text-lg font-semibold hover:scale-[1.02] active:scale-[0.98] press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70">
                 {isInMyList ? <Check className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" /> : <Plus className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-90 transition-transform duration-300" />}
-                <span>{isInMyList ? "In My List" : "Add to List"}</span>
+                <span>{isInMyList ? t("inList") : t("addToList")}</span>
               </button>
-              <button onClick={handleMoreInfo} className="group p-3 sm:p-4 glass-card rounded-xl hover:bg-white/15 transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black" title="More Info">
+              <button onClick={handleMoreInfo} className="group p-3 sm:p-4 glass-card rounded-xl hover:bg-white/15 transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black" title={t("moreInfo")}>
                 <Info className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </button>
             </div>
@@ -224,10 +227,10 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
           <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
             {/* Prev/Next arrows */}
             <div className="hidden sm:flex items-center gap-2">
-              <button onClick={goPrev} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label="Previous title">
+              <button onClick={goPrev} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label={t("prevTitle")}>
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button onClick={goNext} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label="Next title">
+              <button onClick={goNext} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label={t("nextTitle")}>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

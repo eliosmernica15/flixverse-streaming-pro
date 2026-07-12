@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { localeQueryKey } from "@/i18n/config";
+import { useLocale } from "@/hooks/useLocale";
 import { getUpcomingMoviesOnly } from "@/utils/popularMoviesRotator";
 import {
   fetchTrendingMovies,
@@ -73,15 +75,17 @@ export async function loadMoviesCatalog(): Promise<Record<string, TMDBMovie[]>> 
 }
 
 export function useMoviesCatalog() {
+  const locale = useLocale();
+
   const priority = useQuery({
-    queryKey: MOVIES_PRIORITY_KEY,
+    queryKey: localeQueryKey(MOVIES_PRIORITY_KEY, locale),
     queryFn: () => loadSections(PRIORITY_SECTIONS),
     staleTime: STALE,
     gcTime: GC,
   });
 
   const deferred = useQuery({
-    queryKey: MOVIES_DEFERRED_KEY,
+    queryKey: localeQueryKey(MOVIES_DEFERRED_KEY, locale),
     queryFn: () => loadSections(DEFERRED_SECTIONS),
     enabled: priority.isSuccess,
     staleTime: STALE,

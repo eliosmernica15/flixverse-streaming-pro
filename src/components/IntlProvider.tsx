@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { NextIntlClientProvider } from "next-intl";
-import { defaultLocale, LOCALE_STORAGE_KEY, type Locale, locales } from "@/i18n/config";
+import { defaultLocale, getStoredLocale, localeToHtmlLang, LOCALE_STORAGE_KEY, type Locale, locales } from "@/i18n/config";
 import enMessages from "../../messages/en.json";
+import { HtmlLangSetter } from "./HtmlLangSetter";
 
 export function IntlProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocale] = useState<Locale>(defaultLocale);
@@ -19,6 +20,7 @@ export function IntlProvider({ children }: { children: React.ReactNode }) {
     }
 
     setLocale(active);
+    document.documentElement.lang = localeToHtmlLang(active);
     if (active === defaultLocale) {
       setMessages(enMessages);
       return;
@@ -31,6 +33,7 @@ export function IntlProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
+      <HtmlLangSetter />
       {children}
     </NextIntlClientProvider>
   );

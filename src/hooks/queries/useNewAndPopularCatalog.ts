@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { localeQueryKey } from "@/i18n/config";
+import { useLocale } from "@/hooks/useLocale";
 import { getUpcomingMoviesOnly } from "@/utils/popularMoviesRotator";
 import {
   fetchTrendingMovies,
@@ -53,8 +55,9 @@ export async function loadNewAndPopular() {
 }
 
 export function useNewAndPopularCatalog() {
+  const locale = useLocale();
   return useQuery({
-    queryKey: NEW_AND_POPULAR_KEY,
+    queryKey: localeQueryKey(NEW_AND_POPULAR_KEY, locale),
     queryFn: loadNewAndPopular,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

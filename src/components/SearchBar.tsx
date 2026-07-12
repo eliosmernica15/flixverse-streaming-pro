@@ -1,6 +1,8 @@
+"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Search, X, User, Film, Tv } from "lucide-react";
 import { TMDBMovie, TMDBPerson, searchMulti, searchPeople, getContentImage } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +39,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
   const listRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const t = useTranslations("search");
 
   useEffect(() => {
     const focusSearch = () => {
@@ -98,8 +101,8 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
       } catch (error) {
         console.error('Search error:', error);
         toast({
-          title: "Search Error",
-          description: "Failed to search content. Please try again.",
+          title: t("error"),
+          description: t("errorDesc"),
           variant: "destructive"
         });
       }
@@ -108,7 +111,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
 
     const debounceTimer = setTimeout(searchContent, 300);
     return () => clearTimeout(debounceTimer);
-  }, [query, toast]);
+  }, [query, toast, t]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -212,8 +215,8 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
               }
             }
           }}
-          placeholder="Search movies, TV & people..."
-          aria-label="Search movies, TV shows and people"
+          placeholder={t("placeholder")}
+          aria-label={t("ariaLabel")}
           aria-keyshortcuts="/"
           className="input-field pl-10 pr-16 py-2.5 text-sm"
         />

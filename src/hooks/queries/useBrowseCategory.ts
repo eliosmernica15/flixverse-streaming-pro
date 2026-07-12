@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { localeQueryKey } from "@/i18n/config";
+import { useLocale } from "@/hooks/useLocale";
 import { BROWSE_CATEGORIES, normalizeBrowseMovie } from "@/utils/browseCategories";
 
 export const BROWSE_STALE_TIME = 10 * 60 * 1000;
@@ -14,10 +16,11 @@ export async function loadBrowseCategory(category: string) {
 }
 
 export function useBrowseCategory(category: string | undefined) {
+  const locale = useLocale();
   const config = category ? BROWSE_CATEGORIES[category] : null;
 
   return useQuery({
-    queryKey: ["browse", category],
+    queryKey: localeQueryKey(["browse", category], locale),
     queryFn: () => loadBrowseCategory(category!),
     enabled: Boolean(config),
     staleTime: BROWSE_STALE_TIME,

@@ -89,7 +89,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
             <head>
                 <link rel="preconnect" href="https://api.themoviedb.org" />
                 <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />

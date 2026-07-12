@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
+import {
+  defaultLocale,
+  isValidLocale,
+  LOCALE_STORAGE_KEY,
+  localeToTmdbLanguage,
+} from "@/i18n/config";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
@@ -23,6 +29,12 @@ export async function GET(
   const tmdbParams = new URLSearchParams();
   for (const [key, value] of url.searchParams.entries()) {
     tmdbParams.set(key, value);
+  }
+
+  if (!tmdbParams.has("language")) {
+    const cookieLocale = request.cookies.get(LOCALE_STORAGE_KEY)?.value;
+    const locale = isValidLocale(cookieLocale) ? cookieLocale : defaultLocale;
+    tmdbParams.set("language", localeToTmdbLanguage(locale));
   }
 
   // Inject API key or Bearer token

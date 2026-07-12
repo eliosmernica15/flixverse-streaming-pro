@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Crown, Zap, ArrowRight, Sparkles, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/Reveal";
@@ -27,75 +28,56 @@ type Plan = {
   yearly: number;
 };
 
-const PLANS: Plan[] = [
-  {
-    id: "free",
-    name: "Free",
-    subtitle: "For casual viewers",
+const PLAN_META: Record<
+  PlanId,
+  { icon: typeof Zap; accent: string; popular: boolean; monthly: number; yearly: number }
+> = {
+  free: {
     icon: Zap,
     accent: "from-slate-400 to-slate-600",
-    features: [
-      "Unlimited browsing",
-      "Watch history tracking",
-      "Personalized recommendations",
-      "Up to 1 profile",
-      "Standard video quality",
-    ],
-    cta: "Get Started",
     popular: false,
     monthly: 0,
     yearly: 0,
   },
-  {
-    id: "standard",
-    name: "Standard",
-    subtitle: "For everyday streaming",
+  standard: {
     icon: Sparkles,
     accent: "from-red-500 to-orange-600",
-    features: [
-      "Everything in Free",
-      "FlixParty co-watching",
-      "Timeline comments",
-      "Up to 3 profiles",
-      "HD video quality",
-      "Offline caching",
-      "Priority support",
-    ],
-    cta: "Start Free Trial",
     popular: true,
     monthly: 9.99,
     yearly: 99.99,
   },
-  {
-    id: "premium",
-    name: "Premium",
-    subtitle: "The ultimate experience",
+  premium: {
     icon: Crown,
     accent: "from-yellow-500 to-amber-600",
-    features: [
-      "Everything in Standard",
-      "Up to 5 profiles",
-      "Kids profiles with parental controls",
-      "4K video quality",
-      "Ambient glow effects",
-      "Spoiler guard",
-      "Early access to new features",
-      "Priority support",
-    ],
-    cta: "Start Free Trial",
     popular: false,
     monthly: 15.99,
     yearly: 159.99,
   },
-];
+};
 
 export function PlansPricing() {
+  const t = useTranslations("plans");
   const [yearly, setYearly] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
   const { user } = useAuth();
   const { subscription, hasStandard, hasPremium } = useSubscription();
   const { toast } = useToast();
   const router = useRouter();
+
+  const plans = useMemo<Plan[]>(() => {
+    return (["free", "standard", "premium"] as PlanId[]).map((id) => {
+      const meta = PLAN_META[id];
+      const features = t.raw(`${id}.features`) as string[];
+      return {
+        id,
+        name: t(`${id}.name`),
+        subtitle: t(`${id}.subtitle`),
+        cta: t(`${id}.cta`),
+        features: Array.isArray(features) ? features : [],
+        ...meta,
+      };
+    });
+  }, [t]);
 
   const handleCheckout = async (plan: Plan) => {
     if (plan.id === "free") {
@@ -122,15 +104,15 @@ export function PlansPricing() {
       const data = await res.json();
       if (!res.ok) {
         toast({
-          title: "Checkout unavailable",
-          description: data.error || "Stripe is not configured yet.",
+          title: t("checkoutUnavailable"),
+          description: data.error || t("stripeNotConfigured"),
           variant: "destructive",
         });
         return;
       }
       if (data.url) window.location.href = data.url;
     } catch {
-      toast({ title: "Checkout failed", variant: "destructive" });
+      toast({ title: t("checkoutFailed"), variant: "destructive" });
     } finally {
       setLoadingPlan(null);
     }
@@ -168,7 +150,7 @@ export function PlansPricing() {
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            Monthly
+            {t("monthly")}
           </button>
           <button
             type="button"
@@ -179,9 +161,9 @@ export function PlansPricing() {
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            Yearly
+            {t("yearly")}
             <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/15">
-              Save 20%
+              {t("save20")}
             </span>
           </button>
         </div>
@@ -191,19 +173,19 @@ export function PlansPricing() {
             onClick={handleManage}
             className="text-xs text-gray-400 hover:text-white underline"
           >
-            Manage billing
+            {t("manageBilling")}
           </button>
         )}
       </div>
 
       <Reveal className="stagger grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-        {PLANS.map((plan) => {
+        {plans.map((plan) => {
           const Icon = plan.icon;
           const price = plan.monthly === 0 ? "$0" : yearly ? `$${plan.yearly}` : `$${plan.monthly}`;
-          const period = plan.monthly === 0 ? "forever" : yearly ? "/year" : "/month";
+          const period = plan.monthly === 0 ? t("forever") : yearly ? t("perYear") : t("perMonth");
           const current = isCurrentPlan(plan);
           return (
-            <div key={plan.name} className={`relative rounded-2xl p-[1px] ${plan.popular ? "gradient-border" : ""}`}>
+            <div key={plan.id} className={`relative rounded-2xl p-[1px] ${plan.popular ? "gradient-border" : ""}`}>
               <div
                 className={`h-full rounded-2xl p-6 lg:p-8 flex flex-col ${
                   plan.popular ? "surface-elevated glow-ring" : "glass-panel"
@@ -212,13 +194,13 @@ export function PlansPricing() {
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <Badge variant="gradient" className="shadow-lg">
-                      Most Popular
+                      {t("mostPopular")}
                     </Badge>
                   </div>
                 )}
                 {current && (
                   <div className="absolute -top-3 right-4">
-                    <Badge className="bg-green-600/90">Current plan</Badge>
+                    <Badge className="bg-green-600/90">{t("currentPlan")}</Badge>
                   </div>
                 )}
 
@@ -264,7 +246,7 @@ export function PlansPricing() {
                     {loadingPlan === plan.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : current ? (
-                      "Current Plan"
+                      t("currentPlan")
                     ) : (
                       <>
                         {plan.cta}
@@ -280,7 +262,7 @@ export function PlansPricing() {
       </Reveal>
 
       <p className="text-center text-gray-500 text-xs mt-10">
-        All paid plans include a 7-day free trial. Cancel anytime. No charges during trial.
+        {t("trialNote")}
       </p>
     </div>
   );

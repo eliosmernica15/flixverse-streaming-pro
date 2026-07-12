@@ -1,3 +1,4 @@
+import { getCurrentTmdbLanguage, localeToTmdbLanguage } from '@/i18n/config';
 import { getEnv } from './env';
 
 const TMDB_API_KEY = getEnv('NEXT_PUBLIC_TMDB_API_KEY');
@@ -92,6 +93,10 @@ export interface TMDBPerson {
   job?: string;
   known_for_department?: string;
   known_for?: TMDBMovie[];
+  biography?: string;
+  birthday?: string;
+  place_of_birth?: string;
+  deathday?: string | null;
 }
 
 export interface TMDBGenre {
@@ -145,26 +150,79 @@ const setCachedResponse = (url: string, data: unknown): void => {
   });
 };
 
+const setLanguageParam = (url: string, language: string, force = false): string => {
+  const qIndex = url.indexOf('?');
+  const path = qIndex === -1 ? url : url.slice(0, qIndex);
+  const params = new URLSearchParams(qIndex === -1 ? '' : url.slice(qIndex + 1));
+  if (force || !params.has('language')) {
+    params.set('language', language);
+  }
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+};
+
+const appendLanguageParam = (url: string, language?: string): string =>
+  setLanguageParam(url, language ?? getCurrentTmdbLanguage(), false);
+
+const isDetailResponse = (data: Record<string, unknown>): boolean =>
+  Boolean(data.id && !Array.isArray(data.results));
+
+const needsAlbanianFallback = (data: Record<string, unknown>): boolean => {
+  const title = String(data.title || data.name || '').trim();
+  const overview = String(data.overview || '').trim();
+  return !title || !overview;
+};
+
+/** For sq-AL: fill empty title/overview from English TMDB data. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const applyAlbanianFallback = async (localizedUrl: string, data: any): Promise<any> => {
+  if (getCurrentTmdbLanguage() !== 'sq-AL' || !isDetailResponse(data) || !needsAlbanianFallback(data)) {
+    return data;
+  }
+
+  const enUrl = setLanguageParam(localizedUrl, localeToTmdbLanguage('en'), true);
+
+  try {
+    const response = await fetch(enUrl, {
+      ...options,
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return data;
+    const enData = await response.json();
+    return {
+      ...data,
+      title: data.title || enData.title,
+      name: data.name || enData.name,
+      overview: data.overview || enData.overview,
+      tagline: data.tagline || enData.tagline,
+    };
+  } catch {
+    return data;
+  }
+};
+
 // Enhanced API calls with caching, deduplication, and retry logic
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const apiCall = async (url: string, retries: number = 2): Promise<any> => {
+  const localizedUrl = appendLanguageParam(url);
+
   // Check cache first
-  const cached = getCachedResponse(url);
+  const cached = getCachedResponse(localizedUrl);
   if (cached) {
     return cached;
   }
 
   // Check for pending request to the same URL (deduplication)
-  if (pendingRequests.has(url)) {
-    if (isDev) console.log(`Request deduplication: ${url}`);
-    return pendingRequests.get(url);
+  if (pendingRequests.has(localizedUrl)) {
+    if (isDev) console.log(`Request deduplication: ${localizedUrl}`);
+    return pendingRequests.get(localizedUrl);
   }
 
   // Create the request promise
   const requestPromise = (async () => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const response = await fetch(url, {
+        const response = await fetch(localizedUrl, {
           ...options,
           signal: AbortSignal.timeout(15_000),
         });
@@ -177,13 +235,14 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
         }
 
         const data = await response.json();
-        const result = { ...data, success: true };
+        const withFallback = await applyAlbanianFallback(localizedUrl, data);
+        const result = { ...withFallback, success: true };
 
-        setCachedResponse(url, result);
+        setCachedResponse(localizedUrl, result);
         return result;
       } catch (error) {
         // ALWAYS log errors in production for debugging if possible, or at least provide better context
-        console.error(`TMDB API call failed (attempt ${attempt + 1}) for ${url}:`, error);
+        console.error(`TMDB API call failed (attempt ${attempt + 1}) for ${localizedUrl}:`, error);
 
         if (attempt === retries) {
           return { results: [], success: false, error: (error as Error).message };
@@ -194,7 +253,7 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
   })();
 
   // Store pending request
-  pendingRequests.set(url, requestPromise);
+  pendingRequests.set(localizedUrl, requestPromise);
 
   try {
     return await requestPromise;
@@ -219,11 +278,9 @@ export const fetchPopularMovies = async (): Promise<TMDBMovie[]> => {
   return data.results || [];
 };
 
-/** Upcoming movies (Coming soon) - uses TMDB movie/upcoming with language and page. */
+/** Upcoming movies (Coming soon) - uses TMDB movie/upcoming with page. */
 export const fetchUpcomingMovies = async (page: number = 1): Promise<TMDBMovie[]> => {
-  const data = await apiCall(
-    `${TMDB_BASE_URL}/movie/upcoming?language=en-US&page=${page}`
-  );
+  const data = await apiCall(`${TMDB_BASE_URL}/movie/upcoming?page=${page}`);
   return data.results || [];
 };
 

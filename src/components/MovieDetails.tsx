@@ -1,8 +1,10 @@
+"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useTranslations } from "next-intl";
 import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2, Download } from "lucide-react";
 import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, isNotReleasedYet } from "@/utils/tmdbApi";
 import { useContentDetails } from "@/hooks/queries/useContentDetails";
@@ -42,11 +44,14 @@ interface MovieDetailsProps {
 }
 
 const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePosition, initialSeason, initialEpisode, initialServer }: MovieDetailsProps) => {
+  const t = useTranslations("details");
+  const tc = useTranslations("common");
+  const tn = useTranslations("nav");
   const router = useRouter();
   const searchParams = useSearchParams();
   const guestJoinMode = searchParams.get("guest") === "1";
   const { data: content = null, isLoading: loading, isError } = useContentDetails(movieId, mediaType);
-  const error = isError ? "Failed to load content details" : null;
+  const error = isError ? t("loadError") : null;
   const [showPlayer, setShowPlayer] = useState(false);
   const [playerSession, setPlayerSession] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
@@ -137,8 +142,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
     if (!isAuthenticated) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in to add items to your list.",
+        title: t("signInRequired"),
+        description: t("signInForList"),
         variant: "destructive",
       });
       return;
@@ -150,8 +155,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       if (isCurrentlyInList) {
         await removeFromList(movieId);
         toast({
-          title: "Removed from My List",
-          description: `${contentTitle} has been removed from your list.`,
+          title: t("removedFromList"),
+          description: contentTitle,
         });
       } else {
         const movieData: TMDBMovie = {
@@ -161,14 +166,14 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         };
         await addToList(movieData);
         toast({
-          title: "Added to My List",
-          description: `${contentTitle} has been added to your list.`,
+          title: t("addedToList"),
+          description: contentTitle,
         });
       }
     } catch (error: unknown) {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update your list.",
+        title: t("listError"),
+        description: error instanceof Error ? error.message : t("listError"),
         variant: "destructive",
       });
     }
@@ -178,8 +183,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     // Check if user is authenticated
     if (!isAuthenticated) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in or sign up to watch movies and TV shows.",
+        title: t("signInRequired"),
+        description: t("signInToWatch"),
         variant: "destructive",
       });
       // Redirect to auth page after a short delay
@@ -199,10 +204,10 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
     openPlayer();
     toast({
-      title: "Now Playing",
+      title: t("nowPlaying"),
       description: isTVShow
-        ? `Loading ${contentTitle} - Season ${selectedSeason}, Episode ${episodeToPlay}...`
-        : `Loading ${contentTitle}...`,
+        ? t("playingEpisode", { season: selectedSeason, episode: episodeToPlay })
+        : t("playingTitle", { title: contentTitle }),
     });
   };
 
@@ -215,13 +220,13 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     if (trailer) {
       window.open(`https://www.youtube.com/watch?v=${trailer.key}`, '_blank');
       toast({
-        title: "Trailer Playing",
-        description: `Opening ${contentTitle} trailer...`,
+        title: t("trailerPlaying"),
+        description: t("openingTrailer", { title: contentTitle }),
       });
     } else {
       toast({
-        title: "No Trailer Available",
-        description: `Sorry, no trailer found for ${contentTitle}`,
+        title: t("noTrailer"),
+        description: t("noTrailerDesc", { title: contentTitle }),
         variant: "destructive"
       });
     }
@@ -238,7 +243,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       }
     } else {
       await navigator.clipboard.writeText(url);
-      toast({ title: "Link copied!", description: `${contentTitle} link copied to clipboard.` });
+      toast({ title: t("linkCopied"), description: t("linkCopiedDesc", { title: contentTitle }) });
     }
   };
 
@@ -246,8 +251,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     if (!content) return;
     if (!hasPremium) {
       toast({
-        title: "Premium required",
-        description: "Offline downloads are available on the Premium plan.",
+        title: t("premiumRequired"),
+        description: t("premiumDownload"),
         variant: "destructive",
       });
       return;
@@ -271,13 +276,13 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       });
       trackDownload(content.id, isTvContent ? "tv" : "movie");
       toast({
-        title: "Download started",
-        description: `${contentTitle} is being saved for offline use.`,
+        title: t("downloadStarted"),
+        description: contentTitle,
       });
     } catch {
       toast({
-        title: "Download failed",
-        description: "Could not start the download. Try again later.",
+        title: t("downloadFailed"),
+        description: t("downloadFailedDesc"),
         variant: "destructive",
       });
     }
@@ -290,7 +295,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           <div className="relative mb-6">
             <div className="w-16 h-16 border-4 border-red-500/30 border-t-red-500 rounded-full animate-spin"></div>
           </div>
-          <p className="text-gray-400">Loading...</p>
+          <p className="text-gray-400">{t("loading")}</p>
         </div>
       </div>
     );
@@ -303,13 +308,13 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <X className="w-8 h-8 text-red-500" />
           </div>
-          <h2 className="text-white text-xl font-bold mb-2">{error || 'Content not found'}</h2>
-          <p className="text-gray-400 mb-6">We couldn't load this content. Please try again.</p>
+          <h2 className="text-white text-xl font-bold mb-2">{error || t("loadError")}</h2>
+          <p className="text-gray-400 mb-6">{t("loadError")}</p>
           <button
             onClick={handleClose}
             className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105"
           >
-            Go Back
+            {t("back")}
           </button>
         </div>
       </div>
@@ -338,7 +343,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           className="fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] sm:top-6 sm:left-6 z-[999] flex items-center space-x-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur-xl transition-all duration-300 group cursor-pointer hover:bg-white/10 focus-ring sm:px-4"
         >
           <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-x-1 transition-transform" />
-          <span className="text-white text-xs sm:text-sm font-medium">Back</span>
+          <span className="text-white text-xs sm:text-sm font-medium">{t("back")}</span>
         </button>
 
         {/* Hero Section */}
@@ -361,7 +366,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               <div className="flex items-center space-x-3 mb-4 sm:mb-6">
                 <span className="badge-shine inline-flex items-center space-x-1.5 rounded-full bg-red-600 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white sm:px-3 sm:py-1.5">
                   {isTV ? <Tv className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <Film className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
-                  <span>{isTV ? 'TV Series' : 'Movie'}</span>
+                  <span>{isTV ? tc("series") : tc("movie")}</span>
                 </span>
                 {content.vote_average > 7.5 && !isUnreleased && (
                   <span className="rounded-full bg-yellow-500/20 px-2 py-1.5 text-[10px] font-bold text-yellow-400 sm:px-3 sm:py-1.5">
@@ -370,7 +375,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 )}
                 {isUnreleased && (
                   <span className="rounded-full bg-amber-500/30 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-400 sm:px-3 sm:py-1.5">
-                    Coming Soon
+                    {t("comingSoon")}
                   </span>
                 )}
               </div>
@@ -406,7 +411,11 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 {isTV && content.number_of_seasons && (
                   <span className="chip glass-card">
                     <Users className="h-3.5 w-3.5" />
-                    <span>{content.number_of_seasons} Season{content.number_of_seasons > 1 ? 's' : ''}</span>
+                    <span>
+                      {content.number_of_seasons > 1
+                        ? t("seasonsPlural", { count: content.number_of_seasons })
+                        : t("seasons", { count: content.number_of_seasons })}
+                    </span>
                   </span>
                 )}
               </div>
@@ -434,7 +443,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     {/* Season Selector */}
                     <div className="flex-1">
-                      <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">Season</label>
+                      <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">{t("season")}</label>
                       <select
                         value={selectedSeason}
                         onChange={(e) => {
@@ -448,7 +457,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                           .filter(season => season.season_number > 0)
                           .map((season) => (
                             <option key={season.id} value={season.season_number} className="bg-gray-900 text-white">
-                              Season {season.season_number} ({season.episode_count} eps)
+                              {t("season")} {season.season_number} ({season.episode_count} eps)
                             </option>
                           ))}
                       </select>
@@ -456,7 +465,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
                     {/* Episode Selector */}
                     <div className="flex-1">
-                      <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">Episode</label>
+                      <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">{t("episode")}</label>
                       <select
                         value={selectedEpisode}
                         onChange={(e) => setSelectedEpisode(Number(e.target.value))}
@@ -468,7 +477,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                           (_, i) => i + 1
                         ).map((ep) => (
                           <option key={ep} value={ep} className="bg-gray-900 text-white">
-                            Episode {ep}
+                            {t("episode")} {ep}
                           </option>
                         ))}
                       </select>
@@ -483,7 +492,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                       </div>
                       <div>
                         <p className="text-white font-bold text-sm sm:text-base">S{selectedSeason} E{selectedEpisode}</p>
-                        <p className="text-gray-400 text-xs sm:text-sm">Ready to stream</p>
+                        <p className="text-gray-400 text-xs sm:text-sm">{t("readyToStream")}</p>
                       </div>
                     </div>
                     {!isUnreleased && (
@@ -492,7 +501,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                         className="bg-red-600 hover:bg-red-500 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-full font-semibold transition-all hover:scale-105 flex items-center space-x-1.5 sm:space-x-2 text-sm sm:text-base"
                       >
                         <Play className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
-                        <span>Play</span>
+                        <span>{tc("play")}</span>
                       </button>
                     )}
                   </div>
@@ -507,7 +516,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     className="btn-primary group inline-flex items-center space-x-3 rounded-full px-8 py-4 text-lg font-bold shadow-2xl shadow-white/20 transition-all duration-300 hover:scale-105 focus-ring"
                   >
                     <Play className="h-6 w-6 fill-current group-hover:scale-110 transition-transform" />
-                    <span>{isTV ? `Play S${selectedSeason}E${selectedEpisode}` : 'Play Now'}</span>
+                    <span>{isTV ? `${tc("play")} S${selectedSeason}E${selectedEpisode}` : tc("play")}</span>
                   </button>
                 )}
 
@@ -516,7 +525,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   className="btn-glass group inline-flex items-center space-x-3 rounded-full border border-white/20 px-6 py-4 font-semibold text-white transition-all duration-300 hover:scale-105 focus-ring"
                 >
                   <Play className="h-5 w-5" />
-                  <span>Trailer</span>
+                  <span>{t("trailer")}</span>
                 </button>
 
                 <button
@@ -526,7 +535,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     ? 'border-red-500 bg-red-500 text-white'
                     : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
                     } ${(isOperating(movieId) || loadingList) ? 'cursor-not-allowed opacity-50' : ''}`}
-                  title={isInList(movieId) ? 'Remove from List' : 'Add to List'}
+                  title={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
                 >
                   {isOperating(movieId) ? (
                     <Loader2 className="h-6 w-6 animate-spin" />
@@ -538,7 +547,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 <button
                   onClick={handleDownload}
                   className="group rounded-full border border-white/20 bg-white/10 p-4 text-white transition-all duration-300 hover:scale-110 hover:bg-white/20 focus-ring"
-                  title={hasPremium ? "Download for offline" : "Premium required"}
+                  title={hasPremium ? tc("download") : t("premiumRequired")}
                 >
                   <Download className={`h-6 w-6 ${!hasPremium ? "opacity-60" : ""}`} />
                 </button>
@@ -546,7 +555,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 <button
                   onClick={handleShare}
                   className="group rounded-full border border-white/20 bg-white/10 p-4 text-white transition-all duration-300 hover:scale-110 hover:bg-white/20 focus-ring"
-                  title="Share"
+                  title={tc("share")}
                 >
                   <Share2 className="h-6 w-6" />
                 </button>
@@ -569,7 +578,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
             <BreadcrumbNav
               items={[
                 {
-                  label: isTV ? "TV Shows" : "Movies",
+                  label: isTV ? tn("tvShows") : tn("movies"),
                   href: isTV ? "/tv-shows" : "/movies",
                 },
                 { label: contentTitle },
@@ -584,7 +593,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
             <div className="max-w-7xl mx-auto">
               {/* Season Selector */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <h2 className="text-2xl md:text-3xl font-bold text-white">Episodes</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-white">{t("episodes")}</h2>
 
                 {/* Season Dropdown */}
                 <div className="relative z-30">
@@ -593,7 +602,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     className="flex items-center space-x-3 bg-white/10 hover:bg-white/15 backdrop-blur-sm px-5 py-3 rounded-xl border border-white/10 transition-all min-w-[200px] justify-between"
                   >
                     <span className="text-white font-medium">
-                      Season {selectedSeason}
+                      {t("season")} {selectedSeason}
                     </span>
                     <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showSeasonDropdown ? 'rotate-180' : ''}`} />
                   </button>
@@ -657,7 +666,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                             ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20 ring-2 ring-red-400/40'
                             : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
                             }`}
-                          aria-label={`Episode ${episodeNum}${selectedEpisode === episodeNum ? ', tap again to play' : ''}`}
+                          aria-label={`${t("episode")} ${episodeNum}${selectedEpisode === episodeNum ? `, ${t("tapToSelect")}` : ''}`}
                         >
                           <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-white' : 'text-red-500 group-hover:text-red-400'}`} />
                           <span className="font-bold text-xs sm:text-sm">E{episodeNum}</span>
@@ -671,16 +680,16 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               {/* Play Selected Episode */}
               <div className="mt-6 sm:mt-8 p-3 sm:p-5 bg-gradient-to-r from-red-600/10 to-transparent rounded-xl sm:rounded-2xl border border-red-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 <div className="text-center sm:text-left">
-                  <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">Ready to play</p>
-                  <p className="text-white text-base sm:text-xl font-bold">Season {selectedSeason}, Episode {selectedEpisode}</p>
-                  <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 sm:mt-1">Tap to select · tap again to play instantly</p>
+                  <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">{t("readyToPlay")}</p>
+                  <p className="text-white text-base sm:text-xl font-bold">{t("seasonEpisode", { season: selectedSeason, episode: selectedEpisode })}</p>
+                  <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 sm:mt-1">{t("tapToSelect")}</p>
                 </div>
                 <button
                   onClick={() => handleWatch()}
                   className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-5 sm:px-8 py-2.5 sm:py-4 rounded-full font-bold text-sm sm:text-lg transition-all duration-300 hover:scale-105 shadow-lg shadow-red-500/30"
                 >
                   <Play className="w-4 h-4 sm:w-6 sm:h-6 fill-current" />
-                  <span>Play S{selectedSeason}E{selectedEpisode}</span>
+                  <span>{tc("play")} S{selectedSeason}E{selectedEpisode}</span>
                 </button>
               </div>
             </div>
@@ -690,11 +699,11 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         {/* Trailer Section */}
         {trailer && (
           <div className="w-full px-4 md:px-16 py-12 md:py-20 bg-gray-900">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 md:mb-12 text-center">Official Trailer</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 md:mb-12 text-center">{t("trailer")}</h2>
             <div className="aspect-video max-w-6xl mx-auto">
               <iframe
                 src={`https://www.youtube.com/embed/${trailer.key}`}
-                title="Content Trailer"
+                title={t("trailer")}
                 className="w-full h-full rounded-lg"
                 allowFullScreen
               ></iframe>
@@ -706,19 +715,19 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         <Tabs defaultValue="overview" className="content-auto w-full px-4 py-12 sm:px-6 md:px-16 md:py-16">
           <div className="max-w-7xl mx-auto">
             <TabsList className="mb-8 flex flex-wrap gap-2">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="cast">Cast &amp; Crew</TabsTrigger>
-              <TabsTrigger value="similar">More Like This</TabsTrigger>
+              <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
+              <TabsTrigger value="cast">{t("cast")}</TabsTrigger>
+              <TabsTrigger value="similar">{t("similar")}</TabsTrigger>
               <TabsTrigger value="reviews">Reviews</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
               <Reveal>
                 <section className="glass-panel rounded-2xl p-6 sm:p-8">
-                  <SectionHeader title={`About ${contentTitle}`} eyebrow="Details & synopsis" />
+                  <SectionHeader title={t("overview")} eyebrow={contentTitle} />
                   <div className="mt-6 grid gap-8 md:grid-cols-2 md:gap-12">
                     <div>
-                      <h3 className="mb-4 text-xl font-semibold text-white sm:text-2xl">Details</h3>
+                      <h3 className="mb-4 text-xl font-semibold text-white sm:text-2xl">{t("overview")}</h3>
                       <div className="space-y-3 text-sm text-gray-300 sm:text-base lg:text-lg">
                         {releaseDate && (
                           <p>
@@ -727,10 +736,10 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                             </span> {new Date(releaseDate).toLocaleDateString()}
                           </p>
                         )}
-                        <p><span className="font-semibold text-white">Rating:</span> {content.vote_average.toFixed(1)}/10</p>
+                        <p><span className="font-semibold text-white">{tc("rating")}:</span> {content.vote_average.toFixed(1)}/10</p>
                         {content.runtime && <p><span className="font-semibold text-white">Runtime:</span> {content.runtime} minutes</p>}
                         {isTV && content.number_of_seasons && (
-                          <p><span className="font-semibold text-white">Seasons:</span> {content.number_of_seasons}</p>
+                          <p><span className="font-semibold text-white">{t("season")}:</span> {content.number_of_seasons}</p>
                         )}
                         {content.genres && (
                           <p><span className="font-semibold text-white">Genres:</span> {content.genres.map(g => g.name).join(', ')}</p>
@@ -738,7 +747,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                       </div>
                     </div>
                     <div>
-                      <h3 className="mb-4 text-xl font-semibold text-white sm:text-2xl">Synopsis</h3>
+                      <h3 className="mb-4 text-xl font-semibold text-white sm:text-2xl">{t("overview")}</h3>
                       <p className="text-sm leading-relaxed text-gray-300 sm:text-base lg:text-lg">{content.overview}</p>
                     </div>
                   </div>
@@ -746,7 +755,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               </Reveal>
               <Reveal className="mt-6">
                 <div className="glass-panel rounded-2xl p-6">
-                  <h3 className="mb-4 text-lg font-semibold text-white">Rate this {isTV ? 'Series' : 'Movie'}</h3>
+                  <h3 className="mb-4 text-lg font-semibold text-white">{isTV ? tc("series") : tc("movie")}</h3>
                   <QuickRating
                     contentId={content.id}
                     contentType={isTV ? 'tv' : 'movie'}
@@ -759,7 +768,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
             <TabsContent value="cast">
               {content.credits && (content.credits.cast.length > 0 || content.credits.crew.length > 0) && (
                 <Reveal>
-                  <SectionHeader title="Cast & Crew" eyebrow="The people behind it" />
+                  <SectionHeader title={t("cast")} />
                   <div className="mt-6">
                     <CastCrewGrid
                       cast={content.credits.cast.map((c) => ({
@@ -785,7 +794,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
             <TabsContent value="similar">
               {relatedContent.length > 0 && (
                 <Reveal>
-                  <SectionHeader title="More Like This" eyebrow="Because you're watching" />
+                  <SectionHeader title={t("similar")} />
                   <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
                     {relatedContent.map((movie, index) => (
                       <MovieCard

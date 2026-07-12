@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, MapPin, User as UserIcon } from "lucide-react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
-import { getImageUrl, TMDBMovie } from "@/utils/tmdbApi";
+import { getImageUrl, TMDBMovie, fetchPersonDetails as fetchPersonFromTmdb } from "@/utils/tmdbApi";
+import { localeQueryKey } from "@/i18n/config";
+import { useLocale } from "@/hooks/useLocale";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
 import Reveal from "@/components/Reveal";
@@ -14,34 +16,25 @@ interface PersonDetailsProps {
   personId: number;
 }
 
-async function fetchPersonDetails(id: number) {
-  const res = await fetch(
-    `https://api.themoviedb.org/3/person/${id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=en-US`
-  );
-  if (!res.ok) throw new Error("Failed to fetch person");
-  return res.json();
-}
-
 async function fetchPersonCredits(id: number) {
-  const res = await fetch(
-    `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=en-US`
-  );
+  const res = await fetch(`/api/tmdb/person/${id}/combined_credits`);
   if (!res.ok) throw new Error("Failed to fetch credits");
   return res.json();
 }
 
 export default function PersonDetails({ personId }: PersonDetailsProps) {
   const router = useRouter();
+  const locale = useLocale();
   const [showFullBio, setShowFullBio] = useState(false);
 
   const { data: person, isLoading: loadingPerson } = useQuery({
-    queryKey: ["person", personId],
-    queryFn: () => fetchPersonDetails(personId),
+    queryKey: localeQueryKey(["person", personId], locale),
+    queryFn: () => fetchPersonFromTmdb(personId),
     staleTime: 1000 * 60 * 60,
   });
 
   const { data: credits, isLoading: loadingCredits } = useQuery({
-    queryKey: ["person-credits", personId],
+    queryKey: localeQueryKey(["person-credits", personId], locale),
     queryFn: () => fetchPersonCredits(personId),
     staleTime: 1000 * 60 * 60,
   });

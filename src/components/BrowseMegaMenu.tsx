@@ -1,63 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { ChevronDown, Film, Tv, TrendingUp, Star, Clock, Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Film, Tv, Star, Zap } from "lucide-react";
 
 interface MenuSection {
   title: string;
   icon: React.ReactNode;
   items: { label: string; href: string }[];
 }
-
-const MENU_SECTIONS: MenuSection[] = [
-  {
-    title: "Browse",
-    icon: <Film className="w-4 h-4" />,
-    items: [
-      { label: "Movies", href: "/movies" },
-      { label: "TV Shows", href: "/tv-shows" },
-      { label: "New & Popular", href: "/new-and-popular" },
-    ],
-  },
-  {
-    title: "Genres",
-    icon: <Zap className="w-4 h-4" />,
-    items: [
-      { label: "Action", href: "/browse/action" },
-      { label: "Comedy", href: "/browse/comedy" },
-      { label: "Drama", href: "/browse/drama" },
-      { label: "Horror", href: "/browse/horror" },
-      { label: "Sci-Fi", href: "/browse/sci-fi" },
-      { label: "Thriller", href: "/browse/thriller" },
-      { label: "Animation", href: "/browse/animation" },
-      { label: "Fantasy", href: "/browse/fantasy" },
-      { label: "Romance", href: "/browse/romance" },
-      { label: "Adventure", href: "/browse/adventure" },
-    ],
-  },
-  {
-    title: "Collections",
-    icon: <Star className="w-4 h-4" />,
-    items: [
-      { label: "Trending Now", href: "/browse/trending-now" },
-      { label: "Top Rated", href: "/browse/top-rated" },
-      { label: "Now Playing", href: "/browse/now-playing" },
-      { label: "Coming Soon", href: "/browse/coming-soon" },
-    ],
-  },
-  {
-    title: "TV",
-    icon: <Tv className="w-4 h-4" />,
-    items: [
-      { label: "Trending TV", href: "/browse/trending-tv" },
-      { label: "Popular TV", href: "/browse/popular-tv" },
-      { label: "Airing Today", href: "/browse/airing-today" },
-      { label: "On The Air", href: "/browse/on-the-air" },
-      { label: "Top Rated TV", href: "/browse/top-rated-tv" },
-    ],
-  },
-];
 
 interface BrowseMegaMenuProps {
   isOpen: boolean;
@@ -66,6 +18,60 @@ interface BrowseMegaMenuProps {
 
 export function BrowseMegaMenu({ isOpen, onClose }: BrowseMegaMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const t = useTranslations("browse");
+  const tn = useTranslations("nav");
+
+  const menuSections = useMemo<MenuSection[]>(
+    () => [
+      {
+        title: t("menuBrowse"),
+        icon: <Film className="w-4 h-4" />,
+        items: [
+          { label: tn("movies"), href: "/movies" },
+          { label: tn("tvShows"), href: "/tv-shows" },
+          { label: tn("newAndPopular"), href: "/new-and-popular" },
+        ],
+      },
+      {
+        title: t("menuGenres"),
+        icon: <Zap className="w-4 h-4" />,
+        items: [
+          { label: t("action"), href: "/browse/action" },
+          { label: t("comedy"), href: "/browse/comedy" },
+          { label: t("drama"), href: "/browse/drama" },
+          { label: t("horror"), href: "/browse/horror" },
+          { label: t("sci-fi"), href: "/browse/sci-fi" },
+          { label: t("thriller"), href: "/browse/thriller" },
+          { label: t("animation"), href: "/browse/animation" },
+          { label: t("fantasy"), href: "/browse/fantasy" },
+          { label: t("romance"), href: "/browse/romance" },
+          { label: t("adventure"), href: "/browse/adventure" },
+        ],
+      },
+      {
+        title: t("menuCollections"),
+        icon: <Star className="w-4 h-4" />,
+        items: [
+          { label: t("trending-now"), href: "/browse/trending-now" },
+          { label: t("top-rated"), href: "/browse/top-rated" },
+          { label: t("now-playing"), href: "/browse/now-playing" },
+          { label: t("coming-soon"), href: "/browse/coming-soon" },
+        ],
+      },
+      {
+        title: t("menuTv"),
+        icon: <Tv className="w-4 h-4" />,
+        items: [
+          { label: t("trending-tv"), href: "/browse/trending-tv" },
+          { label: t("popular-tv"), href: "/browse/popular-tv" },
+          { label: t("airing-today"), href: "/browse/airing-today" },
+          { label: t("on-the-air"), href: "/browse/on-the-air" },
+          { label: t("top-rated-tv"), href: "/browse/top-rated-tv" },
+        ],
+      },
+    ],
+    [t, tn]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -98,7 +104,7 @@ export function BrowseMegaMenu({ isOpen, onClose }: BrowseMegaMenuProps) {
       <div className="glass-strong border-b border-white/5 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-            {MENU_SECTIONS.map((section) => (
+            {menuSections.map((section) => (
               <div key={section.title}>
                 <div className="mb-3 flex items-center gap-2">
                   <span className="text-red-400">{section.icon}</span>
