@@ -45,10 +45,19 @@ const Auth = () => {
   }, [router]);
 
   const signUp = async () => {
-    if (!email || !password) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !password) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (password.length < 8) {
+      toast({
+        title: "Weak password",
+        description: "Use at least 8 characters",
         variant: "destructive",
       });
       return;
@@ -60,17 +69,16 @@ const Auth = () => {
       const auth = getFirebaseAuth();
       if (!auth) throw new Error("Firebase is not configured");
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
       const user = userCredential.user;
 
-      // Update display name
-      const name = displayName || email.split('@')[0];
+      const name = displayName.trim() || trimmedEmail.split('@')[0];
       await updateProfile(user, { displayName: name });
 
-      // Create user profile in Firestore
       const db = requireFirebaseDb();
       await setDoc(doc(db, 'profiles', user.uid), {
         id: user.uid,
+        user_id: user.uid,
         display_name: name,
         avatar_url: null,
         created_at: new Date().toISOString(),
@@ -94,7 +102,8 @@ const Auth = () => {
   };
 
   const signIn = async () => {
-    if (!email || !password) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !password) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
@@ -108,7 +117,7 @@ const Auth = () => {
       const auth = getFirebaseAuth();
       if (!auth) throw new Error("Firebase is not configured");
 
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, trimmedEmail, password);
       toast({
         title: "Welcome back!",
         description: "You have been signed in successfully",
@@ -131,14 +140,15 @@ const Auth = () => {
       if (!auth) throw new Error("Firebase is not configured");
 
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // Create user profile in Firestore if it doesn't exist
       const name = user.displayName || user.email?.split('@')[0] || 'User';
       const db = requireFirebaseDb();
       await setDoc(doc(db, 'profiles', user.uid), {
         id: user.uid,
+        user_id: user.uid,
         display_name: name,
         avatar_url: user.photoURL,
         created_at: new Date().toISOString(),
@@ -149,6 +159,7 @@ const Auth = () => {
         title: "Welcome to FlixVerse!",
         description: "You have been signed in successfully with Google",
       });
+      trackSignup("google");
       router.push('/');
     } catch (error: unknown) {
       toast({
@@ -285,6 +296,7 @@ const Auth = () => {
 
                       {/* Google Sign In Button */}
                       <Button
+                        type="button"
                         onClick={signInWithGoogle}
                         disabled={loading}
                         variant="outline-glow"
@@ -396,6 +408,7 @@ const Auth = () => {
 
                       {/* Google Sign Up Button */}
                       <Button
+                        type="button"
                         onClick={signInWithGoogle}
                         disabled={loading}
                         variant="outline-glow"

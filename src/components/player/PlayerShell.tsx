@@ -433,7 +433,7 @@ export function PlayerShell({
         </div>
 
         {cameraLayout && (
-          <PartyCameraGrid participants={media.participants} />
+          <PartyCameraGrid participants={media.participants} voiceVolume={media.voiceVolume} />
         )}
         </div>
 

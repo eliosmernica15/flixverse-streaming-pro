@@ -3,22 +3,30 @@
 import { useEffect, useRef } from "react";
 import { Mic, MicOff, Video, VideoOff } from "lucide-react";
 import type { PartyMediaParticipant } from "@/hooks/player/usePartyMedia";
+import { VoiceVolumeSlider } from "./PartyMembersPanel";
 
-function RemoteAudioSink({ stream }: { stream: MediaStream }) {
+function RemoteAudioSink({ stream, volume }: { stream: MediaStream; volume: number }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
+    el.volume = volume;
     el.srcObject = stream;
     void el.play().catch(() => undefined);
     return () => {
       el.srcObject = null;
     };
-  }, [stream]);
+  }, [stream, volume]);
   return <audio ref={audioRef} autoPlay playsInline className="sr-only" aria-hidden />;
 }
 
-function CameraTile({ participant }: { participant: PartyMediaParticipant }) {
+function CameraTile({
+  participant,
+  voiceVolume,
+}: {
+  participant: PartyMediaParticipant;
+  voiceVolume: number;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -48,7 +56,7 @@ function CameraTile({ participant }: { participant: PartyMediaParticipant }) {
         </div>
       ) : (
         <>
-          <RemoteAudioSink stream={participant.stream} />
+          <RemoteAudioSink stream={participant.stream} volume={voiceVolume} />
           <div className="party-camera-avatar">
             <span>{participant.displayName.charAt(0).toUpperCase()}</span>
           </div>
@@ -56,7 +64,9 @@ function CameraTile({ participant }: { participant: PartyMediaParticipant }) {
       )}
       <div className="party-camera-tile-bar">
         <span className="party-camera-name">{participant.displayName}</span>
-        {participant.hasAudio ? (
+        {participant.micMutedByHost ? (
+          <MicOff className="w-3 h-3 text-red-400/80" />
+        ) : participant.hasAudio ? (
           participant.isSpeaking ? (
             <Mic className="w-3 h-3 text-emerald-400" />
           ) : (
@@ -73,9 +83,10 @@ function CameraTile({ participant }: { participant: PartyMediaParticipant }) {
 
 interface PartyCameraGridProps {
   participants: PartyMediaParticipant[];
+  voiceVolume?: number;
 }
 
-export function PartyCameraGrid({ participants }: PartyCameraGridProps) {
+export function PartyCameraGrid({ participants, voiceVolume = 1 }: PartyCameraGridProps) {
   const visible = participants.filter((p) => p.hasVideo || p.hasAudio);
   if (!visible.length) return null;
 
@@ -84,7 +95,7 @@ export function PartyCameraGrid({ participants }: PartyCameraGridProps) {
       <p className="party-camera-grid-label">Party ({visible.length})</p>
       <div className="party-camera-grid-scroll">
         {visible.map((p) => (
-          <CameraTile key={p.peerId} participant={p} />
+          <CameraTile key={p.peerId} participant={p} voiceVolume={voiceVolume} />
         ))}
       </div>
     </aside>
@@ -97,9 +108,13 @@ interface PartyMediaControlsProps {
   cameraMode: boolean;
   anyoneSpeaking: boolean;
   mediaError: string | null;
+  voiceVolume?: number;
+  hostMicForcedOff?: boolean;
+  hostCamForcedOff?: boolean;
   disabled?: boolean;
   onToggleMic: () => void;
   onToggleCamera: () => void;
+  onVoiceVolumeChange?: (v: number) => void;
 }
 
 export function PartyMediaControls({
@@ -108,9 +123,13 @@ export function PartyMediaControls({
   cameraMode,
   anyoneSpeaking,
   mediaError,
+  voiceVolume = 1,
+  hostMicForcedOff,
+  hostCamForcedOff,
   disabled,
   onToggleMic,
   onToggleCamera,
+  onVoiceVolumeChange,
 }: PartyMediaControlsProps) {
   return (
     <div className="party-media-controls">
@@ -118,28 +137,31 @@ export function PartyMediaControls({
         type="button"
         className={`party-media-btn ${micOn ? "is-on" : ""} ${anyoneSpeaking && micOn ? "is-speaking" : ""}`}
         onClick={onToggleMic}
-        disabled={disabled}
-        title={micOn ? "Mute microphone" : "Unmute microphone"}
+        disabled={disabled || hostMicForcedOff}
+        title={hostMicForcedOff ? "Mic muted by host" : micOn ? "Mute microphone" : "Unmute microphone"}
         aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
         aria-pressed={micOn}
       >
         {micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-        <span>{micOn ? "Mic on" : "Mic off"}</span>
+        <span>{hostMicForcedOff ? "Muted by host" : micOn ? "Mic on" : "Mic off"}</span>
       </button>
       <button
         type="button"
         className={`party-media-btn ${cameraOn ? "is-on" : ""}`}
         onClick={onToggleCamera}
-        disabled={disabled}
-        title={cameraOn ? "Turn off camera" : "Turn on camera"}
+        disabled={disabled || hostCamForcedOff}
+        title={hostCamForcedOff ? "Camera disabled by host" : cameraOn ? "Turn off camera" : "Turn on camera"}
         aria-label={cameraOn ? "Turn off camera" : "Turn on camera"}
         aria-pressed={cameraOn}
       >
         {cameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-        <span>{cameraOn ? "Cam on" : "Cam off"}</span>
+        <span>{hostCamForcedOff ? "Cam blocked" : cameraOn ? "Cam on" : "Cam off"}</span>
       </button>
+      {onVoiceVolumeChange && (
+        <VoiceVolumeSlider value={voiceVolume} onChange={onVoiceVolumeChange} />
+      )}
       {cameraMode && (
-        <span className="party-media-hint">Movie left · cameras right</span>
+        <span className="party-media-hint">Movie left · cameras right · HD when available</span>
       )}
       {mediaError && <p className="party-media-error">{mediaError}</p>}
     </div>

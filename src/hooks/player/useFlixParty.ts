@@ -29,6 +29,10 @@ export interface FlixPartyParticipant {
   avatarUrl: string | null;
   lastSeenAt: number;
   role: "host" | "guest";
+  /** Host forced this guest's microphone off */
+  micMutedByHost?: boolean;
+  /** Host disabled this guest's camera */
+  camDisabledByHost?: boolean;
 }
 
 export interface FlixPartyRoom {
@@ -374,6 +378,74 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
     [roomId]
   );
 
+  const kickParticipant = useCallback(
+    async (targetUserId: string) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return;
+      if (targetUserId === user.uid) return;
+
+      const db = requireFirebaseDb();
+      const roomRef = doc(db, "flix_parties", roomId);
+      const snap = await import("firebase/firestore").then((m) => m.getDoc(roomRef));
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const participants: FlixPartyParticipant[] = data.participants || [];
+      const remaining = participants.filter((p) => p.userId !== targetUserId);
+      if (remaining.length === participants.length) return;
+
+      await updateDoc(roomRef, {
+        participants: remaining,
+        participantIds: participantIds(remaining),
+        updatedAt: Date.now(),
+      });
+    },
+    [roomId, user, room?.hostId]
+  );
+
+  const setParticipantMicMuted = useCallback(
+    async (targetUserId: string, muted: boolean) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return;
+
+      const db = requireFirebaseDb();
+      const roomRef = doc(db, "flix_parties", roomId);
+      const snap = await import("firebase/firestore").then((m) => m.getDoc(roomRef));
+      if (!snap.exists()) return;
+
+      const participants: FlixPartyParticipant[] = snap.data().participants || [];
+      const updated = participants.map((p) =>
+        p.userId === targetUserId ? { ...p, micMutedByHost: muted } : p
+      );
+
+      await updateDoc(roomRef, {
+        participants: updated,
+        updatedAt: Date.now(),
+      });
+    },
+    [roomId, user, room?.hostId]
+  );
+
+  const setParticipantCamDisabled = useCallback(
+    async (targetUserId: string, disabled: boolean) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return;
+
+      const db = requireFirebaseDb();
+      const roomRef = doc(db, "flix_parties", roomId);
+      const snap = await import("firebase/firestore").then((m) => m.getDoc(roomRef));
+      if (!snap.exists()) return;
+
+      const participants: FlixPartyParticipant[] = snap.data().participants || [];
+      const updated = participants.map((p) =>
+        p.userId === targetUserId ? { ...p, camDisabledByHost: disabled } : p
+      );
+
+      await updateDoc(roomRef, {
+        participants: updated,
+        updatedAt: Date.now(),
+      });
+    },
+    [roomId, user, room?.hostId]
+  );
+
   const isHost = room?.hostId === user?.uid;
 
   return {
@@ -387,5 +459,8 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
     leaveRoom,
     sendMessage,
     updatePlaybackState,
+    kickParticipant,
+    setParticipantMicMuted,
+    setParticipantCamDisabled,
   };
 }

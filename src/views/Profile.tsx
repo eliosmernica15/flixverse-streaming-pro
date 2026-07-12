@@ -206,7 +206,6 @@ const Profile = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      router.push('/');
     } catch (error) {
       toast({
         title: "Error",

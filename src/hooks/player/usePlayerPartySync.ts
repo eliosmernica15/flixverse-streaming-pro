@@ -82,6 +82,8 @@ export function usePlayerPartySync({
 
   const onRemoteStreamRef = useRef<(peerId: string, stream: MediaStream) => void>(() => {});
   const onRemoteStreamRemovedRef = useRef<(peerId: string) => void>(() => {});
+  const partyJoinAttempted = useRef(false);
+  const wasInPartyRef = useRef(false);
 
   const { isConnected: rtcConnected, sendMessage: sendRtcMessage, setLocalStream } = useWebRTCSync({
     roomId: partyRoomId,
@@ -106,6 +108,8 @@ export function usePlayerPartySync({
     participantNames,
     localUserId: user?.uid ?? null,
     localDisplayName: user?.displayName || "You",
+    hostMicForcedOff: partyRoom?.participants?.find((p) => p.userId === user?.uid)?.micMutedByHost ?? false,
+    hostCamForcedOff: partyRoom?.participants?.find((p) => p.userId === user?.uid)?.camDisabledByHost ?? false,
   });
 
   useEffect(() => {
@@ -114,7 +118,6 @@ export function usePlayerPartySync({
   }, [media.onRemoteStream, media.onRemoteStreamRemoved]);
 
   const lastPartyResyncRef = useRef(0);
-  const partyJoinAttempted = useRef(false);
 
   useEffect(() => {
     if (!partyRoom || isPartyHost || !partyRoomId) return;
@@ -247,7 +250,19 @@ export function usePlayerPartySync({
     setPartyRoomId(null);
     setPartyRoomKey(null);
     setShowInviteDialog(false);
+    wasInPartyRef.current = false;
   }, [leavePartyRoom]);
+
+  // Guest was kicked — no longer in participant list
+  useEffect(() => {
+    if (!partyRoomId || !user || !partyRoom) return;
+    const inRoom = partyRoom.participants.some((p) => p.userId === user.uid);
+    if (inRoom) wasInPartyRef.current = true;
+    else if (wasInPartyRef.current) {
+      handleLeaveParty();
+      setShowPartyPanel(false);
+    }
+  }, [partyRoom?.participants, partyRoomId, user, partyRoom, handleLeaveParty]);
 
   const partyJoinUrl =
     partyRoomId && partyRoomKey

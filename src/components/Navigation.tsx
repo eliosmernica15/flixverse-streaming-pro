@@ -69,15 +69,10 @@ const Navigation = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      toast({
-        title: "Signed out successfully",
-        description: "You have been signed out of your account",
-      });
-      router.push("/");
     } catch {
       toast({
-        title: "Error signing out",
-        description: "There was an error signing out. Please try again.",
+        title: "Sign out failed",
+        description: "Please try again",
         variant: "destructive",
       });
     }

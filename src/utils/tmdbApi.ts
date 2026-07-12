@@ -164,7 +164,10 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
   const requestPromise = (async () => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const response = await fetch(url, options);
+        const response = await fetch(url, {
+          ...options,
+          signal: AbortSignal.timeout(15_000),
+        });
 
         if (!response.ok) {
           if (response.status === 404) {

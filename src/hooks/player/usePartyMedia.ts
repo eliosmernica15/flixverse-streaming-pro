@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 
 const SPEAK_THRESHOLD = 0.04;
 const SPEAK_HYSTERESIS = 0.025;
+const VOICE_VOLUME_KEY = "flixverse-party-voice-volume";
 
 function createAnalyser(stream: MediaStream): { ctx: AudioContext; analyser: AnalyserNode } | null {
   try {
@@ -25,6 +26,16 @@ function readLevel(analyser: AnalyserNode): number {
   return sum / (data.length * 255);
 }
 
+function loadVoiceVolume(): number {
+  if (typeof window === "undefined") return 1;
+  try {
+    const v = parseFloat(localStorage.getItem(VOICE_VOLUME_KEY) || "1");
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+  } catch {
+    return 1;
+  }
+}
+
 export interface PartyMediaParticipant {
   peerId: string;
   displayName: string;
@@ -34,6 +45,7 @@ export interface PartyMediaParticipant {
   hasAudio: boolean;
   isSpeaking: boolean;
   isLocal: boolean;
+  micMutedByHost?: boolean;
 }
 
 interface UsePartyMediaOptions {
@@ -43,6 +55,8 @@ interface UsePartyMediaOptions {
   participantNames?: Map<string, string>;
   localUserId?: string | null;
   localDisplayName?: string;
+  hostMicForcedOff?: boolean;
+  hostCamForcedOff?: boolean;
 }
 
 export function usePartyMedia({
@@ -52,14 +66,16 @@ export function usePartyMedia({
   participantNames,
   localUserId,
   localDisplayName = "You",
+  hostMicForcedOff = false,
+  hostCamForcedOff = false,
 }: UsePartyMediaOptions) {
   const [micOn, setMicOn] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [voiceVolume, setVoiceVolumeState] = useState(loadVoiceVolume);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [speakingPeers, setSpeakingPeers] = useState<Set<string>>(new Set());
   const [localSpeaking, setLocalSpeaking] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
-
   const [localStream, setLocalStreamState] = useState<MediaStream | null>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -67,9 +83,26 @@ export function usePartyMedia({
   const remoteAnalysersRef = useRef<Map<string, { ctx: AudioContext; analyser: AnalyserNode }>>(new Map());
   const rafRef = useRef<number | null>(null);
   const wasSpeakingRef = useRef(false);
+  const micOnRef = useRef(micOn);
+  const cameraOnRef = useRef(cameraOn);
+  micOnRef.current = micOn;
+  cameraOnRef.current = cameraOn;
+
+  const setVoiceVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    setVoiceVolumeState(clamped);
+    try {
+      localStorage.setItem(VOICE_VOLUME_KEY, String(clamped));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const buildLocalStream = useCallback(async (wantMic: boolean, wantCam: boolean) => {
-    if (!wantMic && !wantCam) {
+    const effectiveMic = wantMic && !hostMicForcedOff;
+    const effectiveCam = wantCam && !hostCamForcedOff;
+
+    if (!effectiveMic && !effectiveCam) {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       setLocalStreamState(null);
@@ -81,8 +114,22 @@ export function usePartyMedia({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: wantMic ? { echoCancellation: true, noiseSuppression: true } : false,
-        video: wantCam ? { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: "user" } : false,
+        audio: effectiveMic
+          ? {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000,
+            }
+          : false,
+        video: effectiveCam
+          ? {
+              width: { ideal: 1280, max: 1920 },
+              height: { ideal: 720, max: 1080 },
+              frameRate: { ideal: 30, max: 30 },
+              facingMode: "user",
+            }
+          : false,
       });
 
       localStreamRef.current?.getTracks().forEach((t) => {
@@ -92,7 +139,7 @@ export function usePartyMedia({
       setLocalStreamState(stream);
       setMediaError(null);
 
-      if (wantMic && stream.getAudioTracks().length) {
+      if (effectiveMic && stream.getAudioTracks().length) {
         analyserRef.current?.ctx.close().catch(() => undefined);
         analyserRef.current = createAnalyser(stream);
       } else {
@@ -107,19 +154,36 @@ export function usePartyMedia({
       setMicOn(false);
       setCameraOn(false);
     }
-  }, [setLocalStream]);
+  }, [setLocalStream, hostMicForcedOff, hostCamForcedOff]);
 
   const toggleMic = useCallback(async () => {
+    if (hostMicForcedOff) return;
     const next = !micOn;
     setMicOn(next);
     await buildLocalStream(next, cameraOn);
-  }, [micOn, cameraOn, buildLocalStream]);
+  }, [micOn, cameraOn, buildLocalStream, hostMicForcedOff]);
 
   const toggleCamera = useCallback(async () => {
+    if (hostCamForcedOff) return;
     const next = !cameraOn;
     setCameraOn(next);
     await buildLocalStream(micOn, next);
-  }, [micOn, cameraOn, buildLocalStream]);
+  }, [micOn, cameraOn, buildLocalStream, hostCamForcedOff]);
+
+  // Host forced mute/cam — apply immediately
+  useEffect(() => {
+    if (hostMicForcedOff && micOnRef.current) {
+      setMicOn(false);
+      void buildLocalStream(false, cameraOnRef.current);
+    }
+  }, [hostMicForcedOff, buildLocalStream]);
+
+  useEffect(() => {
+    if (hostCamForcedOff && cameraOnRef.current) {
+      setCameraOn(false);
+      void buildLocalStream(micOnRef.current, false);
+    }
+  }, [hostCamForcedOff, buildLocalStream]);
 
   const onRemoteStream = useCallback((peerId: string, stream: MediaStream) => {
     setRemoteStreams((prev) => new Map(prev).set(peerId, stream));
@@ -147,14 +211,13 @@ export function usePartyMedia({
     remoteAnalysersRef.current.delete(peerId);
   }, []);
 
-  // Voice activity detection loop
   useEffect(() => {
     if (!roomId) return;
 
     const tick = () => {
       const remoteSpeaking = new Set<string>();
 
-      if (analyserRef.current && micOn) {
+      if (analyserRef.current && micOn && !hostMicForcedOff) {
         const level = readLevel(analyserRef.current.analyser);
         const speaking = wasSpeakingRef.current
           ? level > SPEAK_HYSTERESIS
@@ -182,7 +245,7 @@ export function usePartyMedia({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [roomId, micOn, localUserId, sendSpeakingState]);
+  }, [roomId, micOn, localUserId, sendSpeakingState, hostMicForcedOff]);
 
   useEffect(() => {
     if (!roomId) {
@@ -211,10 +274,11 @@ export function usePartyMedia({
       peerId: localUserId,
       displayName: localDisplayName,
       stream: localStream,
-      hasVideo: cameraOn && localStream.getVideoTracks().some((t) => t.enabled),
-      hasAudio: micOn,
+      hasVideo: cameraOn && !hostCamForcedOff && localStream.getVideoTracks().some((t) => t.enabled),
+      hasAudio: micOn && !hostMicForcedOff,
       isSpeaking: localSpeaking,
       isLocal: true,
+      micMutedByHost: hostMicForcedOff,
     });
   }
 
@@ -232,19 +296,23 @@ export function usePartyMedia({
     });
   }
 
-  const cameraMode = cameraOn || participants.some((p) => p.hasVideo);
+  const cameraMode = (cameraOn && !hostCamForcedOff) || participants.some((p) => p.hasVideo);
   const anyoneSpeaking = speakingPeers.size > 0;
 
   return {
-    micOn,
-    cameraOn,
+    micOn: micOn && !hostMicForcedOff,
+    cameraOn: cameraOn && !hostCamForcedOff,
     cameraMode,
+    voiceVolume,
+    setVoiceVolume,
     toggleMic,
     toggleCamera,
     participants,
     anyoneSpeaking,
     localSpeaking,
     mediaError,
+    hostMicForcedOff,
+    hostCamForcedOff,
     onRemoteStream,
     onRemoteStreamRemoved,
   };

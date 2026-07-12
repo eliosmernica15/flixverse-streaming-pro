@@ -6,11 +6,13 @@ import {
 } from "lucide-react";
 import { useFlixParty, type FlixPartyParticipant } from "@/hooks/player/useFlixParty";
 import { useFriends, type Friend } from "@/hooks/useFriends";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { FriendsList } from "@/components/FriendsList";
 import { WatchParty } from "./WatchParty";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge";
 import { PartyMediaControls } from "./PartyMediaPanel";
+import { PartyMembersPanel } from "./PartyMembersPanel";
 import type { usePartyMedia } from "@/hooks/player/usePartyMedia";
 
 type PartyMediaState = ReturnType<typeof usePartyMedia>;
@@ -64,7 +66,8 @@ export function FlixPartySidebar({
   hasStandard = false,
   media,
 }: FlixPartySidebarProps) {
-  const { room, messages, isHost, sendMessage } = useFlixParty({ roomId });
+  const { room, messages, isHost, sendMessage, kickParticipant, setParticipantMicMuted, setParticipantCamDisabled } = useFlixParty({ roomId });
+  const { user } = useAuth();
   const { friends, incomingRequests } = useFriends();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<SidebarTab>("friends");
@@ -199,16 +202,34 @@ export function FlixPartySidebar({
       {/* Tab content */}
       <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
         {roomId && media && (
-          <div className="shrink-0 border-b border-white/10 px-3 py-3">
+          <div className="shrink-0 border-b border-white/10 px-3 py-3 space-y-3">
             <PartyMediaControls
               micOn={media.micOn}
               cameraOn={media.cameraOn}
               cameraMode={media.cameraMode}
               anyoneSpeaking={media.anyoneSpeaking}
               mediaError={media.mediaError}
+              voiceVolume={media.voiceVolume}
+              hostMicForcedOff={media.hostMicForcedOff}
+              hostCamForcedOff={media.hostCamForcedOff}
               onToggleMic={() => void media.toggleMic()}
               onToggleCamera={() => void media.toggleCamera()}
+              onVoiceVolumeChange={media.setVoiceVolume}
             />
+            {room && user && (
+              <PartyMembersPanel
+                participants={room.participants}
+                hostId={room.hostId}
+                currentUserId={user.uid}
+                isHost={isHost}
+                onKick={(id) => {
+                  void kickParticipant(id);
+                  toast({ title: "Guest removed", description: "They were removed from the party." });
+                }}
+                onToggleMic={(id, muted) => void setParticipantMicMuted(id, muted)}
+                onToggleCam={(id, off) => void setParticipantCamDisabled(id, off)}
+              />
+            )}
           </div>
         )}
         {!hasStandard && !roomId && (

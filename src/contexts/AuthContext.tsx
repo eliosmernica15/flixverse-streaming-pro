@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { User, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { getFirebaseAuth } from "@/integrations/firebase/client";
+import { clearAuthClientStorage } from "@/lib/auth/sessionCleanup";
 
 interface AuthContextValue {
   user: User | null;
@@ -32,11 +33,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     const auth = getFirebaseAuth();
-    if (!auth) return;
-    await firebaseSignOut(auth);
-  };
+    clearAuthClientStorage();
+    if (auth) {
+      try {
+        await firebaseSignOut(auth);
+      } catch (err) {
+        console.error("Sign out error:", err);
+        throw err;
+      }
+    }
+    if (typeof window !== "undefined") {
+      window.location.href = "/auth";
+    }
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -45,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       isAuthenticated: !!user,
     }),
-    [user, loading]
+    [user, loading, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

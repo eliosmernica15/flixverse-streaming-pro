@@ -1,4 +1,4 @@
-/** Security headers applied via Next.js config and proxy. */
+/** Security headers — keep in sync with security-headers.mjs (used by next.config). */
 export const securityHeaders = [
   {
     key: "Strict-Transport-Security",
@@ -32,13 +32,12 @@ export const securityHeaders = [
       "form-action 'self'",
       "frame-ancestors 'self'",
       "object-src 'none'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://www.googletagmanager.com",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev",
-      "font-src 'self' data:",
-      "connect-src 'self' https://api.themoviedb.org https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://*.firebaseio.com",
-      // Player iframes load directly from allowed embed hosts (no sandbox).
-      "frame-src 'self' blob: https://vidlink.pro https://player.videasy.net https://vidfast.pro https://vidsrc.me https://vidsrc.net https://www.2embed.cc https://2embed.cc https://multiembed.mov https://embed.su https://www.youtube.com https://www.youtube-nocookie.com",
+      "font-src 'self' data: blob:",
+      "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com",
+      "connect-src 'self' https://api.themoviedb.org https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com wss://*.firebaseio.com",
+      "frame-src 'self' blob: https://accounts.google.com https://*.firebaseapp.com https://vidlink.pro https://player.videasy.net https://vidfast.pro https://vidsrc.me https://vidsrc.net https://www.2embed.cc https://2embed.cc https://multiembed.mov https://embed.su https://www.youtube.com https://www.youtube-nocookie.com",
       "upgrade-insecure-requests",
     ].join("; "),
   },
