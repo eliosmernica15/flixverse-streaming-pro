@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isRateLimited } from "@/lib/rateLimit";
 import { trackPartyJoin } from "@/lib/analytics";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { dedupeRoomParticipants } from "@/lib/party/participantUtils";
 import { useFlixPartyPython } from "@/hooks/player/useFlixPartyPython";
 import type { PartyContentMeta } from "@/lib/player/roomEncryption";
 
@@ -99,17 +100,18 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
       }
 
       const data = snap.data();
+      const hostId = data.hostId as string;
       setRoom({
         id: snap.id,
         code: data.code,
-        hostId: data.hostId,
+        hostId,
         encryptedPayload: data.encryptedPayload,
         contentMeta: data.contentMeta ?? null,
         playbackState: data.playbackState,
         lastKnownTime: data.lastKnownTime,
         serverIndex: data.serverIndex,
         updatedAt: data.updatedAt,
-        participants: data.participants || [],
+        participants: dedupeRoomParticipants(data.participants || [], hostId),
         createdAt: data.createdAt,
       });
       setLoading(false);

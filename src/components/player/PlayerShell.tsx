@@ -633,6 +633,7 @@ export function PlayerShell({
             participants={media.participants}
             voiceVolume={media.voiceVolume}
             roomParticipants={party.partyRoom?.participants}
+            hostId={party.partyRoom?.hostId}
             layoutMode={effectiveCameraLayout}
             onLayoutChange={layout.setCameraLayout}
           />
@@ -644,6 +645,7 @@ export function PlayerShell({
             participants={media.participants}
             voiceVolume={media.voiceVolume}
             roomParticipants={party.partyRoom?.participants}
+            hostId={party.partyRoom?.hostId}
             expanded={mobilePartyExpanded}
           />
         )}

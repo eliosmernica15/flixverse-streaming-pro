@@ -104,6 +104,7 @@ interface PartyCameraGridProps {
   participants: PartyMediaParticipant[];
   voiceVolume?: number;
   roomParticipants?: FlixPartyParticipant[];
+  hostId?: string | null;
   layoutMode?: CameraLayoutMode;
   onLayoutChange?: (mode: CameraLayoutMode) => void;
 }
@@ -119,10 +120,11 @@ export function PartyCameraGrid({
   participants,
   voiceVolume = 1,
   roomParticipants = [],
+  hostId = null,
   layoutMode = "side",
   onLayoutChange,
 }: PartyCameraGridProps) {
-  const hostId = roomParticipants.find((p) => p.role === "host")?.userId;
+  const resolvedHostId = hostId ?? roomParticipants.find((p) => p.role === "host")?.userId ?? null;
   const visible = participants.length > 0 ? participants : [];
 
   if (!visible.length && layoutMode === "hidden") return null;
@@ -156,7 +158,7 @@ export function PartyCameraGrid({
             key={p.peerId}
             participant={p}
             voiceVolume={voiceVolume}
-            isHost={p.peerId === hostId}
+            isHost={resolvedHostId ? p.peerId === resolvedHostId : false}
           />
         ))}
       </div>
@@ -236,6 +238,7 @@ interface PartyCameraPiPProps {
   participants: PartyMediaParticipant[];
   voiceVolume?: number;
   roomParticipants?: FlixPartyParticipant[];
+  hostId?: string | null;
   expanded?: boolean;
 }
 
@@ -244,13 +247,15 @@ export function PartyCameraPiP({
   participants,
   voiceVolume = 1,
   roomParticipants = [],
+  hostId = null,
   expanded = false,
 }: PartyCameraPiPProps) {
-  const hostId = roomParticipants.find((p) => p.role === "host")?.userId;
+  const resolvedHostId = hostId ?? roomParticipants.find((p) => p.role === "host")?.userId ?? null;
   const withVideo = participants.filter((p) => p.hasVideo);
   if (!withVideo.length) return null;
 
   const primary = withVideo.find((p) => p.isLocal) ?? withVideo[0];
+  const others = withVideo.filter((p) => p.peerId !== primary.peerId).slice(0, 2);
 
   return (
     <div
@@ -260,16 +265,16 @@ export function PartyCameraPiP({
       <CameraTile
         participant={primary}
         voiceVolume={voiceVolume}
-        isHost={primary.peerId === hostId}
+        isHost={resolvedHostId ? primary.peerId === resolvedHostId : false}
       />
-      {withVideo.length > 1 && (
+      {others.length > 0 && (
         <div className="party-camera-pip-stack" aria-hidden>
-          {withVideo.slice(0, 3).map((p) => (
+          {others.map((p) => (
             <CameraTile
               key={p.peerId}
               participant={p}
               voiceVolume={voiceVolume}
-              isHost={p.peerId === hostId}
+              isHost={resolvedHostId ? p.peerId === resolvedHostId : false}
             />
           ))}
         </div>

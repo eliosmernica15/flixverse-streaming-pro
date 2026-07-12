@@ -1,4 +1,37 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import type { FlixPartyParticipant } from "@/hooks/player/useFlixParty";
+
+export interface PartyMediaParticipant {
+  peerId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  stream: MediaStream;
+  hasVideo: boolean;
+  hasAudio: boolean;
+  isSpeaking: boolean;
+  isLocal: boolean;
+  micMutedByHost?: boolean;
+}
+
+function dedupeMediaParticipants(list: PartyMediaParticipant[]): PartyMediaParticipant[] {
+  const byPeer = new Map<string, PartyMediaParticipant>();
+  for (const p of list) {
+    const prev = byPeer.get(p.peerId);
+    if (!prev) {
+      byPeer.set(p.peerId, p);
+      continue;
+    }
+    if (p.isLocal) {
+      byPeer.set(p.peerId, { ...prev, ...p, isLocal: true });
+      continue;
+    }
+    if (prev.isLocal) continue;
+    if (p.hasVideo || p.hasAudio) byPeer.set(p.peerId, p);
+  }
+  const locals = [...byPeer.values()].filter((p) => p.isLocal);
+  const remotes = [...byPeer.values()].filter((p) => !p.isLocal);
+  return [...locals, ...remotes];
+}
 
 const SPEAK_THRESHOLD = 0.04;
 const SPEAK_HYSTERESIS = 0.025;
@@ -39,20 +72,6 @@ function loadVoiceVolume(): number {
   } catch {
     return 1;
   }
-}
-
-import type { FlixPartyParticipant } from "@/hooks/player/useFlixParty";
-
-export interface PartyMediaParticipant {
-  peerId: string;
-  displayName: string;
-  avatarUrl?: string | null;
-  stream: MediaStream;
-  hasVideo: boolean;
-  hasAudio: boolean;
-  isSpeaking: boolean;
-  isLocal: boolean;
-  micMutedByHost?: boolean;
 }
 
 interface UsePartyMediaOptions {
@@ -394,6 +413,7 @@ export function usePartyMedia({
   }
 
   for (const [peerId, stream] of remoteStreams) {
+    if (peerId === localUserId) continue;
     seen.add(peerId);
     const hasVideo = stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
     participants.push({
@@ -408,7 +428,7 @@ export function usePartyMedia({
   }
 
   for (const rp of roomParticipants) {
-    if (seen.has(rp.userId)) continue;
+    if (seen.has(rp.userId) || rp.userId === localUserId) continue;
     participants.push({
       peerId: rp.userId,
       displayName: rp.displayName,
@@ -435,6 +455,8 @@ export function usePartyMedia({
     });
   }
 
+  const mergedParticipants = dedupeMediaParticipants(participants);
+
   const cameraMode = !!roomId;
   const anyoneSpeaking = speakingPeers.size > 0;
 
@@ -446,7 +468,7 @@ export function usePartyMedia({
     setVoiceVolume,
     toggleMic,
     toggleCamera,
-    participants,
+    participants: mergedParticipants,
     anyoneSpeaking,
     localSpeaking,
     mediaError,

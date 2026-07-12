@@ -205,6 +205,11 @@ abstract class WebRTCPartySyncBase implements PartySyncTransport {
     for (const channel of this.channels.values()) {
       if (channel.readyState === "open") return true;
     }
+    for (const pc of this.peers.values()) {
+      if (pc.connectionState === "connected") {
+        return true;
+      }
+    }
     return false;
   }
 
@@ -284,7 +289,7 @@ export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
     mediaCallbacks: MediaCallbacks = {}
   ) {
     super(roomId, userId, isHost, hostId, onMessage, mediaCallbacks);
-    this.pollTimer = setInterval(() => void this.pollSignals(), 300);
+    this.pollTimer = setInterval(() => void this.pollSignals(), 120);
     void this.pollSignals();
   }
 

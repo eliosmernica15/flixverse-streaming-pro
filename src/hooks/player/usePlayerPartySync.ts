@@ -31,11 +31,12 @@ import {
   stripGuestJoinParam,
 } from "@/lib/player/partyUrl";
 
-const JOIN_GRACE_MS = 3000;
-const SYNC_INTERVAL_MS = 2000;
-const DRIFT_SEEK_THRESHOLD_SEC = 1.5;
-const SEEK_COOLDOWN_MS = 1500;
+const JOIN_GRACE_MS = 1200;
+const SYNC_INTERVAL_MS = 1000;
+const DRIFT_SEEK_THRESHOLD_SEC = 1.2;
+const SEEK_COOLDOWN_MS = 900;
 const MAX_GUEST_SPLASH_MS = 14_000;
+const HOST_HEARTBEAT_MS = 800;
 const MOBILE_BREAKPOINT = 768;
 
 function isMobileViewport(): boolean {
@@ -339,9 +340,23 @@ export function usePlayerPartySync({
       setPartySyncStatus("disconnected");
       return;
     }
-    if (rtcConnected) setPartySyncStatus("connected");
-    else if (partyRoom) setPartySyncStatus("connecting");
-  }, [partyRoomId, rtcConnected, partyRoom]);
+    if (rtcConnected) {
+      setPartySyncStatus("connected");
+    } else if (!isPartyHost && guestInitialSynced) {
+      setPartySyncStatus("connected");
+    } else if (partyRoom) {
+      setPartySyncStatus("connecting");
+    }
+  }, [partyRoomId, rtcConnected, partyRoom, isPartyHost, guestInitialSynced]);
+
+  // Guest: prime position from room state before WebRTC heartbeats arrive
+  useEffect(() => {
+    if (!partyRoomId || isPartyHost || !embedReady || initialSyncDoneRef.current) return;
+    const hostTime = partyRoom?.lastKnownTime ?? 0;
+    if (hostTime <= 0) return;
+    lastSeekAtRef.current = 0;
+    softSeekTo(hostTime);
+  }, [partyRoomId, isPartyHost, embedReady, partyRoom?.lastKnownTime, softSeekTo]);
 
   // Join party from ?party= URL param
   useEffect(() => {
@@ -446,7 +461,7 @@ export function usePlayerPartySync({
     };
 
     tick();
-    const id = setInterval(tick, 1500);
+    const id = setInterval(tick, HOST_HEARTBEAT_MS);
     return () => clearInterval(id);
   }, [partyRoomId, isPartyHost, sendRtcMessage, updatePlaybackState]);
 

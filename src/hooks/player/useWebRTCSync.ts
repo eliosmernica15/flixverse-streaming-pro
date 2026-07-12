@@ -72,7 +72,7 @@ export function useWebRTCSync({
     ) {
       const poll = setInterval(() => {
         if (syncRef.current) setIsConnected(syncRef.current.isConnected);
-      }, 1000);
+      }, 200);
       return () => clearInterval(poll);
     }
 
@@ -133,7 +133,7 @@ export function useWebRTCSync({
 
     const poll = setInterval(() => {
       if (syncRef.current) setIsConnected(syncRef.current.isConnected);
-    }, 1000);
+    }, 200);
 
     return () => {
       cancelled = true;

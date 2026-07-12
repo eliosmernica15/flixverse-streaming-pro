@@ -9,13 +9,16 @@ import type {
   FlixPartyRoom,
 } from "@/hooks/player/useFlixParty";
 import type { PartyContentMeta } from "@/lib/player/roomEncryption";
+import { dedupeRoomParticipants } from "@/lib/party/participantUtils";
 
 interface UseFlixPartyOptions {
   roomId: string | null;
 }
 
-const ROOM_POLL_MS = 1200;
-const MESSAGE_POLL_MS = 2500;
+const FAST_ROOM_POLL_MS = 350;
+const STEADY_ROOM_POLL_MS = 1000;
+const FAST_POLL_WINDOW_MS = 20_000;
+const MESSAGE_POLL_MS = 1200;
 
 export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
   const { user } = useAuth();
@@ -33,8 +36,14 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     }
     try {
       const data = await pythonFetch<{ room: FlixPartyRoom }>(`/parties/${roomId}`);
-      setRoom(data.room);
-      return data.room;
+      const normalized = data.room
+        ? {
+            ...data.room,
+            participants: dedupeRoomParticipants(data.room.participants ?? [], data.room.hostId),
+          }
+        : null;
+      setRoom(normalized);
+      return normalized;
     } catch {
       setRoom(null);
       return null;
@@ -63,7 +72,14 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     void fetchMessages();
     if (!roomId) return;
 
-    roomPollRef.current = setInterval(() => void fetchRoom(), ROOM_POLL_MS);
+    const pollRoom = () => void fetchRoom();
+    pollRoom();
+    roomPollRef.current = setInterval(pollRoom, FAST_ROOM_POLL_MS);
+    const slowSwitch = window.setTimeout(() => {
+      if (roomPollRef.current) clearInterval(roomPollRef.current);
+      roomPollRef.current = setInterval(pollRoom, STEADY_ROOM_POLL_MS);
+    }, FAST_POLL_WINDOW_MS);
+
     msgPollRef.current = setInterval(() => void fetchMessages(), MESSAGE_POLL_MS);
 
     const onVisible = () => {
@@ -72,6 +88,7 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      window.clearTimeout(slowSwitch);
       if (roomPollRef.current) clearInterval(roomPollRef.current);
       if (msgPollRef.current) clearInterval(msgPollRef.current);
       document.removeEventListener("visibilitychange", onVisible);

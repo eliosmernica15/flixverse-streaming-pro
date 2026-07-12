@@ -133,23 +133,29 @@ def _join_room_user(
 
 
 def _room_participants(conn, room_id: str) -> list[dict[str, Any]]:
+    host_row = db_fetchone(conn, "SELECT host_id FROM party_rooms WHERE id = ?", (room_id,))
+    host_id = row_get(host_row, "host_id") if host_row else None
     rows = db_fetchall(
         conn,
         "SELECT * FROM party_participants WHERE room_id = ? ORDER BY last_seen_at",
         (room_id,),
     )
-    return [
-        {
-            "userId": row_get(r, "user_id"),
+    by_user: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        uid = row_get(r, "user_id")
+        entry = {
+            "userId": uid,
             "displayName": row_get(r, "display_name"),
             "avatarUrl": row_get(r, "avatar_url"),
             "lastSeenAt": row_get(r, "last_seen_at"),
-            "role": row_get(r, "role"),
+            "role": "host" if uid == host_id else "guest",
             "micMutedByHost": bool(row_get(r, "mic_muted_by_host")),
             "camDisabledByHost": bool(row_get(r, "cam_disabled_by_host")),
         }
-        for r in rows
-    ]
+        prev = by_user.get(uid)
+        if not prev or entry["lastSeenAt"] >= prev["lastSeenAt"]:
+            by_user[uid] = entry
+    return list(by_user.values())
 
 
 def _parse_content_meta(raw: Any) -> dict[str, Any] | None:
