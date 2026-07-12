@@ -53,7 +53,10 @@ export const useFirebaseNotifications = () => {
       setUnreadCount(unread);
       setLoading(false);
     }, (error) => {
-      console.error('Error fetching notifications:', error);
+      console.error('[notifications] query failed:', error);
+      if (error && typeof error === 'object' && 'code' in error) {
+        console.error('[notifications] Firestore error code:', (error as { code: string }).code);
+      }
       setLoading(false);
     });
 

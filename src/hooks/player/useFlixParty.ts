@@ -123,7 +123,7 @@ export function useFlixParty({ roomId }: UseFlixPartyOptions) {
 
     const db = requireFirebaseDb();
     const messagesRef = collection(db, "flix_parties", roomId, "messages");
-    const q = query(messagesRef, orderBy("createdAt", "desc"), limit(100));
+    const q = query(messagesRef, orderBy("createdAt", "desc"), limit(40));
 
     const unsub = onSnapshot(q, (snap) => {
       const msgs: FlixPartyChatMessage[] = [];

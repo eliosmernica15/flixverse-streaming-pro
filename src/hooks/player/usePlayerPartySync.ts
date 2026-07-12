@@ -11,6 +11,7 @@ import {
 import type { SyncStatus } from "@/components/player/SyncStatusBadge";
 import { usePartyMedia } from "@/hooks/player/usePartyMedia";
 import { playUiSound } from "@/lib/uiSound";
+import { firestoreErrorMessage, isFirestoreQuotaError } from "@/lib/firestore/errors";
 
 interface UsePlayerPartySyncOptions {
   movieId: number;
@@ -53,11 +54,16 @@ export function usePlayerPartySync({
 
   const {
     room: partyRoom,
+    messages: partyMessages,
     isHost: isPartyHost,
     createRoom: createPartyRoom,
     joinRoomById,
     leaveRoom: leavePartyRoom,
     updatePlaybackState,
+    sendMessage: sendPartyMessage,
+    kickParticipant,
+    setParticipantMicMuted,
+    setParticipantCamDisabled,
   } = useFlixParty({ roomId: partyRoomId });
 
   const partyParticipantIds = partyRoom?.participants?.map((p) => p.userId) ?? [];
@@ -206,20 +212,18 @@ export function usePlayerPartySync({
 
     const tick = () => {
       const time = partyTimeRef.current;
-      const playing = partyPlayingRef.current;
-      void updatePlaybackState(playing ? "playing" : "paused", time);
       sendRtcMessage("heartbeat", { currentTime: time });
     };
 
     tick();
-    const id = setInterval(tick, 2500);
+    const id = setInterval(tick, 3000);
     return () => clearInterval(id);
-  }, [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage]);
+  }, [partyRoomId, isPartyHost, sendRtcMessage]);
 
-  const handleStartParty = useCallback(async () => {
+  const handleStartParty = useCallback(async (): Promise<{ roomId: string; joinUrl: string } | null> => {
     if (!user) {
       setShowPartyPanel(true);
-      return;
+      return null;
     }
     try {
       const key = generateRoomKey();
@@ -233,9 +237,14 @@ export function usePlayerPartySync({
       setShowInviteDialog(true);
       setShowPartyPanel(true);
       playUiSound("success");
+      return { roomId: id, joinUrl: buildPartyJoinUrl(id, key) };
     } catch (err) {
       console.error("Failed to create party:", err);
       playUiSound("error");
+      if (isFirestoreQuotaError(err)) {
+        throw new Error(firestoreErrorMessage(err));
+      }
+      throw err;
     }
   }, [user, movieId, mediaType, season, episode, currentServer, createPartyRoom]);
 
@@ -280,6 +289,11 @@ export function usePlayerPartySync({
     broadcastPartyState,
     partyJoinUrl,
     partyRoomCode: partyRoom?.code || (partyRoomId ? partyRoomId.slice(0, 6).toUpperCase() : ""),
+    partyMessages,
+    sendPartyMessage,
+    kickParticipant,
+    setParticipantMicMuted,
+    setParticipantCamDisabled,
     media,
   };
 }

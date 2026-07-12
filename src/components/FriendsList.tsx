@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 interface FriendsListProps {
   inviteMode?: boolean;
   onInvite?: (friend: Friend) => void;
+  invitingUserId?: string | null;
   variant?: "sidebar" | "page";
   initialTab?: "friends" | "requests" | "find";
 }
@@ -16,6 +17,7 @@ interface FriendsListProps {
 export function FriendsList({
   inviteMode = false,
   onInvite,
+  invitingUserId = null,
   variant = "sidebar",
   initialTab = "friends",
 }: FriendsListProps) {
@@ -214,11 +216,16 @@ export function FriendsList({
                 {inviteMode && onInvite && (
                   <button
                     type="button"
-                    onClick={() => onInvite(friend)}
-                    className="flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 transition-colors hover:bg-red-500 focus-ring group-hover:opacity-100"
+                    onClick={() => void onInvite(friend)}
+                    disabled={invitingUserId === friend.userId}
+                    className="flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-red-500 focus-ring disabled:opacity-50"
                   >
-                    <Send className="h-3 w-3" />
-                    Invite
+                    {invitingUserId === friend.userId ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Send className="h-3 w-3" />
+                    )}
+                    {invitingUserId === friend.userId ? "Sending…" : "Invite"}
                   </button>
                 )}
               </div>

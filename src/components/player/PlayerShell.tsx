@@ -458,6 +458,13 @@ export function PlayerShell({
             onSyncToPosition={seekTo}
             partyJoinUrl={party.partyJoinUrl}
             media={media}
+            partyRoom={party.partyRoom}
+            partyMessages={party.partyMessages}
+            isHost={party.isPartyHost}
+            sendPartyMessage={party.sendPartyMessage}
+            kickParticipant={party.kickParticipant}
+            setParticipantMicMuted={party.setParticipantMicMuted}
+            setParticipantCamDisabled={party.setParticipantCamDisabled}
           />
         )}
       </div>

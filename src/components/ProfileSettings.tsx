@@ -15,8 +15,7 @@ interface ProfileSettingsProps {
 
 export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
   const { preferences, updatePreferences } = useUserPreferencesContext();
-  const { hasPermission, preferences: notifPrefs, requestPermission, updatePreferences: updateNotif } =
-    useNotifications();
+  const { preferences: notifPrefs, updatePreferences: updateNotif } = useNotifications();
   const { toast } = useToast();
 
   const { spoilerGuard, setSpoilerGuard } = useSyncedCaptionPreferences();
@@ -185,34 +184,31 @@ export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
           </div>
         </div>
 
-        {!hasPermission ? (
-          <Button onClick={() => void requestPermission()} className="btn-primary w-full focus-ring">
-            Enable browser notifications
-          </Button>
-        ) : (
-          <div className="space-y-3">
-            {(
-              [
-                ["allNotifications", "All notifications"],
-                ["newMovies", "New movies"],
-                ["popularMovies", "Popular movies"],
-                ["popularTVShows", "Popular TV shows"],
-                ["upcomingContent", "Upcoming content"],
-              ] as const
-            ).map(([key, label]) => (
-              <div
-                key={key}
-                className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5"
-              >
-                <span className="text-sm text-gray-200">{label}</span>
-                <Switch
-                  checked={notifPrefs[key]}
-                  onCheckedChange={(checked) => updateNotif({ [key]: checked })}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-xs text-gray-500 mb-4">
+          Friend requests and watch party invites always appear in the bell icon. Toggles below are for optional browser alerts only.
+        </p>
+        <div className="space-y-3">
+          {(
+            [
+              ["allNotifications", "All browser alerts"],
+              ["newMovies", "New movies"],
+              ["popularMovies", "Popular movies"],
+              ["popularTVShows", "Popular TV shows"],
+              ["upcomingContent", "Upcoming content"],
+            ] as const
+          ).map(([key, label]) => (
+            <div
+              key={key}
+              className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5"
+            >
+              <span className="text-sm text-gray-200">{label}</span>
+              <Switch
+                checked={notifPrefs[key]}
+                onCheckedChange={(checked) => updateNotif({ [key]: checked })}
+              />
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="glass-card rounded-2xl border border-white/10 p-6">

@@ -12,11 +12,17 @@ export async function sendNotificationToUser(params: {
   data?: Notification["data"];
 }): Promise<boolean> {
   const db = getFirebaseDb();
-  if (!db) return false;
+  if (!db) {
+    console.error("[notifications] Firebase not configured");
+    return false;
+  }
+
+  if (params.recipientId === params.senderId) return false;
 
   try {
     await addDoc(collection(db, "notifications"), {
       user_id: params.recipientId,
+      from_user_id: params.senderId,
       type: params.type,
       title: params.title,
       message: params.message,
@@ -30,7 +36,8 @@ export async function sendNotificationToUser(params: {
     });
     return true;
   } catch (err) {
-    console.error("[notifications] send failed:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[notifications] send failed:", message, err);
     return false;
   }
 }

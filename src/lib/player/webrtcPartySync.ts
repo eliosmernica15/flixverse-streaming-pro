@@ -4,6 +4,7 @@ import {
   onSnapshot,
   query,
   where,
+  deleteDoc,
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 
@@ -245,7 +246,9 @@ export class WebRTCPartySync {
           this.seenSignals.add(docId);
 
           const data = change.doc.data() as SignalMessage;
-          void this.handleSignal(data);
+          void this.handleSignal(data).finally(() => {
+            void deleteDoc(change.doc.ref).catch(() => undefined);
+          });
         });
       }
     );

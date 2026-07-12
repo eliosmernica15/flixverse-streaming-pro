@@ -18,6 +18,9 @@ import {
 } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useFriends, type Friend } from "@/hooks/useFriends";
+import { useToast } from "@/hooks/use-toast";
+import { sendWatchPartyInvite } from "@/lib/notifications/sendWatchPartyInvite";
+import { firestoreErrorMessage } from "@/lib/firestore/errors";
 import { Send, Users, Copy, Check, X, Loader2 } from "lucide-react";
 
 export interface WatchPartyRoom {
@@ -45,8 +48,9 @@ interface WatchPartyProps {
   currentTime: number;
   isPlaying: boolean;
   onSyncToPosition: (position: number) => void;
-  onStartParty?: () => void;
+  onStartParty?: () => Promise<{ roomId: string; joinUrl: string } | null> | void;
   externalRoomId?: string | null;
+  partyJoinUrl?: string | null;
 }
 
 export function WatchParty({
@@ -61,19 +65,24 @@ export function WatchParty({
   onSyncToPosition,
   onStartParty,
   externalRoomId,
+  partyJoinUrl,
 }: WatchPartyProps) {
   const { user } = useAuth();
   const { friends } = useFriends();
+  const { toast } = useToast();
   const [activeRoom, setActiveRoom] = useState<WatchPartyRoom | null>(null);
   const [invitedFriend, setInvitedFriend] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [localRoomId, setLocalRoomId] = useState<string | null>(null);
   const [showInviteList, setShowInviteList] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  // Subscribe to active room
+  const activeRoomId = externalRoomId ?? localRoomId;
+
+  // Legacy watch_parties listener — skip when using FlixParty (onStartParty)
   useEffect(() => {
-    if (!user) return;
+    if (!user || onStartParty) return;
 
     const db = getFirestore();
     const roomsRef = collection(db, "watch_parties");
@@ -95,9 +104,8 @@ export function WatchParty({
 
     unsubscribeRef.current = unsub;
     return () => unsub();
-  }, [user]);
+  }, [user, onStartParty]);
 
-  // Create a new watch party room
   const createRoom = useCallback(async () => {
     if (!user || creating) return;
     setCreating(true);
@@ -121,40 +129,90 @@ export function WatchParty({
       };
 
       await setDoc(doc(db, "watch_parties", roomId), roomData);
+      setLocalRoomId(roomId);
       setActiveRoom({ id: roomId, ...roomData });
     } catch (err) {
       console.error("Failed to create room:", err);
+      toast({
+        title: "Could not create party",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setCreating(false);
     }
-  }, [user, creating, movieId, mediaType, season, episode, title, posterPath]);
+  }, [user, creating, movieId, mediaType, season, episode, title, posterPath, toast]);
+
+  const handleStart = useCallback(async () => {
+    if (creating) return;
+    if (onStartParty) {
+      setCreating(true);
+      try {
+        const result = await onStartParty();
+        if (result && typeof result === "object") {
+          setLocalRoomId(result.roomId);
+          toast({ title: "Party started", description: "Invite friends from the Friends tab." });
+        }
+      } catch (err) {
+        toast({
+          title: "Could not start party",
+          description: firestoreErrorMessage(err),
+          variant: "destructive",
+        });
+      } finally {
+        setCreating(false);
+      }
+      return;
+    }
+    await createRoom();
+  }, [creating, onStartParty, createRoom, toast]);
 
   // Invite a friend to the room
   const inviteFriend = useCallback(async (friend: Friend) => {
-    if (!activeRoom || !user) return;
+    if (!user) return;
 
-    const db = getFirestore();
+    const roomIdForInvite = activeRoom?.id ?? activeRoomId;
+    if (!roomIdForInvite) return;
 
-    // Create invitation document
-    await setDoc(doc(db, "watch_party_invites", `${activeRoom.id}_${friend.userId}`), {
-      roomId: activeRoom.id,
-      roomTitle: activeRoom.title,
-      fromUserId: user.uid,
-      fromUserName: user.displayName || "Host",
-      toUserId: friend.userId,
-      toUserName: friend.displayName,
-      movieId: activeRoom.movieId,
-      mediaType: activeRoom.mediaType,
-      season: activeRoom.season,
-      episode: activeRoom.episode,
-      posterPath: activeRoom.posterPath,
-      status: "pending",
-      createdAt: Date.now(),
-    });
+    const myName = user.displayName || user.email?.split("@")[0] || "Host";
+    const joinUrl =
+      partyJoinUrl ||
+      `${window.location.origin}/movie/${activeRoom?.movieId ?? movieId}?type=${activeRoom?.mediaType ?? mediaType}&party=${roomIdForInvite}`;
 
-    setInvitedFriend(friend.userId);
-    setTimeout(() => setInvitedFriend(null), 2000);
-  }, [activeRoom, user]);
+    try {
+      const sent = await sendWatchPartyInvite({
+        roomId: roomIdForInvite,
+        roomTitle: activeRoom?.title ?? title,
+        fromUserId: user.uid,
+        fromUserName: myName,
+        toUserId: friend.userId,
+        toUserName: friend.displayName,
+        movieId: activeRoom?.movieId ?? movieId,
+        mediaType: activeRoom?.mediaType ?? mediaType,
+        season: activeRoom?.season ?? season,
+        episode: activeRoom?.episode ?? episode,
+        posterPath: activeRoom?.posterPath ?? posterPath,
+        partyJoinUrl: joinUrl,
+      });
+
+      setInvitedFriend(friend.userId);
+      setTimeout(() => setInvitedFriend(null), 2000);
+      toast({
+        title: sent ? "Invite sent" : "Invite failed",
+        description: sent
+          ? `${friend.displayName} will see a toast and bell notification.`
+          : `Could not notify ${friend.displayName}.`,
+        variant: sent ? "default" : "destructive",
+      });
+    } catch (err) {
+      console.error("[party-invite] send failed:", err);
+      toast({
+        title: "Invite failed",
+        description: "Could not send the invite. Try again.",
+        variant: "destructive",
+      });
+    }
+  }, [activeRoom, activeRoomId, user, partyJoinUrl, movieId, mediaType, season, episode, title, posterPath, toast]);
 
   // End the party
   const endParty = useCallback(async () => {
@@ -189,7 +247,7 @@ export function WatchParty({
 
   // Copy invite link (FlixParty external room or legacy watch_parties room)
   const copyInviteLink = useCallback(() => {
-    const roomId = activeRoom?.id ?? externalRoomId;
+    const roomId = activeRoom?.id ?? activeRoomId;
     if (!roomId) return;
 
     const mid = activeRoom?.movieId ?? movieId;
@@ -204,7 +262,7 @@ export function WatchParty({
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
-  }, [activeRoom, externalRoomId, movieId, mediaType, season, episode]);
+  }, [activeRoom, activeRoomId, movieId, mediaType, season, episode]);
 
   // Cleanup
   useEffect(() => {
@@ -216,11 +274,11 @@ export function WatchParty({
   return (
     <div className="space-y-4">
       {/* No active room — show create/invite */}
-      {!activeRoom && !externalRoomId && (
+      {!activeRoom && !activeRoomId && (
         <div>
           <button
-            onClick={onStartParty || createRoom}
-            disabled={creating && !onStartParty}
+            onClick={() => void handleStart()}
+            disabled={creating}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-sm font-bold text-white transition-all disabled:opacity-50"
           >
             {creating ? (
@@ -237,7 +295,7 @@ export function WatchParty({
       )}
 
       {/* Active room — show party info + invite */}
-      {(activeRoom || externalRoomId) && (
+      {(activeRoom || activeRoomId) && (
         <div className="space-y-3">
           {/* Room status */}
           <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">

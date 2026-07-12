@@ -20,6 +20,7 @@ import BackToTop from "@/components/BackToTop";
 import OfflineCacheSync from "@/components/OfflineCacheSync";
 import { CookieConsent } from "@/components/CookieConsent";
 import UsernameReminder from "@/components/UsernameReminder";
+import InviteAlertListener from "@/components/InviteAlertListener";
 
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"), { ssr: false });
 const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcutsHelp"), {
@@ -69,6 +70,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                     <BackToTop />
                     <CookieConsent />
                     <UsernameReminder />
+                    <InviteAlertListener />
                     {children}
                     <Toaster />
                     <Sonner />

@@ -4,13 +4,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   X, Users, Send, Crown, LogOut, PartyPopper, Smile, UserPlus
 } from "lucide-react";
-import { useFlixParty, type FlixPartyParticipant } from "@/hooks/player/useFlixParty";
+import type { FlixPartyParticipant, FlixPartyChatMessage, FlixPartyRoom } from "@/hooks/player/useFlixParty";
 import { useFriends, type Friend } from "@/hooks/useFriends";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useToast } from "@/hooks/use-toast";
-import { addDoc, collection, getFirestore } from "firebase/firestore";
-import { sendNotificationToUser } from "@/lib/notifications/createNotification";
+import { sendWatchPartyInvite } from "@/lib/notifications/sendWatchPartyInvite";
+import { firestoreErrorMessage } from "@/lib/firestore/errors";
 import { FriendsList } from "@/components/FriendsList";
 import { WatchParty } from "./WatchParty";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge";
@@ -20,6 +20,8 @@ import type { usePartyMedia } from "@/hooks/player/usePartyMedia";
 
 type PartyMediaState = ReturnType<typeof usePartyMedia>;
 
+export type PartyStartResult = { roomId: string; joinUrl: string };
+
 interface FlixPartySidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,7 +29,7 @@ interface FlixPartySidebarProps {
   syncStatus: SyncStatus;
   driftMs?: number;
   onLeaveRoom: () => void;
-  onStartParty?: () => void;
+  onStartParty?: () => Promise<PartyStartResult | null> | void;
   /** Render beside the player window instead of full-screen overlay */
   embedded?: boolean;
   /** Current playback context for WatchParty */
@@ -42,6 +44,13 @@ interface FlixPartySidebarProps {
   onSyncToPosition?: (position: number) => void;
   partyJoinUrl?: string | null;
   media?: PartyMediaState;
+  partyRoom?: FlixPartyRoom | null;
+  partyMessages?: FlixPartyChatMessage[];
+  isHost?: boolean;
+  sendPartyMessage?: (text: string, emoji?: string) => Promise<void>;
+  kickParticipant?: (targetUserId: string) => Promise<void>;
+  setParticipantMicMuted?: (targetUserId: string, muted: boolean) => Promise<void>;
+  setParticipantCamDisabled?: (targetUserId: string, disabled: boolean) => Promise<void>;
 }
 
 type SidebarTab = "chat" | "friends" | "party";
@@ -66,17 +75,27 @@ export function FlixPartySidebar({
   partyJoinUrl,
   embedded = false,
   media,
+  partyRoom: room,
+  partyMessages: messages = [],
+  isHost = false,
+  sendPartyMessage,
+  kickParticipant,
+  setParticipantMicMuted,
+  setParticipantCamDisabled,
 }: FlixPartySidebarProps) {
-  const { room, messages, isHost, sendMessage, kickParticipant, setParticipantMicMuted, setParticipantCamDisabled } = useFlixParty({ roomId });
+  const [activeTab, setActiveTab] = useState<SidebarTab>("friends");
+  const [input, setInput] = useState("");
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const { user } = useAuth();
   const { profile } = useUserProfileContext();
   const { friends, incomingRequests } = useFriends();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<SidebarTab>("friends");
-  const [input, setInput] = useState("");
-  const [showEmoji, setShowEmoji] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+
+  const sendMessage = sendPartyMessage ?? (async () => undefined);
 
   const QUICK_EMOJIS = ["😂", "🔥", "❤️", "👏", "😮", "💀", "🎬", "🍿"];
 
@@ -119,26 +138,38 @@ export function FlixPartySidebar({
 
   const handleInviteFriend = useCallback(
     async (friend: Friend) => {
-      if (!user || !partyJoinUrl) {
-        if (!roomId && onStartParty) {
-          toast({
-            title: "Start a party first",
-            description: "Create a watch party, then invite friends from this list.",
-          });
-          onStartParty();
-        }
-        setActiveTab("party");
-        return;
-      }
+      if (!user || invitingFriendId) return;
 
-      const myName =
-        profile?.display_name || user.displayName || user.email?.split("@")[0] || "Someone";
-      const movieTitle = title || "this title";
+      setInvitingFriendId(friend.userId);
+      let joinUrl = partyJoinUrl;
+      let activeRoomId = roomId;
 
       try {
-        const db = getFirestore();
-        await addDoc(collection(db, "watch_party_invites"), {
-          roomId,
+        if (!joinUrl && onStartParty) {
+          toast({ title: "Starting party…", description: "Creating your watch room." });
+          const result = await onStartParty();
+          if (result && typeof result === "object") {
+            joinUrl = result.joinUrl;
+            activeRoomId = result.roomId;
+          }
+        }
+
+        if (!joinUrl || !activeRoomId) {
+          toast({
+            title: "No active party",
+            description: "Open the Party tab and tap Start Watch Party first.",
+            variant: "destructive",
+          });
+          setActiveTab("party");
+          return;
+        }
+
+        const myName =
+          profile?.display_name || user.displayName || user.email?.split("@")[0] || "Someone";
+        const movieTitle = title || "this title";
+
+        const sent = await sendWatchPartyInvite({
+          roomId: activeRoomId,
           roomTitle: movieTitle,
           fromUserId: user.uid,
           fromUserName: myName,
@@ -149,45 +180,30 @@ export function FlixPartySidebar({
           season: season ?? null,
           episode: episode ?? null,
           posterPath: posterPath ?? null,
-          partyJoinUrl,
-          status: "pending",
-          createdAt: Date.now(),
+          partyJoinUrl: joinUrl,
         });
 
-        void sendNotificationToUser({
-          recipientId: friend.userId,
-          senderId: user.uid,
-          senderName: myName,
-          type: "watch_party_invite",
-          title: "Watch party invite",
-          message: `${myName} invited you to watch "${movieTitle}" together`,
-          data: {
-            from_user_id: user.uid,
-            from_user_name: myName,
-            party_join_url: partyJoinUrl,
-            room_id: roomId,
-            content_id: movieId,
-            content_type: mediaType,
-            movie_title: movieTitle,
-          },
-        });
-
-        const message = `Join me on FlixVerse to watch "${movieTitle}" together!\n${partyJoinUrl}`;
+        const message = `Join me on FlixVerse to watch "${movieTitle}" together!\n${joinUrl}`;
         void navigator.clipboard.writeText(message);
 
         toast({
-          title: "Invite sent",
-          description: `${friend.displayName} got a notification. Link copied to clipboard.`,
+          title: sent ? "Invite sent" : "Invite failed",
+          description: sent
+            ? `${friend.displayName} will see a toast and bell notification.`
+            : `Could not notify ${friend.displayName}. Check console for details.`,
+          variant: sent ? "default" : "destructive",
         });
-      } catch {
+      } catch (err) {
+        console.error("[party-invite] send failed:", err);
         toast({
-          title: "Invite failed",
-          description: "Could not send the invite. Try again.",
+          title: "Could not invite",
+          description: firestoreErrorMessage(err),
           variant: "destructive",
         });
+        if (!roomId) setActiveTab("party");
+      } finally {
+        setInvitingFriendId(null);
       }
-
-      setActiveTab("party");
     },
     [
       user,
@@ -202,6 +218,7 @@ export function FlixPartySidebar({
       season,
       episode,
       posterPath,
+      invitingFriendId,
     ]
   );
 
@@ -292,18 +309,22 @@ export function FlixPartySidebar({
                 currentUserId={user.uid}
                 isHost={isHost}
                 onKick={(id) => {
-                  void kickParticipant(id);
+                  void kickParticipant?.(id);
                   toast({ title: "Guest removed", description: "They were removed from the party." });
                 }}
-                onToggleMic={(id, muted) => void setParticipantMicMuted(id, muted)}
-                onToggleCam={(id, off) => void setParticipantCamDisabled(id, off)}
+                onToggleMic={(id, muted) => void setParticipantMicMuted?.(id, muted)}
+                onToggleCam={(id, off) => void setParticipantCamDisabled?.(id, off)}
               />
             )}
           </div>
         )}
         {/* Friends tab */}
         {activeTab === "friends" && (
-          <FriendsList inviteMode={true} onInvite={handleInviteFriend} />
+          <FriendsList
+            inviteMode={true}
+            onInvite={handleInviteFriend}
+            invitingUserId={invitingFriendId}
+          />
         )}
 
         {/* Chat tab */}
@@ -404,6 +425,7 @@ export function FlixPartySidebar({
                 onSyncToPosition={onSyncToPosition || (() => {})}
                 onStartParty={onStartParty}
                 externalRoomId={roomId}
+                partyJoinUrl={partyJoinUrl}
               />
             )}
           </div>

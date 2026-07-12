@@ -10,87 +10,53 @@ export interface NotificationPreferences {
   allNotifications: boolean;
 }
 
+const DEFAULT_PREFERENCES: NotificationPreferences = {
+  newMovies: true,
+  popularMovies: true,
+  popularTVShows: true,
+  upcomingContent: true,
+  allNotifications: true,
+};
+
 export const useNotifications = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [preferences, setPreferences] = useState<NotificationPreferences>({
-    newMovies: false,
-    popularMovies: false,
-    popularTVShows: false,
-    upcomingContent: false,
-    allNotifications: false,
-  });
+  const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if notifications are supported
     if ('Notification' in window) {
-      const permission = Notification.permission;
-      setHasPermission(permission === 'granted');
-
-      // Load preferences from localStorage
-      const savedPreferences = localStorage.getItem('notificationPreferences');
-      if (savedPreferences) {
-        try {
-          setPreferences(JSON.parse(savedPreferences));
-        } catch (error) {
-          console.error('Error parsing notification preferences:', error);
-        }
-      }
+      setHasPermission(Notification.permission === 'granted');
     } else {
       setHasPermission(false);
+    }
+
+    const savedPreferences = localStorage.getItem('notificationPreferences');
+    if (savedPreferences) {
+      try {
+        setPreferences({ ...DEFAULT_PREFERENCES, ...JSON.parse(savedPreferences) });
+      } catch (error) {
+        console.error('Error parsing notification preferences:', error);
+        setPreferences(DEFAULT_PREFERENCES);
+      }
+    } else {
+      localStorage.setItem('notificationPreferences', JSON.stringify(DEFAULT_PREFERENCES));
     }
   }, []);
 
   const requestPermission = async (): Promise<boolean> => {
-    if (!('Notification' in window)) {
-      toast({
-        title: "Notifications not supported",
-        description: "Your browser doesn't support notifications",
-        variant: "destructive",
-      });
-      return false;
-    }
-
+    if (!('Notification' in window)) return false;
     if (Notification.permission === 'granted') {
       setHasPermission(true);
       return true;
     }
-
-    if (Notification.permission === 'denied') {
-      toast({
-        title: "Notifications blocked",
-        description: "Please enable notifications in your browser settings",
-        variant: "destructive",
-      });
-      return false;
-    }
+    if (Notification.permission === 'denied') return false;
 
     try {
       const permission = await Notification.requestPermission();
       const granted = permission === 'granted';
       setHasPermission(granted);
-
-      if (granted) {
-        toast({
-          title: "Notifications enabled",
-          description: "You'll now receive updates about new content",
-        });
-      } else {
-        toast({
-          title: "Notifications disabled",
-          description: "You can enable them later in your browser settings",
-          variant: "destructive",
-        });
-      }
-
       return granted;
-    } catch (error) {
-      console.error('Error requesting notification permission:', error);
-      toast({
-        title: "Error",
-        description: "Failed to request notification permission",
-        variant: "destructive",
-      });
+    } catch {
       return false;
     }
   };
@@ -98,7 +64,6 @@ export const useNotifications = () => {
   const updatePreferences = (newPreferences: Partial<NotificationPreferences>) => {
     const updated = { ...preferences, ...newPreferences };
 
-    // If turning off all notifications, turn off individual preferences too
     if (newPreferences.allNotifications === false) {
       updated.newMovies = false;
       updated.popularMovies = false;
@@ -111,36 +76,26 @@ export const useNotifications = () => {
   };
 
   const sendNotification = (title: string, options?: NotificationOptions) => {
-    if (!hasPermission) {
-      return;
-    }
-
-    if (!preferences.allNotifications) {
-      return;
-    }
+    if (!preferences.allNotifications) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
     try {
       const notification = new Notification(title, {
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
         tag: 'flixverse-notification',
         requireInteraction: false,
         ...options,
       });
-
-      // Auto close after 5 seconds
-      setTimeout(() => {
-        notification.close();
-      }, 5000);
+      setTimeout(() => notification.close(), 5000);
     } catch (error) {
       console.error('Error sending notification:', error);
     }
   };
 
-  // Test notification function
   const sendTestNotification = () => {
     sendNotification('FlixVerse Test', {
-      body: 'This is a test notification to verify the feature is working!',
+      body: 'Browser notifications are working. In-app alerts always appear in the bell icon.',
     });
   };
 

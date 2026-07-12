@@ -154,14 +154,16 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && hasString(request.resource.data.title)
         && hasString(request.resource.data.message)
+        && hasString(request.resource.data.user_id)
         && request.resource.data.type in [
           'like', 'comment', 'follow', 'review', 'new_episode', 'recommendation',
-          'friend_request', 'friend_accepted', 'watch_party_invite'
+          'friend_request', 'friend_accepted', 'watch_party_invite', 'watch_party_invite_declined'
         ]
         && (
           request.auth.uid == request.resource.data.user_id
           || (
-            request.resource.data.data.from_user_id == request.auth.uid
+            hasString(request.resource.data.from_user_id)
+            && request.resource.data.from_user_id == request.auth.uid
             && request.resource.data.user_id != request.auth.uid
           )
         );
@@ -225,7 +227,10 @@ service cloud.firestore {
           && request.resource.data.type in ['offer', 'answer', 'candidate']
           && request.resource.data.targetId is string
           && request.resource.data.targetId.size() > 0;
-        allow update, delete: if false;
+        allow delete: if isAuthenticated()
+          && (request.auth.uid == resource.data.senderId
+              || request.auth.uid == resource.data.targetId);
+        allow update: if false;
       }
     }
 
@@ -355,6 +360,11 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.auth.uid == request.resource.data.fromUserId
         && request.auth.uid != request.resource.data.toUserId;
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.toUserId
+        && request.resource.data.status in ['accepted', 'declined']
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'respondedAt']);
       allow delete: if isAuthenticated()
         && (request.auth.uid == resource.data.fromUserId
             || request.auth.uid == resource.data.toUserId);

@@ -13,13 +13,19 @@ import {
   Tv,
   PartyPopper,
   UserCheck,
+  X,
 } from "lucide-react";
 import { useFirebaseNotifications } from "@/hooks/useNotificationsFirebase";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { Notification } from "@/integrations/firebase/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  acceptWatchPartyInvite,
+  declineWatchPartyInvite,
+} from "@/lib/notifications/partyInvite";
 
 const NotificationIcon = ({ type }: { type: Notification["type"] }) => {
   switch (type) {
@@ -35,6 +41,8 @@ const NotificationIcon = ({ type }: { type: Notification["type"] }) => {
       return <UserCheck className="h-4 w-4 text-green-400" />;
     case "watch_party_invite":
       return <PartyPopper className="h-4 w-4 text-purple-400" />;
+    case "watch_party_invite_declined":
+      return <X className="h-4 w-4 text-orange-400" />;
     case "review":
       return <Star className="h-4 w-4 text-yellow-400" />;
     case "new_episode":
@@ -52,6 +60,14 @@ function getNotificationHref(notification: Notification): string | null {
   if (notification.type === "friend_accepted") {
     return "/profile?tab=friends";
   }
+  if (
+    notification.type === "watch_party_invite" &&
+    data?.invite_status !== "accepted" &&
+    data?.invite_status !== "declined" &&
+    !notification.read
+  ) {
+    return null;
+  }
   if (notification.type === "watch_party_invite" && data?.party_join_url) {
     return data.party_join_url;
   }
@@ -65,16 +81,31 @@ function getNotificationHref(notification: Notification): string | null {
   return null;
 }
 
+function isPendingPartyInvite(notification: Notification) {
+  return (
+    notification.type === "watch_party_invite" &&
+    !notification.read &&
+    notification.data?.invite_status !== "accepted" &&
+    notification.data?.invite_status !== "declined"
+  );
+}
+
 const NotificationItem = ({
   notification,
   onRead,
   onDelete,
   onOpen,
+  onAcceptParty,
+  onDeclineParty,
+  partyActionLoading,
 }: {
   notification: Notification;
   onRead: () => void;
   onDelete: () => void;
   onOpen: () => void;
+  onAcceptParty?: () => void;
+  onDeclineParty?: () => void;
+  partyActionLoading?: boolean;
 }) => {
   const timeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -89,16 +120,19 @@ const NotificationItem = ({
   };
 
   const href = getNotificationHref(notification);
+  const showPartyActions = isPendingPartyInvite(notification);
 
   return (
     <div
-      role={href ? "button" : undefined}
-      tabIndex={href ? 0 : undefined}
+      role={href && !showPartyActions ? "button" : undefined}
+      tabIndex={href && !showPartyActions ? 0 : undefined}
       onClick={() => {
+        if (showPartyActions) return;
         if (!notification.read) onRead();
         if (href) onOpen();
       }}
       onKeyDown={(e) => {
+        if (showPartyActions) return;
         if (href && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
           if (!notification.read) onRead();
@@ -109,7 +143,7 @@ const NotificationItem = ({
         notification.read
           ? "bg-transparent hover:bg-white/5"
           : "bg-white/5 hover:bg-white/10"
-      } ${href ? "cursor-pointer" : ""}`}
+      } ${href && !showPartyActions ? "cursor-pointer" : ""}`}
     >
       <div className="flex items-start space-x-3">
         <div
@@ -126,10 +160,37 @@ const NotificationItem = ({
           </p>
           <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{notification.message}</p>
           <p className="mt-1 text-[10px] text-gray-600">{timeAgo(notification.created_at)}</p>
+
+          {showPartyActions && (
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                disabled={partyActionLoading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAcceptParty?.();
+                }}
+                className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                Join party
+              </button>
+              <button
+                type="button"
+                disabled={partyActionLoading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeclineParty?.();
+                }}
+                className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-gray-300 transition-colors hover:bg-white/10 disabled:opacity-50"
+              >
+                Decline
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-1">
-          {!notification.read && (
+          {!notification.read && !showPartyActions && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -159,6 +220,7 @@ const NotificationItem = ({
 
 const NotificationBell = () => {
   const [open, setOpen] = useState(false);
+  const [partyActionId, setPartyActionId] = useState<string | null>(null);
   const router = useRouter();
   const {
     notifications,
@@ -169,7 +231,11 @@ const NotificationBell = () => {
     deleteNotification,
     clearAll,
   } = useFirebaseNotifications();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { profile } = useUserProfileContext();
+
+  const myName =
+    profile?.display_name || user?.displayName || user?.email?.split("@")[0] || "You";
 
   if (!isAuthenticated) {
     return null;
@@ -183,6 +249,38 @@ const NotificationBell = () => {
       window.location.href = href;
     } else {
       router.push(href);
+    }
+  };
+
+  const handleAcceptParty = async (notification: Notification) => {
+    if (!user) return;
+    setPartyActionId(notification.id);
+    try {
+      const joinUrl = await acceptWatchPartyInvite(notification);
+      setOpen(false);
+      if (joinUrl) {
+        if (joinUrl.startsWith("http")) {
+          window.location.href = joinUrl;
+        } else {
+          router.push(joinUrl);
+        }
+      }
+    } catch (err) {
+      console.error("[party-invite] accept failed:", err);
+    } finally {
+      setPartyActionId(null);
+    }
+  };
+
+  const handleDeclineParty = async (notification: Notification) => {
+    if (!user) return;
+    setPartyActionId(notification.id);
+    try {
+      await declineWatchPartyInvite(notification, user.uid, myName);
+    } catch (err) {
+      console.error("[party-invite] decline failed:", err);
+    } finally {
+      setPartyActionId(null);
     }
   };
 
@@ -250,6 +348,9 @@ const NotificationBell = () => {
                   onRead={() => void markAsRead(notification.id)}
                   onDelete={() => void deleteNotification(notification.id)}
                   onOpen={() => handleOpenNotification(notification)}
+                  onAcceptParty={() => void handleAcceptParty(notification)}
+                  onDeclineParty={() => void handleDeclineParty(notification)}
+                  partyActionLoading={partyActionId === notification.id}
                 />
               ))}
             </div>

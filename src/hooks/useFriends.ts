@@ -238,15 +238,15 @@ export function useFriends() {
 
       await deleteDoc(doc(db, "friend_requests", request.id));
 
-      void sendNotificationToUser({
-        recipientId: request.fromUserId,
-        senderId: user.uid,
-        senderName: myName,
-        type: "friend_accepted",
-        title: "Friend request accepted",
-        message: `${myName} accepted your friend request`,
-        data: { from_user_id: user.uid, from_user_name: myName },
-      });
+        await sendNotificationToUser({
+          recipientId: request.fromUserId,
+          senderId: user.uid,
+          senderName: myName,
+          type: "friend_accepted",
+          title: "Friend request accepted",
+          message: `${myName} accepted your friend request`,
+          data: { from_user_id: user.uid, from_user_name: myName },
+        });
     },
     [user, myName, myAvatar]
   );
@@ -291,7 +291,7 @@ export function useFriends() {
           createdAt: Date.now(),
         });
 
-        void sendNotificationToUser({
+        await sendNotificationToUser({
           recipientId: targetUser.uid,
           senderId: user.uid,
           senderName: myName,
