@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast as sonnerToast } from "sonner";
-import { useFirebaseNotifications } from "@/hooks/useNotificationsFirebase";
+import { useAppNotifications } from "@/hooks/useAppNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import type { Notification } from "@/integrations/firebase/types";
@@ -42,7 +42,7 @@ function isPendingPartyInvite(n: Notification) {
 }
 
 export default function InviteAlertListener() {
-  const { notifications, loading } = useFirebaseNotifications();
+  const { notifications, loading } = useAppNotifications();
   const { user, isAuthenticated } = useAuth();
   const { profile } = useUserProfileContext();
   const router = useRouter();

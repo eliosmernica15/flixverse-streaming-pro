@@ -11,13 +11,13 @@ import {
   where,
   orderBy,
   limit,
-  serverTimestamp,
-  type Timestamp,
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { isRateLimited } from "@/lib/rateLimit";
 import { trackPartyJoin } from "@/lib/analytics";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { useFlixPartyPython } from "@/hooks/player/useFlixPartyPython";
 
 function participantIds(participants: FlixPartyParticipant[]): string[] {
   return participants.map((p) => p.userId);
@@ -62,7 +62,16 @@ interface UseFlixPartyOptions {
   roomId: string | null;
 }
 
-export function useFlixParty({ roomId }: UseFlixPartyOptions) {
+const USE_PYTHON_PARTY = process.env.NEXT_PUBLIC_USE_PYTHON_API === "true";
+
+export function useFlixParty(opts: UseFlixPartyOptions) {
+  if (USE_PYTHON_PARTY) {
+    return useFlixPartyPython(opts);
+  }
+  return useFlixPartyFirestore(opts);
+}
+
+function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
   const { user } = useAuth();
   const [room, setRoom] = useState<FlixPartyRoom | null>(null);
   const [messages, setMessages] = useState<FlixPartyChatMessage[]>([]);

@@ -1,8 +1,9 @@
-import { doc, setDoc } from "firebase/firestore";
-import { requireFirebaseDb } from "@/integrations/firebase/client";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { pythonFetch } from "@/lib/pythonApi/client";
 import { sendNotificationToUser } from "@/lib/notifications/createNotification";
 import { buildWatchPartyInviteId } from "@/lib/notifications/partyInvite";
-import { isFirestoreQuotaError } from "@/lib/firestore/errors";
+import { doc, setDoc } from "firebase/firestore";
+import { requireFirebaseDb } from "@/integrations/firebase/client";
 
 export interface WatchPartyInvitePayload {
   roomId: string;
@@ -20,33 +21,51 @@ export interface WatchPartyInvitePayload {
 }
 
 export async function sendWatchPartyInvite(payload: WatchPartyInvitePayload): Promise<boolean> {
+  if (isPythonBackendEnabled()) {
+    try {
+      await pythonFetch("/invites", {
+        method: "POST",
+        body: JSON.stringify({
+          roomId: payload.roomId,
+          toUserId: payload.toUserId,
+          toUserName: payload.toUserName,
+          partyJoinUrl: payload.partyJoinUrl,
+          roomTitle: payload.roomTitle,
+          movieId: payload.movieId,
+          mediaType: payload.mediaType,
+          season: payload.season,
+          episode: payload.episode,
+          posterPath: payload.posterPath,
+        }),
+      });
+      return true;
+    } catch (err) {
+      console.error("[party-invite/python] failed:", err);
+      return false;
+    }
+  }
+
   const db = requireFirebaseDb();
   const inviteId = buildWatchPartyInviteId(payload.roomId, payload.toUserId);
 
-  try {
-    await setDoc(doc(db, "watch_party_invites", inviteId), {
-      roomId: payload.roomId,
-      roomTitle: payload.roomTitle,
-      fromUserId: payload.fromUserId,
-      fromUserName: payload.fromUserName,
-      toUserId: payload.toUserId,
-      toUserName: payload.toUserName,
-      movieId: payload.movieId ?? null,
-      mediaType: payload.mediaType ?? "movie",
-      season: payload.season ?? null,
-      episode: payload.episode ?? null,
-      posterPath: payload.posterPath ?? null,
-      partyJoinUrl: payload.partyJoinUrl,
-      status: "pending",
-      createdAt: Date.now(),
-    });
-  } catch (err) {
-    if (isFirestoreQuotaError(err)) throw err;
-    console.error("[party-invite] invite doc failed:", err);
-    throw err;
-  }
+  await setDoc(doc(db, "watch_party_invites", inviteId), {
+    roomId: payload.roomId,
+    roomTitle: payload.roomTitle,
+    fromUserId: payload.fromUserId,
+    fromUserName: payload.fromUserName,
+    toUserId: payload.toUserId,
+    toUserName: payload.toUserName,
+    movieId: payload.movieId ?? null,
+    mediaType: payload.mediaType ?? "movie",
+    season: payload.season ?? null,
+    episode: payload.episode ?? null,
+    posterPath: payload.posterPath ?? null,
+    partyJoinUrl: payload.partyJoinUrl,
+    status: "pending",
+    createdAt: Date.now(),
+  });
 
-  const sent = await sendNotificationToUser({
+  return sendNotificationToUser({
     recipientId: payload.toUserId,
     senderId: payload.fromUserId,
     senderName: payload.fromUserName,
@@ -63,10 +82,4 @@ export async function sendWatchPartyInvite(payload: WatchPartyInvitePayload): Pr
       movie_title: payload.roomTitle,
     },
   });
-
-  if (!sent) {
-    throw new Error("Notification could not be delivered.");
-  }
-
-  return true;
 }

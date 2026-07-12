@@ -1,7 +1,8 @@
-import { addDoc, collection } from "firebase/firestore";
-import { getFirebaseAuth, getFirebaseDb } from "@/integrations/firebase/client";
 import type { Notification } from "@/integrations/firebase/types";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { pythonFetch } from "@/lib/pythonApi/client";
 import { enqueuePendingJob } from "@/lib/pendingJobs";
+import { getFirebaseAuth } from "@/integrations/firebase/client";
 
 const SOCIAL_TYPES: Notification["type"][] = [
   "friend_request",
@@ -11,18 +12,7 @@ const SOCIAL_TYPES: Notification["type"][] = [
   "follow",
 ];
 
-async function getIdToken(): Promise<string | null> {
-  const auth = getFirebaseAuth();
-  const user = auth?.currentUser;
-  if (!user) return null;
-  try {
-    return await user.getIdToken();
-  } catch {
-    return null;
-  }
-}
-
-async function dispatchViaApi(params: {
+async function dispatchViaPython(params: {
   recipientId: string;
   senderId: string;
   senderName: string;
@@ -30,8 +20,36 @@ async function dispatchViaApi(params: {
   title: string;
   message: string;
   data?: Notification["data"];
+}): Promise<boolean> {
+  try {
+    await pythonFetch("/notifications/dispatch", {
+      method: "POST",
+      body: JSON.stringify({
+        recipientId: params.recipientId,
+        type: params.type,
+        title: params.title,
+        message: params.message,
+        senderName: params.senderName,
+        data: params.data,
+      }),
+    });
+    return true;
+  } catch (err) {
+    console.error("[notifications/python] dispatch failed:", err);
+    return false;
+  }
+}
+
+async function dispatchViaNextApi(params: {
+  recipientId: string;
+  senderName: string;
+  type: Notification["type"];
+  title: string;
+  message: string;
+  data?: Notification["data"];
 }): Promise<"ok" | "fallback" | "failed"> {
-  const token = await getIdToken();
+  const auth = getFirebaseAuth();
+  const token = await auth?.currentUser?.getIdToken();
   if (!token) return "fallback";
 
   try {
@@ -50,18 +68,10 @@ async function dispatchViaApi(params: {
         data: params.data,
       }),
     });
-
     if (res.ok) return "ok";
-
-    const payload = (await res.json().catch(() => ({}))) as { fallback?: string };
-    if (res.status === 503 || res.status === 500 || payload.fallback === "pending_job") {
-      return "fallback";
-    }
-
-    console.error("[notifications] API dispatch failed:", res.status, payload);
+    if (res.status === 503 || res.status === 500) return "fallback";
     return "failed";
-  } catch (err) {
-    console.warn("[notifications] API unreachable, using job queue:", err);
+  } catch {
     return "fallback";
   }
 }
@@ -75,9 +85,6 @@ async function dispatchViaJobQueue(params: {
   message: string;
   data?: Notification["data"];
 }): Promise<boolean> {
-  const db = getFirebaseDb();
-  if (!db) return false;
-
   try {
     await enqueuePendingJob(params.senderId, "social_notify", {
       recipientId: params.recipientId,
@@ -88,13 +95,12 @@ async function dispatchViaJobQueue(params: {
       data: params.data ?? {},
     });
     return true;
-  } catch (err) {
-    console.error("[notifications] job enqueue failed:", err);
+  } catch {
     return false;
   }
 }
 
-/** Secure notification dispatch: verified API (Admin SDK) with job-queue fallback. */
+/** Secure notification dispatch — Python SQLite API (preferred), then Admin API, then job queue. */
 export async function sendNotificationToUser(params: {
   recipientId: string;
   senderId: string;
@@ -105,15 +111,14 @@ export async function sendNotificationToUser(params: {
   data?: Notification["data"];
 }): Promise<boolean> {
   if (params.recipientId === params.senderId) return false;
+  if (!SOCIAL_TYPES.includes(params.type)) return false;
 
-  if (!SOCIAL_TYPES.includes(params.type)) {
-    console.error("[notifications] unsupported type for secure dispatch:", params.type);
-    return false;
+  if (isPythonBackendEnabled()) {
+    return dispatchViaPython(params);
   }
 
-  const viaApi = await dispatchViaApi(params);
+  const viaApi = await dispatchViaNextApi(params);
   if (viaApi === "ok") return true;
   if (viaApi === "failed") return false;
-
   return dispatchViaJobQueue(params);
 }

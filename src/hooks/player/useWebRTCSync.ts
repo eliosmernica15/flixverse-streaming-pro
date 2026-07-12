@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { WebRTCPartySync } from "@/lib/player/webrtcPartySync";
+import { WebRTCPartySyncWs, openPartyWebSocket } from "@/lib/player/webrtcPartySyncWs";
 import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { getFirebaseAuth } from "@/integrations/firebase/client";
 
 export interface SyncMessage {
   type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";
@@ -59,12 +62,11 @@ export function useWebRTCSync({
       return;
     }
 
-    const sync = new WebRTCPartySync(
-      roomId,
-      user.uid,
-      isHost,
-      isHost ? null : hostId,
-      (raw) => {
+    let sync: WebRTCPartySync | WebRTCPartySyncWs | null = null;
+    let cancelled = false;
+
+    void (async () => {
+      const onMsg = (raw: unknown) => {
         const msg = raw as SyncMessage;
         if (msg.type === "chat") {
           setMessages((prev) => [...prev, msg]);
@@ -73,23 +75,55 @@ export function useWebRTCSync({
         if (["play", "pause", "seek", "heartbeat"].includes(msg.type)) {
           onPlaybackSyncRef.current?.(msg);
         }
-      },
-      {
-        onRemoteStream: (peerId, stream) => onRemoteStreamRef.current?.(peerId, stream),
-        onRemoteStreamRemoved: (peerId) => onRemoteStreamRemovedRef.current?.(peerId),
-      }
-    );
+      };
 
-    sync.start();
-    syncRef.current = sync;
+      const mediaCb = {
+        onRemoteStream: (peerId: string, stream: MediaStream) =>
+          onRemoteStreamRef.current?.(peerId, stream),
+        onRemoteStreamRemoved: (peerId: string) =>
+          onRemoteStreamRemovedRef.current?.(peerId),
+      };
+
+      if (isPythonBackendEnabled()) {
+        const token = await getFirebaseAuth()?.currentUser?.getIdToken();
+        if (!token || cancelled) return;
+        const ws = await openPartyWebSocket(roomId, token);
+        if (cancelled) {
+          ws.close();
+          return;
+        }
+        sync = new WebRTCPartySyncWs(
+          roomId,
+          user.uid,
+          isHost,
+          isHost ? null : hostId,
+          onMsg,
+          mediaCb,
+          ws
+        );
+      } else {
+        sync = new WebRTCPartySync(
+          roomId,
+          user.uid,
+          isHost,
+          isHost ? null : hostId,
+          onMsg,
+          mediaCb
+        );
+        sync.start();
+      }
+
+      syncRef.current = sync as WebRTCPartySync;
+    })();
 
     const poll = setInterval(() => {
-      setIsConnected(sync.isConnected);
+      if (syncRef.current) setIsConnected(syncRef.current.isConnected);
     }, 1000);
 
     return () => {
+      cancelled = true;
       clearInterval(poll);
-      sync.destroy();
+      syncRef.current?.destroy();
       syncRef.current = null;
       setIsConnected(false);
     };

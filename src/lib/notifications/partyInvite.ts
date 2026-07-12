@@ -1,25 +1,32 @@
+import type { Notification } from "@/integrations/firebase/types";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { pythonFetch } from "@/lib/pythonApi/client";
 import { doc, updateDoc } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
-import type { Notification } from "@/integrations/firebase/types";
 import { sendNotificationToUser } from "@/lib/notifications/createNotification";
 
-function inviteDocId(roomId: string, toUserId: string) {
+export function buildWatchPartyInviteId(roomId: string, toUserId: string) {
   return `${roomId}_${toUserId}`;
 }
 
-export function buildWatchPartyInviteId(roomId: string, toUserId: string) {
-  return inviteDocId(roomId, toUserId);
-}
+export async function acceptWatchPartyInvite(notification: Notification): Promise<string | null> {
+  if (isPythonBackendEnabled()) {
+    const data = await pythonFetch<{ ok: boolean; joinUrl?: string }>(
+      "/notifications/party-invite/accept",
+      {
+        method: "POST",
+        body: JSON.stringify({ notificationId: notification.id }),
+      }
+    );
+    return data.joinUrl ?? notification.data?.party_join_url ?? null;
+  }
 
-export async function acceptWatchPartyInvite(
-  notification: Notification
-): Promise<string | null> {
   const db = requireFirebaseDb();
   const joinUrl = notification.data?.party_join_url ?? null;
   const roomId = notification.data?.room_id;
   const inviteId =
     notification.data?.invite_id ??
-    (roomId && notification.user_id ? inviteDocId(roomId, notification.user_id) : null);
+    (roomId && notification.user_id ? buildWatchPartyInviteId(roomId, notification.user_id) : null);
 
   if (inviteId) {
     await updateDoc(doc(db, "watch_party_invites", inviteId), {
@@ -30,10 +37,7 @@ export async function acceptWatchPartyInvite(
 
   await updateDoc(doc(db, "notifications", notification.id), {
     read: true,
-    data: {
-      ...notification.data,
-      invite_status: "accepted",
-    },
+    data: { ...notification.data, invite_status: "accepted" },
   });
 
   return joinUrl;
@@ -44,11 +48,19 @@ export async function declineWatchPartyInvite(
   responderId: string,
   responderName: string
 ): Promise<void> {
+  if (isPythonBackendEnabled()) {
+    await pythonFetch("/notifications/party-invite/decline", {
+      method: "POST",
+      body: JSON.stringify({ notificationId: notification.id }),
+    });
+    return;
+  }
+
   const db = requireFirebaseDb();
   const roomId = notification.data?.room_id;
   const inviteId =
     notification.data?.invite_id ??
-    (roomId ? inviteDocId(roomId, responderId) : null);
+    (roomId ? buildWatchPartyInviteId(roomId, responderId) : null);
   const hostId = notification.from_user_id ?? notification.data?.from_user_id;
 
   if (inviteId) {
@@ -60,10 +72,7 @@ export async function declineWatchPartyInvite(
 
   await updateDoc(doc(db, "notifications", notification.id), {
     read: true,
-    data: {
-      ...notification.data,
-      invite_status: "declined",
-    },
+    data: { ...notification.data, invite_status: "declined" },
   });
 
   if (hostId && hostId !== responderId) {

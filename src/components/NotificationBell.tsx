@@ -15,7 +15,7 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
-import { useFirebaseNotifications } from "@/hooks/useNotificationsFirebase";
+import { useAppNotifications } from "@/hooks/useAppNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { Notification } from "@/integrations/firebase/types";
@@ -230,7 +230,7 @@ const NotificationBell = () => {
     markAllAsRead,
     deleteNotification,
     clearAll,
-  } = useFirebaseNotifications();
+  } = useAppNotifications();
   const { user, isAuthenticated } = useAuth();
   const { profile } = useUserProfileContext();
 

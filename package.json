@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "api": "cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
     "lint": "eslint . --ext .ts,.tsx",
     "worker:jobs": "python scripts/python/process_jobs.py --once",
     "worker:reports": "python scripts/python/process_reports.py"
