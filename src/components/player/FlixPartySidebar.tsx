@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  X, Users, Send, Crown, LogOut, PartyPopper, Smile, UserPlus
+  X, Users, Send, Crown, LogOut, PartyPopper, Smile, UserPlus, ChevronDown
 } from "lucide-react";
 import type { FlixPartyParticipant, FlixPartyChatMessage, FlixPartyRoom } from "@/hooks/player/useFlixParty";
 import { useFriends, type Friend } from "@/hooks/useFriends";
@@ -51,6 +51,10 @@ interface FlixPartySidebarProps {
   kickParticipant?: (targetUserId: string) => Promise<void>;
   setParticipantMicMuted?: (targetUserId: string, muted: boolean) => Promise<void>;
   setParticipantCamDisabled?: (targetUserId: string, disabled: boolean) => Promise<void>;
+  /** Mobile bottom-sheet mode */
+  isMobile?: boolean;
+  mobileExpanded?: boolean;
+  onMinimize?: () => void;
 }
 
 type SidebarTab = "chat" | "friends" | "party";
@@ -82,6 +86,9 @@ export function FlixPartySidebar({
   kickParticipant,
   setParticipantMicMuted,
   setParticipantCamDisabled,
+  isMobile = false,
+  mobileExpanded = true,
+  onMinimize,
 }: FlixPartySidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>(roomId ? "chat" : "friends");
   const [input, setInput] = useState("");
@@ -229,45 +236,74 @@ export function FlixPartySidebar({
   if (!isOpen) return null;
 
   const participants: FlixPartyParticipant[] = room?.participants || [];
+  const panelClass = embedded
+    ? `player-party-panel${isMobile ? " player-party-panel--mobile" : ""}${isMobile && mobileExpanded ? " player-party-panel--expanded" : ""}${isMobile && !mobileExpanded ? " player-party-panel--minimized" : ""}`
+    : "fixed inset-y-0 right-0 z-[10000] w-full sm:w-96 flex flex-col bg-zinc-950 border-l border-white/10 shadow-2xl animate-slide-in-right";
 
   return (
-    <div
-      className={
-        embedded
-          ? "player-party-panel"
-          : "fixed inset-y-0 right-0 z-[10000] w-full sm:w-96 flex flex-col bg-zinc-950 border-l border-white/10 shadow-2xl animate-slide-in-right"
-      }
-    >
+    <div className={panelClass}>
+      {isMobile && mobileExpanded && (
+        <div className="player-party-drag-handle" aria-hidden>
+          <span />
+        </div>
+      )}
+
       {/* Header */}
-      <div className="p-4 border-b border-white/10 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+      <div className={`player-party-header ${isMobile ? "player-party-header--mobile" : ""}`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shrink-0">
             <PartyPopper className="w-5 h-5 text-white" />
           </div>
-          <div>
-            <h2 className="font-bold text-white text-sm">Watch Together</h2>
-            <p className="text-xs text-gray-500">
-              {friends.length} friend{friends.length !== 1 ? "s" : ""}
-              {incomingRequests.length > 0 && (
-                <span className="text-red-400 ml-1">· {incomingRequests.length} request{incomingRequests.length !== 1 ? "s" : ""}</span>
-              )}
-            </p>
+          <div className="min-w-0">
+            <h2 className="font-bold text-white text-sm truncate">Watch Together</h2>
+            {!isMobile && (
+              <p className="text-xs text-gray-500">
+                {friends.length} friend{friends.length !== 1 ? "s" : ""}
+                {incomingRequests.length > 0 && (
+                  <span className="text-red-400 ml-1">· {incomingRequests.length} request{incomingRequests.length !== 1 ? "s" : ""}</span>
+                )}
+              </p>
+            )}
             {roomId && (
               <SyncStatusBadge status={syncStatus} driftMs={driftMs} className="mt-1" />
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-2.5 min-w-[2.75rem] min-h-[2.75rem] hover:bg-white/10 rounded-lg transition-colors"
-          aria-label="Close sidebar"
-        >
-          <X className="w-4 h-4 text-gray-400" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {roomId && isMobile && (
+            <button
+              type="button"
+              onClick={onLeaveRoom}
+              className="player-party-icon-btn player-party-icon-btn--danger"
+              aria-label={isHostProp ? "End party for everyone" : "Leave party"}
+              title={isHostProp ? "End party" : "Leave"}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
+          {isMobile && mobileExpanded && onMinimize && (
+            <button
+              type="button"
+              onClick={onMinimize}
+              className="player-party-icon-btn"
+              aria-label="Minimize party panel"
+              title="Minimize"
+            >
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="player-party-icon-btn"
+            aria-label="Close sidebar"
+          >
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
       </div>
 
-      {roomId && (
+      {roomId && !isMobile && (
         <div className="px-3 py-2 border-b border-white/10 shrink-0">
           <button
             type="button"
@@ -280,8 +316,10 @@ export function FlixPartySidebar({
         </div>
       )}
 
+      {(!isMobile || mobileExpanded) && (
+        <>
       {/* Tabs */}
-      <div className="flex border-b border-white/10 shrink-0">
+      <div className="player-party-tabs">
         {[
           { id: "friends" as const, label: "Friends", icon: UserPlus },
           { id: "chat" as const, label: "Chat", icon: Send },
@@ -305,7 +343,7 @@ export function FlixPartySidebar({
       {/* Tab content */}
       <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
         {roomId && media && activeTab !== "chat" && (
-          <div className="shrink-0 border-b border-white/10 px-3 py-3 space-y-3">
+          <div className="shrink-0 border-b border-white/10 px-3 py-2 space-y-2">
             <PartyMediaControls
               micOn={media.micOn}
               cameraOn={media.cameraOn}
@@ -318,6 +356,7 @@ export function FlixPartySidebar({
               onToggleMic={() => void media.toggleMic()}
               onToggleCamera={() => void media.toggleCamera()}
               onVoiceVolumeChange={media.setVoiceVolume}
+              compact={isMobile}
             />
             {room && user && (
               <PartyMembersPanel
@@ -369,6 +408,7 @@ export function FlixPartySidebar({
                       onToggleMic={() => void media.toggleMic()}
                       onToggleCamera={() => void media.toggleCamera()}
                       onVoiceVolumeChange={media.setVoiceVolume}
+                      compact={isMobile}
                     />
                   </div>
                 )}
@@ -465,6 +505,27 @@ export function FlixPartySidebar({
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {isMobile && !mobileExpanded && roomId && media && (
+        <div className="player-party-minibar">
+          <PartyMediaControls
+            micOn={media.micOn}
+            cameraOn={media.cameraOn}
+            cameraMode={media.cameraMode}
+            anyoneSpeaking={media.anyoneSpeaking}
+            mediaError={media.mediaError}
+            voiceVolume={media.voiceVolume}
+            hostMicForcedOff={media.hostMicForcedOff}
+            hostCamForcedOff={media.hostCamForcedOff}
+            onToggleMic={() => void media.toggleMic()}
+            onToggleCamera={() => void media.toggleCamera()}
+            onVoiceVolumeChange={media.setVoiceVolume}
+            compact
+          />
+        </div>
+      )}
     </div>
   );
 }

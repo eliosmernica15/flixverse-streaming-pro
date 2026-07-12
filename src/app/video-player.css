@@ -88,6 +88,16 @@
   font-weight: 600;
 }
 
+.player-party-syncing {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.player-party-offline {
+  color: #f87171;
+  font-weight: 600;
+}
+
 /* Layout: player + party column */
 .player-layout {
   display: flex;
@@ -867,6 +877,191 @@
   color: #fca5a5;
 }
 
+.party-media-controls--compact {
+  gap: 0.35rem;
+}
+
+.party-media-controls--compact .party-media-btn span {
+  display: none;
+}
+
+.party-media-controls--compact .party-media-btn {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+/* Party invite dialog */
+.party-invite-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10003;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.party-invite-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.party-invite-dialog-panel {
+  position: relative;
+  width: 100%;
+  max-width: 28rem;
+  max-height: min(92dvh, 40rem);
+  overflow-y: auto;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #09090b;
+  box-shadow: 0 0 80px rgba(239, 68, 68, 0.2);
+  animation: player-party-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.party-invite-dialog-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.75rem 1.25rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.party-invite-dialog-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.625rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Mobile camera PiP */
+.party-camera-pip {
+  position: fixed;
+  right: 0.75rem;
+  bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  z-index: 10001;
+  width: 5.5rem;
+  pointer-events: none;
+}
+
+.party-camera-pip .party-camera-tile {
+  aspect-ratio: 3 / 4;
+  min-width: 0;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+}
+
+.party-camera-pip .party-camera-tile-bar {
+  padding: 0.2rem 0.35rem;
+  font-size: 0.55rem;
+}
+
+.party-camera-pip-stack {
+  display: none;
+}
+
+.party-camera-pip--expanded {
+  bottom: calc(min(45vh, 20rem) + 0.75rem + env(safe-area-inset-bottom));
+  width: 6.5rem;
+}
+
+/* Party FAB */
+.player-party-fab {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 10001;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ef4444, #a855f7);
+  color: #fff;
+  box-shadow: 0 8px 28px rgba(239, 68, 68, 0.4);
+  cursor: pointer;
+}
+
+.player-party-fab-badge {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #4ade80;
+  border: 2px solid #09090b;
+}
+
+/* Party panel mobile chrome */
+.player-party-drag-handle {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0 0.15rem;
+  flex-shrink: 0;
+}
+
+.player-party-drag-handle span {
+  width: 2.5rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.player-party-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.player-party-header--mobile {
+  padding: 0.5rem 0.75rem;
+}
+
+.player-party-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: none;
+  border-radius: 0.6rem;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.player-party-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-party-icon-btn--danger {
+  color: #fecaca;
+}
+
+.player-party-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.player-party-minibar {
+  padding: 0.5rem 0.75rem;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* Party members + host controls */
 .party-members-panel {
   display: flex;
@@ -1023,15 +1218,49 @@
 /* Tablet: stacked layout, party panel below player */
 @media (max-width: 768px) {
   .player-shell {
-    padding: 0.75rem;
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    padding: 0.5rem;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    align-items: stretch;
   }
 
-  .player-layout {
+  .player-shell--mobile .player-layout {
+    flex: 1;
+    min-height: 0;
     flex-direction: column;
     align-items: stretch;
     max-width: 100%;
-    gap: 0.65rem;
+    gap: 0;
+  }
+
+  .player-shell--mobile .player-layout-main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .player-shell--mobile .player-window.is-framed {
+    flex: 1;
+    width: 100%;
+    max-width: 100%;
+    min-height: 55vh;
+    max-height: none;
+    border-radius: 0.75rem;
+  }
+
+  .player-shell--mobile.player-shell--party-expanded .player-window.is-framed {
+    min-height: 55vh;
+    max-height: calc(100dvh - min(45vh, 20rem) - 1rem);
+  }
+
+  .player-shell--mobile.player-shell--party-minimized .player-window.is-framed {
+    min-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom));
+  }
+
+  .player-shell--mobile:not(.player-shell--party-open) .player-window.is-framed {
+    min-height: calc(100dvh - 2rem - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 2rem - env(safe-area-inset-bottom));
   }
 
   .player-layout--camera .player-layout-main {
@@ -1040,35 +1269,25 @@
   }
 
   .player-layout--camera .player-window.is-framed {
-    flex: none;
+    flex: 1;
     width: 100%;
   }
 
-  .player-shell--party-open .player-layout {
-    max-width: 100%;
-  }
-
-  .player-shell--party-open .player-window.is-framed {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .player-window.is-framed {
-    width: 100%;
-    max-height: none;
-  }
-
-  .player-party-panel {
+  .player-party-panel--mobile {
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 10002;
     width: 100%;
-    max-height: min(45vh, 22rem);
     padding-bottom: env(safe-area-inset-bottom);
     border-radius: 1rem 1rem 0 0;
     border-bottom: none;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55);
+  }
+
+  .player-party-panel--mobile.player-party-panel--expanded {
+    max-height: min(45vh, 20rem);
     animation: player-party-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
@@ -1083,27 +1302,26 @@
     }
   }
 
+  .player-party-panel--mobile.player-party-panel--minimized {
+    max-height: 3.75rem;
+    border-radius: 0.85rem 0.85rem 0 0;
+  }
+
+  .party-invite-dialog {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .party-invite-dialog-panel {
+    max-width: none;
+    max-height: none;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+
   .party-camera-grid {
-    width: 100%;
-    max-height: 28vh;
-    flex-direction: row;
-    order: 2;
-  }
-
-  .party-camera-grid-scroll {
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
-    padding-bottom: 0.15rem;
-  }
-
-  .party-camera-tile {
-    min-width: 4.5rem;
-    flex: 0 0 auto;
-    scroll-snap-align: start;
-    aspect-ratio: 1;
+    display: none;
   }
 
   .party-camera-hint {
@@ -1115,85 +1333,15 @@
   }
 
   .player-party-panel .party-media-btn,
-  .player-party-panel button {
+  .player-party-panel button,
+  .player-party-icon-btn {
     min-height: 2.75rem;
     min-width: 2.75rem;
   }
 }
 
 @media (max-width: 640px) {
-  .player-layout--camera .player-layout-main {
-    flex-direction: column;
-  }
-
-  .party-camera-grid {
-    width: 100%;
-    max-height: 28vh;
-    flex-direction: row;
-  }
-
-  .party-camera-grid-scroll {
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .party-camera-tile {
-    min-width: 4.5rem;
-    aspect-ratio: 1;
-  }
-
-  .player-shell {
-    padding: 0.5rem;
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-    align-items: flex-start;
-  }
-
-  .player-layout {
-    flex-direction: column;
-    align-items: stretch;
-    max-width: 100%;
-  }
-
-  .player-shell--party-open .player-window.is-framed {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .player-party-panel {
-    width: 100%;
-    max-height: min(55vh, 24rem);
-    border-radius: 0.85rem 0.85rem 0 0;
-  }
-
-  .player-shell--boost-1 .player-party-panel,
-  .player-shell--boost-2 .player-party-panel,
-  .player-shell--boost-3 .player-party-panel {
-    display: none;
-  }
-
-  .player-window.is-framed {
-    width: 100%;
-    max-height: calc(100dvh - min(55vh, 24rem) - 1.5rem);
-    border-radius: 0.75rem;
-  }
-
-  .player-shell--party-open .player-window.is-framed {
-    max-height: calc(45dvh - 1rem);
-  }
-
-  .player-shell--boost-1 .player-window.is-framed,
-  .player-shell--boost-2 .player-window.is-framed {
-    max-height: calc(100dvh - 10rem) !important;
-  }
-
-  .player-shell--boost-3 .player-window.is-framed {
-    max-height: calc(100dvh - 4rem) !important;
-    width: 100% !important;
-  }
-
-  .player-window-bar {
+  .player-shell--mobile .player-window-bar {
     padding: 0.45rem 0.5rem 0.45rem 0.75rem;
   }
 
@@ -1206,6 +1354,14 @@
     max-width: calc(100% - 1.5rem);
     white-space: normal;
     text-align: center;
+  }
+
+  .party-camera-pip {
+    width: 5rem;
+  }
+
+  .party-camera-pip--expanded {
+    width: 5.75rem;
   }
 }
 

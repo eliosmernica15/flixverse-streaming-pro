@@ -36,6 +36,11 @@ const SYNC_INTERVAL_MS = 2000;
 const DRIFT_SEEK_THRESHOLD_SEC = 1.5;
 const SEEK_COOLDOWN_MS = 1500;
 const MAX_GUEST_SPLASH_MS = 14_000;
+const MOBILE_BREAKPOINT = 768;
+
+function isMobileViewport(): boolean {
+  return typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
+}
 
 interface UsePlayerPartySyncOptions {
   movieId: number;
@@ -465,7 +470,7 @@ export function usePlayerPartySync({
       setPartyRoomId(id);
       setPartyRoomKey(key);
       setShowInviteDialog(true);
-      setShowPartyPanel(true);
+      setShowPartyPanel(isMobileViewport() ? false : true);
       playUiSound("success");
       return { roomId: id, joinUrl: buildPartyJoinUrl(id, key) };
     } catch (err) {

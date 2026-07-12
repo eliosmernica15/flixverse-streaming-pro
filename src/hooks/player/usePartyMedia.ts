@@ -3,6 +3,11 @@ import { useState, useCallback, useRef, useEffect } from "react";
 const SPEAK_THRESHOLD = 0.04;
 const SPEAK_HYSTERESIS = 0.025;
 const VOICE_VOLUME_KEY = "flixverse-party-voice-volume";
+const MOBILE_BREAKPOINT = 768;
+
+function isMobileDevice(): boolean {
+  return typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
+}
 
 function createAnalyser(stream: MediaStream): { ctx: AudioContext; analyser: AnalyserNode } | null {
   try {
@@ -102,9 +107,21 @@ export function usePartyMedia({
     }
   }, []);
 
+  const resumeAnalyser = useCallback(async () => {
+    const ctx = analyserRef.current?.ctx;
+    if (ctx && ctx.state === "suspended") {
+      try {
+        await ctx.resume();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
   const buildLocalStream = useCallback(async (wantMic: boolean, wantCam: boolean) => {
     const effectiveMic = wantMic && !hostMicForcedOff;
     const effectiveCam = wantCam && !hostCamForcedOff;
+    const mobile = isMobileDevice();
 
     if (!effectiveMic && !effectiveCam) {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -116,25 +133,69 @@ export function usePartyMedia({
       return;
     }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: effectiveMic
-          ? {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 48000,
-            }
-          : false,
-        video: effectiveCam
-          ? {
-              width: { ideal: 1280, max: 1920 },
-              height: { ideal: 720, max: 1080 },
-              frameRate: { ideal: 30, max: 30 },
-              facingMode: "user",
-            }
-          : false,
+    const existing = localStreamRef.current;
+    const hasAudio = existing?.getAudioTracks().some((t) => t.readyState === "live");
+    const hasVideo = existing?.getVideoTracks().some((t) => t.readyState === "live");
+
+    if (existing && hasAudio === effectiveMic && hasVideo === effectiveCam) {
+      existing.getAudioTracks().forEach((t) => {
+        t.enabled = effectiveMic;
       });
+      existing.getVideoTracks().forEach((t) => {
+        t.enabled = effectiveCam;
+      });
+      if (effectiveMic) {
+        if (!analyserRef.current) {
+          analyserRef.current = createAnalyser(existing);
+        }
+        await resumeAnalyser();
+      }
+      await setLocalStream(existing);
+      return;
+    }
+
+    const audioConstraints = effectiveMic
+      ? {
+          echoCancellation: { ideal: true },
+          noiseSuppression: { ideal: true },
+          autoGainControl: { ideal: true },
+          channelCount: { ideal: 1 },
+        }
+      : false;
+
+    const videoConstraints = effectiveCam
+      ? mobile
+        ? {
+            width: { ideal: 640, max: 1280 },
+            height: { ideal: 480, max: 720 },
+            frameRate: { ideal: 24, max: 30 },
+            facingMode: { ideal: "user" },
+          }
+        : {
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            frameRate: { ideal: 30, max: 30 },
+            facingMode: { ideal: "user" },
+          }
+      : false;
+
+    const requestMedia = async () =>
+      navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints,
+        video: videoConstraints,
+      });
+
+    try {
+      let stream: MediaStream;
+      try {
+        stream = await requestMedia();
+      } catch (firstErr) {
+        if (!effectiveCam || !mobile) throw firstErr;
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: audioConstraints,
+          video: { facingMode: "user" },
+        });
+      }
 
       localStreamRef.current?.getTracks().forEach((t) => {
         if (!stream.getTracks().some((nt) => nt.kind === t.kind)) t.stop();
@@ -143,9 +204,17 @@ export function usePartyMedia({
       setLocalStreamState(stream);
       setMediaError(null);
 
+      stream.getAudioTracks().forEach((t) => {
+        t.enabled = effectiveMic;
+      });
+      stream.getVideoTracks().forEach((t) => {
+        t.enabled = effectiveCam;
+      });
+
       if (effectiveMic && stream.getAudioTracks().length) {
         analyserRef.current?.ctx.close().catch(() => undefined);
         analyserRef.current = createAnalyser(stream);
+        await resumeAnalyser();
       } else {
         analyserRef.current?.ctx.close().catch(() => undefined);
         analyserRef.current = null;
@@ -158,19 +227,55 @@ export function usePartyMedia({
       setMicOn(false);
       setCameraOn(false);
     }
-  }, [setLocalStream, hostMicForcedOff, hostCamForcedOff]);
+  }, [setLocalStream, hostMicForcedOff, hostCamForcedOff, resumeAnalyser]);
 
   const toggleMic = useCallback(async () => {
     if (hostMicForcedOff) return;
     const next = !micOn;
     setMicOn(next);
+
+    const stream = localStreamRef.current;
+    if (stream?.getAudioTracks().length) {
+      stream.getAudioTracks().forEach((t) => {
+        t.enabled = next;
+      });
+      if (next) {
+        if (!analyserRef.current) {
+          analyserRef.current = createAnalyser(stream);
+        }
+        await resumeAnalyser();
+      } else {
+        wasSpeakingRef.current = false;
+        setLocalSpeaking(false);
+        sendSpeakingState?.(false);
+      }
+      await setLocalStream(stream);
+      if (!next && !cameraOn) {
+        await buildLocalStream(false, false);
+      }
+      return;
+    }
+
     await buildLocalStream(next, cameraOn);
-  }, [micOn, cameraOn, buildLocalStream, hostMicForcedOff]);
+  }, [micOn, cameraOn, buildLocalStream, hostMicForcedOff, resumeAnalyser, sendSpeakingState]);
 
   const toggleCamera = useCallback(async () => {
     if (hostCamForcedOff) return;
     const next = !cameraOn;
     setCameraOn(next);
+
+    const stream = localStreamRef.current;
+    if (stream?.getVideoTracks().length) {
+      stream.getVideoTracks().forEach((t) => {
+        t.enabled = next;
+      });
+      await setLocalStream(stream);
+      if (!next && !micOn) {
+        await buildLocalStream(false, false);
+      }
+      return;
+    }
+
     await buildLocalStream(micOn, next);
   }, [micOn, cameraOn, buildLocalStream, hostCamForcedOff]);
 

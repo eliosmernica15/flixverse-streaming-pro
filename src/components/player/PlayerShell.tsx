@@ -13,8 +13,9 @@ import { EmbedFrame } from "./EmbedFrame";
 import { PlayerShortcutsDropdown } from "./PlayerShortcutsDropdown";
 import { FlixPartySidebar } from "./FlixPartySidebar";
 import { FlixPartyInviteDialog } from "./FlixPartyInviteDialog";
-import { PartyCameraGrid } from "./PartyMediaPanel";
+import { PartyCameraGrid, PartyCameraPiP } from "./PartyMediaPanel";
 import { PartyGuestSplash } from "./PartyGuestSplash";
+import type { SyncStatus } from "./SyncStatusBadge";
 import { trackPlaybackStart } from "@/lib/analytics";
 import { releasePageScrollLock } from "@/lib/player/releaseScrollLock";
 import "@/app/video-player.css";
@@ -38,6 +39,33 @@ interface PlayerShellProps {
 }
 
 const LOAD_TIMEOUT_MS = 15_000;
+
+function partyStatusLabel(status: SyncStatus): string {
+  switch (status) {
+    case "connected":
+      return "Party live";
+    case "connecting":
+      return "Connecting…";
+    case "drift":
+      return "Re-syncing…";
+    case "disconnected":
+      return "Party offline";
+    default:
+      return "Party";
+  }
+}
+
+function partyStatusClass(status: SyncStatus): string {
+  switch (status) {
+    case "connected":
+      return "player-party-live";
+    case "connecting":
+    case "drift":
+      return "player-party-syncing";
+    default:
+      return "player-party-offline";
+  }
+}
 
 export function PlayerShell({
   movieId,
@@ -129,11 +157,31 @@ export function PlayerShell({
   const { media, guestServerIndex } = party;
   const layout = usePartyLayout();
   const guestServerAppliedRef = useRef(false);
+  const mobilePartyPreparedRef = useRef(false);
 
   const inParty = !!party.partyRoomId;
-  const showPartyPanel =
+  const isMobile = layout.isMobile;
+  const mobilePartyExpanded = layout.partyPanelMode === "expanded";
+  const mobilePartyMinimized =
+    layout.partyPanelMode === "minimized" || layout.partyPanelMode === "closed";
+
+  const showPartyPanelDesktop =
     party.showPartyPanel && (!inParty || layout.showPartyPanel) && !party.guestSplashVisible;
-  const showCameras = inParty && layout.showCameras && layout.cameraLayout !== "hidden";
+
+  const showPartyPanelMobile =
+    party.showPartyPanel && !party.guestSplashVisible;
+
+  const showPartyPanel = isMobile ? showPartyPanelMobile : showPartyPanelDesktop;
+
+  const effectiveCameraLayout = layout.effectiveCameraLayout;
+  const showCameras =
+    inParty && layout.showCameras && effectiveCameraLayout !== "hidden" && !isMobile;
+  const showMobileCameraPiP =
+    isMobile &&
+    inParty &&
+    media.cameraOn &&
+    effectiveCameraLayout !== "hidden" &&
+    media.participants.some((p) => p.hasVideo);
 
   const cycleLayoutFocus = useCallback(() => {
     layout.cycleFocusLevel();
@@ -190,8 +238,67 @@ export function PlayerShell({
     void party.handleLeaveParty();
     party.resetPartySession();
     layout.resetFocusLevel();
+    layout.resetPartyPanelMode();
     party.setShowPartyPanel(false);
   }, [party, layout]);
+
+  const togglePartyPanel = useCallback(() => {
+    if (!party.showPartyPanel) party.resetPartySession();
+
+    if (isMobile && inParty) {
+      if (mobilePartyExpanded) {
+        layout.minimizePartyPanel();
+      } else {
+        layout.expandPartyPanel();
+        party.setShowInviteDialog(false);
+      }
+      party.setShowPartyPanel(true);
+      return;
+    }
+
+    party.setShowPartyPanel((p) => !p);
+    if (!party.showPartyPanel) {
+      party.setShowInviteDialog(false);
+    }
+  }, [party, layout, isMobile, inParty, mobilePartyExpanded]);
+
+  const minimizePartyPanel = useCallback(() => {
+    layout.minimizePartyPanel();
+  }, [layout]);
+
+  const closePartyPanel = useCallback(() => {
+    if (isMobile) {
+      layout.minimizePartyPanel();
+      return;
+    }
+    party.setShowPartyPanel(false);
+  }, [party, layout, isMobile]);
+
+  useEffect(() => {
+    if (!inParty || mobilePartyPreparedRef.current) return;
+    mobilePartyPreparedRef.current = true;
+    layout.prepareMobilePartyJoin();
+  }, [inParty, layout]);
+
+  useEffect(() => {
+    if (!inParty) {
+      mobilePartyPreparedRef.current = false;
+      layout.resetPartyPanelMode();
+    }
+  }, [inParty, layout]);
+
+  useEffect(() => {
+    if (isMobile && party.showInviteDialog) {
+      layout.closePartyPanel();
+      party.setShowPartyPanel(false);
+    }
+  }, [isMobile, party.showInviteDialog, layout, party]);
+
+  useEffect(() => {
+    if (isMobile && inParty && party.showPartyPanel && layout.partyPanelMode === "closed") {
+      layout.minimizePartyPanel();
+    }
+  }, [isMobile, inParty, party.showPartyPanel, layout.partyPanelMode, layout]);
 
   const toggleBrowserFullscreen = useCallback(async () => {
     const el = windowRef.current;
@@ -293,7 +400,12 @@ export function PlayerShell({
           return;
         }
         if (party.showPartyPanel) {
-          party.setShowPartyPanel(false);
+          if (isMobile && mobilePartyExpanded) {
+            layout.minimizePartyPanel();
+          } else {
+            party.setShowPartyPanel(false);
+            layout.closePartyPanel();
+          }
           return;
         }
         if (document.fullscreenElement) {
@@ -313,8 +425,7 @@ export function PlayerShell({
       }
       if (e.key === "g" || e.key === "G") {
         if (isFeatureEnabled("flixparty")) {
-          if (!party.showPartyPanel) party.resetPartySession();
-          party.setShowPartyPanel((p) => !p);
+          togglePartyPanel();
         }
         return;
       }
@@ -375,6 +486,9 @@ export function PlayerShell({
     layout,
     party,
     media,
+    isMobile,
+    mobilePartyExpanded,
+    togglePartyPanel,
   ]);
 
   const onIframeLoad = () => {
@@ -393,9 +507,23 @@ export function PlayerShell({
 
   const flixPartyEnabled = isFeatureEnabled("flixparty");
 
+  const shellClasses = [
+    "player-shell",
+    showPartyPanel ? "player-shell--party-open" : "",
+    isMobile && mobilePartyExpanded ? "player-shell--party-expanded" : "",
+    isMobile && mobilePartyMinimized && !mobilePartyExpanded ? "player-shell--party-minimized" : "",
+    cameraLayout ? "player-shell--camera" : "",
+    `player-shell--boost-${layout.focusLevel}`,
+    inParty ? `player-shell--cam-${effectiveCameraLayout}` : "",
+    party.guestSplashVisible ? "player-shell--guest-splash" : "",
+    isMobile ? "player-shell--mobile" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
-      className={`player-shell ${showPartyPanel ? "player-shell--party-open" : ""} ${cameraLayout ? "player-shell--camera" : ""} player-shell--boost-${layout.focusLevel} ${inParty ? `player-shell--cam-${layout.cameraLayout}` : ""} ${party.guestSplashVisible ? "player-shell--guest-splash" : ""}`}
+      className={shellClasses}
       role="dialog"
       aria-label={`Watching ${title}`}
     >
@@ -406,7 +534,7 @@ export function PlayerShell({
         driftMs={party.partyDriftMs}
         visible={party.guestSplashVisible}
       />
-      <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""} ${inParty ? `player-layout--cam-${layout.cameraLayout}` : ""}`}>
+      <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""} ${inParty ? `player-layout--cam-${effectiveCameraLayout}` : ""}`}>
         <div className="player-layout-main">
           <div
             ref={windowRef}
@@ -418,7 +546,10 @@ export function PlayerShell({
               <p className="player-window-sub">
                 {currentSource.name} · {currentServer + 1}/{streamingSources.length}
                 {party.partyRoomId && (
-                  <span className="player-party-live"> · Party live</span>
+                  <span className={partyStatusClass(party.partySyncStatus)}>
+                    {" "}
+                    · {partyStatusLabel(party.partySyncStatus)}
+                  </span>
                 )}
               </p>
             </div>
@@ -438,10 +569,7 @@ export function PlayerShell({
                 <button
                   type="button"
                   className={`player-window-btn ${party.showPartyPanel ? "is-active" : ""}`}
-                  onClick={() => {
-                    if (!party.showPartyPanel) party.resetPartySession();
-                    party.setShowPartyPanel((p) => !p);
-                  }}
+                  onClick={togglePartyPanel}
                   aria-label="Watch together"
                   aria-pressed={party.showPartyPanel}
                   title="Watch together (G)"
@@ -505,17 +633,29 @@ export function PlayerShell({
             participants={media.participants}
             voiceVolume={media.voiceVolume}
             roomParticipants={party.partyRoom?.participants}
-            layoutMode={layout.cameraLayout}
+            layoutMode={effectiveCameraLayout}
             onLayoutChange={layout.setCameraLayout}
           />
         )}
         </div>
 
+        {showMobileCameraPiP && (
+          <PartyCameraPiP
+            participants={media.participants}
+            voiceVolume={media.voiceVolume}
+            roomParticipants={party.partyRoom?.participants}
+            expanded={mobilePartyExpanded}
+          />
+        )}
+
         {flixPartyEnabled && showPartyPanel && (
           <FlixPartySidebar
             embedded
             isOpen={showPartyPanel}
-            onClose={() => party.setShowPartyPanel(false)}
+            onClose={closePartyPanel}
+            isMobile={isMobile}
+            mobileExpanded={!isMobile || mobilePartyExpanded}
+            onMinimize={minimizePartyPanel}
             roomId={party.partyRoomId}
             syncStatus={party.partySyncStatus}
             driftMs={party.partyDriftMs}
@@ -543,13 +683,37 @@ export function PlayerShell({
         )}
       </div>
 
-      {party.showInviteDialog && party.partyJoinUrl && (
+      {party.showInviteDialog && party.partyJoinUrl && !showPartyPanel && (
         <FlixPartyInviteDialog
           isOpen={party.showInviteDialog}
-          onClose={() => party.setShowInviteDialog(false)}
+          onClose={() => {
+            party.setShowInviteDialog(false);
+            if (isMobile && inParty) {
+              party.setShowPartyPanel(true);
+              layout.minimizePartyPanel();
+            }
+          }}
           roomCode={party.partyRoomCode}
           roomUrl={party.partyJoinUrl}
         />
+      )}
+
+      {isMobile && inParty && !showPartyPanel && !party.showInviteDialog && (
+        <button
+          type="button"
+          className="player-party-fab"
+          onClick={() => {
+            party.setShowPartyPanel(true);
+            layout.expandPartyPanel();
+          }}
+          aria-label="Open watch together panel"
+          title="Watch together"
+        >
+          <Users className="w-5 h-5" />
+          {party.partyMessages.length > 0 && (
+            <span className="player-party-fab-badge" aria-hidden />
+          )}
+        </button>
       )}
     </div>
   );

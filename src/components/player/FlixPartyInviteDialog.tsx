@@ -77,9 +77,9 @@ export function FlixPartyInviteDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/85 backdrop-blur-md" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 shadow-[0_0_80px_rgba(239,68,68,0.2)] animate-scale-in">
+    <div className="party-invite-dialog" role="dialog" aria-modal="true" aria-label="Invite to party">
+      <div className="party-invite-dialog-backdrop" onClick={onClose} aria-hidden />
+      <div className="party-invite-dialog-panel">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-orange-500/70 to-transparent" />
         <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-orange-500/20 blur-3xl" />
         <div className="absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-red-500/15 blur-3xl" />
@@ -189,8 +189,8 @@ export function FlixPartyInviteDialog({
           </button>
         </div>
 
-        <div className="border-t border-white/5 px-5 py-3">
-          <p className="flex items-center justify-center gap-1.5 text-[10px] text-gray-600">
+        <div className="party-invite-dialog-footer">
+          <p className="party-invite-dialog-note">
             <Sparkles className="h-3 w-3 text-amber-500/70" />
             Invited friends also get a bell notification
           </p>

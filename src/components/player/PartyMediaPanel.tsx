@@ -37,11 +37,16 @@ function CameraTile({
     const el = videoRef.current;
     if (!el) return;
     el.srcObject = participant.hasVideo ? participant.stream : null;
-    if (participant.hasVideo) void el.play().catch(() => undefined);
+    if (participant.hasVideo) {
+      el.muted = participant.isLocal;
+      el.setAttribute("playsinline", "true");
+      el.setAttribute("webkit-playsinline", "true");
+      void el.play().catch(() => undefined);
+    }
     return () => {
       el.srcObject = null;
     };
-  }, [participant.stream, participant.hasVideo]);
+  }, [participant.stream, participant.hasVideo, participant.isLocal]);
 
   const initial = participant.displayName.charAt(0).toUpperCase();
 
@@ -55,6 +60,7 @@ function CameraTile({
           autoPlay
           playsInline
           muted={participant.isLocal}
+          disablePictureInPicture
           className="party-camera-video"
         />
       ) : (
@@ -187,9 +193,10 @@ export function PartyMediaControls({
   onToggleMic,
   onToggleCamera,
   onVoiceVolumeChange,
-}: PartyMediaControlsProps) {
+  compact = false,
+}: PartyMediaControlsProps & { compact?: boolean }) {
   return (
-    <div className="party-media-controls">
+    <div className={`party-media-controls ${compact ? "party-media-controls--compact" : ""}`}>
       <button
         type="button"
         className={`party-media-btn ${micOn ? "is-on" : ""} ${anyoneSpeaking && micOn ? "is-speaking" : ""}`}
@@ -221,6 +228,52 @@ export function PartyMediaControls({
         <span className="party-media-hint party-media-hint--desktop">Movie left · cameras right · HD when available</span>
       )}
       {mediaError && <p className="party-media-error">{mediaError}</p>}
+    </div>
+  );
+}
+
+interface PartyCameraPiPProps {
+  participants: PartyMediaParticipant[];
+  voiceVolume?: number;
+  roomParticipants?: FlixPartyParticipant[];
+  expanded?: boolean;
+}
+
+/** Floating camera preview for mobile — stays visible above party bottom sheet */
+export function PartyCameraPiP({
+  participants,
+  voiceVolume = 1,
+  roomParticipants = [],
+  expanded = false,
+}: PartyCameraPiPProps) {
+  const hostId = roomParticipants.find((p) => p.role === "host")?.userId;
+  const withVideo = participants.filter((p) => p.hasVideo);
+  if (!withVideo.length) return null;
+
+  const primary = withVideo.find((p) => p.isLocal) ?? withVideo[0];
+
+  return (
+    <div
+      className={`party-camera-pip ${expanded ? "party-camera-pip--expanded" : ""}`}
+      aria-label="Your camera preview"
+    >
+      <CameraTile
+        participant={primary}
+        voiceVolume={voiceVolume}
+        isHost={primary.peerId === hostId}
+      />
+      {withVideo.length > 1 && (
+        <div className="party-camera-pip-stack" aria-hidden>
+          {withVideo.slice(0, 3).map((p) => (
+            <CameraTile
+              key={p.peerId}
+              participant={p}
+              voiceVolume={voiceVolume}
+              isHost={p.peerId === hostId}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
