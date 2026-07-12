@@ -1,14 +1,8 @@
-const CACHE_VERSION = "flixverse-v3";
+const CACHE_VERSION = "flixverse-v5";
 const OFFLINE_URL = "/offline";
-const PRECACHE = [
-  "/",
-  OFFLINE_URL,
-  "/offline-library",
-  "/movies",
-  "/tv-shows",
-  "/manifest.json",
-  "/favicon.svg",
-];
+
+/** Static assets only — never precache HTML (avoids stale pages blocking fonts/clicks). */
+const PRECACHE = [OFFLINE_URL, "/manifest.json", "/favicon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -21,9 +15,8 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
@@ -37,7 +30,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (event.request.mode === "navigate") {
-    event.respondWith(networkFirstNavigate(event.request));
+    event.respondWith(networkOnlyNavigate(event.request));
     return;
   }
 
@@ -50,17 +43,12 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-async function networkFirstNavigate(request) {
-  const cache = await caches.open(CACHE_VERSION);
+/** Always fetch fresh HTML — no stale shell that breaks hydration/clicks. */
+async function networkOnlyNavigate(request) {
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      cache.put(request, response.clone());
-    }
-    return response;
+    return await fetch(request, { cache: "no-store" });
   } catch {
-    const cached = await cache.match(request);
-    if (cached) return cached;
+    const cache = await caches.open(CACHE_VERSION);
     const offline = await cache.match(OFFLINE_URL);
     return offline || Response.error();
   }
@@ -88,6 +76,5 @@ async function staleWhileRevalidate(request, cacheName) {
       return response;
     })
     .catch(() => cached);
-
   return cached || fetchPromise;
 }

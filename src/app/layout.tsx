@@ -6,25 +6,7 @@ import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import { WebsiteJsonLd, OrganizationJsonLd } from "@/components/seo/JsonLd";
 import type { Metadata, Viewport } from "next";
-import { Inter, Poppins } from "next/font/google";
 import { DEFAULT_DESCRIPTION, DEFAULT_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo/metadata";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  preload: true,
-  adjustFontFallback: true,
-  variable: "--font-inter",
-});
-
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-  preload: true,
-  adjustFontFallback: true,
-  variable: "--font-poppins",
-});
 
 export const metadata: Metadata = {
     metadataBase: new URL(SITE_URL),
@@ -107,14 +89,14 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en" className={`${inter.variable} ${poppins.variable}`}>
+        <html lang="en">
             <head>
                 <link rel="preconnect" href="https://api.themoviedb.org" />
                 <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />
                 <link rel="dns-prefetch" href="https://api.themoviedb.org" />
                 <link rel="dns-prefetch" href="https://image.tmdb.org" />
             </head>
-            <body className={`${inter.className} antialiased`}>
+            <body className="antialiased">
                 <WebsiteJsonLd />
                 <OrganizationJsonLd />
                 <Providers>

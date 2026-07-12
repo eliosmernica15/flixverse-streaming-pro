@@ -8,7 +8,9 @@ export default function ServiceWorkerRegister() {
 
     const register = async () => {
       try {
-        await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+        if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        await reg.update();
       } catch {
         // Service worker registration is best-effort
       }
@@ -17,7 +19,7 @@ export default function ServiceWorkerRegister() {
     if (document.readyState === "complete") {
       void register();
     } else {
-      window.addEventListener("load", register, { once: true });
+      window.addEventListener("load", () => void register(), { once: true });
     }
   }, []);
 
