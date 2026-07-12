@@ -7,8 +7,41 @@ import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
 export const runtime = "nodejs";
 
-/** GET ?q= — prefix search for usernames (authenticated). */
+/** GET ?q= — prefix search · GET ?username= — availability check */
 export async function GET(request: NextRequest) {
+  const usernameCheck = request.nextUrl.searchParams.get("username");
+  if (usernameCheck !== null) {
+    const limit = await rateLimitByIp(request, "username-check", 120, "1 m");
+    if (!limit.success) return rateLimitResponse(limit);
+
+    const parsed = validateUsername(usernameCheck);
+    if (parsed.ok === false) {
+      return NextResponse.json({ available: false, error: parsed.error }, { status: 400 });
+    }
+
+    const db = getAdminDb();
+    if (!db) return NextResponse.json({ error: "Server not configured" }, { status: 503 });
+
+    const user = await verifyAuthHeader(request);
+    const snap = await db.collection("usernames").doc(parsed.value).get();
+
+    if (!snap.exists) {
+      return NextResponse.json({ available: true });
+    }
+
+    const ownerUid = snap.data()?.uid as string | undefined;
+
+    if (user) {
+      const profileSnap = await db.collection("profiles").doc(user.uid).get();
+      const profileUsername = profileSnap.data()?.username as string | undefined;
+      if (profileUsername === parsed.value || ownerUid === user.uid) {
+        return NextResponse.json({ available: true, owned: true });
+      }
+    }
+
+    return NextResponse.json({ available: false }, { status: 409 });
+  }
+
   const limit = await rateLimitByIp(request, "username-search", 60, "1 m");
   if (!limit.success) return rateLimitResponse(limit);
 
@@ -124,7 +157,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** HEAD ?username= — availability check. */
+/** HEAD ?username= — availability check (legacy; prefer GET). */
 export async function HEAD(request: NextRequest) {
   const raw = request.nextUrl.searchParams.get("username") ?? "";
   const parsed = validateUsername(raw);
@@ -135,6 +168,17 @@ export async function HEAD(request: NextRequest) {
   const db = getAdminDb();
   if (!db) return new NextResponse(null, { status: 503 });
 
+  const user = await verifyAuthHeader(request);
   const snap = await db.collection("usernames").doc(parsed.value).get();
-  return new NextResponse(null, { status: snap.exists ? 409 : 204 });
+
+  if (!snap.exists) {
+    return new NextResponse(null, { status: 204 });
+  }
+
+  const ownerUid = snap.data()?.uid as string | undefined;
+  if (user && ownerUid === user.uid) {
+    return new NextResponse(null, { status: 204 });
+  }
+
+  return new NextResponse(null, { status: 409 });
 }

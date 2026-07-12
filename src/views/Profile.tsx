@@ -25,6 +25,7 @@ import { getImageUrl } from '@/utils/tmdbApi';
 import { uploadToCloudinary } from '@/utils/cloudinary';
 import Image from 'next/image';
 import ProfileSettings from '@/components/ProfileSettings';
+import { UsernameSettings } from '@/components/UsernameSettings';
 import { ProfileBillingTab } from '@/components/ProfileBillingTab';
 import { PosterGridSkeleton } from '@/components/skeletons/ContentSkeletons';
 import {
@@ -164,6 +165,11 @@ const Profile = () => {
     const tab = searchParams.get('tab');
     if (tab && ['watchlist', 'history', 'activity', 'settings', 'billing'].includes(tab)) {
       setActiveTab(tab);
+    }
+    if (searchParams.get('setup') === 'username') {
+      requestAnimationFrame(() => {
+        document.getElementById('username-setup')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     }
   }, [searchParams]);
 
@@ -420,6 +426,11 @@ const Profile = () => {
                   Sign Out
                 </Button>
               </div>
+            </div>
+
+            {/* Username — profile header, not Settings tab */}
+            <div className="mt-6">
+              <UsernameSettings />
             </div>
 
             {/* Stats */}

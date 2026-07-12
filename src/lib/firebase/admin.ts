@@ -37,34 +37,46 @@ function parseServiceAccount():
   return null;
 }
 
-/** Server-side Firestore (bypasses security rules). Returns null if Admin is not configured. */
-export function getAdminDb(): Firestore | null {
-  if (adminDb) return adminDb;
+/** Initialize Firebase Admin app (auth + Firestore). Safe to call repeatedly. */
+export function ensureAdminApp(): boolean {
+  if (getApps().length) return true;
 
   const serviceAccount = parseServiceAccount();
   const projectId =
     serviceAccount?.project_id || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  if (!projectId) return null;
+  if (!projectId) return false;
 
   try {
-    if (!getApps().length) {
-      if (serviceAccount) {
-        adminApp = initializeApp({
-          credential: cert({
-            projectId: serviceAccount.project_id,
-            clientEmail: serviceAccount.client_email,
-            privateKey: serviceAccount.private_key,
-          }),
+    if (serviceAccount) {
+      adminApp = initializeApp({
+        credential: cert({
           projectId: serviceAccount.project_id,
-        });
-      } else {
-        adminApp = initializeApp({ projectId });
-      }
+          clientEmail: serviceAccount.client_email,
+          privateKey: serviceAccount.private_key,
+        }),
+        projectId: serviceAccount.project_id,
+      });
+    } else {
+      adminApp = initializeApp({ projectId });
     }
+    return true;
+  } catch (err) {
+    console.error("Firebase Admin init failed:", err);
+    return false;
+  }
+}
+
+/** Server-side Firestore (bypasses security rules). Returns null if Admin is not configured. */
+export function getAdminDb(): Firestore | null {
+  if (adminDb) return adminDb;
+
+  if (!ensureAdminApp()) return null;
+
+  try {
     adminDb = getFirestore();
     return adminDb;
   } catch (err) {
-    console.error("Firebase Admin init failed:", err);
+    console.error("Firebase Admin Firestore init failed:", err);
     return null;
   }
 }
