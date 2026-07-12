@@ -8,15 +8,18 @@ interface KeyboardShortcutsHelpProps {
 }
 
 const SHORTCUTS = [
+  { keys: ["T"], action: "Maximize / restore player" },
+  { keys: ["F"], action: "Browser fullscreen" },
+  { keys: ["Esc"], action: "Exit fullscreen → restore → close" },
   { keys: ["Space", "K"], action: "Play / pause" },
-  { keys: ["←", "→"], action: "Seek ±10 seconds" },
-  { keys: ["↑", "↓"], action: "Volume up / down" },
+  { keys: ["←", "→"], action: "Seek ±10s (Shift: ±30s)" },
+  { keys: ["↑", "↓"], action: "Volume up / down (Shift: bigger step)" },
+  { keys: ["+", "−"], action: "Volume up / down" },
   { keys: ["M"], action: "Mute / unmute" },
-  { keys: ["F"], action: "Fullscreen" },
   { keys: ["N", "]"], action: "Next server" },
   { keys: ["["], action: "Previous server" },
   { keys: ["0-9"], action: "Jump to 0–90%" },
-  { keys: ["Esc"], action: "Close player" },
+  { keys: ["?"], action: "Show this help" },
 ];
 
 export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelpProps) {
@@ -36,7 +39,7 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
           </button>
         </div>
         <p className="player-shortcuts-note">
-          Use the embed player&apos;s own controls with your mouse. These keys work on top of that.
+          The embed has its own on-screen controls. These keys layer on top for quick actions.
         </p>
         <ul className="player-shortcuts-list">
           {SHORTCUTS.map(({ keys, action }) => (

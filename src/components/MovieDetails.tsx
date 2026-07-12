@@ -824,21 +824,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           const episodeCount = currentSeasonData?.episode_count;
 
           return (
-            <div
-              key={`player-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ''}`}
-              className="fixed inset-0 z-[9999]"
-              style={{
-                position: 'fixed',
-                left: 0,
-                top: 0,
-                right: 0,
-                bottom: 0,
-                width: '100vw',
-                height: '100vh',
-                zIndex: 9999,
-                backgroundColor: '#000',
-              }}
-            >
+            <div key={`player-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ''}`}>
               <VideoPlayer
                 movieId={content.id}
                 title={contentTitle}
