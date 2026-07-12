@@ -1,71 +1,127 @@
 "use client";
 
-import { useState } from 'react';
-import { Bell, Check, Trash2, MessageCircle, Heart, UserPlus, Star, Tv } from 'lucide-react';
-import { useFirebaseNotifications } from '@/hooks/useNotificationsFirebase';
-import { useAuth } from '@/hooks/useAuth';
-import { Notification } from '@/integrations/firebase/types';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
+  Bell,
+  Check,
+  Trash2,
+  MessageCircle,
+  Heart,
+  UserPlus,
+  Star,
+  Tv,
+  PartyPopper,
+  UserCheck,
+} from "lucide-react";
+import { useFirebaseNotifications } from "@/hooks/useNotificationsFirebase";
+import { useAuth } from "@/hooks/useAuth";
+import { Notification } from "@/integrations/firebase/types";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-const NotificationIcon = ({ type }: { type: Notification['type'] }) => {
+const NotificationIcon = ({ type }: { type: Notification["type"] }) => {
   switch (type) {
-    case 'like':
+    case "like":
       return <Heart className="h-4 w-4 text-red-400" />;
-    case 'comment':
+    case "comment":
       return <MessageCircle className="h-4 w-4 text-blue-400" />;
-    case 'follow':
+    case "follow":
       return <UserPlus className="h-4 w-4 text-green-400" />;
-    case 'review':
+    case "friend_request":
+      return <UserPlus className="h-4 w-4 text-emerald-400" />;
+    case "friend_accepted":
+      return <UserCheck className="h-4 w-4 text-green-400" />;
+    case "watch_party_invite":
+      return <PartyPopper className="h-4 w-4 text-purple-400" />;
+    case "review":
       return <Star className="h-4 w-4 text-yellow-400" />;
-    case 'new_episode':
+    case "new_episode":
       return <Tv className="h-4 w-4 text-purple-400" />;
     default:
       return <Bell className="h-4 w-4 text-gray-400" />;
   }
 };
 
+function getNotificationHref(notification: Notification): string | null {
+  const data = notification.data;
+  if (notification.type === "friend_request") {
+    return "/profile?tab=friends&friendsTab=requests";
+  }
+  if (notification.type === "friend_accepted") {
+    return "/profile?tab=friends";
+  }
+  if (notification.type === "watch_party_invite" && data?.party_join_url) {
+    return data.party_join_url;
+  }
+  if (notification.type === "watch_party_invite" && data?.content_id) {
+    const type = data.content_type || "movie";
+    return `/movie/${data.content_id}?type=${type}`;
+  }
+  if (data?.content_id) {
+    return `/movie/${data.content_id}?type=${data.content_type || "movie"}`;
+  }
+  return null;
+}
+
 const NotificationItem = ({
   notification,
   onRead,
-  onDelete
+  onDelete,
+  onOpen,
 }: {
   notification: Notification;
   onRead: () => void;
   onDelete: () => void;
+  onOpen: () => void;
 }) => {
   const timeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    if (seconds < 60) return 'now';
+    if (seconds < 60) return "now";
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
     if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
     return date.toLocaleDateString();
   };
 
+  const href = getNotificationHref(notification);
+
   return (
     <div
+      role={href ? "button" : undefined}
+      tabIndex={href ? 0 : undefined}
+      onClick={() => {
+        if (!notification.read) onRead();
+        if (href) onOpen();
+      }}
+      onKeyDown={(e) => {
+        if (href && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          if (!notification.read) onRead();
+          onOpen();
+        }
+      }}
       className={`rounded-xl p-3 transition-colors ${
         notification.read
-          ? 'bg-transparent hover:bg-white/5'
-          : 'bg-white/5 hover:bg-white/10'
-      }`}
+          ? "bg-transparent hover:bg-white/5"
+          : "bg-white/5 hover:bg-white/10"
+      } ${href ? "cursor-pointer" : ""}`}
     >
       <div className="flex items-start space-x-3">
-        <div className={`mt-0.5 rounded-full p-2 ${notification.read ? 'bg-gray-800' : 'bg-white/10'}`}>
+        <div
+          className={`mt-0.5 rounded-full p-2 ${notification.read ? "bg-gray-800" : "bg-white/10"}`}
+        >
           <NotificationIcon type={notification.type} />
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className={`text-sm font-medium ${notification.read ? 'text-gray-400' : 'text-white'}`}>
+          <p
+            className={`text-sm font-medium ${notification.read ? "text-gray-400" : "text-white"}`}
+          >
             {notification.title}
           </p>
           <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{notification.message}</p>
@@ -103,12 +159,32 @@ const NotificationItem = ({
 
 const NotificationBell = () => {
   const [open, setOpen] = useState(false);
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, clearAll } = useFirebaseNotifications();
+  const router = useRouter();
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    clearAll,
+  } = useFirebaseNotifications();
   const { isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
     return null;
   }
+
+  const handleOpenNotification = (notification: Notification) => {
+    const href = getNotificationHref(notification);
+    if (!href) return;
+    setOpen(false);
+    if (href.startsWith("http")) {
+      window.location.href = href;
+    } else {
+      router.push(href);
+    }
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -117,7 +193,7 @@ const NotificationBell = () => {
           <Bell className="h-5 w-5 transition-transform group-hover:scale-110" />
           {unreadCount > 0 && (
             <span className="badge-shine absolute -right-0.5 -top-0.5 grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-red-500 to-red-600 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(239,68,68,0.6)]">
-              {unreadCount > 9 ? '9+' : unreadCount}
+              {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </button>
@@ -171,8 +247,9 @@ const NotificationBell = () => {
                 <NotificationItem
                   key={notification.id}
                   notification={notification}
-                  onRead={() => markAsRead(notification.id)}
-                  onDelete={() => deleteNotification(notification.id)}
+                  onRead={() => void markAsRead(notification.id)}
+                  onDelete={() => void deleteNotification(notification.id)}
+                  onOpen={() => handleOpenNotification(notification)}
                 />
               ))}
             </div>

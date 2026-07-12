@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User, Settings, Film, Tv, Star, Heart, Clock,
   Calendar, Edit2, Camera, LogOut, ChevronRight, Trash2,
-  MessageCircle, TrendingUp, Award, Filter, CreditCard
+  MessageCircle, TrendingUp, Award, Filter, CreditCard, Users
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
@@ -26,6 +26,7 @@ import { uploadToCloudinary } from '@/utils/cloudinary';
 import Image from 'next/image';
 import ProfileSettings from '@/components/ProfileSettings';
 import { UsernameSettings } from '@/components/UsernameSettings';
+import { FriendsList } from '@/components/FriendsList';
 import { ProfileBillingTab } from '@/components/ProfileBillingTab';
 import { PosterGridSkeleton } from '@/components/skeletons/ContentSkeletons';
 import {
@@ -57,6 +58,7 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [activityFilter, setActivityFilter] = useState<ActivityType | 'all'>('all');
   const [activeTab, setActiveTab] = useState<string>('watchlist');
+  const [friendsSubTab, setFriendsSubTab] = useState<'friends' | 'requests' | 'find'>('friends');
   const [uploading, setUploading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cropperOpen, setCropperOpen] = useState(false);
@@ -163,8 +165,12 @@ const Profile = () => {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['watchlist', 'history', 'activity', 'settings', 'billing'].includes(tab)) {
+    if (tab && ['watchlist', 'history', 'activity', 'friends', 'settings', 'billing'].includes(tab)) {
       setActiveTab(tab);
+    }
+    const friendsTab = searchParams.get('friendsTab');
+    if (friendsTab === 'requests' || friendsTab === 'find' || friendsTab === 'friends') {
+      setFriendsSubTab(friendsTab);
     }
     if (searchParams.get('setup') === 'username') {
       requestAnimationFrame(() => {
@@ -467,6 +473,10 @@ const Profile = () => {
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Activity
               </TabsTrigger>
+              <TabsTrigger value="friends" className="data-[state=active]:bg-red-500 rounded-lg">
+                <Users className="w-4 h-4 mr-2" />
+                Friends
+              </TabsTrigger>
               <TabsTrigger value="billing" className="data-[state=active]:bg-red-500 rounded-lg">
                 <CreditCard className="w-4 h-4 mr-2" />
                 Billing
@@ -674,6 +684,10 @@ const Profile = () => {
                     : `No ${activityFilter} activity yet`
                 }
               />
+            </TabsContent>
+
+            <TabsContent value="friends">
+              <FriendsList variant="page" initialTab={friendsSubTab} />
             </TabsContent>
 
             <TabsContent value="billing">

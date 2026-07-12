@@ -457,7 +457,6 @@ export function PlayerShell({
             isPlaying={isPlaying}
             onSyncToPosition={seekTo}
             partyJoinUrl={party.partyJoinUrl}
-            hasStandard={party.hasStandard}
             media={media}
           />
         )}

@@ -7,7 +7,10 @@ import {
 import { useFlixParty, type FlixPartyParticipant } from "@/hooks/player/useFlixParty";
 import { useFriends, type Friend } from "@/hooks/useFriends";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useToast } from "@/hooks/use-toast";
+import { addDoc, collection, getFirestore } from "firebase/firestore";
+import { sendNotificationToUser } from "@/lib/notifications/createNotification";
 import { FriendsList } from "@/components/FriendsList";
 import { WatchParty } from "./WatchParty";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge";
@@ -27,7 +30,6 @@ interface FlixPartySidebarProps {
   onStartParty?: () => void;
   /** Render beside the player window instead of full-screen overlay */
   embedded?: boolean;
-  hasStandard?: boolean;
   /** Current playback context for WatchParty */
   movieId?: number;
   mediaType?: "movie" | "tv";
@@ -63,11 +65,11 @@ export function FlixPartySidebar({
   onSyncToPosition,
   partyJoinUrl,
   embedded = false,
-  hasStandard = false,
   media,
 }: FlixPartySidebarProps) {
   const { room, messages, isHost, sendMessage, kickParticipant, setParticipantMicMuted, setParticipantCamDisabled } = useFlixParty({ roomId });
   const { user } = useAuth();
+  const { profile } = useUserProfileContext();
   const { friends, incomingRequests } = useFriends();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<SidebarTab>("friends");
@@ -116,24 +118,91 @@ export function FlixPartySidebar({
   );
 
   const handleInviteFriend = useCallback(
-    (friend: Friend) => {
-      if (partyJoinUrl) {
-        const message = `Join me on FlixVerse to watch "${title || "this title"}" together!\n${partyJoinUrl}`;
-        void navigator.clipboard.writeText(message);
-        toast({
-          title: "Invite copied",
-          description: `Paste to ${friend.displayName} — they'll join synced to your playback.`,
-        });
-      } else if (!roomId && onStartParty) {
-        toast({
-          title: "Start a party first",
-          description: "Create a watch party, then invite friends from this list.",
-        });
-        onStartParty();
+    async (friend: Friend) => {
+      if (!user || !partyJoinUrl) {
+        if (!roomId && onStartParty) {
+          toast({
+            title: "Start a party first",
+            description: "Create a watch party, then invite friends from this list.",
+          });
+          onStartParty();
+        }
+        setActiveTab("party");
+        return;
       }
+
+      const myName =
+        profile?.display_name || user.displayName || user.email?.split("@")[0] || "Someone";
+      const movieTitle = title || "this title";
+
+      try {
+        const db = getFirestore();
+        await addDoc(collection(db, "watch_party_invites"), {
+          roomId,
+          roomTitle: movieTitle,
+          fromUserId: user.uid,
+          fromUserName: myName,
+          toUserId: friend.userId,
+          toUserName: friend.displayName,
+          movieId: movieId ?? null,
+          mediaType: mediaType ?? "movie",
+          season: season ?? null,
+          episode: episode ?? null,
+          posterPath: posterPath ?? null,
+          partyJoinUrl,
+          status: "pending",
+          createdAt: Date.now(),
+        });
+
+        void sendNotificationToUser({
+          recipientId: friend.userId,
+          senderId: user.uid,
+          senderName: myName,
+          type: "watch_party_invite",
+          title: "Watch party invite",
+          message: `${myName} invited you to watch "${movieTitle}" together`,
+          data: {
+            from_user_id: user.uid,
+            from_user_name: myName,
+            party_join_url: partyJoinUrl,
+            room_id: roomId,
+            content_id: movieId,
+            content_type: mediaType,
+            movie_title: movieTitle,
+          },
+        });
+
+        const message = `Join me on FlixVerse to watch "${movieTitle}" together!\n${partyJoinUrl}`;
+        void navigator.clipboard.writeText(message);
+
+        toast({
+          title: "Invite sent",
+          description: `${friend.displayName} got a notification. Link copied to clipboard.`,
+        });
+      } catch {
+        toast({
+          title: "Invite failed",
+          description: "Could not send the invite. Try again.",
+          variant: "destructive",
+        });
+      }
+
       setActiveTab("party");
     },
-    [partyJoinUrl, title, roomId, onStartParty, toast]
+    [
+      user,
+      profile,
+      partyJoinUrl,
+      title,
+      roomId,
+      onStartParty,
+      toast,
+      movieId,
+      mediaType,
+      season,
+      episode,
+      posterPath,
+    ]
   );
 
   if (!isOpen) return null;
@@ -230,11 +299,6 @@ export function FlixPartySidebar({
                 onToggleCam={(id, off) => void setParticipantCamDisabled(id, off)}
               />
             )}
-          </div>
-        )}
-        {!hasStandard && !roomId && (
-          <div className="mx-3 mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[11px] text-amber-100/90">
-            Standard plan unlocks synced watch parties. You can still add friends and search users below.
           </div>
         )}
         {/* Friends tab */}

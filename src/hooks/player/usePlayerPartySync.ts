@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useSubscription } from "@/hooks/useSubscription";
 import { useFlixParty } from "@/hooks/player/useFlixParty";
 import { useWebRTCSync, type SyncMessage } from "@/hooks/player/useWebRTCSync";
 import { computeResync, sendSoftSeek, injectSeekParam } from "@/lib/player/embedSeekUrls";
@@ -45,7 +44,6 @@ export function usePlayerPartySync({
   seekRelative,
 }: UsePlayerPartySyncOptions) {
   const { user } = useAuth();
-  const { hasStandard } = useSubscription();
   const [showPartyPanel, setShowPartyPanel] = useState(false);
   const [partyRoomId, setPartyRoomId] = useState<string | null>(null);
   const [partyRoomKey, setPartyRoomKey] = useState<string | null>(null);
@@ -223,10 +221,6 @@ export function usePlayerPartySync({
       setShowPartyPanel(true);
       return;
     }
-    if (!hasStandard) {
-      setShowPartyPanel(true);
-      return;
-    }
     try {
       const key = generateRoomKey();
       const encrypted = await encryptPayload(
@@ -243,7 +237,7 @@ export function usePlayerPartySync({
       console.error("Failed to create party:", err);
       playUiSound("error");
     }
-  }, [user, hasStandard, movieId, mediaType, season, episode, currentServer, createPartyRoom]);
+  }, [user, movieId, mediaType, season, episode, currentServer, createPartyRoom]);
 
   const handleLeaveParty = useCallback(() => {
     void leavePartyRoom();
@@ -280,7 +274,6 @@ export function usePlayerPartySync({
     partyDriftMs,
     showInviteDialog,
     setShowInviteDialog,
-    hasStandard,
     isPartyHost,
     handleStartParty,
     handleLeaveParty,

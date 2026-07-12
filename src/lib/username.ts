@@ -26,7 +26,7 @@ const RESERVED = new Set([
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
 export function normalizeUsername(raw: string): string {
-  return raw.trim().toLowerCase().replace(/\s+/g, "_");
+  return raw.trim().toLowerCase().replace(/^@+/, "").replace(/\s+/g, "_");
 }
 
 export function validateUsername(raw: string): { ok: true; value: string } | { ok: false; error: string } {

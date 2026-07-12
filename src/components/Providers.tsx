@@ -19,6 +19,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import BackToTop from "@/components/BackToTop";
 import OfflineCacheSync from "@/components/OfflineCacheSync";
 import { CookieConsent } from "@/components/CookieConsent";
+import UsernameReminder from "@/components/UsernameReminder";
 
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"), { ssr: false });
 const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcutsHelp"), {
@@ -67,6 +68,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                     <InstallPrompt />
                     <BackToTop />
                     <CookieConsent />
+                    <UsernameReminder />
                     {children}
                     <Toaster />
                     <Sonner />

@@ -9,10 +9,11 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  orderBy,
   limit,
 } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserProfileContext } from "@/contexts/UserProfileContext";
+import { sendNotificationToUser } from "@/lib/notifications/createNotification";
 
 export interface Friend {
   id: string;
@@ -36,17 +37,30 @@ export interface UserProfile {
   uid: string;
   displayName: string;
   photoURL: string | null;
-  /** Public handle from member_profiles when available */
   username?: string | null;
 }
 
+export type FriendRelationship = "friend" | "incoming" | "outgoing" | "none";
+
+export type SendFriendResult =
+  | "sent"
+  | "accepted"
+  | "already_friends"
+  | "already_sent"
+  | "error";
+
 export function useFriends() {
   const { user } = useAuth();
+  const { profile } = useUserProfileContext();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Subscribe to friends list
+  const myName =
+    profile?.display_name || user?.displayName || user?.email?.split("@")[0] || "Unknown";
+  const myAvatar = profile?.avatar_url || user?.photoURL || null;
+
   useEffect(() => {
     if (!user) {
       setFriends([]);
@@ -55,9 +69,8 @@ export function useFriends() {
     }
 
     const db = getFirestore();
-    const friendsRef = collection(db, "friendships");
     const q = query(
-      friendsRef,
+      collection(db, "friendships"),
       where("status", "==", "accepted"),
       where("users", "array-contains", user.uid)
     );
@@ -66,7 +79,6 @@ export function useFriends() {
       const items: Friend[] = [];
       snap.forEach((d) => {
         const data = d.data();
-        // The friend is the OTHER user in the pair
         const friendId = data.users.find((u: string) => u !== user.uid);
         if (friendId) {
           items.push({
@@ -85,7 +97,6 @@ export function useFriends() {
     return () => unsub();
   }, [user]);
 
-  // Subscribe to incoming friend requests
   useEffect(() => {
     if (!user) {
       setIncomingRequests([]);
@@ -93,9 +104,8 @@ export function useFriends() {
     }
 
     const db = getFirestore();
-    const requestsRef = collection(db, "friend_requests");
     const q = query(
-      requestsRef,
+      collection(db, "friend_requests"),
       where("toUserId", "==", user.uid),
       where("status", "==", "pending")
     );
@@ -111,7 +121,41 @@ export function useFriends() {
     return () => unsub();
   }, [user]);
 
-  // Search users by username via API (prefix) with local fallback
+  useEffect(() => {
+    if (!user) {
+      setOutgoingRequests([]);
+      return;
+    }
+
+    const db = getFirestore();
+    const q = query(
+      collection(db, "friend_requests"),
+      where("fromUserId", "==", user.uid),
+      where("status", "==", "pending")
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const items: FriendRequest[] = [];
+      snap.forEach((d) => {
+        items.push({ id: d.id, ...d.data() } as FriendRequest);
+      });
+      setOutgoingRequests(items);
+    });
+
+    return () => unsub();
+  }, [user]);
+
+  const getRelationship = useCallback(
+    (targetUid: string): FriendRelationship => {
+      if (!user || targetUid === user.uid) return "none";
+      if (friends.some((f) => f.userId === targetUid)) return "friend";
+      if (incomingRequests.some((r) => r.fromUserId === targetUid)) return "incoming";
+      if (outgoingRequests.some((r) => r.toUserId === targetUid)) return "outgoing";
+      return "none";
+    },
+    [user, friends, incomingRequests, outgoingRequests]
+  );
+
   const searchUsers = useCallback(async (searchQuery: string): Promise<UserProfile[]> => {
     if (!user || searchQuery.length < 2) return [];
 
@@ -139,19 +183,13 @@ export function useFriends() {
         }));
       }
     } catch {
-      // fall through to local scan
+      // fall through
     }
 
     const db = getFirestore();
     const searchTerm = searchQuery.toLowerCase().trim();
     const results: UserProfile[] = [];
     const seen = new Set<string>();
-
-    const addResult = (uid: string, displayName: string, photoURL: string | null, username?: string | null) => {
-      if (uid === user.uid || seen.has(uid)) return;
-      seen.add(uid);
-      results.push({ uid, displayName, photoURL, username });
-    };
 
     const profilesSnap = await getDocs(query(collection(db, "profiles"), limit(80)));
     profilesSnap.forEach((d) => {
@@ -162,100 +200,144 @@ export function useFriends() {
         name.toLowerCase().includes(searchTerm) ||
         handle.toLowerCase().includes(searchTerm)
       ) {
-        addResult(d.id, name || handle, data.avatar_url || null, handle || null);
+        if (d.id !== user.uid && !seen.has(d.id)) {
+          seen.add(d.id);
+          results.push({
+            uid: d.id,
+            displayName: name || handle,
+            photoURL: data.avatar_url || null,
+            username: handle || null,
+          });
+        }
       }
     });
 
     return results.slice(0, 12);
   }, [user]);
 
-  // Send friend request
-  const sendFriendRequest = useCallback(async (targetUser: UserProfile) => {
-    if (!user) return;
+  const acceptFriendRequest = useCallback(
+    async (request: FriendRequest) => {
+      if (!user) return;
 
-    const db = getFirestore();
+      const db = getFirestore();
 
-    // Check if already friends or request exists
-    const existingQ = query(
-      collection(db, "friendships"),
-      where("users", "array-contains", user.uid)
-    );
-    const existingSnap = await getDocs(existingQ);
-    for (const d of existingSnap.docs) {
-      const data = d.data();
-      if (data.users.includes(targetUser.uid)) return; // Already friends
-    }
+      await addDoc(collection(db, "friendships"), {
+        users: [user.uid, request.fromUserId],
+        displayNames: {
+          [user.uid]: myName,
+          [request.fromUserId]: request.fromDisplayName,
+        },
+        avatarUrls: {
+          [user.uid]: myAvatar,
+          [request.fromUserId]: request.fromAvatarUrl || null,
+        },
+        status: "accepted",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
 
-    // Check for existing pending request
-    const requestsQ = query(
-      collection(db, "friend_requests"),
-      where("fromUserId", "==", user.uid),
-      where("toUserId", "==", targetUser.uid),
-      where("status", "==", "pending")
-    );
-    const requestsSnap = await getDocs(requestsQ);
-    if (!requestsSnap.empty) return; // Already sent
+      await deleteDoc(doc(db, "friend_requests", request.id));
 
-    await addDoc(collection(db, "friend_requests"), {
-      fromUserId: user.uid,
-      fromDisplayName: user.displayName || "Unknown",
-      fromAvatarUrl: user.photoURL || null,
-      toUserId: targetUser.uid,
-      status: "pending",
-      createdAt: Date.now(),
-    });
-  }, [user]);
+      void sendNotificationToUser({
+        recipientId: request.fromUserId,
+        senderId: user.uid,
+        senderName: myName,
+        type: "friend_accepted",
+        title: "Friend request accepted",
+        message: `${myName} accepted your friend request`,
+        data: { from_user_id: user.uid, from_user_name: myName },
+      });
+    },
+    [user, myName, myAvatar]
+  );
 
-  // Accept friend request
-  const acceptFriendRequest = useCallback(async (request: FriendRequest) => {
-    if (!user) return;
+  const sendFriendRequest = useCallback(
+    async (targetUser: UserProfile): Promise<SendFriendResult> => {
+      if (!user) return "error";
 
-    const db = getFirestore();
+      try {
+        const db = getFirestore();
 
-    // Create friendship document
-    await addDoc(collection(db, "friendships"), {
-      users: [user.uid, request.fromUserId],
-      displayNames: {
-        [user.uid]: user.displayName || "Unknown",
-        [request.fromUserId]: request.fromDisplayName,
-      },
-      avatarUrls: {
-        [user.uid]: user.photoURL || null,
-        [request.fromUserId]: request.fromAvatarUrl || null,
-      },
-      status: "accepted",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
+        if (friends.some((f) => f.userId === targetUser.uid)) {
+          return "already_friends";
+        }
 
-    // Update request status
-    await deleteDoc(doc(db, "friend_requests", request.id));
-  }, [user]);
+        const incoming = incomingRequests.find((r) => r.fromUserId === targetUser.uid);
+        if (incoming) {
+          await acceptFriendRequest(incoming);
+          return "accepted";
+        }
 
-  // Decline friend request
+        const outgoing = outgoingRequests.find((r) => r.toUserId === targetUser.uid);
+        if (outgoing) {
+          return "already_sent";
+        }
+
+        const requestsQ = query(
+          collection(db, "friend_requests"),
+          where("fromUserId", "==", user.uid),
+          where("toUserId", "==", targetUser.uid),
+          where("status", "==", "pending")
+        );
+        const requestsSnap = await getDocs(requestsQ);
+        if (!requestsSnap.empty) return "already_sent";
+
+        const docRef = await addDoc(collection(db, "friend_requests"), {
+          fromUserId: user.uid,
+          fromDisplayName: myName,
+          fromAvatarUrl: myAvatar,
+          toUserId: targetUser.uid,
+          status: "pending",
+          createdAt: Date.now(),
+        });
+
+        void sendNotificationToUser({
+          recipientId: targetUser.uid,
+          senderId: user.uid,
+          senderName: myName,
+          type: "friend_request",
+          title: "New friend request",
+          message: `${myName} wants to be your friend`,
+          data: {
+            from_user_id: user.uid,
+            from_user_name: myName,
+            friend_request_id: docRef.id,
+          },
+        });
+
+        return "sent";
+      } catch {
+        return "error";
+      }
+    },
+    [user, myName, myAvatar, friends, incomingRequests, outgoingRequests, acceptFriendRequest]
+  );
+
   const declineFriendRequest = useCallback(async (request: FriendRequest) => {
     const db = getFirestore();
     await deleteDoc(doc(db, "friend_requests", request.id));
   }, []);
 
-  // Remove friend
   const removeFriend = useCallback(async (friendshipId: string) => {
     const db = getFirestore();
     await deleteDoc(doc(db, "friendships", friendshipId));
   }, []);
 
-  // Check if two users are friends
-  const areFriends = useCallback((userId1: string, userId2: string): boolean => {
-    return friends.some(
-      (f) =>
-        (f.userId === userId1 && userId2 === user?.uid) ||
-        (f.userId === userId2 && userId1 === user?.uid)
-    );
-  }, [friends, user]);
+  const areFriends = useCallback(
+    (userId1: string, userId2: string): boolean => {
+      return friends.some(
+        (f) =>
+          (f.userId === userId1 && userId2 === user?.uid) ||
+          (f.userId === userId2 && userId1 === user?.uid)
+      );
+    },
+    [friends, user]
+  );
 
   return {
     friends,
     incomingRequests,
+    outgoingRequests,
     loading,
     searchUsers,
     sendFriendRequest,
@@ -263,5 +345,6 @@ export function useFriends() {
     declineFriendRequest,
     removeFriend,
     areFriends,
+    getRelationship,
   };
 }

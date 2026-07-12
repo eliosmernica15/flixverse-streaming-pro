@@ -148,16 +148,23 @@ service cloud.firestore {
       allow delete: if false; // watch history is never deleted via client
     }
 
-    // Notifications — FIX: prevent spoofing — create requires user_id == auth.uid
-    // and target user_id must exist (field validator)
+    // Notifications — recipient reads/updates own; senders may create social alerts
     match /notifications/{notificationId} {
-      allow read, update: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
       allow create: if isAuthenticated()
-        && request.auth.uid == request.resource.data.user_id
-        && request.resource.data.type in ['like', 'comment', 'follow', 'review', 'new_episode', 'recommendation']
         && hasString(request.resource.data.title)
-        && hasString(request.resource.data.message);
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+        && hasString(request.resource.data.message)
+        && request.resource.data.type in [
+          'like', 'comment', 'follow', 'review', 'new_episode', 'recommendation',
+          'friend_request', 'friend_accepted', 'watch_party_invite'
+        ]
+        && (
+          request.auth.uid == request.resource.data.user_id
+          || (
+            request.resource.data.data.from_user_id == request.auth.uid
+            && request.resource.data.user_id != request.auth.uid
+          )
+        );
     }
 
     // Activity feed - anyone authenticated can read

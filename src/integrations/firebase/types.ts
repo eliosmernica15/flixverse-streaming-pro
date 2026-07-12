@@ -94,7 +94,7 @@ export interface WatchHistory {
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'like' | 'comment' | 'follow' | 'review' | 'new_episode' | 'recommendation';
+  type: 'like' | 'comment' | 'follow' | 'review' | 'new_episode' | 'recommendation' | 'friend_request' | 'friend_accepted' | 'watch_party_invite';
   title: string;
   message: string;
   data?: {
@@ -104,6 +104,10 @@ export interface Notification {
     from_user_name?: string;
     review_id?: string;
     comment_id?: string;
+    friend_request_id?: string;
+    party_join_url?: string;
+    room_id?: string;
+    movie_title?: string;
   };
   read: boolean;
   created_at: string;
