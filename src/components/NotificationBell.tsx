@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -230,12 +230,17 @@ const NotificationBell = () => {
     markAllAsRead,
     deleteNotification,
     clearAll,
+    refresh,
   } = useAppNotifications();
   const { user, isAuthenticated } = useAuth();
   const { profile } = useUserProfileContext();
 
   const myName =
     profile?.display_name || user?.displayName || user?.email?.split("@")[0] || "You";
+
+  useEffect(() => {
+    if (open) void refresh();
+  }, [open, refresh]);
 
   if (!isAuthenticated) {
     return null;

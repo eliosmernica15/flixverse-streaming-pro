@@ -13,7 +13,7 @@ export function usePythonNotifications() {
   const wsRef = useRef<WebSocket | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!user || !isPythonBackendEnabled()) return;
+    if (!user) return;
     try {
       const data = await pythonFetch<{ notifications: Notification[]; unreadCount: number }>(
         "/notifications"
@@ -28,17 +28,27 @@ export function usePythonNotifications() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || !isPythonBackendEnabled()) {
+    if (!user) {
       setNotifications([]);
       setUnreadCount(0);
       setLoading(false);
       return;
     }
 
+    if (!isPythonBackendEnabled()) {
+      setLoading(false);
+      return;
+    }
+
     void refresh();
 
-    const pollMs = useHttpTransport() ? 5000 : 15000;
+    const pollMs = useHttpTransport() ? 3000 : 15000;
     const poll = setInterval(() => void refresh(), pollMs);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     if (!useHttpTransport()) {
       void (async () => {
@@ -68,6 +78,7 @@ export function usePythonNotifications() {
 
     return () => {
       clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
       wsRef.current?.close();
       wsRef.current = null;
     };

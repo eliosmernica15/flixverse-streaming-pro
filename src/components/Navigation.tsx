@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { User, LogOut, Menu, X, Sparkles, ChevronDown, CreditCard } from "lucide-react";
+import { User, LogOut, Menu, X, Sparkles, ChevronDown, CreditCard, PartyPopper } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { TMDBMovie, getContentType } from "@/utils/tmdbApi";
@@ -38,6 +38,11 @@ const NotificationBell = dynamic(() => import("./NotificationBell"), {
   loading: () => null,
 });
 
+const FlixPartyJoinDialog = dynamic(
+  () => import("./player/FlixPartyJoinDialog").then((m) => m.FlixPartyJoinDialog),
+  { ssr: false }
+);
+
 const LanguageSwitcher = dynamic(() => import("./LanguageSwitcher").then((m) => m.LanguageSwitcher), {
   ssr: false,
   loading: () => null,
@@ -50,6 +55,7 @@ const OfflineSyncBadge = dynamic(() => import("./OfflineSyncBadge").then((m) => 
 
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showJoinParty, setShowJoinParty] = useState(false);
   const isScrolled = useThrottledScroll(20);
   const pathname = usePathname();
   const router = useRouter();
@@ -178,6 +184,15 @@ const Navigation = () => {
 
             {isAuthenticated && (
               <>
+                <button
+                  type="button"
+                  onClick={() => setShowJoinParty(true)}
+                  className="group hidden items-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-sm font-semibold text-purple-200 transition-all hover:border-purple-400/50 hover:bg-purple-500/20 hover:text-white focus-ring sm:flex"
+                  title="Join a watch party with a 6-letter code"
+                >
+                  <PartyPopper className="h-4 w-4 transition-transform group-hover:scale-110" />
+                  <span>Join Party</span>
+                </button>
                 <NotificationSettings />
                 <NotificationBell />
               </>
@@ -285,6 +300,19 @@ const Navigation = () => {
               </div>
 
               <div className="mt-1 space-y-1">
+                {isAuthenticated && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowJoinParty(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex w-full min-h-[44px] items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-purple-200 transition-colors hover:bg-purple-500/10 focus-ring"
+                  >
+                    <PartyPopper className="h-4 w-4" />
+                    Join Party
+                  </button>
+                )}
                 {navLinks.map((link) => (
                   <Link
                     key={link.path}
@@ -308,6 +336,10 @@ const Navigation = () => {
           </div>
         )}
       </div>
+
+      {isAuthenticated && (
+        <FlixPartyJoinDialog isOpen={showJoinParty} onClose={() => setShowJoinParty(false)} />
+      )}
     </nav>
   );
 };

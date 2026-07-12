@@ -62,13 +62,11 @@ interface UseFlixPartyOptions {
   roomId: string | null;
 }
 
-const USE_PYTHON_PARTY = process.env.NEXT_PUBLIC_USE_PYTHON_API === "true";
 
 export function useFlixParty(opts: UseFlixPartyOptions) {
-  if (USE_PYTHON_PARTY) {
-    return useFlixPartyPython(opts);
-  }
-  return useFlixPartyFirestore(opts);
+  const pythonResult = useFlixPartyPython(opts);
+  const firestoreResult = useFlixPartyFirestore(opts);
+  return isPythonBackendEnabled() ? pythonResult : firestoreResult;
 }
 
 function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {

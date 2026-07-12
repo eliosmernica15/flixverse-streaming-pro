@@ -136,6 +136,7 @@ export const useFirebaseNotifications = () => {
     markAllAsRead,
     deleteNotification,
     clearAll,
-    hasUnread: unreadCount > 0
+    hasUnread: unreadCount > 0,
+    refresh: async () => {},
   };
 };
