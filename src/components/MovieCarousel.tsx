@@ -7,6 +7,7 @@ import MovieCard from "./MovieCard";
 import SectionHeader from "./SectionHeader";
 import { TMDBMovie } from "@/utils/tmdbApi";
 import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
+import { useTranslations } from "next-intl";
 import {
   Carousel,
   CarouselContent,
@@ -38,6 +39,8 @@ const MovieCarousel = memo(
   }: MovieCarouselProps) => {
     const [isHovered, setIsHovered] = useState(false);
     const prefetchRoute = useRoutePrefetch();
+    const tc = useTranslations("common");
+    const t = useTranslations("carousel");
 
     const validMovies = useMemo(
       () =>
@@ -94,7 +97,7 @@ const MovieCarousel = memo(
           <SectionHeader
             className="min-w-0 flex-1"
             title={title}
-            eyebrow={validMovies.length > 0 ? `${validMovies.length} titles` : undefined}
+            eyebrow={validMovies.length > 0 ? tc("titles", { count: validMovies.length }) : undefined}
             action={
               exploreAllPath ? (
                 <Link
@@ -105,7 +108,7 @@ const MovieCarousel = memo(
                   className="group/btn glass-card glass-sheen hover-lift-sm flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-gray-400 transition-all duration-200 hover:translate-x-0.5 hover:text-white focus-ring"
                 >
                   <Sparkles className="h-4 w-4 text-red-500" />
-                  <span>Explore All</span>
+                  <span>{tc("exploreAll")}</span>
                   <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                 </Link>
               ) : undefined
@@ -114,6 +117,7 @@ const MovieCarousel = memo(
         </div>
 
         {validMovies.length > 0 ? (
+          <div className="relative px-1 sm:px-2">
           <Carousel
             opts={{
               align: "start",
@@ -137,29 +141,32 @@ const MovieCarousel = memo(
             {validMovies.length > 4 && (
               <>
                 <CarouselPrevious
-                  className={`glow-hover glass-premium press-effect absolute -left-5 top-1/2 z-10 hidden h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white transition-all duration-300 hover:bg-red-600 hover:border-red-600 shadow-2xl focus-ring lg:flex ${
-                    isHovered ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0 pointer-events-none"
+                  className={`carousel-side-arrow glow-hover glass-premium press-effect absolute left-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl transition-all duration-300 hover:border-red-600 hover:bg-red-600 focus-ring sm:left-1 md:flex ${
+                    isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
                   }`}
                 />
                 <CarouselNext
-                  className={`glow-hover glass-premium press-effect absolute -right-5 top-1/2 z-10 hidden h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white transition-all duration-300 hover:bg-red-600 hover:border-red-600 shadow-2xl focus-ring lg:flex ${
-                    isHovered ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0 pointer-events-none"
+                  className={`carousel-side-arrow glow-hover glass-premium press-effect absolute right-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl transition-all duration-300 hover:border-red-600 hover:bg-red-600 focus-ring sm:right-1 md:flex ${
+                    isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
                   }`}
                 />
               </>
             )}
           </Carousel>
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 z-10 hidden w-10 bg-gradient-to-r from-black to-transparent md:block" />
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 hidden w-10 bg-gradient-to-l from-black to-transparent md:block" />
+          </div>
         ) : (
           <div className="glass-panel rounded-2xl py-16 px-8 text-center">
             <p className="text-gray-300 text-lg">
-              New movies and series will appear here before they’re released.
+              {t("emptyComingSoon")}
             </p>
-            <p className="text-gray-500 text-sm mt-2">Check back for upcoming releases.</p>
+            <p className="text-gray-500 text-sm mt-2">{t("checkBack")}</p>
           </div>
         )}
 
-        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-black to-transparent pointer-events-none z-10 hidden lg:block" />
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-black to-transparent pointer-events-none z-10 hidden lg:block" />
+        <div className="absolute left-0 top-16 bottom-0 w-8 bg-gradient-to-r from-black to-transparent pointer-events-none z-10 hidden md:block" />
+        <div className="absolute right-0 top-16 bottom-0 w-8 bg-gradient-to-l from-black to-transparent pointer-events-none z-10 hidden md:block" />
       </section>
     );
   }

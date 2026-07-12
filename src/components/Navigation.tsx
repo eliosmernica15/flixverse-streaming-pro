@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { User, LogOut, Menu, X, Sparkles, ChevronDown, CreditCard, PartyPopper } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { TMDBMovie, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -64,6 +65,8 @@ const Navigation = () => {
   const { profile } = useUserProfileContext();
   const { toast } = useToast();
   const prefetchRoute = useRoutePrefetch();
+  const t = useTranslations("nav");
+  const tc = useTranslations("common");
 
   const handleMovieSelect = (movie: TMDBMovie) => {
     const type = getContentType(movie);
@@ -77,21 +80,21 @@ const Navigation = () => {
       await signOut();
     } catch {
       toast({
-        title: "Sign out failed",
-        description: "Please try again",
+        title: t("signOutFailed"),
+        description: t("tryAgain"),
         variant: "destructive",
       });
     }
   };
 
   const navLinks = [
-    { path: "/", label: "Home" },
-    { path: "/tv-shows", label: "TV Shows" },
-    { path: "/movies", label: "Movies" },
-    { path: "/new-and-popular", label: "New & Popular" },
-    { path: "/my-list", label: "My List" },
-    { path: "/plans", label: "Plans" },
-    { path: "/offline-library", label: "Offline" },
+    { path: "/", label: t("home"), key: "home" },
+    { path: "/tv-shows", label: t("tvShows"), key: "tvShows" },
+    { path: "/movies", label: t("movies"), key: "movies" },
+    { path: "/new-and-popular", label: t("newAndPopular"), key: "newAndPopular" },
+    { path: "/my-list", label: t("myList"), key: "myList" },
+    { path: "/plans", label: t("plans"), key: "plans" },
+    { path: "/offline-library", label: t("offline"), key: "offline" },
   ];
 
   useEffect(() => {
@@ -120,8 +123,8 @@ const Navigation = () => {
       <div aria-hidden className="absolute inset-x-0 bottom-0 divider-glow" />
 
       <div className="mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between lg:h-20">
-          <div className="flex items-center">
+        <div className="flex h-16 items-center justify-between gap-3 lg:h-20">
+          <div className="nav-main flex min-w-0 flex-1 items-center gap-4 lg:gap-8">
             <Link
               href="/"
               className="group flex-shrink-0 rounded-xl focus-ring magnetic"
@@ -142,39 +145,39 @@ const Navigation = () => {
                 </h1>
               </div>
             </Link>
+
+            <div className="nav-links hidden min-w-0 flex-1 items-center gap-0.5 overflow-hidden lg:flex lg:gap-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.key}
+                  href={link.path}
+                  prefetch
+                  onMouseEnter={() => prefetchRoute(link.path)}
+                  onFocus={() => prefetchRoute(link.path)}
+                  aria-current={isActive(link.path) ? "page" : undefined}
+                  className={`nav-link group relative flex min-h-[44px] flex-shrink-0 items-center whitespace-nowrap rounded-xl px-3 text-sm font-medium transition-colors duration-200 focus-ring lg:px-4 lg:text-base ${
+                    isActive(link.path) ? "text-white" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <span
+                    className={`absolute inset-0 rounded-xl transition-colors duration-200 ${
+                      isActive(link.path) ? "bg-white/10" : "bg-transparent group-hover:bg-white/5"
+                    }`}
+                  />
+                  <span className="relative z-10">{link.label}</span>
+                  <span
+                    className={`absolute -bottom-1 left-1/2 h-[3px] -translate-x-1/2 rounded-full bg-gradient-to-r from-red-500 via-orange-500 to-red-500 transition-all duration-300 ${
+                      isActive(link.path)
+                        ? "w-6 opacity-100 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
+                        : "w-0 opacity-0 group-hover:w-4 group-hover:opacity-70"
+                    }`}
+                  />
+                </Link>
+              ))}
+            </div>
           </div>
 
-          <div className="hidden items-center gap-1 lg:flex lg:gap-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                href={link.path}
-                prefetch
-                onMouseEnter={() => prefetchRoute(link.path)}
-                onFocus={() => prefetchRoute(link.path)}
-                aria-current={isActive(link.path) ? "page" : undefined}
-                className={`group relative flex min-h-[44px] items-center rounded-xl px-4 text-sm font-medium transition-colors duration-200 focus-ring lg:text-base ${
-                  isActive(link.path) ? "text-white" : "text-gray-400 hover:text-white"
-                }`}
-              >
-                <span
-                  className={`absolute inset-0 rounded-xl transition-colors duration-200 ${
-                    isActive(link.path) ? "bg-white/10" : "bg-transparent group-hover:bg-white/5"
-                  }`}
-                />
-                <span className="relative z-10">{link.label}</span>
-                <span
-                  className={`absolute -bottom-1 left-1/2 h-[3px] -translate-x-1/2 rounded-full bg-gradient-to-r from-red-500 via-orange-500 to-red-500 transition-all duration-300 ${
-                    isActive(link.path)
-                      ? "w-6 opacity-100 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
-                      : "w-0 opacity-0 group-hover:w-4 group-hover:opacity-70"
-                  }`}
-                />
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
             <div className="hidden glow-hover rounded-xl sm:block">
               <SearchBar onMovieSelect={handleMovieSelect} />
             </div>
@@ -191,7 +194,7 @@ const Navigation = () => {
                   title="Join a watch party with a 6-letter code"
                 >
                   <PartyPopper className="h-4 w-4 transition-transform group-hover:scale-110" />
-                  <span className="hidden lg:inline">Join Party</span>
+                  <span className="hidden lg:inline">{t("joinParty")}</span>
                 </button>
                 <NotificationSettings />
                 <NotificationBell />
@@ -243,21 +246,21 @@ const Navigation = () => {
                     className="cursor-pointer rounded-xl py-3 text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
                   >
                     <CreditCard className="mr-3 h-4 w-4" />
-                    Billing
+                    {t("billing")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => router.push("/profile")}
                     className="cursor-pointer rounded-xl py-3 text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
                   >
                     <User className="mr-3 h-4 w-4" />
-                    My Profile
+                    {t("myProfile")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => router.push("/my-list")}
                     className="cursor-pointer rounded-xl py-3 text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
                   >
                     <Sparkles className="mr-3 h-4 w-4" />
-                    My Watchlist
+                    {t("myWatchlist")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-2 bg-white/10" />
                   <DropdownMenuItem
@@ -265,14 +268,14 @@ const Navigation = () => {
                     className="cursor-pointer rounded-xl py-3 text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300"
                   >
                     <LogOut className="mr-3 h-4 w-4" />
-                    Sign Out
+                    {tc("signOut")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <Link href="/auth">
                 <Button className="btn-shine min-h-[44px] rounded-xl bg-gradient-to-r from-red-600 to-red-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition-transform duration-200 hover:scale-105 hover:from-red-500 hover:to-red-400 press-effect focus-ring">
-                  Sign In
+                  {tc("signIn")}
                 </Button>
               </Link>
             )}
@@ -280,7 +283,7 @@ const Navigation = () => {
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl transition-colors duration-200 hover:bg-white/10 focus-ring lg:hidden"
-              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-label={isMobileMenuOpen ? tc("closeMenu") : tc("openMenu")}
               aria-expanded={isMobileMenuOpen}
             >
               {isMobileMenuOpen ? (
@@ -310,19 +313,19 @@ const Navigation = () => {
                     className="flex w-full min-h-[44px] items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-purple-200 transition-colors hover:bg-purple-500/10 focus-ring"
                   >
                     <PartyPopper className="h-4 w-4" />
-                    Join Party
+                    {t("joinParty")}
                   </button>
                 )}
                 {navLinks.map((link) => (
                   <Link
-                    key={link.path}
+                    key={link.key}
                     href={link.path}
                     prefetch
                     onMouseEnter={() => prefetchRoute(link.path)}
                     onFocus={() => prefetchRoute(link.path)}
                     onClick={() => setIsMobileMenuOpen(false)}
                     aria-current={isActive(link.path) ? "page" : undefined}
-                    className={`block min-h-[44px] rounded-xl px-4 py-3 text-base font-medium transition-colors duration-200 focus-ring ${
+                    className={`nav-link block min-h-[44px] whitespace-nowrap rounded-xl px-4 py-3 text-base font-medium transition-colors duration-200 focus-ring ${
                       isActive(link.path)
                         ? "border-l-2 border-red-500 bg-gradient-to-r from-red-500/20 to-orange-500/10 text-white"
                         : "text-gray-400 hover:bg-white/5 hover:text-white"

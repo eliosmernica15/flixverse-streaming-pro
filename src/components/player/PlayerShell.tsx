@@ -8,6 +8,9 @@ import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
 import { usePlayerPartySync } from "@/hooks/player/usePlayerPartySync";
 import { usePartyLayout } from "@/hooks/player/usePartyLayout";
 import { usePlayerWindowDrag } from "@/hooks/player/usePlayerWindowDrag";
+import {
+  usePlayerWindowResize,
+} from "@/hooks/player/usePlayerWindowResize";
 import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { EmbedFrame } from "./EmbedFrame";
@@ -165,6 +168,13 @@ export function PlayerShell({
 
   const inParty = !!party.partyRoomId;
   const isMobile = layout.isMobile;
+
+  const playerResize = usePlayerWindowResize(shellRef, windowRef, {
+    enabled: !isMobile,
+    isFloating: playerDrag.isFloating,
+    position: playerDrag.position,
+    onPositionChange: playerDrag.setPosition,
+  });
   const mobilePartyExpanded = layout.partyPanelMode === "expanded";
   const mobilePartyMinimized =
     layout.partyPanelMode === "minimized" || layout.partyPanelMode === "closed";
@@ -522,6 +532,9 @@ export function PlayerShell({
     party.guestSplashVisible ? "player-shell--guest-splash" : "",
     isMobile ? "player-shell--mobile" : "",
     playerDrag.isFloating ? "player-shell--window-floating" : "",
+    playerDrag.isDragging ? "player-shell--window-dragging" : "",
+    playerResize.isResizing ? "player-shell--window-resizing" : "",
+    playerResize.isCustomSize ? "player-shell--window-custom-size" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -544,14 +557,17 @@ export function PlayerShell({
         <div className="player-layout-main">
           <div
             ref={windowRef}
-            style={playerDrag.windowStyle}
-            className={`player-window is-framed player-window--boost-${layout.focusLevel} ${playerDrag.isFloating ? "is-floating" : ""} ${playerDrag.isDragging ? "is-dragging" : ""}`}
+            style={{ ...playerDrag.windowStyle, ...playerResize.sizeStyle }}
+            className={`player-window is-framed player-window--boost-${layout.focusLevel} ${playerDrag.isFloating ? "is-floating" : ""} ${playerDrag.isDragging ? "is-dragging" : ""} ${playerResize.isResizing ? "is-resizing" : ""} ${playerResize.isCustomSize ? "is-custom-size" : ""}`}
           >
           <header className="player-window-bar">
             <div
               className="player-window-drag-zone"
               onPointerDown={playerDrag.onDragZonePointerDown}
-              onDoubleClick={playerDrag.resetPosition}
+              onDoubleClick={() => {
+                playerDrag.resetPosition();
+                playerResize.resetSize();
+              }}
               title="Drag anywhere here to move · double-click to re-center"
             >
               <span className="player-window-drag-grip" aria-hidden>
@@ -627,7 +643,10 @@ export function PlayerShell({
             </div>
           </header>
 
-          <div className="player-window-body">
+          <div
+            className="player-window-body"
+            style={playerResize.bodyHeight ? { height: playerResize.bodyHeight, aspectRatio: "auto" } : undefined}
+          >
             <EmbedFrame
               currentSource={currentSource}
               currentServer={currentServer}
@@ -646,6 +665,17 @@ export function PlayerShell({
               T maximize · G watch together · ↑↓ volume · ? shortcuts
             </p>
           )}
+
+          {!isMobile &&
+            playerResize.visibleHandles.map((handle) => (
+              <div
+                key={handle}
+                className={`player-resize-handle player-resize-handle--${handle}`}
+                onPointerDown={playerResize.onResizeHandlePointerDown(handle)}
+                role="presentation"
+                aria-hidden
+              />
+            ))}
         </div>
 
         {cameraLayout && (

@@ -247,22 +247,23 @@ export function WatchParty({
 
   // Copy invite link (FlixParty external room or legacy watch_parties room)
   const copyInviteLink = useCallback(() => {
-    const roomId = activeRoom?.id ?? activeRoomId;
-    if (!roomId) return;
-
-    const mid = activeRoom?.movieId ?? movieId;
-    const mtype = activeRoom?.mediaType ?? mediaType;
-    const params = new URLSearchParams({ type: mtype, party: roomId });
-    const s = activeRoom?.season ?? season;
-    const e = activeRoom?.episode ?? episode;
-    if (s) params.set("season", String(s));
-    if (e) params.set("episode", String(e));
-
-    const link = `${window.location.origin}/movie/${mid}?${params}`;
+    const link = partyJoinUrl || (() => {
+      const roomId = activeRoom?.id ?? activeRoomId;
+      if (!roomId) return null;
+      const mid = activeRoom?.movieId ?? movieId;
+      const mtype = activeRoom?.mediaType ?? mediaType;
+      const params = new URLSearchParams({ type: mtype, party: roomId });
+      const s = activeRoom?.season ?? season;
+      const e = activeRoom?.episode ?? episode;
+      if (s) params.set("season", String(s));
+      if (e) params.set("episode", String(e));
+      return `${window.location.origin}/movie/${mid}?${params}`;
+    })();
+    if (!link) return;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
-  }, [activeRoom, activeRoomId, movieId, mediaType, season, episode]);
+  }, [activeRoom, activeRoomId, movieId, mediaType, season, episode, partyJoinUrl]);
 
   // Cleanup
   useEffect(() => {

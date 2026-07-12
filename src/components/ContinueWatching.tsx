@@ -4,6 +4,7 @@ import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import { useAuth } from '@/hooks/useAuth';
 import { getImageUrl } from '@/utils/tmdbApi';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ContinueWatchingSkeleton } from '@/components/skeletons/ContentSkeletons';
 import SectionHeader from './SectionHeader';
 import {
@@ -18,6 +19,7 @@ const ContinueWatching = () => {
   const { getContinueWatching, removeFromHistory, loading } = useWatchHistoryContext();
   const { isAuthenticated } = useAuth();
   const router = useRouter();
+  const t = useTranslations("carousel");
 
   const continueWatchingItems = getContinueWatching();
 
@@ -59,13 +61,13 @@ const ContinueWatching = () => {
   return (
     <section className="relative mb-10 content-auto animate-fade-in-up">
       <SectionHeader
-        title="Continue Watching"
-        eyebrow="Pick up where you left off"
+        title={t("continueWatching")}
+        eyebrow={t("continueEyebrow")}
       />
 
       <Carousel
         opts={{ align: 'start', loop: false, skipSnaps: false, dragFree: true }}
-        className="w-full"
+        className="relative w-full px-1 sm:px-2"
       >
         <CarouselContent className="-ml-3 md:-ml-5">
           {items.map((item) => {
@@ -142,8 +144,8 @@ const ContinueWatching = () => {
         </CarouselContent>
         {items.length > 3 && (
           <>
-            <CarouselPrevious className="glow-hover press-effect -left-2 sm:-left-5 top-1/2 -translate-y-1/2 hidden h-12 w-12 items-center justify-center rounded-full glass-premium border-white/10 text-white hover:bg-red-600/20 hover:border-red-500/30 focus-ring lg:flex" />
-            <CarouselNext className="-right-2 sm:-right-5 top-1/2 -translate-y-1/2 glow-hover press-effect hidden h-12 w-12 items-center justify-center rounded-full glass-premium border-white/10 text-white hover:bg-red-600/20 hover:border-red-500/30 focus-ring lg:flex" />
+            <CarouselPrevious className="carousel-side-arrow glow-hover press-effect absolute left-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full glass-premium border-white/10 text-white hover:border-red-600 hover:bg-red-600/20 focus-ring md:flex" />
+            <CarouselNext className="carousel-side-arrow glow-hover press-effect absolute right-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full glass-premium border-white/10 text-white hover:border-red-600 hover:bg-red-600/20 focus-ring md:flex" />
           </>
         )}
       </Carousel>

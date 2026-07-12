@@ -17,8 +17,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
-import CardPreviewPanel from "./CardPreviewPanel";
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -58,13 +58,13 @@ const genreNames: Record<number, string> = {
 
 const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
+  const t = useTranslations("movieCard");
+  const tc = useTranslations("common");
   const { addToHistory, addFavoriteGenre } = useUserPreferencesContext();
   const { isAuthenticated } = useAuth();
   const [isInLocalList, setIsInLocalList] = useState(false);
@@ -117,7 +117,6 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
 
   useEffect(() => () => {
     cancelPrefetch();
-    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
   }, [cancelPrefetch]);
 
   const handlePlayClick = (e: React.MouseEvent) => {
@@ -131,8 +130,8 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
 
     if (!isAuthenticated) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in to add movies to your list",
+        title: t("signInRequired"),
+        description: t("signInForList"),
         variant: "destructive",
       });
       return;
@@ -144,20 +143,20 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
       if (isInMyList) {
         await removeFromList(movie.id);
         toast({
-          title: "Removed from My List",
-          description: `${movieTitle} has been removed from your list.`,
+          title: t("removedFromList"),
+          description: t("removedDesc", { title: movieTitle }),
         });
       } else {
         await addToList(movie);
         toast({
-          title: "Added to My List",
-          description: `${movieTitle} has been added to your list.`,
+          title: t("addedToList"),
+          description: t("addedDesc", { title: movieTitle }),
         });
       }
     } catch (error: unknown) {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Something went wrong",
+        title: t("error"),
+        description: error instanceof Error ? error.message : t("somethingWrong"),
         variant: "destructive",
       });
     }
@@ -191,15 +190,10 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
       onMouseEnter={() => {
         setIsHovered(true);
         schedulePrefetch();
-        // Show preview panel after 400ms hover delay
-        if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
-        previewTimerRef.current = setTimeout(() => setShowPreview(true), 400);
       }}
       onMouseLeave={() => {
         setIsHovered(false);
         cancelPrefetch();
-        if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
-        previewTimerRef.current = setTimeout(() => setShowPreview(false), 200);
       }}
       onClick={handleCardClick}
       onKeyDown={(e) => {
@@ -235,7 +229,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
 
           <div className="absolute left-3 top-3 flex items-center space-x-1.5 rounded-md bg-white/10 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-md badge-shine">
             {contentType === "tv" ? <Tv className="h-3 w-3" /> : <Film className="h-3 w-3" />}
-            <span>{contentType === "tv" ? "SERIES" : "MOVIE"}</span>
+            <span>{contentType === "tv" ? tc("series").toUpperCase() : tc("movie").toUpperCase()}</span>
           </div>
 
           {hasValidRating && (
@@ -245,6 +239,14 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
               <Star className="h-3 w-3 fill-current" />
               <span>{rating.toFixed(1)}</span>
             </div>
+          )}
+
+          {movie.overview && (
+            <p
+              className={`pointer-events-none absolute inset-x-3 top-12 z-[5] line-clamp-3 text-[10px] leading-snug text-gray-200/90 transition-opacity duration-200 ${isHovered ? "opacity-100" : "opacity-0"}`}
+            >
+              {movie.overview}
+            </p>
           )}
 
           <div
@@ -266,7 +268,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
             <div className="flex items-center gap-2">
               {comingSoon ? (
                 <div className="flex-1 border border-amber-500/30 bg-amber-500/20 py-2 text-center text-[10px] font-bold text-amber-400">
-                  COMING SOON
+                  {tc("comingSoon").toUpperCase()}
                 </div>
               ) : (
                 <button
@@ -274,7 +276,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
                   onClick={handlePlayClick}
                 >
                   <Play className="h-3 w-3 fill-current" />
-                  <span>PLAY</span>
+                  <span>{tc("play").toUpperCase()}</span>
                 </button>
               )}
 
@@ -283,7 +285,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
                 className={`press-effect flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg transition-colors focus-ring ${isInMyList ? "bg-red-500 text-white" : "glass-card text-white"} ${listBusy ? "opacity-70" : ""}`}
                 onClick={handleAddToListClick}
                 disabled={listBusy}
-                aria-label={isInMyList ? "Remove from list" : "Add to list"}
+                aria-label={isInMyList ? tc("removeFromList") : tc("addToList")}
               >
                 {listBusy ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -314,16 +316,9 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
       <div className={`mt-2 transition-opacity duration-200 ${isHovered ? "opacity-0" : "opacity-100"}`}>
         <p className="text-white text-xs font-bold truncate">{displayTitle}</p>
         <p className="text-gray-500 text-[10px] uppercase font-bold tracking-tighter mt-0.5">
-          {year} • {hasValidRating ? `${rating.toFixed(1)} Rating` : "New"}
+          {year ? `${year} • ` : ""}{hasValidRating ? `${rating.toFixed(1)} ${tc("rating")}` : tc("new")}
         </p>
       </div>
-
-      <CardPreviewPanel
-        movie={movie}
-        anchorEl={cardRef.current}
-        isVisible={showPreview}
-        onClose={() => setShowPreview(false)}
-      />
     </div>
   );
 };

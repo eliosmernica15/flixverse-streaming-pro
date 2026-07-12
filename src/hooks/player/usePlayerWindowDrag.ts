@@ -124,11 +124,17 @@ export function usePlayerWindowDrag(
       }
     : undefined;
 
+  const setPositionDirect = useCallback((next: { x: number; y: number }) => {
+    setPosition(next);
+  }, []);
+
   return {
+    position,
     isFloating: position !== null,
     isDragging,
     windowStyle,
     onDragZonePointerDown,
     resetPosition,
+    setPosition: setPositionDirect,
   };
 }

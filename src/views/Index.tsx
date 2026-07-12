@@ -11,6 +11,7 @@ import { useHomeContent } from "@/hooks/queries/useHomeContent";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { usePartyGuestRoute } from "@/hooks/player/usePartyGuestRoute";
 import { TrendingUp, Star, Play, Tv, Film, Calendar } from "lucide-react";
 import Reveal from "@/components/Reveal";
@@ -30,6 +31,7 @@ const Index = () => {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, isFetching } = useHomeContent();
+  const t = useTranslations("carousel");
 
   usePartyGuestRoute();
 
@@ -64,7 +66,7 @@ const Index = () => {
 
           <Reveal>
             <MovieCarousel
-              title="Trending Now"
+              title={t("trendingNow")}
               movies={data?.trendingMovies || []}
               loading={!data?.trendingMovies?.length && (isLoading || isFetching)}
               icon={<TrendingUp className="w-5 h-5 text-red-500" />}
@@ -82,7 +84,7 @@ const Index = () => {
 
           <Reveal delay={80}>
             <MovieCarousel
-              title="Now Playing"
+              title={t("nowPlaying")}
               movies={data?.nowPlayingMovies || []}
               loading={!data?.nowPlayingMovies?.length && (isLoading || isFetching)}
               icon={<Play className="w-5 h-5 text-green-500" />}
@@ -96,7 +98,7 @@ const Index = () => {
 
               <Reveal delay={0}>
                 <MovieCarousel
-                  title="Top Rated"
+                  title={t("topRated")}
                   movies={data?.topRatedMovies || []}
                   loading={!data?.topRatedMovies?.length && (isLoading || isFetching)}
                   icon={<Star className="w-5 h-5 text-yellow-500" />}
@@ -108,7 +110,7 @@ const Index = () => {
 
               <Reveal delay={80}>
                 <MovieCarousel
-                  title="Popular Movies"
+                  title={t("popularMovies")}
                   movies={data?.popularMovies || []}
                   loading={!data?.popularMovies?.length && (isLoading || isFetching)}
                   icon={<Film className="w-5 h-5 text-blue-500" />}
@@ -120,7 +122,7 @@ const Index = () => {
 
               <Reveal delay={160}>
                 <MovieCarousel
-                  title="Trending TV Shows"
+                  title={t("trendingTv")}
                   movies={data?.trendingTVShows || []}
                   loading={!data?.trendingTVShows?.length && (isLoading || isFetching)}
                   icon={<Tv className="w-5 h-5 text-purple-500" />}
@@ -132,7 +134,7 @@ const Index = () => {
 
               <Reveal delay={240}>
                 <MovieCarousel
-                  title="Popular TV Shows"
+                  title={t("popularTv")}
                   movies={data?.popularTVShows || []}
                   loading={!data?.popularTVShows?.length && (isLoading || isFetching)}
                   icon={<Tv className="w-5 h-5 text-pink-500" />}
@@ -144,7 +146,7 @@ const Index = () => {
 
               <Reveal delay={320}>
                 <MovieCarousel
-                  title="Coming soon"
+                  title={t("comingSoon")}
                   movies={data?.comingSoon || []}
                   loading={!data?.comingSoon?.length && (isLoading || isFetching)}
                   icon={<Calendar className="w-5 h-5 text-amber-500" />}

@@ -1,36 +1,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Clock, Star, Sparkles, Film } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
-import Link from "next/link";
 import Reveal from "./Reveal";
 
 const PersonalizedWelcome = () => {
   const { user, isAuthenticated } = useAuth();
   const { profile } = useUserProfileContext();
-  const [greeting, setGreeting] = useState("Welcome");
+  const t = useTranslations("welcome");
+  const tc = useTranslations("common");
+  const [greeting, setGreeting] = useState(t("goodEvening"));
   const [timeOfDay, setTimeOfDay] = useState("");
 
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) {
-      setGreeting("Good Morning");
+      setGreeting(t("goodMorning"));
       setTimeOfDay("morning");
     } else if (hour < 18) {
-      setGreeting("Good Afternoon");
+      setGreeting(t("goodAfternoon"));
       setTimeOfDay("afternoon");
     } else {
-      setGreeting("Good Evening");
+      setGreeting(t("goodEvening"));
       setTimeOfDay("evening");
     }
-  }, []);
+  }, [t]);
 
-  const displayName = profile?.display_name || user?.email?.split("@")[0] || "Movie Lover";
+  const displayName = profile?.display_name || user?.email?.split("@")[0] || t("movieLover");
   const message = isAuthenticated
-    ? `Welcome back, ${displayName}. Pick up where you left off or discover something new.`
-    : "Sign in to unlock personalized recommendations, watchlists, and continue watching.";
+    ? t("welcomeBack", { name: displayName })
+    : t("guestMessage");
 
   return (
     <section className="w-full min-w-0 flex-1" aria-label="Personalized welcome">
@@ -54,13 +57,16 @@ const PersonalizedWelcome = () => {
             <div className="flex shrink-0 flex-wrap items-center gap-2.5">
               {!isAuthenticated ? (
                 <Link href="/auth" className="btn-primary px-5 py-2.5 text-sm focus-ring">
-                  Sign In Free
+                  {tc("signInFree")}
                 </Link>
               ) : (
                 <>
+                  <Link href="/movies" className="btn-primary px-5 py-2.5 text-sm focus-ring">
+                    {tc("continueWatching")}
+                  </Link>
                   <span className="glass-card inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-gray-300 sm:text-sm">
                     <Star className="h-4 w-4 text-yellow-500" />
-                    Personalized
+                    {t("personalized")}
                   </span>
                   <span className="glass-card inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs capitalize text-gray-300 sm:text-sm">
                     <Clock className="h-4 w-4 text-sky-400" />
@@ -74,7 +80,7 @@ const PersonalizedWelcome = () => {
           {isAuthenticated && profile && (
             <div className="relative z-10 mt-4 flex flex-wrap gap-2 border-t border-white/5 pt-4">
               <span className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
-                Synced Watchlist
+                {t("syncedWatchlist")}
               </span>
             </div>
           )}

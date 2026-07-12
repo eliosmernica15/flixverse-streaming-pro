@@ -15,24 +15,30 @@ import {
   ArrowUpRight,
   Send,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useTranslations } from "next-intl";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const { isAuthenticated } = useAuth();
+  const t = useTranslations("footer");
+  const tn = useTranslations("nav");
+  const tc = useTranslations("common");
 
   const navLinks = [
-    { path: "/", label: "Home", icon: Sparkles },
-    { path: "/movies", label: "Movies", icon: Film },
-    { path: "/tv-shows", label: "TV Shows", icon: Tv },
-    { path: "/my-list", label: "My List", icon: Heart },
-    { path: "/new-and-popular", label: "Trending", icon: TrendingUp },
-    { path: "/offline-library", label: "Offline Library", icon: WifiOff },
+    { path: "/", label: tn("home"), icon: Sparkles },
+    { path: "/movies", label: tn("movies"), icon: Film },
+    { path: "/tv-shows", label: tn("tvShows"), icon: Tv },
+    { path: "/my-list", label: tn("myList"), icon: Heart },
+    { path: "/new-and-popular", label: t("trending"), icon: TrendingUp },
+    { path: "/offline-library", label: t("offlineLibrary"), icon: WifiOff },
   ];
 
   const legalLinks = [
-    { label: "Privacy Policy", href: "/privacy" },
-    { label: "Terms of Service", href: "/terms" },
-    { label: "Contact Us", href: "/contact" },
-    { label: "Help Center", href: "/help" },
+    { label: t("privacy"), href: "/privacy" },
+    { label: t("terms"), href: "/terms" },
+    { label: t("contact"), href: "/contact" },
+    { label: t("help"), href: "/help" },
   ];
 
   const socialLinks = [
@@ -60,18 +66,17 @@ const Footer = () => {
           <div className="relative flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
             <div>
               <h2 className="mb-2 text-2xl font-black tracking-tight text-white lg:text-4xl">
-                Ready to start watching?
+                {isAuthenticated ? t("ctaTitleLoggedIn") : t("ctaTitle")}
               </h2>
               <p className="max-w-lg text-gray-400">
-                Join FlixVerse today and unlock thousands of movies and TV shows, personalized
-                recommendations, and offline viewing.
+                {isAuthenticated ? t("ctaDescriptionLoggedIn") : t("ctaDescription")}
               </p>
             </div>
             <Link
-              href="/auth"
+              href={isAuthenticated ? "/movies" : "/auth"}
               className="group inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-500 px-8 py-4 font-bold text-white shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] hover:from-red-500 hover:to-red-400 active:scale-[0.98] focus-ring"
             >
-              <span>Get Started</span>
+              <span>{isAuthenticated ? tc("continueWatching") : tc("getStarted")}</span>
               <ArrowUpRight className="h-5 w-5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -94,8 +99,7 @@ const Footer = () => {
               </h2>
             </Link>
             <p className="max-w-xs text-sm leading-relaxed text-gray-400">
-              Watch free movies and TV shows online in HD. Stream trending films, build your
-              watchlist, and browse offline with FlixVerse.
+              {t("tagline")}
             </p>
 
             {/* Newsletter */}
@@ -105,13 +109,13 @@ const Footer = () => {
             >
               <input
                 type="email"
-                placeholder="Your email"
-                aria-label="Email address for newsletter"
+                placeholder={t("emailPlaceholder")}
+                aria-label={t("emailPlaceholder")}
                 className="input-field min-h-[44px] flex-1 px-3 text-sm"
               />
               <button
                 type="submit"
-                aria-label="Subscribe"
+                aria-label={t("subscribe")}
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20 transition-all hover:from-red-500 hover:to-red-400 focus-ring glow-hover"
               >
                 <Send className="h-4 w-4" />
@@ -120,7 +124,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="eyebrow mb-5">Navigate</h3>
+            <h3 className="eyebrow mb-5">{t("navigate")}</h3>
             <ul className="space-y-1">
               {navLinks.map((link) => (
                 <li key={link.path}>
@@ -138,7 +142,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="eyebrow mb-5">Legal</h3>
+            <h3 className="eyebrow mb-5">{t("legal")}</h3>
             <ul className="space-y-1">
               {legalLinks.map((link) => (
                 <li key={link.label}>
@@ -155,7 +159,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="eyebrow mb-5">Connect</h3>
+            <h3 className="eyebrow mb-5">{t("connect")}</h3>
             <div className="mb-5 flex items-center gap-3">
               {socialLinks.map((social) => (
                 <a
@@ -171,7 +175,7 @@ const Footer = () => {
               ))}
             </div>
             <p className="max-w-[14rem] text-xs leading-relaxed text-gray-500">
-              Stay updated with the latest releases and exclusive content.
+              {t("stayUpdated")}
             </p>
           </div>
         </div>
@@ -179,11 +183,11 @@ const Footer = () => {
         <div className="section-divider mb-6" />
 
         <div className="flex flex-col items-center justify-between gap-4 text-sm sm:flex-row">
-          <p className="text-gray-500">© {currentYear} FlixVerse. All rights reserved.</p>
+          <p className="text-gray-500">{t("copyright", { year: currentYear })}</p>
           <div className="flex items-center gap-4 text-xs text-gray-600">
-            <span>Powered by TMDB API</span>
+            <span>{t("poweredBy")}</span>
             <span className="h-1 w-1 rounded-full bg-gray-700" />
-            <span>Made for movie lovers</span>
+            <span>{t("madeFor")}</span>
           </div>
         </div>
       </div>

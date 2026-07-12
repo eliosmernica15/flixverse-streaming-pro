@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Search, UserPlus, Check, X, Users, Send, Loader2, Clock } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useFriends, type Friend, type UserProfile } from "@/hooks/useFriends";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ export function FriendsList({
   initialTab = "friends",
 }: FriendsListProps) {
   const { toast } = useToast();
+  const t = useTranslations("friends");
   const {
     friends,
     incomingRequests,
@@ -153,9 +155,9 @@ export function FriendsList({
     <div className={`${shellClass} ${variant === "sidebar" ? "flex h-full flex-col" : ""}`}>
       <div className="flex shrink-0 border-b border-white/10">
         {[
-          { id: "friends" as const, label: "Friends", count: friends.length },
-          { id: "requests" as const, label: "Requests", count: incomingRequests.length },
-          { id: "find" as const, label: "Find", icon: UserPlus },
+          { id: "friends" as const, label: t("friends"), count: friends.length },
+          { id: "requests" as const, label: t("requests"), count: incomingRequests.length },
+          { id: "find" as const, label: t("find"), icon: UserPlus },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -189,8 +191,8 @@ export function FriendsList({
             {!loading && friends.length === 0 && (
               <div className="py-8 text-center">
                 <Users className="mx-auto mb-2 h-8 w-8 text-gray-700" />
-                <p className="text-xs text-gray-500">No friends yet</p>
-                <p className="mt-1 text-[10px] text-gray-600">Search users in the Find tab</p>
+                <p className="text-xs text-gray-500">{t("noFriends")}</p>
+                <p className="mt-1 text-[10px] text-gray-600">{t("searchFindTab")}</p>
               </div>
             )}
             {friends.map((friend) => (
@@ -212,6 +214,7 @@ export function FriendsList({
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white">{friend.displayName}</p>
+                  <p className="text-[10px] text-emerald-400/80">{inviteMode ? t("available") : ""}</p>
                 </div>
                 {inviteMode && onInvite && (
                   <button
@@ -225,7 +228,7 @@ export function FriendsList({
                     ) : (
                       <Send className="h-3 w-3" />
                     )}
-                    {invitingUserId === friend.userId ? "Sending…" : "Invite"}
+                    {invitingUserId === friend.userId ? t("sending") : t("invite")}
                   </button>
                 )}
               </div>

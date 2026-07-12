@@ -1419,3 +1419,21 @@ input[type="range"].player-volume::-moz-range-thumb {
   0%, 100% { transform: scale(1); opacity: 0.5; }
   50% { transform: scale(1.6); opacity: 0; }
 }
+
+/* Navigation — single-line links, gap from logo */
+.nav-main {
+  flex: 1 1 auto;
+}
+
+.nav-links {
+  flex-wrap: nowrap;
+}
+
+.nav-link {
+  white-space: nowrap;
+}
+
+/* Carousel side arrows — Netflix-style flanking */
+.carousel-side-arrow {
+  pointer-events: auto;
+}
