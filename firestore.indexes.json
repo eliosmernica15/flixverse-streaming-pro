@@ -172,6 +172,13 @@
         { "fieldPath": "toUserId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "usernames",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

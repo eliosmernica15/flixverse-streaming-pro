@@ -44,6 +44,7 @@ export function useWebRTCSync({
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
   const syncRef = useRef<WebRTCPartySync | PartySyncTransport | null>(null);
+  const syncInitRef = useRef<{ roomId: string; isHost: boolean; hostId: string | null } | null>(null);
   const onPlaybackSyncRef = useRef(onPlaybackSync);
   const onRemoteStreamRef = useRef(onRemoteStream);
   const onRemoteStreamRemovedRef = useRef(onRemoteStreamRemoved);
@@ -62,8 +63,24 @@ export function useWebRTCSync({
     }
     if (!isHost && !hostId) return;
 
+    const resolvedHostId = isHost ? null : hostId;
+    if (
+      syncRef.current &&
+      syncInitRef.current?.roomId === roomId &&
+      syncInitRef.current?.isHost === isHost &&
+      syncInitRef.current?.hostId === resolvedHostId
+    ) {
+      const poll = setInterval(() => {
+        if (syncRef.current) setIsConnected(syncRef.current.isConnected);
+      }, 1000);
+      return () => clearInterval(poll);
+    }
+
     let sync: WebRTCPartySync | PartySyncTransport | null = null;
     let cancelled = false;
+
+    syncRef.current?.destroy();
+    syncRef.current = null;
 
     void (async () => {
       const onMsg = (raw: unknown) => {
@@ -111,6 +128,7 @@ export function useWebRTCSync({
       }
 
       syncRef.current = sync;
+      syncInitRef.current = { roomId, isHost, hostId: resolvedHostId };
     })();
 
     const poll = setInterval(() => {
@@ -122,9 +140,10 @@ export function useWebRTCSync({
       clearInterval(poll);
       syncRef.current?.destroy();
       syncRef.current = null;
+      syncInitRef.current = null;
       setIsConnected(false);
     };
-  }, [roomId, user, isHost, hostId]);
+  }, [roomId, user?.uid, isHost, hostId]);
 
   useEffect(() => {
     if (!isHost || !syncRef.current) return;

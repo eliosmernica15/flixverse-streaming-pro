@@ -18,6 +18,7 @@ import { isRateLimited } from "@/lib/rateLimit";
 import { trackPartyJoin } from "@/lib/analytics";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
 import { useFlixPartyPython } from "@/hooks/player/useFlixPartyPython";
+import type { PartyContentMeta } from "@/lib/player/roomEncryption";
 
 function participantIds(participants: FlixPartyParticipant[]): string[] {
   return participants.map((p) => p.userId);
@@ -40,6 +41,8 @@ export interface FlixPartyRoom {
   code: string;
   hostId: string;
   encryptedPayload: string;
+  /** Public metadata for guest redirect without decryption key. */
+  contentMeta?: PartyContentMeta | null;
   playbackState: "playing" | "paused";
   lastKnownTime: number;
   serverIndex: number;
@@ -101,6 +104,7 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
         code: data.code,
         hostId: data.hostId,
         encryptedPayload: data.encryptedPayload,
+        contentMeta: data.contentMeta ?? null,
         playbackState: data.playbackState,
         lastKnownTime: data.lastKnownTime,
         serverIndex: data.serverIndex,
@@ -174,12 +178,13 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
   }, []);
 
   const createRoom = useCallback(
-    async (encryptedPayload: string): Promise<string> => {
+    async (encryptedPayload: string, contentMeta?: PartyContentMeta): Promise<string> => {
       if (!user) throw new Error("Must be signed in to create a party");
 
       const db = requireFirebaseDb();
       const code = generateCode();
       const roomId = crypto.randomUUID();
+      const serverIndex = contentMeta?.serverIndex ?? 0;
 
       const participant: FlixPartyParticipant = {
         userId: user.uid,
@@ -193,9 +198,10 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
         code,
         hostId: user.uid,
         encryptedPayload,
+        contentMeta: contentMeta ?? null,
         playbackState: "playing",
         lastKnownTime: 0,
-        serverIndex: 0,
+        serverIndex,
         updatedAt: Date.now(),
         createdAt: Date.now(),
         participants: [participant],
@@ -322,27 +328,23 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
       if (!snap.exists()) return;
 
       const data = snap.data();
-      const participants: FlixPartyParticipant[] = data.participants || [];
-      const remaining = participants.filter((p) => p.userId !== user.uid);
+      const isHostLeaving = data.hostId === user.uid;
 
-      if (remaining.length === 0) {
-        // Last person left — delete room
+      if (isHostLeaving) {
         await deleteDoc(roomRef);
       } else {
-        // Promote next guest to host if host left
-        const newHostId =
-          data.hostId === user.uid ? remaining[0].userId : data.hostId;
-        const updatedParticipants = remaining.map((p) => ({
-          ...p,
-          role: (p.userId === newHostId ? "host" : "guest") as "host" | "guest",
-        }));
+        const participants: FlixPartyParticipant[] = data.participants || [];
+        const remaining = participants.filter((p) => p.userId !== user.uid);
 
-        await updateDoc(roomRef, {
-          participants: updatedParticipants,
-          participantIds: participantIds(updatedParticipants),
-          hostId: newHostId,
-          updatedAt: Date.now(),
-        });
+        if (remaining.length === 0) {
+          await deleteDoc(roomRef);
+        } else {
+          await updateDoc(roomRef, {
+            participants: remaining,
+            participantIds: participantIds(remaining),
+            updatedAt: Date.now(),
+          });
+        }
       }
     } catch (err) {
       console.error("Error leaving room:", err);
@@ -372,15 +374,19 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
   );
 
   const updatePlaybackState = useCallback(
-    async (state: "playing" | "paused", currentTime: number) => {
+    async (state: "playing" | "paused", currentTime: number, serverIndex?: number) => {
       if (!roomId) return;
 
       const db = requireFirebaseDb();
-      await updateDoc(doc(db, "flix_parties", roomId), {
+      const patch: Record<string, unknown> = {
         playbackState: state,
         lastKnownTime: currentTime,
         updatedAt: Date.now(),
-      });
+      };
+      if (typeof serverIndex === "number") {
+        patch.serverIndex = serverIndex;
+      }
+      await updateDoc(doc(db, "flix_parties", roomId), patch);
     },
     [roomId]
   );

@@ -107,6 +107,34 @@ export function trackPartyJoin(roomId: string) {
   trackEvent("party_join", { roomId });
 }
 
+export function trackGuestJoinStarted(props: {
+  roomId?: string;
+  source: string;
+  movieTitle?: string;
+}) {
+  trackEvent("guest_join_started", props);
+}
+
+export function trackGuestJoinNavigated(props: {
+  roomId?: string;
+  target: string;
+  hasMeta: boolean;
+}) {
+  trackEvent("guest_join_navigated", props);
+}
+
+export function trackGuestJoinSynced(props: {
+  roomId?: string;
+  driftMs: number;
+  elapsedMs: number;
+}) {
+  trackEvent("guest_join_synced", props);
+}
+
+export function trackGuestJoinFailed(props: { roomId?: string; reason: string }) {
+  trackEvent("guest_join_failed", props);
+}
+
 export function trackSearch(query: string, resultCount: number) {
   trackEvent("search", { query, resultCount });
 }

@@ -6,8 +6,12 @@ import { AtSign, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { Button } from "@/components/ui/button";
-
-const DISMISS_KEY = "flixverse-username-reminder-dismissed";
+import { hasUsername } from "@/lib/username/resolveUsername";
+import {
+  clearUsernameReminderDismiss,
+  dismissUsernameReminder,
+  isUsernameReminderDismissed,
+} from "@/lib/username/reminder";
 
 export default function UsernameReminder() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -22,7 +26,8 @@ export default function UsernameReminder() {
       return;
     }
 
-    if (profile.username) {
+    if (hasUsername(profile)) {
+      clearUsernameReminderDismiss();
       setVisible(false);
       return;
     }
@@ -32,13 +37,9 @@ export default function UsernameReminder() {
       return;
     }
 
-    try {
-      if (sessionStorage.getItem(DISMISS_KEY) === "1") {
-        setVisible(false);
-        return;
-      }
-    } catch {
-      // ignore
+    if (isUsernameReminderDismissed()) {
+      setVisible(false);
+      return;
     }
 
     const timer = setTimeout(() => setVisible(true), 1200);
@@ -46,11 +47,7 @@ export default function UsernameReminder() {
   }, [authLoading, profileLoading, isAuthenticated, profile, pathname]);
 
   const dismiss = () => {
-    try {
-      sessionStorage.setItem(DISMISS_KEY, "1");
-    } catch {
-      // ignore
-    }
+    dismissUsernameReminder();
     setVisible(false);
   };
 

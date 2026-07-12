@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -23,6 +23,8 @@ import MovieCard from "./MovieCard";
 import SectionHeader from "./SectionHeader";
 import Reveal from "./Reveal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { stripPartyQueryParams } from "@/lib/player/partyUrl";
+import { releasePageScrollLock } from "@/lib/player/releaseScrollLock";
 
 const VideoPlayer = dynamic(() => import("./VideoPlayer"), { ssr: false });
 const ReviewSection = dynamic(() => import("./ReviewSection"), { ssr: false });
@@ -36,13 +38,17 @@ interface MovieDetailsProps {
   resumePosition?: number;
   initialSeason?: number;
   initialEpisode?: number;
+  initialServer?: number;
 }
 
-const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePosition, initialSeason, initialEpisode }: MovieDetailsProps) => {
+const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePosition, initialSeason, initialEpisode, initialServer }: MovieDetailsProps) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const guestJoinMode = searchParams.get("guest") === "1";
   const { data: content = null, isLoading: loading, isError } = useContentDetails(movieId, mediaType);
   const error = isError ? "Failed to load content details" : null;
   const [showPlayer, setShowPlayer] = useState(false);
+  const [playerSession, setPlayerSession] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
@@ -54,8 +60,12 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const { hasPremium } = useSubscription();
   const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieListContext();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { getProgress } = useWatchHistoryContext();
+  const userClosedPlayerRef = useRef(false);
+
+  useEffect(() => {
+    userClosedPlayerRef.current = false;
+  }, [movieId, initialSeason, initialEpisode]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 10);
@@ -70,20 +80,29 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const openPlayer = () => {
+    userClosedPlayerRef.current = false;
+    setPlayerSession((k) => k + 1);
+    setShowPlayer(true);
+  };
+
   // Handle autoplay (skip for unreleased content - cannot play)
   useEffect(() => {
+    if (userClosedPlayerRef.current) return;
     if (autoplay && content && !showPlayer && !isNotReleasedYet(content)) {
-      // Small delay to ensure content is fully loaded
+      const delay = guestJoinMode ? 0 : 500;
       const timer = setTimeout(() => {
-        setShowPlayer(true);
-      }, 500);
+        openPlayer();
+      }, delay);
       return () => clearTimeout(timer);
     }
-  }, [autoplay, content, showPlayer]);
+  }, [autoplay, content, showPlayer, guestJoinMode]);
 
-  // Lock page scroll while the fullscreen player is open
   useEffect(() => {
-    if (!showPlayer) return;
+    if (!showPlayer) {
+      releasePageScrollLock();
+      return;
+    }
     const prevBody = document.body.style.overflow;
     const prevHtml = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
@@ -91,25 +110,24 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     return () => {
       document.body.style.overflow = prevBody;
       document.documentElement.style.overflow = prevHtml;
+      releasePageScrollLock();
     };
   }, [showPlayer]);
 
   const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(() => onClose(), 300);
+    releasePageScrollLock();
+    onClose();
   };
 
-  // When user closes the video player (X or Escape), close and remove autoplay from URL
-  // so the autoplay effect doesn't reopen the player after 500ms.
+  // Closing the player (X / Esc) must not reopen it — strip party/autoplay from URL.
   const handleClosePlayer = () => {
+    userClosedPlayerRef.current = true;
     setShowPlayer(false);
-    const currentParams = new URLSearchParams(searchParams.toString());
-    if (currentParams.has('autoplay') || currentParams.has('resume')) {
-      currentParams.delete('autoplay');
-      currentParams.delete('resume');
-      const newQs = currentParams.toString();
-      router.replace(`${pathname.trim()}${newQs ? `?${newQs}` : ''}`);
-    }
+    releasePageScrollLock();
+    const currentParams = stripPartyQueryParams(new URLSearchParams(searchParams.toString()));
+    currentParams.delete("resume");
+    const newQs = currentParams.toString();
+    router.replace(`${pathname}${newQs ? `?${newQs}` : ""}`);
   };
 
   const handleAddToList = async () => {
@@ -179,7 +197,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       setSelectedEpisode(episodeToPlay);
     }
 
-    setShowPlayer(true);
+    openPlayer();
     toast({
       title: "Now Playing",
       description: isTVShow
@@ -317,7 +335,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         <button
           type="button"
           onClick={handleClose}
-          className="fixed top-4 left-4 sm:top-6 sm:left-6 z-[999] flex items-center space-x-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur-xl transition-all duration-300 group cursor-pointer hover:bg-white/10 focus-ring sm:px-4"
+          className="fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] sm:top-6 sm:left-6 z-[999] flex items-center space-x-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur-xl transition-all duration-300 group cursor-pointer hover:bg-white/10 focus-ring sm:px-4"
         >
           <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-x-1 transition-transform" />
           <span className="text-white text-xs sm:text-sm font-medium">Back</span>
@@ -616,7 +634,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 const episodeCount = currentSeason?.episode_count || 10;
 
                 return (
-                  <div className="grid grid-cols-4 xs:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
                     {Array.from({ length: episodeCount }, (_, i) => i + 1).map((episodeNum) => (
                       <SpoilerProtectedEpisode
                         key={`spoiler-${episodeNum}`}
@@ -824,7 +842,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           const episodeCount = currentSeasonData?.episode_count;
 
           return (
-            <div key={`player-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ''}`}>
+            <div key={`player-${playerSession}-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ""}`}>
               <VideoPlayer
                 movieId={content.id}
                 title={contentTitle}
@@ -837,6 +855,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 resumePosition={effectiveResumePosition}
                 totalDuration={totalDuration}
                 episodeCount={isTV ? episodeCount : undefined}
+                initialServer={initialServer}
+                guestJoinMode={guestJoinMode}
                 onAdvanceEpisode={(nextSeason, nextEpisode) => {
                   setSelectedSeason(nextSeason);
                   setSelectedEpisode(nextEpisode);

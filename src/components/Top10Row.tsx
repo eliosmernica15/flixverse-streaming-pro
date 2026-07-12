@@ -28,10 +28,10 @@ const Top10Row = memo(({ movies, title = "Top 10 Today" }: Top10RowProps) => {
   if (top10.length === 0) return null;
 
   return (
-    <section className="content-auto">
+    <section className="content-auto overflow-hidden">
       <SectionHeader title={title} eyebrow="Most popular right now" />
 
-      <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-4 scrollbar-hide">
+      <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-4 pl-6 sm:pl-8 pr-4 sm:pr-6 scrollbar-hide">
         {top10.map((movie, index) => {
           const title = getContentTitle(movie);
           const posterUrl = movie.poster_path ? getImageUrl(movie.poster_path, "medium") : null;

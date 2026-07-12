@@ -29,6 +29,7 @@ interface FlixPartySidebarProps {
   syncStatus: SyncStatus;
   driftMs?: number;
   onLeaveRoom: () => void;
+  isHost?: boolean;
   onStartParty?: () => Promise<PartyStartResult | null> | void;
   /** Render beside the player window instead of full-screen overlay */
   embedded?: boolean;
@@ -46,7 +47,6 @@ interface FlixPartySidebarProps {
   media?: PartyMediaState;
   partyRoom?: FlixPartyRoom | null;
   partyMessages?: FlixPartyChatMessage[];
-  isHost?: boolean;
   sendPartyMessage?: (text: string, emoji?: string) => Promise<void>;
   kickParticipant?: (targetUserId: string) => Promise<void>;
   setParticipantMicMuted?: (targetUserId: string, muted: boolean) => Promise<void>;
@@ -63,6 +63,7 @@ export function FlixPartySidebar({
   driftMs,
   onLeaveRoom,
   onStartParty,
+  isHost: isHostProp = false,
   movieId,
   mediaType,
   season,
@@ -77,13 +78,12 @@ export function FlixPartySidebar({
   media,
   partyRoom: room,
   partyMessages: messages = [],
-  isHost = false,
   sendPartyMessage,
   kickParticipant,
   setParticipantMicMuted,
   setParticipantCamDisabled,
 }: FlixPartySidebarProps) {
-  const [activeTab, setActiveTab] = useState<SidebarTab>("friends");
+  const [activeTab, setActiveTab] = useState<SidebarTab>(roomId ? "chat" : "friends");
   const [input, setInput] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
   const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
@@ -98,6 +98,10 @@ export function FlixPartySidebar({
   const sendMessage = sendPartyMessage ?? (async () => undefined);
 
   const QUICK_EMOJIS = ["😂", "🔥", "❤️", "👏", "😮", "💀", "🎬", "🍿"];
+
+  useEffect(() => {
+    if (roomId) setActiveTab("chat");
+  }, [roomId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -256,12 +260,25 @@ export function FlixPartySidebar({
         <button
           type="button"
           onClick={onClose}
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          className="p-2.5 min-w-[2.75rem] min-h-[2.75rem] hover:bg-white/10 rounded-lg transition-colors"
           aria-label="Close sidebar"
         >
           <X className="w-4 h-4 text-gray-400" />
         </button>
       </div>
+
+      {roomId && (
+        <div className="px-3 py-2 border-b border-white/10 shrink-0">
+          <button
+            type="button"
+            onClick={onLeaveRoom}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 min-h-[2.75rem] rounded-xl text-sm font-semibold transition-colors bg-red-600/20 hover:bg-red-600/35 text-red-200 border border-red-500/30"
+          >
+            <LogOut className="w-4 h-4" />
+            {isHostProp ? "End party for everyone" : "Leave party"}
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-white/10 shrink-0">
@@ -273,7 +290,7 @@ export function FlixPartySidebar({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-medium transition-colors border-b-2 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 min-h-[2.75rem] text-xs font-medium transition-colors border-b-2 ${
               activeTab === tab.id
                 ? "text-white border-red-500"
                 : "text-gray-500 border-transparent hover:text-gray-300"
@@ -287,7 +304,7 @@ export function FlixPartySidebar({
 
       {/* Tab content */}
       <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-        {roomId && media && (
+        {roomId && media && activeTab !== "chat" && (
           <div className="shrink-0 border-b border-white/10 px-3 py-3 space-y-3">
             <PartyMediaControls
               micOn={media.micOn}
@@ -307,7 +324,7 @@ export function FlixPartySidebar({
                 participants={room.participants}
                 hostId={room.hostId}
                 currentUserId={user.uid}
-                isHost={isHost}
+                isHost={isHostProp}
                 onKick={(id) => {
                   void kickParticipant?.(id);
                   toast({ title: "Guest removed", description: "They were removed from the party." });
@@ -329,7 +346,7 @@ export function FlixPartySidebar({
 
         {/* Chat tab */}
         {activeTab === "chat" && (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col flex-1 min-h-0">
             {!roomId ? (
               <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                 <Users className="w-8 h-8 text-gray-700 mb-2" />
@@ -338,7 +355,24 @@ export function FlixPartySidebar({
               </div>
             ) : (
               <>
-                <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                {media && (
+                  <div className="shrink-0 border-b border-white/10 px-3 py-2">
+                    <PartyMediaControls
+                      micOn={media.micOn}
+                      cameraOn={media.cameraOn}
+                      cameraMode={media.cameraMode}
+                      anyoneSpeaking={media.anyoneSpeaking}
+                      mediaError={media.mediaError}
+                      voiceVolume={media.voiceVolume}
+                      hostMicForcedOff={media.hostMicForcedOff}
+                      hostCamForcedOff={media.hostCamForcedOff}
+                      onToggleMic={() => void media.toggleMic()}
+                      onToggleCamera={() => void media.toggleCamera()}
+                      onVoiceVolumeChange={media.setVoiceVolume}
+                    />
+                  </div>
+                )}
+                <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
                   {messages.map((msg) => (
                     <div key={msg.id} className="flex gap-2.5">
                       {msg.senderAvatar ? (
@@ -377,7 +411,7 @@ export function FlixPartySidebar({
                   </div>
                 )}
 
-                <div className="p-3 border-t border-white/10 shrink-0">
+                <div className="p-3 border-t border-white/10 shrink-0 bg-zinc-950/95 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setShowEmoji(!showEmoji)}

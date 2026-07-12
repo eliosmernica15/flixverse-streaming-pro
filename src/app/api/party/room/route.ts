@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
     const data = snap.data()!;
     return NextResponse.json({
       encryptedPayload: data.encryptedPayload,
+      contentMeta: data.contentMeta ?? null,
       code: data.code,
     });
   } catch {

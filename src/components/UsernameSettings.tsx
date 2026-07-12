@@ -8,11 +8,11 @@ import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getFirebaseDb } from "@/integrations/firebase/client";
+import { getAuthHeaders } from "@/lib/firebase/clientAuth";
 import { normalizeUsername, validateUsername } from "@/lib/username";
-import {
-  checkUsernameAvailability,
-  claimUsername,
-} from "@/lib/username/claimUsername";
+import { checkUsernameAvailability } from "@/lib/username/claimUsername";
+import { hasUsername } from "@/lib/username/resolveUsername";
+import { clearUsernameReminderDismiss } from "@/lib/username/reminder";
 
 interface UsernameSettingsProps {
   /** When true, hide after user already has a username (for global reminders only). */
@@ -110,40 +110,38 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
     }
     if (parsed.value === profile.username) return;
 
-    const db = getFirebaseDb();
-    if (!db) {
-      toast({
-        title: "Firebase not configured",
-        description: "Cannot save username right now.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setSaving(true);
     try {
-      const result = await claimUsername(db, user.uid, parsed.value, profile, user.email);
-      if (result.ok === false) {
+      const headers = await getAuthHeaders(user);
+      const res = await fetch("/api/profile/username", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ username: parsed.value }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as {
+        username?: string;
+        error?: string;
+      };
+
+      if (!res.ok) {
         toast({
           title: "Could not save username",
-          description: result.error,
+          description: data.error || "Please try again.",
           variant: "destructive",
         });
-        if (result.error.includes("taken")) setAvailability("taken");
+        if (res.status === 409) setAvailability("taken");
         return;
       }
 
-      await updateProfile({ username: result.username });
+      const saved = data.username ?? parsed.value;
+      await updateProfile({ username: saved });
       setAvailability("available");
       setAvailabilityError(null);
-      try {
-        sessionStorage.removeItem("flixverse-username-reminder-dismissed");
-      } catch {
-        // ignore
-      }
+      clearUsernameReminderDismiss();
       toast({
         title: "Username saved",
-        description: `Friends can find you as @${result.username}`,
+        description: `Friends can find you as @${saved}`,
       });
     } catch {
       toast({ title: "Could not save username", description: "Please try again.", variant: "destructive" });
@@ -162,7 +160,7 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
     !saving &&
     Boolean(user);
 
-  if (compact && profile?.username) {
+  if (compact && hasUsername(profile)) {
     return null;
   }
 

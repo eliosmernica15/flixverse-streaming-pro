@@ -111,6 +111,9 @@ export interface Notification {
     party_join_url?: string;
     room_id?: string;
     movie_title?: string;
+    season?: number;
+    episode?: number;
+    server_index?: number;
   };
   read: boolean;
   created_at: string;
@@ -159,6 +162,13 @@ export interface FlixPartyRoom {
   code: string;
   hostId: string;
   encryptedPayload: string;
+  contentMeta?: {
+    tmdbId: number;
+    mediaType: 'movie' | 'tv';
+    season?: number;
+    episode?: number;
+    serverIndex: number;
+  } | null;
   playbackState: 'playing' | 'paused';
   lastKnownTime: number;
   serverIndex: number;

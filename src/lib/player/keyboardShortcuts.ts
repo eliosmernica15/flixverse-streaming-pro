@@ -5,7 +5,7 @@ export interface PlayerShortcut {
 }
 
 export const PLAYER_SHORTCUTS: PlayerShortcut[] = [
-  { keys: ["T"], action: "Maximize / restore player", group: "view" },
+  { keys: ["T"], action: "Enlarge video step-by-step (4 sizes)", group: "view" },
   { keys: ["F"], action: "Browser fullscreen", group: "view" },
   { keys: ["G"], action: "Open watch-together panel", group: "party" },
   { keys: ["V"], action: "Toggle party camera", group: "party" },

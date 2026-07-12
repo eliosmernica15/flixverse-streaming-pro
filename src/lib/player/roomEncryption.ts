@@ -125,3 +125,81 @@ export function extractRoomKeyFromHash(): string | null {
   const match = hash.match(/#key=([A-Z0-9]{6})/);
   return match?.[1] ?? null;
 }
+
+/** Public (unencrypted) content metadata stored on the room for guest redirects. */
+export type PartyContentMeta = PartyPayload;
+
+export function buildPartyPlayerUrl(
+  roomId: string,
+  payload: PartyContentMeta,
+  opts?: { autoplay?: boolean }
+): string {
+  const qs = new URLSearchParams({ type: payload.mediaType, party: roomId });
+  if (payload.season) qs.set("season", String(payload.season));
+  if (payload.episode) qs.set("episode", String(payload.episode));
+  if (payload.serverIndex > 0) qs.set("server", String(payload.serverIndex));
+  if (opts?.autoplay !== false) qs.set("autoplay", "true");
+  return `/movie/${payload.tmdbId}?${qs}`;
+}
+
+export function partyContentMatches(
+  payload: PartyContentMeta,
+  movieId: number,
+  mediaType: "movie" | "tv",
+  season?: number,
+  episode?: number
+): boolean {
+  if (payload.tmdbId !== movieId || payload.mediaType !== mediaType) return false;
+  if (payload.mediaType === "tv") {
+    const hostSeason = payload.season ?? 1;
+    const hostEpisode = payload.episode ?? 1;
+    const guestSeason = season ?? 1;
+    const guestEpisode = episode ?? 1;
+    return hostSeason === guestSeason && hostEpisode === guestEpisode;
+  }
+  return true;
+}
+
+/** Fetch public room metadata for guest redirect (no decryption key required). */
+export async function fetchPartyRoomMeta(
+  roomId: string
+): Promise<{ contentMeta: PartyContentMeta | null; encryptedPayload: string | null }> {
+  try {
+    const res = await fetch(`/api/party/room?id=${encodeURIComponent(roomId)}`);
+    if (!res.ok) return { contentMeta: null, encryptedPayload: null };
+    const data = (await res.json()) as {
+      contentMeta?: PartyContentMeta | null;
+      encryptedPayload?: string | null;
+    };
+    return {
+      contentMeta: data.contentMeta ?? null,
+      encryptedPayload: data.encryptedPayload ?? null,
+    };
+  } catch {
+    return { contentMeta: null, encryptedPayload: null };
+  }
+}
+
+/** Resolve party content from public metadata or encrypted payload + room key. */
+export async function resolvePartyContent(
+  contentMeta: PartyContentMeta | null | undefined,
+  encryptedPayload: string | null | undefined,
+  roomKey?: string | null
+): Promise<PartyContentMeta | null> {
+  if (contentMeta) return contentMeta;
+  if (encryptedPayload && roomKey) {
+    return decryptPayload(encryptedPayload, roomKey);
+  }
+  return null;
+}
+
+/** Resolve the player URL for a guest joining a party (one-shot redirect target). */
+export async function resolvePartyPlayerUrl(
+  roomId: string,
+  roomKey?: string | null
+): Promise<string | null> {
+  const { contentMeta, encryptedPayload } = await fetchPartyRoomMeta(roomId);
+  const content = await resolvePartyContent(contentMeta, encryptedPayload, roomKey);
+  if (!content) return null;
+  return buildPartyPlayerUrl(roomId, content);
+}

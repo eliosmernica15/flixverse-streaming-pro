@@ -11,6 +11,7 @@ import { useHomeContent } from "@/hooks/queries/useHomeContent";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { usePartyGuestRoute } from "@/hooks/player/usePartyGuestRoute";
 import { TrendingUp, Star, Play, Tv, Film, Calendar } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -30,6 +31,8 @@ const Index = () => {
   const queryClient = useQueryClient();
   const { data, isLoading, isFetching } = useHomeContent();
 
+  usePartyGuestRoute();
+
   useEffect(() => {
     if (!data?.hero?.id) return;
     const contentType = data.hero.media_type === "tv" ? "tv" : "movie";
@@ -41,12 +44,14 @@ const Index = () => {
       {data?.hero ? (
         <HeroBanner movie={data.hero} />
       ) : isLoading ? (
-        <div className="h-[88vh] lg:h-[92vh] bg-zinc-950 skeleton shimmer-overlay" />
+        <div className="h-[72vh] sm:h-[88vh] lg:h-[92vh] bg-zinc-950 skeleton shimmer-overlay" />
       ) : null}
 
-      <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8 flex items-center gap-3 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
+      <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
         <PersonalizedWelcome />
-        <PlaySomething />
+        <div className="w-full shrink-0 sm:w-auto [&_button]:w-full sm:[&_button]:w-auto sm:[&_button]:justify-center">
+          <PlaySomething />
+        </div>
       </div>
 
       <div className="relative z-10">

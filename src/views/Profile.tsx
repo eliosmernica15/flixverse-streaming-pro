@@ -460,28 +460,28 @@ const Profile = () => {
         {/* Tabs Content */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
           <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === 'activity') refetchActivity(); }} className="w-full">
-            <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl mb-6">
-              <TabsTrigger value="watchlist" className="data-[state=active]:bg-red-500 rounded-lg">
+            <TabsList className="mb-6 flex w-full flex-nowrap justify-start gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/5 p-1 scrollbar-hide">
+              <TabsTrigger value="watchlist" className="shrink-0 data-[state=active]:bg-red-500 rounded-lg">
                 <Heart className="w-4 h-4 mr-2" />
                 Watchlist
               </TabsTrigger>
-              <TabsTrigger value="history" className="data-[state=active]:bg-red-500 rounded-lg">
+              <TabsTrigger value="history" className="shrink-0 data-[state=active]:bg-red-500 rounded-lg">
                 <Clock className="w-4 h-4 mr-2" />
                 History
               </TabsTrigger>
-              <TabsTrigger value="activity" className="data-[state=active]:bg-red-500 rounded-lg">
+              <TabsTrigger value="activity" className="shrink-0 data-[state=active]:bg-red-500 rounded-lg">
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Activity
               </TabsTrigger>
-              <TabsTrigger value="friends" className="data-[state=active]:bg-red-500 rounded-lg">
+              <TabsTrigger value="friends" className="shrink-0 data-[state=active]:bg-red-500 rounded-lg">
                 <Users className="w-4 h-4 mr-2" />
                 Friends
               </TabsTrigger>
-              <TabsTrigger value="billing" className="data-[state=active]:bg-red-500 rounded-lg">
+              <TabsTrigger value="billing" className="shrink-0 data-[state=active]:bg-red-500 rounded-lg">
                 <CreditCard className="w-4 h-4 mr-2" />
                 Billing
               </TabsTrigger>
-              <TabsTrigger value="settings" className="data-[state=active]:bg-red-500 rounded-lg">
+              <TabsTrigger value="settings" className="shrink-0 data-[state=active]:bg-red-500 rounded-lg">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </TabsTrigger>

@@ -1,7 +1,7 @@
 /**
  * Adaptive re-sync for FlixParty.
- * - Soft drift (3–8s): send postMessage seek commands to the embed iframe
- * - Hard resync (>8s): reload iframe with corrected start URL
+ * - Soft drift (3–30s): send postMessage seek commands to the embed iframe
+ * - Hard resync (>30s): reload iframe with corrected start URL (guest-only, heavily throttled)
  */
 
 export type SyncAction =
@@ -10,7 +10,7 @@ export type SyncAction =
   | { kind: "none" };
 
 const SOFT_DRIFT_THRESHOLD = 3;
-const HARD_DRIFT_THRESHOLD = 8;
+const HARD_DRIFT_THRESHOLD = 30;
 
 /**
  * Given host time, guest time, and the embed URL, decide whether to soft-seek,

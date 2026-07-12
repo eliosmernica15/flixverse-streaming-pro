@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useFlixParty } from "@/hooks/player/useFlixParty";
 import { useToast } from "@/hooks/use-toast";
+import { resolvePartyPlayerUrl } from "@/lib/player/roomEncryption";
 
 interface FlixPartyJoinDialogProps {
   isOpen: boolean;
@@ -60,7 +61,8 @@ export function FlixPartyJoinDialog({ isOpen, onClose }: FlixPartyJoinDialogProp
       }
       onClose();
       toast({ title: "Joined party!", description: "Opening the watch room…" });
-      router.push(`/?party=${roomId}`);
+      const playerUrl = await resolvePartyPlayerUrl(roomId);
+      router.push(playerUrl ?? `/?party=${roomId}`);
     } catch (err) {
       toast({
         title: "Could not join",
@@ -127,11 +129,11 @@ export function FlixPartyJoinDialog({ isOpen, onClose }: FlixPartyJoinDialogProp
             <label htmlFor="party-code-input" className="mb-3 block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
               Party code
             </label>
-            <div className="mb-3 flex justify-center gap-2">
+            <div className="mb-3 flex justify-center gap-1.5 sm:gap-2">
               {chars.map((ch, i) => (
                 <div
                   key={i}
-                  className={`grid h-12 w-10 place-items-center rounded-xl border text-lg font-black font-mono transition-all ${
+                  className={`grid h-10 w-8 sm:h-12 sm:w-10 place-items-center rounded-xl border text-base sm:text-lg font-black font-mono transition-all ${
                     ch.trim()
                       ? "border-red-500/40 bg-red-500/10 text-white shadow-[0_0_20px_rgba(239,68,68,0.2)]"
                       : "border-white/10 bg-black/40 text-gray-600"

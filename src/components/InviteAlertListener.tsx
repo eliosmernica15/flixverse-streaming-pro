@@ -8,9 +8,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import type { Notification } from "@/integrations/firebase/types";
 import {
-  acceptWatchPartyInvite,
   declineWatchPartyInvite,
 } from "@/lib/notifications/partyInvite";
+import { executeGuestJoin } from "@/lib/party/executeGuestJoin";
 
 const SEEN_KEY = "flixverse_seen_invite_toasts";
 
@@ -71,16 +71,10 @@ export default function InviteAlertListener() {
           onClick: () => {
             void (async () => {
               try {
-                const joinUrl = await acceptWatchPartyInvite(notification);
-                if (joinUrl) {
-                  if (joinUrl.startsWith("http")) {
-                    window.location.href = joinUrl;
-                  } else {
-                    router.push(joinUrl);
-                  }
-                } else {
-                  sonnerToast.error("Could not open party link");
-                }
+                await executeGuestJoin({
+                  notification,
+                  user: { displayName: user.displayName, photoURL: user.photoURL },
+                });
               } catch (err) {
                 console.error("[party-invite] accept failed:", err);
                 sonnerToast.error("Could not join party");

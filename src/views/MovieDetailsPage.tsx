@@ -17,10 +17,14 @@ const MovieDetailsPage = () => {
   const router = useRouter();
   const movieId = id ? parseInt(Array.isArray(id) ? id[0] : id) : 0;
   const mediaType = (searchParams.get("type") as "movie" | "tv") || "movie";
-  const autoplay = searchParams.get("autoplay") === "true";
-  const resumePosition = searchParams.get("resume") ? parseInt(searchParams.get("resume")!) : undefined;
   const season = searchParams.get("season") ? parseInt(searchParams.get("season")!) : undefined;
   const episode = searchParams.get("episode") ? parseInt(searchParams.get("episode")!) : undefined;
+  const partyId = searchParams.get("party");
+  const autoplay =
+    searchParams.get("autoplay") === "true" ||
+    (!!partyId && searchParams.get("autoplay") !== "false");
+  const resumePosition = searchParams.get("resume") ? parseInt(searchParams.get("resume")!) : undefined;
+  const initialServer = searchParams.get("server") ? parseInt(searchParams.get("server")!) : undefined;
   const { toast } = useToast();
   const autoplayTriggered = useRef(false);
 
@@ -52,11 +56,18 @@ const MovieDetailsPage = () => {
     <MovieDetails
       movieId={movieId}
       mediaType={mediaType}
-      onClose={() => router.back()}
+      onClose={() => {
+        if (typeof window !== "undefined" && window.history.length > 1) {
+          router.back();
+        } else {
+          router.push(mediaType === "tv" ? "/tv-shows" : "/movies");
+        }
+      }}
       autoplay={autoplay}
       resumePosition={resumePosition}
       initialSeason={season}
       initialEpisode={episode}
+      initialServer={initialServer}
     />
   );
 };

@@ -79,6 +79,7 @@ export async function claimUsername(
         {
           username: handle,
           user_id: uid,
+          display_name: displayName,
           updated_at: new Date().toISOString(),
         },
         { merge: true }

@@ -155,6 +155,23 @@ def _exec_script(conn: Any, sql: str) -> None:
         conn.executescript(sql)
 
 
+def _migrate_party_content_meta(conn: Any) -> None:
+    """Add content_meta_json column for guest redirects without URL hash key."""
+    try:
+        if USE_POSTGRES:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "ALTER TABLE party_rooms ADD COLUMN IF NOT EXISTS content_meta_json TEXT"
+                )
+        else:
+            rows = conn.execute("PRAGMA table_info(party_rooms)").fetchall()
+            names = {row[1] for row in rows}
+            if "content_meta_json" not in names:
+                conn.execute("ALTER TABLE party_rooms ADD COLUMN content_meta_json TEXT")
+    except Exception:
+        pass
+
+
 def init_db() -> None:
     if os.environ.get("VERCEL") == "1" and not USE_POSTGRES:
         return
@@ -170,6 +187,7 @@ def init_db() -> None:
                     _exec_script(conn, s + ";")
                 except Exception:
                     pass
+        _migrate_party_content_meta(conn)
 
 
 def row_get(row: Any, key: str) -> Any:

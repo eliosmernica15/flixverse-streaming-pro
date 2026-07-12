@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Mic, MicOff, Video, VideoOff, Crown } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Crown, LayoutGrid, PanelRight, Rows3, EyeOff } from "lucide-react";
 import type { PartyMediaParticipant } from "@/hooks/player/usePartyMedia";
 import type { FlixPartyParticipant } from "@/hooks/player/useFlixParty";
+import type { CameraLayoutMode } from "@/hooks/player/usePartyLayout";
 import { VoiceVolumeSlider } from "./PartyMembersPanel";
 
 function RemoteAudioSink({ stream, volume }: { stream: MediaStream; volume: number }) {
@@ -97,21 +98,52 @@ interface PartyCameraGridProps {
   participants: PartyMediaParticipant[];
   voiceVolume?: number;
   roomParticipants?: FlixPartyParticipant[];
+  layoutMode?: CameraLayoutMode;
+  onLayoutChange?: (mode: CameraLayoutMode) => void;
 }
+
+const LAYOUT_OPTIONS: { id: CameraLayoutMode; label: string; icon: typeof LayoutGrid }[] = [
+  { id: "side", label: "Side", icon: PanelRight },
+  { id: "bottom", label: "Bottom", icon: Rows3 },
+  { id: "grid", label: "Grid", icon: LayoutGrid },
+  { id: "hidden", label: "Hide", icon: EyeOff },
+];
 
 export function PartyCameraGrid({
   participants,
   voiceVolume = 1,
   roomParticipants = [],
+  layoutMode = "side",
+  onLayoutChange,
 }: PartyCameraGridProps) {
   const hostId = roomParticipants.find((p) => p.role === "host")?.userId;
   const visible = participants.length > 0 ? participants : [];
 
+  if (!visible.length && layoutMode === "hidden") return null;
   if (!visible.length) return null;
 
   return (
     <aside className="party-camera-grid" aria-label="Party cameras">
-      <p className="party-camera-grid-label">Watch together · {visible.length} here</p>
+      <div className="party-camera-grid-head">
+        <p className="party-camera-grid-label">Watch together · {visible.length} here</p>
+        {onLayoutChange && (
+          <div className="party-camera-layout-picker" role="group" aria-label="Camera layout">
+            {LAYOUT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`party-camera-layout-btn ${layoutMode === opt.id ? "is-active" : ""}`}
+                onClick={() => onLayoutChange(opt.id)}
+                title={opt.label}
+                aria-label={opt.label}
+                aria-pressed={layoutMode === opt.id}
+              >
+                <opt.icon className="w-3.5 h-3.5" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="party-camera-grid-scroll">
         {visible.map((p) => (
           <CameraTile
@@ -186,7 +218,7 @@ export function PartyMediaControls({
         <VoiceVolumeSlider value={voiceVolume} onChange={onVoiceVolumeChange} />
       )}
       {cameraMode && (
-        <span className="party-media-hint">Movie left · cameras right · HD when available</span>
+        <span className="party-media-hint party-media-hint--desktop">Movie left · cameras right · HD when available</span>
       )}
       {mediaError && <p className="party-media-error">{mediaError}</p>}
     </div>

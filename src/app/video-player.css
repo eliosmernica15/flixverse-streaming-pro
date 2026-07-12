@@ -131,10 +131,6 @@
   max-width: min(98vw, 90rem);
 }
 
-.player-shell--party-open .player-window.is-framed {
-  width: min(52rem, 68vw);
-}
-
 .player-party-panel {
   display: flex;
   flex-direction: column;
@@ -142,6 +138,7 @@
   max-height: min(82vh, 52rem);
   flex-shrink: 0;
   overflow: hidden;
+  min-height: 0;
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(165deg, rgba(18, 18, 22, 0.98), rgba(8, 8, 10, 0.98));
@@ -556,6 +553,167 @@
   color: rgba(216, 180, 254, 0.75);
 }
 
+.party-camera-grid-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.party-camera-layout-picker {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.party-camera-layout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.party-camera-layout-btn.is-active {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: rgba(168, 85, 247, 0.45);
+  color: #e9d5ff;
+}
+
+.player-window-btn--leave {
+  color: #fecaca;
+}
+
+.player-window-btn--leave:hover {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fff;
+}
+
+.player-shell--party-open .player-window.is-framed {
+  width: min(54rem, 76vw);
+}
+
+/* Size boost: each click makes the video bigger (never smaller until reset) */
+.player-shell--boost-1.player-shell--party-open .player-party-panel {
+  display: none;
+}
+
+.player-shell--boost-2 .party-camera-grid,
+.player-shell--boost-3 .party-camera-grid {
+  display: none;
+}
+
+.player-shell--boost-3.player-shell--party-open .player-party-panel {
+  display: none;
+}
+
+/* Boost 1 — slightly roomier */
+.player-window.is-framed.player-window--boost-1 {
+  width: min(60rem, 94vw) !important;
+  max-height: min(84vh, 54rem) !important;
+}
+
+.player-shell--party-open .player-window.is-framed.player-window--boost-1 {
+  width: min(58rem, 84vw) !important;
+}
+
+.player-layout--camera .player-window.is-framed.player-window--boost-1 {
+  flex: 1 1 72% !important;
+}
+
+/* Boost 2 — more space, cameras hidden */
+.player-window.is-framed.player-window--boost-2 {
+  width: min(64rem, 96vw) !important;
+  max-height: min(86vh, 56rem) !important;
+}
+
+.player-shell--party-open .player-window.is-framed.player-window--boost-2,
+.player-shell--boost-2 .player-layout--camera .player-window.is-framed {
+  width: min(62rem, 90vw) !important;
+  flex: 1 1 100% !important;
+  max-width: 100% !important;
+}
+
+.player-shell--boost-2 .player-layout--camera .player-layout-main {
+  flex-direction: column;
+}
+
+/* Boost 3 — widest comfortable (not full-screen cinema) */
+.player-window.is-framed.player-window--boost-3 {
+  width: min(68rem, 98vw) !important;
+  max-height: min(88vh, 58rem) !important;
+}
+
+.player-shell--boost-3 .player-window.is-framed,
+.player-shell--boost-3.player-shell--party-open .player-window.is-framed {
+  width: min(66rem, 96vw) !important;
+  max-width: 96vw !important;
+  flex: 1 1 auto !important;
+}
+
+.player-shell--boost-3 .player-layout {
+  max-width: 98vw;
+}
+
+.player-shell--boost-3 .player-layout--camera .player-layout-main {
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Camera layout modes */
+.player-layout--cam-bottom .player-layout--camera .player-layout-main {
+  flex-direction: column;
+}
+
+.player-layout--cam-bottom .party-camera-grid {
+  width: 100%;
+  max-height: 12rem;
+  order: 2;
+}
+
+.player-layout--cam-bottom .party-camera-grid-scroll {
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.player-layout--cam-bottom .party-camera-tile {
+  min-width: 5.5rem;
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 10;
+}
+
+.player-layout--cam-grid .party-camera-grid-scroll {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 0.45rem;
+  overflow-y: auto;
+}
+
+.player-layout--cam-grid .party-camera-tile {
+  aspect-ratio: 16 / 10;
+  min-width: 0;
+}
+
+.player-shell--cam-hidden .party-camera-grid {
+  display: none;
+}
+
+.player-shell--cam-hidden.player-layout--camera .player-layout-main {
+  flex-direction: column;
+}
+
+.player-shell--cam-hidden .player-layout--camera .player-window.is-framed {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
 .party-camera-hint {
   margin: 0;
   padding: 0.25rem 0.35rem 0;
@@ -668,6 +826,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  min-height: 2.75rem;
   padding: 0.45rem 0.65rem;
   border-radius: 0.6rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -809,8 +968,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.65rem;
-  height: 1.65rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border: none;
   border-radius: 0.4rem;
   background: rgba(255, 255, 255, 0.06);
@@ -861,6 +1020,107 @@
   cursor: pointer;
 }
 
+/* Tablet: stacked layout, party panel below player */
+@media (max-width: 768px) {
+  .player-shell {
+    padding: 0.75rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .player-layout {
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 100%;
+    gap: 0.65rem;
+  }
+
+  .player-layout--camera .player-layout-main {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .player-layout--camera .player-window.is-framed {
+    flex: none;
+    width: 100%;
+  }
+
+  .player-shell--party-open .player-layout {
+    max-width: 100%;
+  }
+
+  .player-shell--party-open .player-window.is-framed {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .player-window.is-framed {
+    width: 100%;
+    max-height: none;
+  }
+
+  .player-party-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10002;
+    width: 100%;
+    max-height: min(45vh, 22rem);
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 1rem 1rem 0 0;
+    border-bottom: none;
+    animation: player-party-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes player-party-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .party-camera-grid {
+    width: 100%;
+    max-height: 28vh;
+    flex-direction: row;
+    order: 2;
+  }
+
+  .party-camera-grid-scroll {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    padding-bottom: 0.15rem;
+  }
+
+  .party-camera-tile {
+    min-width: 4.5rem;
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    aspect-ratio: 1;
+  }
+
+  .party-camera-hint {
+    display: none;
+  }
+
+  .party-media-hint--desktop {
+    display: none;
+  }
+
+  .player-party-panel .party-media-btn,
+  .player-party-panel button {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+}
+
 @media (max-width: 640px) {
   .player-layout--camera .player-layout-main {
     flex-direction: column;
@@ -868,7 +1128,7 @@
 
   .party-camera-grid {
     width: 100%;
-    max-height: 9rem;
+    max-height: 28vh;
     flex-direction: row;
   }
 
@@ -876,15 +1136,18 @@
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .party-camera-tile {
-    min-width: 5.5rem;
+    min-width: 4.5rem;
     aspect-ratio: 1;
   }
 
   .player-shell {
-    padding: 0.75rem;
+    padding: 0.5rem;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    align-items: flex-start;
   }
 
   .player-layout {
@@ -895,22 +1158,48 @@
 
   .player-shell--party-open .player-window.is-framed {
     width: 100%;
+    max-width: 100%;
   }
 
   .player-party-panel {
     width: 100%;
-    max-height: min(42vh, 20rem);
-    border-radius: 0.75rem;
+    max-height: min(55vh, 24rem);
+    border-radius: 0.85rem 0.85rem 0 0;
+  }
+
+  .player-shell--boost-1 .player-party-panel,
+  .player-shell--boost-2 .player-party-panel,
+  .player-shell--boost-3 .player-party-panel {
+    display: none;
   }
 
   .player-window.is-framed {
     width: 100%;
-    max-height: 78vh;
+    max-height: calc(100dvh - min(55vh, 24rem) - 1.5rem);
     border-radius: 0.75rem;
+  }
+
+  .player-shell--party-open .player-window.is-framed {
+    max-height: calc(45dvh - 1rem);
+  }
+
+  .player-shell--boost-1 .player-window.is-framed,
+  .player-shell--boost-2 .player-window.is-framed {
+    max-height: calc(100dvh - 10rem) !important;
+  }
+
+  .player-shell--boost-3 .player-window.is-framed {
+    max-height: calc(100dvh - 4rem) !important;
+    width: 100% !important;
   }
 
   .player-window-bar {
     padding: 0.45rem 0.5rem 0.45rem 0.75rem;
+  }
+
+  .player-window-btn {
+    width: 2.75rem;
+    height: 2.75rem;
   }
 
   .player-hint {
@@ -925,8 +1214,234 @@
   .player-hint {
     animation: none;
   }
+}
+
+/* Guest join splash — hide video until synced with host */
+.player-shell--guest-splash .player-window.is-framed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.party-guest-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(20, 10, 30, 0.97) 0%, rgba(0, 0, 0, 0.99) 70%);
+  backdrop-filter: blur(12px);
+  animation: party-splash-in 0.35s ease-out;
+}
+
+@keyframes party-splash-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.party-guest-splash-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 2.5rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+  text-align: center;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+.party-guest-splash-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.35);
+}
+
+.party-guest-splash-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.party-guest-splash-status {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0;
+}
+
+.party-guest-splash-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  margin-top: 0.25rem;
+}
+
+.party-guest-splash-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ef4444, #a855f7);
+  transition: width 0.5s ease-out;
+}
+
+.party-guest-splash-drift {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.party-guest-splash-spinner {
+  animation: spin 1s linear infinite;
+  margin-top: 0.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .party-guest-splash {
+    animation: none;
+  }
+
+  .party-guest-splash-bar-fill {
+    transition: none;
+  }
+
+  .party-guest-splash-spinner {
+    animation: none;
+  }
 
   .player-window {
     transition: none;
   }
+}
+
+/* Pre-navigation guest join overlay (notification accept) */
+.guest-join-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10060;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(15, 8, 28, 0.98) 0%, rgba(0, 0, 0, 0.99) 72%);
+  backdrop-filter: blur(14px);
+  animation: party-splash-in 0.3s ease-out;
+}
+
+.guest-join-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 2rem 2.5rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+  text-align: center;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.6);
+}
+
+.guest-join-overlay-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  box-shadow: 0 8px 28px rgba(124, 58, 237, 0.4);
+}
+
+.guest-join-overlay-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.guest-join-overlay-host {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+}
+
+.guest-join-overlay-status {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.guest-join-overlay-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  margin-top: 0.15rem;
+}
+
+.guest-join-overlay-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ef4444, #8b5cf6, #ec4899);
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.guest-join-overlay-spinner {
+  animation: spin 1s linear infinite;
+  margin-top: 0.2rem;
+}
+
+.party-guest-splash--exit {
+  animation: party-splash-out 0.45s ease-in forwards;
+}
+
+@keyframes party-splash-out {
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+}
+
+.party-guest-splash-steps {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.party-guest-splash-step {
+  width: 1.75rem;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.party-guest-splash-step.is-active {
+  background: linear-gradient(90deg, #ef4444, #a855f7);
+  transform: scaleY(1.2);
+}
+
+.party-guest-splash-step.is-done {
+  background: rgba(52, 211, 153, 0.85);
+}
+
+.party-guest-splash-host {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+}
+
+.player-shell .player-window.is-framed {
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }

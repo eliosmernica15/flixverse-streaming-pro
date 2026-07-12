@@ -33,8 +33,7 @@ const PersonalizedWelcome = () => {
     : "Sign in to unlock personalized recommendations, watchlists, and continue watching.";
 
   return (
-    <section className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6" aria-label="Personalized welcome">
-      <div className="max-w-[1800px] mx-auto">
+    <section className="w-full min-w-0 flex-1" aria-label="Personalized welcome">
         <Reveal className="glass-panel relative overflow-hidden rounded-2xl border border-white/8 p-5 sm:p-6 shadow-xl">
           <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-red-500/10 blur-3xl pointer-events-none" />
 
@@ -80,7 +79,6 @@ const PersonalizedWelcome = () => {
             </div>
           )}
         </Reveal>
-      </div>
     </section>
   );
 };

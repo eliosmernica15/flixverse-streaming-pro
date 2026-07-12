@@ -31,10 +31,19 @@ def _gen_code() -> str:
     return "".join(random.choice(chars) for _ in range(6))
 
 
+class ContentMetaBody(BaseModel):
+    tmdbId: int
+    mediaType: str = "movie"
+    season: int | None = None
+    episode: int | None = None
+    serverIndex: int = 0
+
+
 class CreatePartyBody(BaseModel):
     encryptedPayload: str
     hostName: str = "Host"
     hostAvatar: str | None = None
+    contentMeta: ContentMetaBody | None = None
 
 
 class JoinPartyBody(BaseModel):
@@ -143,6 +152,15 @@ def _room_participants(conn, room_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def _parse_content_meta(raw: Any) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw) if isinstance(raw, str) else raw
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 def _room_doc(conn, room_id: str) -> dict[str, Any] | None:
     row = db_fetchone(conn, "SELECT * FROM party_rooms WHERE id = ?", (room_id,))
     if not row:
@@ -152,6 +170,7 @@ def _room_doc(conn, room_id: str) -> dict[str, Any] | None:
         "code": row_get(row, "code"),
         "hostId": row_get(row, "host_id"),
         "encryptedPayload": row_get(row, "encrypted_payload"),
+        "contentMeta": _parse_content_meta(row_get(row, "content_meta_json")),
         "playbackState": row_get(row, "playback_state"),
         "lastKnownTime": row_get(row, "last_known_time"),
         "serverIndex": row_get(row, "server_index"),
@@ -225,13 +244,14 @@ def public_party_meta(room_id: str) -> dict[str, Any]:
     with get_conn() as conn:
         row = db_fetchone(
             conn,
-            "SELECT encrypted_payload, code FROM party_rooms WHERE id = ?",
+            "SELECT encrypted_payload, code, content_meta_json FROM party_rooms WHERE id = ?",
             (room_id,),
         )
     if not row:
         raise HTTPException(status_code=404, detail="Room not found")
     return {
         "encryptedPayload": row_get(row, "encrypted_payload"),
+        "contentMeta": _parse_content_meta(row_get(row, "content_meta_json")),
         "code": row_get(row, "code"),
     }
 
@@ -244,14 +264,17 @@ def create_party(body: CreatePartyBody, auth: dict = Depends(verify_bearer)) -> 
     now = iso_now()
     ts = int(time.time() * 1000)
 
+    meta_json = json.dumps(body.contentMeta.model_dump()) if body.contentMeta else None
+    server_index = body.contentMeta.serverIndex if body.contentMeta else 0
+
     with get_conn() as conn:
         db_execute(
             conn,
             """
-            INSERT INTO party_rooms (id, code, host_id, encrypted_payload, playback_state, last_known_time, server_index, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 'playing', 0, 0, ?, ?)
+            INSERT INTO party_rooms (id, code, host_id, encrypted_payload, content_meta_json, playback_state, last_known_time, server_index, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 'playing', 0, ?, ?, ?)
             """,
-            (room_id, code, uid, body.encryptedPayload, now, now),
+            (room_id, code, uid, body.encryptedPayload, meta_json, server_index, now, now),
         )
         db_execute(
             conn,
@@ -309,38 +332,31 @@ def leave_party(room_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, 
         if not row:
             return {"ok": True}
 
-        db_execute(
-            conn,
-            "DELETE FROM party_participants WHERE room_id = ? AND user_id = ?",
-            (room_id, uid),
-        )
-        remaining = db_fetchall(
-            conn,
-            "SELECT user_id FROM party_participants WHERE room_id = ?",
-            (room_id,),
-        )
+        is_host = row_get(row, "host_id") == uid
 
-        if not remaining:
+        if is_host:
+            # Host leaving ends the party for everyone
+            db_execute(conn, "DELETE FROM party_signals WHERE room_id = ?", (room_id,))
+            db_execute(conn, "DELETE FROM party_messages WHERE room_id = ?", (room_id,))
+            db_execute(conn, "DELETE FROM party_participants WHERE room_id = ?", (room_id,))
             db_execute(conn, "DELETE FROM party_rooms WHERE id = ?", (room_id,))
-        elif row_get(row, "host_id") == uid:
-            new_host = row_get(remaining[0], "user_id")
+        else:
             db_execute(
                 conn,
-                "UPDATE party_rooms SET host_id = ?, updated_at = ? WHERE id = ?",
-                (new_host, iso_now(), room_id),
+                "DELETE FROM party_participants WHERE room_id = ? AND user_id = ?",
+                (room_id, uid),
             )
-            db_execute(
+            remaining = db_fetchall(
                 conn,
-                "UPDATE party_participants SET role = 'guest' WHERE room_id = ?",
+                "SELECT user_id FROM party_participants WHERE room_id = ?",
                 (room_id,),
             )
-            db_execute(
-                conn,
-                "UPDATE party_participants SET role = 'host' WHERE room_id = ? AND user_id = ?",
-                (room_id, new_host),
-            )
+            if not remaining:
+                db_execute(conn, "DELETE FROM party_signals WHERE room_id = ?", (room_id,))
+                db_execute(conn, "DELETE FROM party_messages WHERE room_id = ?", (room_id,))
+                db_execute(conn, "DELETE FROM party_rooms WHERE id = ?", (room_id,))
 
-    return {"ok": True}
+    return {"ok": True, "ended": is_host if row else False}
 
 
 class ParticipantPatchBody(BaseModel):
@@ -585,6 +601,9 @@ async def send_invite(body: InviteBody, auth: dict = Depends(verify_bearer)) -> 
         "movie_title": body.roomTitle,
         "from_user_id": uid,
         "from_user_name": sender_name,
+        "season": body.season,
+        "episode": body.episode,
+        "server_index": 0,
     }
 
     with get_conn() as conn:

@@ -149,6 +149,26 @@ class InviteActionBody(BaseModel):
     notificationId: str
 
 
+def _guest_player_url(data: dict[str, Any]) -> str | None:
+    """Direct player URL so guests skip /party/join (hash key not needed when content_id is present)."""
+    room_id = data.get("room_id")
+    content_id = data.get("content_id")
+    if not room_id or not content_id:
+        return data.get("party_join_url")
+
+    media_type = data.get("content_type") or "movie"
+    parts = [f"type={media_type}", f"party={room_id}", "autoplay=true", "guest=1"]
+    if media_type == "tv":
+        if data.get("season") is not None:
+            parts.append(f"season={data['season']}")
+        if data.get("episode") is not None:
+            parts.append(f"episode={data['episode']}")
+    server = data.get("server_index")
+    if server is not None and int(server) > 0:
+        parts.append(f"server={server}")
+    return f"/movie/{content_id}?{'&'.join(parts)}"
+
+
 @router.post("/party-invite/accept")
 def accept_party_invite(body: InviteActionBody, auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
     uid = uid_from_auth(auth)
@@ -174,7 +194,7 @@ def accept_party_invite(body: InviteActionBody, auth: dict = Depends(verify_bear
                 "UPDATE watch_party_invites SET status = 'accepted', responded_at = ? WHERE id = ? AND to_user_id = ?",
                 (iso_now(), invite_id, uid),
             )
-    return {"ok": True, "joinUrl": data.get("party_join_url")}
+    return {"ok": True, "joinUrl": _guest_player_url(data)}
 
 
 @router.post("/party-invite/decline")

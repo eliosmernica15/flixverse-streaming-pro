@@ -8,6 +8,7 @@ import type {
   FlixPartyParticipant,
   FlixPartyRoom,
 } from "@/hooks/player/useFlixParty";
+import type { PartyContentMeta } from "@/lib/player/roomEncryption";
 
 interface UseFlixPartyOptions {
   roomId: string | null;
@@ -78,12 +79,13 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
   }, [roomId, fetchRoom, fetchMessages]);
 
   const createRoom = useCallback(
-    async (encryptedPayload: string): Promise<string> => {
+    async (encryptedPayload: string, contentMeta?: PartyContentMeta): Promise<string> => {
       if (!user) throw new Error("Must be signed in");
       const data = await pythonFetch<{ roomId: string; room: FlixPartyRoom }>("/parties", {
         method: "POST",
         body: JSON.stringify({
           encryptedPayload,
+          contentMeta: contentMeta ?? null,
           hostName: user.displayName || "Host",
           hostAvatar: user.photoURL,
         }),
@@ -173,7 +175,7 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
   );
 
   const updatePlaybackState = useCallback(
-    async (state: "playing" | "paused", currentTime: number) => {
+    async (state: "playing" | "paused", currentTime: number, serverIndex?: number) => {
       if (!roomId) return;
       setRoom((prev) =>
         prev
@@ -181,6 +183,7 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
               ...prev,
               playbackState: state,
               lastKnownTime: currentTime,
+              serverIndex: typeof serverIndex === "number" ? serverIndex : prev.serverIndex,
               updatedAt: Date.now(),
             }
           : prev
@@ -188,7 +191,11 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
       try {
         await pythonFetch(`/parties/${roomId}/playback`, {
           method: "PATCH",
-          body: JSON.stringify({ state, currentTime }),
+          body: JSON.stringify({
+            state,
+            currentTime,
+            ...(typeof serverIndex === "number" ? { serverIndex } : {}),
+          }),
         });
       } catch {
         /* host-only */

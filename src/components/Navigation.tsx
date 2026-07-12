@@ -144,7 +144,7 @@ const Navigation = () => {
             </Link>
           </div>
 
-          <div className="hidden items-center gap-1 md:flex lg:gap-2">
+          <div className="hidden items-center gap-1 lg:flex lg:gap-2">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
@@ -187,11 +187,11 @@ const Navigation = () => {
                 <button
                   type="button"
                   onClick={() => setShowJoinParty(true)}
-                  className="group hidden items-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-sm font-semibold text-purple-200 transition-all hover:border-purple-400/50 hover:bg-purple-500/20 hover:text-white focus-ring sm:flex"
+                  className="group hidden min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-2 py-2 text-sm font-semibold text-purple-200 transition-all hover:border-purple-400/50 hover:bg-purple-500/20 hover:text-white focus-ring sm:flex lg:px-3"
                   title="Join a watch party with a 6-letter code"
                 >
                   <PartyPopper className="h-4 w-4 transition-transform group-hover:scale-110" />
-                  <span>Join Party</span>
+                  <span className="hidden lg:inline">Join Party</span>
                 </button>
                 <NotificationSettings />
                 <NotificationBell />
@@ -279,7 +279,7 @@ const Navigation = () => {
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl transition-colors duration-200 hover:bg-white/10 focus-ring md:hidden"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl transition-colors duration-200 hover:bg-white/10 focus-ring lg:hidden"
               aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={isMobileMenuOpen}
             >
@@ -293,7 +293,7 @@ const Navigation = () => {
         </div>
 
         {isMobileMenuOpen && (
-          <div className="animate-fade-in-up border-t border-white/10 md:hidden">
+          <div className="animate-fade-in-up border-t border-white/10 lg:hidden">
             <div className="glass-panel mb-4 mt-3 rounded-2xl p-3">
               <div className="px-2 py-2">
                 <SearchBar onMovieSelect={handleMovieSelect} />

@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, PartyPopper } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useFlixParty } from "@/hooks/player/useFlixParty";
-import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
-import { pythonFetch } from "@/lib/pythonApi/client";
 import {
-  decryptPayload,
   extractRoomKeyFromHash,
-  type PartyPayload,
+  resolvePartyPlayerUrl,
 } from "@/lib/player/roomEncryption";
+import { clearPartyLeftMark } from "@/lib/player/partyUrl";
+import { persistGuestJoinSession } from "@/lib/party/guestJoinSession";
 
 export default function PartyJoinClient() {
   const router = useRouter();
@@ -20,9 +19,11 @@ export default function PartyJoinClient() {
   const [status, setStatus] = useState("Preparing your party…");
   const [error, setError] = useState<string | null>(null);
   const { joinRoom, joinRoomById } = useFlixParty({ roomId: null });
+  const joinStartedRef = useRef(false);
+  const guestMode = searchParams.get("guest") === "1";
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || joinStartedRef.current) return;
 
     if (!user) {
       router.replace(
@@ -31,13 +32,14 @@ export default function PartyJoinClient() {
       return;
     }
 
+    joinStartedRef.current = true;
+
     const code = searchParams.get("code");
     const roomId = searchParams.get("id");
     const roomKey = extractRoomKeyFromHash();
 
     async function join() {
       try {
-        let payload: PartyPayload | null = null;
         let targetRoomId = roomId;
 
         if (code) {
@@ -62,37 +64,20 @@ export default function PartyJoinClient() {
           return;
         }
 
-        if (roomKey) {
-          setStatus("Decrypting party details…");
-          let encryptedPayload: string | null = null;
-          if (isPythonBackendEnabled()) {
-            try {
-              const meta = await pythonFetch<{ encryptedPayload: string }>(
-                `/parties/${targetRoomId}/public-meta`
-              );
-              encryptedPayload = meta.encryptedPayload;
-            } catch {
-              encryptedPayload = null;
-            }
-          } else {
-            const res = await fetch(`/api/party/room?id=${targetRoomId}`);
-            if (res.ok) {
-              const data = (await res.json()) as { encryptedPayload: string };
-              encryptedPayload = data.encryptedPayload;
-            }
-          }
-          if (encryptedPayload) {
-            payload = await decryptPayload(encryptedPayload, roomKey);
-          }
-        }
-
-        if (payload) {
-          const qs = new URLSearchParams({ type: payload.mediaType, party: targetRoomId });
-          if (payload.season) qs.set("season", String(payload.season));
-          if (payload.episode) qs.set("episode", String(payload.episode));
-          router.replace(`/movie/${payload.tmdbId}?${qs}`);
+        clearPartyLeftMark(targetRoomId);
+        setStatus("Loading watch room…");
+        const playerUrl = await resolvePartyPlayerUrl(targetRoomId, roomKey);
+        if (playerUrl) {
+          const sep = playerUrl.includes("?") ? "&" : "?";
+          const target = `${playerUrl}${sep}guest=1`;
+          persistGuestJoinSession({
+            roomId: targetRoomId,
+            targetPath: target,
+            startedAt: Date.now(),
+          });
+          window.location.replace(target);
         } else {
-          router.replace(`/?party=${targetRoomId}`);
+          window.location.replace(`/?party=${targetRoomId}&guest=1`);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to join party");
@@ -104,7 +89,7 @@ export default function PartyJoinClient() {
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 p-6">
-      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
         <PartyPopper className="w-7 h-7 text-white" />
       </div>
       {error ? (
@@ -122,6 +107,11 @@ export default function PartyJoinClient() {
         <>
           <Loader2 className="w-6 h-6 text-red-400 animate-spin" />
           <p className="text-gray-400 text-sm">{status}</p>
+          {guestMode && (
+            <p className="text-gray-500 text-xs text-center max-w-xs">
+              Syncing with the host before playback starts…
+            </p>
+          )}
         </>
       )}
     </div>

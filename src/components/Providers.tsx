@@ -21,6 +21,7 @@ import OfflineCacheSync from "@/components/OfflineCacheSync";
 import { CookieConsent } from "@/components/CookieConsent";
 import UsernameReminder from "@/components/UsernameReminder";
 import InviteAlertListener from "@/components/InviteAlertListener";
+import GuestJoinOverlay from "@/components/party/GuestJoinOverlay";
 
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"), { ssr: false });
 const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcutsHelp"), {
@@ -71,6 +72,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                     <CookieConsent />
                     <UsernameReminder />
                     <InviteAlertListener />
+                    <GuestJoinOverlay />
                     {children}
                     <Toaster />
                     <Sonner />

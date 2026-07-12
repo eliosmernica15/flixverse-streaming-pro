@@ -133,7 +133,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   };
 
   return (
-    <div className="relative h-[88vh] lg:h-[92vh] overflow-hidden contain-paint">
+    <div className="relative h-[72vh] sm:h-[88vh] lg:h-[92vh] overflow-hidden contain-paint">
       {/* Backdrops — crossfade between slides */}
       {allMovies.map((m, i) => {
         const url = m.backdrop_path ? getBackdropUrl(m.backdrop_path, "large") : "";
@@ -166,10 +166,10 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
         </>
       )}
 
-      <div className="relative z-10 flex items-end lg:items-center h-full pb-28 lg:pb-0">
+      <div className="relative z-10 flex items-end lg:items-center h-full pb-20 sm:pb-28 lg:pb-0">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
            <div className="max-w-3xl animate-fade-in-up" key={currentMovie.id}>
-             <div className="flex flex-wrap items-center gap-3 mb-5">
+             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-5">
                <span className="eyebrow">{releaseYear ? `${releaseYear}` : "Now Streaming"}</span>
                <span className="chip bg-gradient-to-r from-red-600 to-red-500 text-white border-0 shadow-lg shadow-red-500/20">
                  {currentMovie.media_type === "tv" ? "Series" : "Movie"}
@@ -180,11 +180,11 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
                </span>
              </div>
 
-             <h1 className="display-title gradient-text text-balance mb-5">
+             <h1 className="display-title gradient-text text-balance mb-3 sm:mb-5 text-3xl sm:text-4xl md:text-5xl lg:text-6xl">
                {title}
              </h1>
 
-             <div className="flex flex-wrap items-center gap-3 mb-6">
+             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
                <span className="chip bg-yellow-500/15 border-yellow-500/20 font-bold text-yellow-400">
                  <Star className="h-3.5 w-3.5 fill-current" />
                  <span>{currentMovie.vote_average?.toFixed(1)}</span>
@@ -195,21 +195,21 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
                <span className="chip glass-card">HD Available</span>
              </div>
 
-            <p className="text-base sm:text-lg md:text-xl mb-8 text-gray-300 leading-relaxed line-clamp-3 max-w-2xl">
+            <p className="text-sm sm:text-base md:text-lg mb-6 sm:mb-8 text-gray-300 leading-relaxed line-clamp-3 max-w-2xl">
               {currentMovie.overview}
             </p>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <button onClick={handlePlayClick} className="btn-primary group flex items-center space-x-3 px-8 py-4 text-lg hover:scale-[1.02] active:scale-[0.98] press-effect btn-shine focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
-                <Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              <button onClick={handlePlayClick} className="btn-primary group flex items-center space-x-2 sm:space-x-3 px-5 py-3 sm:px-8 sm:py-4 text-base sm:text-lg hover:scale-[1.02] active:scale-[0.98] press-effect btn-shine focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
+                <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-current group-hover:scale-110 transition-transform" />
                 <span>Play Now</span>
               </button>
-              <button onClick={handleAddToList} className="btn-glass group flex items-center space-x-3 px-8 py-4 text-lg font-semibold hover:scale-[1.02] active:scale-[0.98] press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70">
-                {isInMyList ? <Check className="w-6 h-6 text-green-400" /> : <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />}
+              <button onClick={handleAddToList} className="btn-glass group flex items-center space-x-2 sm:space-x-3 px-5 py-3 sm:px-8 sm:py-4 text-base sm:text-lg font-semibold hover:scale-[1.02] active:scale-[0.98] press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70">
+                {isInMyList ? <Check className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" /> : <Plus className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-90 transition-transform duration-300" />}
                 <span>{isInMyList ? "In My List" : "Add to List"}</span>
               </button>
-              <button onClick={handleMoreInfo} className="group p-4 glass-card rounded-xl hover:bg-white/15 transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black" title="More Info">
-                <Info className="w-6 h-6 text-white" />
+              <button onClick={handleMoreInfo} className="group p-3 sm:p-4 glass-card rounded-xl hover:bg-white/15 transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black" title="More Info">
+                <Info className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </button>
             </div>
           </div>

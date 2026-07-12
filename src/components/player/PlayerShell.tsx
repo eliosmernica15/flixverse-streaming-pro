@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Maximize2, Minimize2, X, Users } from "lucide-react";
+import { Maximize2, Minimize2, X, Users, LogOut } from "lucide-react";
 import { buildStreamingSources } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
 import { usePlayerPartySync } from "@/hooks/player/usePlayerPartySync";
+import { usePartyLayout } from "@/hooks/player/usePartyLayout";
 import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { EmbedFrame } from "./EmbedFrame";
@@ -13,7 +14,9 @@ import { PlayerShortcutsDropdown } from "./PlayerShortcutsDropdown";
 import { FlixPartySidebar } from "./FlixPartySidebar";
 import { FlixPartyInviteDialog } from "./FlixPartyInviteDialog";
 import { PartyCameraGrid } from "./PartyMediaPanel";
+import { PartyGuestSplash } from "./PartyGuestSplash";
 import { trackPlaybackStart } from "@/lib/analytics";
+import { releasePageScrollLock } from "@/lib/player/releaseScrollLock";
 import "@/app/video-player.css";
 
 interface PlayerShellProps {
@@ -30,6 +33,8 @@ interface PlayerShellProps {
   totalDuration?: number;
   episodeCount?: number;
   onAdvanceEpisode?: (nextSeason: number, nextEpisode: number) => void;
+  initialServer?: number;
+  guestJoinMode?: boolean;
 }
 
 const LOAD_TIMEOUT_MS = 15_000;
@@ -44,10 +49,11 @@ export function PlayerShell({
   posterPath,
   resumePosition = 0,
   totalDuration,
+  initialServer,
+  guestJoinMode = false,
 }: PlayerShellProps) {
-  const [currentServer, setCurrentServer] = useState(0);
+  const [currentServer, setCurrentServer] = useState(initialServer ?? 0);
   const [embedState, setEmbedState] = useState<"loading" | "ready" | "error">("loading");
-  const [isExpanded, setIsExpanded] = useState(false);
   const [showShortcutsMenu, setShowShortcutsMenu] = useState(false);
   const [showHint, setShowHint] = useState(true);
   const [liveDuration, setLiveDuration] = useState(0);
@@ -89,6 +95,7 @@ export function PlayerShell({
     setPlaying,
     play,
     pause,
+    isLiveSynced,
   } = useEmbedBridge({
     iframeRef,
     enabled: embedState === "ready",
@@ -107,6 +114,8 @@ export function PlayerShell({
     currentSourceProviderUrl: currentSource.providerUrl,
     currentTime,
     isPlaying,
+    embedReady: embedState === "ready",
+    embedLiveSynced: isLiveSynced,
     iframeRef,
     setPlaying,
     playEmbed: play,
@@ -114,18 +123,21 @@ export function PlayerShell({
     seekEmbed: seek,
     seekTo,
     seekRelative,
+    guestJoinMode,
   });
 
-  const { media } = party;
+  const { media, guestServerIndex } = party;
+  const layout = usePartyLayout();
+  const guestServerAppliedRef = useRef(false);
 
-  useVolumeDucking({
-    enabled: !!party.partyRoomId && (media.micOn || media.anyoneSpeaking),
-    anyoneSpeaking: media.anyoneSpeaking,
-    baseVolume: volume,
-    setVolume,
-  });
+  const inParty = !!party.partyRoomId;
+  const showPartyPanel =
+    party.showPartyPanel && (!inParty || layout.showPartyPanel) && !party.guestSplashVisible;
+  const showCameras = inParty && layout.showCameras && layout.cameraLayout !== "hidden";
 
-  const cameraLayout = !!party.partyRoomId;
+  const cycleLayoutFocus = useCallback(() => {
+    layout.cycleFocusLevel();
+  }, [layout]);
 
   const switchServer = useCallback((index: number) => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -136,6 +148,24 @@ export function PlayerShell({
     setPlaying(true);
     setReady(false);
   }, [setPlaying, setReady]);
+
+  useEffect(() => {
+    if (guestServerIndex === null || guestServerAppliedRef.current || party.isPartyHost) return;
+    if (guestServerIndex < 0 || guestServerIndex >= streamingSources.length) return;
+    guestServerAppliedRef.current = true;
+    if (guestServerIndex !== currentServer) {
+      switchServer(guestServerIndex);
+    }
+  }, [guestServerIndex, party.isPartyHost, currentServer, streamingSources.length, switchServer]);
+
+  useVolumeDucking({
+    enabled: !!party.partyRoomId && (media.micOn || media.anyoneSpeaking),
+    anyoneSpeaking: media.anyoneSpeaking,
+    baseVolume: volume,
+    setVolume,
+  });
+
+  const cameraLayout = inParty && showCameras;
 
   const nextServer = useCallback(() => {
     switchServer((currentServer + 1) % streamingSources.length);
@@ -150,12 +180,18 @@ export function PlayerShell({
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => undefined);
     }
+    releasePageScrollLock();
     onClose();
   }, [onClose]);
 
-  const toggleExpanded = useCallback(() => {
-    setIsExpanded((prev) => !prev);
-  }, []);
+  const toggleExpanded = cycleLayoutFocus;
+
+  const handleLeaveParty = useCallback(() => {
+    void party.handleLeaveParty();
+    party.resetPartySession();
+    layout.resetFocusLevel();
+    party.setShowPartyPanel(false);
+  }, [party, layout]);
 
   const toggleBrowserFullscreen = useCallback(async () => {
     const el = windowRef.current;
@@ -196,10 +232,11 @@ export function PlayerShell({
     const hintTimer = setTimeout(() => setShowHint(false), 10000);
 
     return () => {
-      document.body.style.overflow = prevBody;
-      document.documentElement.style.overflow = prevHtml;
       clearTimeout(hintTimer);
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+      releasePageScrollLock();
     };
   }, []);
 
@@ -263,8 +300,8 @@ export function PlayerShell({
           void document.exitFullscreen();
           return;
         }
-        if (isExpanded) {
-          setIsExpanded(false);
+        if (layout.focusLevel > 0) {
+          layout.resetFocusLevel();
           return;
         }
         handleClose();
@@ -276,6 +313,7 @@ export function PlayerShell({
       }
       if (e.key === "g" || e.key === "G") {
         if (isFeatureEnabled("flixparty")) {
+          if (!party.showPartyPanel) party.resetPartySession();
           party.setShowPartyPanel((p) => !p);
         }
         return;
@@ -334,7 +372,7 @@ export function PlayerShell({
     prevServer,
     seekToPercent,
     showShortcutsMenu,
-    isExpanded,
+    layout,
     party,
     media,
   ]);
@@ -357,15 +395,22 @@ export function PlayerShell({
 
   return (
     <div
-      className={`player-shell ${party.showPartyPanel ? "player-shell--party-open" : ""} ${cameraLayout ? "player-shell--camera" : ""}`}
+      className={`player-shell ${showPartyPanel ? "player-shell--party-open" : ""} ${cameraLayout ? "player-shell--camera" : ""} player-shell--boost-${layout.focusLevel} ${inParty ? `player-shell--cam-${layout.cameraLayout}` : ""} ${party.guestSplashVisible ? "player-shell--guest-splash" : ""}`}
       role="dialog"
       aria-label={`Watching ${title}`}
     >
-      <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""}`}>
+      <PartyGuestSplash
+        phase={party.guestSplashPhase}
+        title={title}
+        hostName={party.guestJoinHostName}
+        driftMs={party.partyDriftMs}
+        visible={party.guestSplashVisible}
+      />
+      <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""} ${inParty ? `player-layout--cam-${layout.cameraLayout}` : ""}`}>
         <div className="player-layout-main">
           <div
             ref={windowRef}
-            className={`player-window ${isExpanded ? "is-maximized" : "is-framed"}`}
+            className={`player-window is-framed player-window--boost-${layout.focusLevel}`}
           >
           <header className="player-window-bar">
             <div className="player-window-meta">
@@ -378,11 +423,25 @@ export function PlayerShell({
               </p>
             </div>
             <div className="player-window-actions">
+              {flixPartyEnabled && inParty && (
+                <button
+                  type="button"
+                  className="player-window-btn player-window-btn--leave"
+                  onClick={handleLeaveParty}
+                  aria-label={party.isPartyHost ? "End party for everyone" : "Leave party"}
+                  title={party.isPartyHost ? "End party for all" : "Leave party"}
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              )}
               {flixPartyEnabled && (
                 <button
                   type="button"
                   className={`player-window-btn ${party.showPartyPanel ? "is-active" : ""}`}
-                  onClick={() => party.setShowPartyPanel((p) => !p)}
+                  onClick={() => {
+                    if (!party.showPartyPanel) party.resetPartySession();
+                    party.setShowPartyPanel((p) => !p);
+                  }}
                   aria-label="Watch together"
                   aria-pressed={party.showPartyPanel}
                   title="Watch together (G)"
@@ -398,11 +457,15 @@ export function PlayerShell({
               <button
                 type="button"
                 className="player-window-btn"
-                onClick={toggleExpanded}
-                aria-label={isExpanded ? "Restore player size" : "Maximize player"}
-                title={isExpanded ? "Restore (T)" : "Maximize (T)"}
+                onClick={cycleLayoutFocus}
+                aria-label={`Video size: ${layout.focusLabel}. Click to make bigger.`}
+                title={`Size: ${layout.focusLabel} — click to enlarge (T)`}
               >
-                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {layout.isMaxBoost ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
               </button>
               <button
                 type="button"
@@ -442,19 +505,22 @@ export function PlayerShell({
             participants={media.participants}
             voiceVolume={media.voiceVolume}
             roomParticipants={party.partyRoom?.participants}
+            layoutMode={layout.cameraLayout}
+            onLayoutChange={layout.setCameraLayout}
           />
         )}
         </div>
 
-        {flixPartyEnabled && party.showPartyPanel && (
+        {flixPartyEnabled && showPartyPanel && (
           <FlixPartySidebar
             embedded
-            isOpen={party.showPartyPanel}
+            isOpen={showPartyPanel}
             onClose={() => party.setShowPartyPanel(false)}
             roomId={party.partyRoomId}
             syncStatus={party.partySyncStatus}
             driftMs={party.partyDriftMs}
-            onLeaveRoom={party.handleLeaveParty}
+            onLeaveRoom={handleLeaveParty}
+            isHost={party.isPartyHost}
             onStartParty={party.handleStartParty}
             movieId={movieId}
             mediaType={mediaType}
@@ -469,7 +535,6 @@ export function PlayerShell({
             media={media}
             partyRoom={party.partyRoom}
             partyMessages={party.partyMessages}
-            isHost={party.isPartyHost}
             sendPartyMessage={party.sendPartyMessage}
             kickParticipant={party.kickParticipant}
             setParticipantMicMuted={party.setParticipantMicMuted}

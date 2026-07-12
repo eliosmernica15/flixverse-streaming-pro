@@ -23,9 +23,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  acceptWatchPartyInvite,
   declineWatchPartyInvite,
 } from "@/lib/notifications/partyInvite";
+import { executeGuestJoin } from "@/lib/party/executeGuestJoin";
 
 const NotificationIcon = ({ type }: { type: Notification["type"] }) => {
   switch (type) {
@@ -261,15 +261,11 @@ const NotificationBell = () => {
     if (!user) return;
     setPartyActionId(notification.id);
     try {
-      const joinUrl = await acceptWatchPartyInvite(notification);
       setOpen(false);
-      if (joinUrl) {
-        if (joinUrl.startsWith("http")) {
-          window.location.href = joinUrl;
-        } else {
-          router.push(joinUrl);
-        }
-      }
+      await executeGuestJoin({
+        notification,
+        user: { displayName: user.displayName, photoURL: user.photoURL },
+      });
     } catch (err) {
       console.error("[party-invite] accept failed:", err);
     } finally {
@@ -304,7 +300,7 @@ const NotificationBell = () => {
 
       <PopoverContent
         align="end"
-        className="glass-strong w-80 animate-scale-in rounded-2xl border-white/10 p-0 shadow-2xl shadow-black/50"
+        className="glass-strong w-[min(20rem,calc(100vw-1rem))] animate-scale-in rounded-2xl border-white/10 p-0 shadow-2xl shadow-black/50"
       >
         <div className="flex items-center justify-between border-b border-white/10 p-4">
           <h3 className="font-semibold text-white">Notifications</h3>

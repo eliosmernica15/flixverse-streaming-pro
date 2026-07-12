@@ -137,11 +137,17 @@ export async function POST(request: NextRequest) {
         updatedAt: Date.now(),
       });
 
+      const displayName =
+        (profile.display_name as string) ||
+        user.email?.split("@")[0] ||
+        handle;
+
       tx.set(
         profileRef,
         {
           username: handle,
           user_id: user.uid,
+          display_name: displayName,
           updated_at: new Date().toISOString(),
         },
         { merge: true }

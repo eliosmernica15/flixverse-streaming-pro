@@ -80,6 +80,9 @@ export async function sendWatchPartyInvite(payload: WatchPartyInvitePayload): Pr
       content_id: payload.movieId ?? undefined,
       content_type: payload.mediaType ?? "movie",
       movie_title: payload.roomTitle,
+      season: payload.season ?? undefined,
+      episode: payload.episode ?? undefined,
+      server_index: 0,
     },
   });
 }

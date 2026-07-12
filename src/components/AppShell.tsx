@@ -20,7 +20,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-black text-white">
+    <div className="safe-area-top flex min-h-screen flex-col overflow-x-hidden bg-black text-white">
       <a href="#main-content" className="skip-link">
         Skip to content
       </a>
