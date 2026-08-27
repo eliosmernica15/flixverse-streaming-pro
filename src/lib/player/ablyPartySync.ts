@@ -109,7 +109,8 @@ export class AblyPartyChannel {
 
   get isConnected(): boolean {
     const client = getClient();
-    return client?.connection.state === "connected" ?? false;
+    if (!client) return false;
+    return client.connection.state === "connected";
   }
 
   destroy() {

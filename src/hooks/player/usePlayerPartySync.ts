@@ -199,7 +199,7 @@ export function usePlayerPartySync({
         const hostTime = msg.data.currentTime;
         if (currentTimeRef.current === 0 && hostTime > 10) return;
         const drift = Math.abs(currentTimeRef.current - hostTime);
-        if (drift > DRIFT_SEEK_THRESHOLD_SEC) {
+        if (drift > DRIFT_SOFT_THRESHOLD_SEC) {
           softSeekToRef.current(hostTime);
         }
       }
