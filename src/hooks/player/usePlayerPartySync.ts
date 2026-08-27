@@ -31,13 +31,13 @@ import {
   stripGuestJoinParam,
 } from "@/lib/player/partyUrl";
 
-const JOIN_GRACE_MS = 3000;           // longer grace — iframes take 2–5 s to load
+const JOIN_GRACE_MS = 5000;           // wait for iframe to fully load before any sync
 const SYNC_INTERVAL_MS = 1000;
-const DRIFT_SEEK_THRESHOLD_SEC = 1.2;
-const SEEK_COOLDOWN_MS = 600;         // slightly tighter so rapid corrections land
+// Drift threshold for postMessage seek attempt (fast, best-effort)
+const DRIFT_SOFT_THRESHOLD_SEC = 2;
+const SEEK_COOLDOWN_MS = 600;
 const MAX_GUEST_SPLASH_MS = 14_000;
 const HOST_HEARTBEAT_MS = 800;
-// How often the host writes the authoritative Firestore state (separate from WebRTC heartbeats)
 const FIRESTORE_PERSIST_INTERVAL_MS = 4000;
 const MOBILE_BREAKPOINT = 768;
 
@@ -285,29 +285,24 @@ export function usePlayerPartySync({
     setGuestServerIndex(serverIdx);
   }, [isPartyHost, partyRoom]);
 
-  // Guest: periodic drift sync loop — soft seek only, never reload iframe
+  // Guest: periodic drift sync loop
   useEffect(() => {
     if (!partyRoomId || isPartyHost) return;
 
     const tick = () => {
       if (!embedReadyRef.current) return;
-
-      if (partyJoinTimeRef.current && Date.now() - partyJoinTimeRef.current < JOIN_GRACE_MS) {
-        return;
-      }
+      if (partyJoinTimeRef.current && Date.now() - partyJoinTimeRef.current < JOIN_GRACE_MS) return;
 
       const guestTime = currentTimeRef.current;
       const hostTime = Math.max(partyHostTimeRef.current, hostTimeRef.current);
 
-      if (!embedLiveSyncedRef.current && guestTime === 0 && hostTime > 5) {
-        return;
-      }
-
+      if (!embedLiveSyncedRef.current && guestTime === 0 && hostTime > 5) return;
       if (guestTime === 0 && hostTime > 10) return;
 
       const driftSec = Math.abs(guestTime - hostTime);
       setPartyDriftMs(driftSec * 1000);
 
+      // Enforce play/pause state
       if (partyPlaybackRef.current === "playing" && !isPlayingRef.current) {
         setPlaying(true);
         playEmbed();
@@ -316,7 +311,7 @@ export function usePlayerPartySync({
         pauseEmbed();
       }
 
-      if (driftSec >= DRIFT_SEEK_THRESHOLD_SEC) {
+      if (driftSec >= DRIFT_SOFT_THRESHOLD_SEC) {
         softSeekTo(hostTime);
         setPartySyncStatus("drift");
       } else {

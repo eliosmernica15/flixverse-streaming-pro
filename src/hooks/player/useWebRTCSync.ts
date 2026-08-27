@@ -4,6 +4,11 @@ import { createPartySyncTransport, type PartySyncTransport } from "@/lib/player/
 import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { useAblyPartySync } from "@/hooks/player/useAblyPartySync";
+
+const ABLY_ENABLED =
+  typeof process !== "undefined" &&
+  !!process.env.NEXT_PUBLIC_ABLY_API_KEY;
 
 export interface SyncMessage {
   type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";
@@ -41,7 +46,18 @@ export function useWebRTCSync({
   onRemoteStreamRemoved,
 }: UseWebRTCSyncOptions) {
   const { user } = useAuth();
-  const [isConnected, setIsConnected] = useState(false);
+
+  // ── Ably path (preferred when API key is configured) ──────────────────────
+  const ably = useAblyPartySync({
+    roomId: ABLY_ENABLED ? roomId : null,
+    isHost,
+    onPlaybackSync,
+    onRemoteStream,
+    onRemoteStreamRemoved,
+  });
+
+  // ── WebRTC path (fallback when no Ably key) ───────────────────────────────
+  const [rtcConnected, setRtcConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
   const syncRef = useRef<WebRTCPartySync | PartySyncTransport | null>(null);
   const syncInitRef = useRef<{ roomId: string; isHost: boolean; hostId: string | null } | null>(null);
@@ -57,8 +73,10 @@ export function useWebRTCSync({
   }, []);
 
   useEffect(() => {
+    // Skip WebRTC setup when Ably is active
+    if (ABLY_ENABLED) return;
     if (!roomId || !user) {
-      setIsConnected(false);
+      setRtcConnected(false);
       return;
     }
     if (!isHost && !hostId) return;
@@ -71,7 +89,7 @@ export function useWebRTCSync({
       syncInitRef.current?.hostId === resolvedHostId
     ) {
       const poll = setInterval(() => {
-        if (syncRef.current) setIsConnected(syncRef.current.isConnected);
+        if (syncRef.current) setRtcConnected(syncRef.current.isConnected);
       }, 200);
       return () => clearInterval(poll);
     }
@@ -132,7 +150,7 @@ export function useWebRTCSync({
     })();
 
     const poll = setInterval(() => {
-      if (syncRef.current) setIsConnected(syncRef.current.isConnected);
+      if (syncRef.current) setRtcConnected(syncRef.current.isConnected);
     }, 200);
 
     return () => {
@@ -141,16 +159,17 @@ export function useWebRTCSync({
       syncRef.current?.destroy();
       syncRef.current = null;
       syncInitRef.current = null;
-      setIsConnected(false);
+      setRtcConnected(false);
     };
   }, [roomId, user?.uid, isHost, hostId]);
 
   useEffect(() => {
+    if (ABLY_ENABLED) return;
     if (!isHost || !syncRef.current) return;
     syncRef.current.syncParticipants(participantIds);
   }, [isHost, participantIds.join(",")]);
 
-  const sendMessage = useCallback((type: SyncMessage["type"], data: SyncMessage["data"]) => {
+  const sendMessageRtc = useCallback((type: SyncMessage["type"], data: SyncMessage["data"]) => {
     if (!syncRef.current) return;
     const msg: SyncMessage = {
       type,
@@ -160,9 +179,26 @@ export function useWebRTCSync({
     syncRef.current.sendMessage(msg);
   }, []);
 
-  const setLocalStream = useCallback(async (stream: MediaStream | null) => {
+  const setLocalStreamRtc = useCallback(async (stream: MediaStream | null) => {
     await syncRef.current?.setLocalStream(stream);
   }, []);
 
-  return { isConnected, sendMessage, messages, setLocalStream, syncRef };
+  // ── Unified interface ─────────────────────────────────────────────────────
+  if (ABLY_ENABLED) {
+    return {
+      isConnected: ably.isConnected,
+      sendMessage: ably.sendMessage,
+      messages: [],
+      setLocalStream: ably.setLocalStream,
+      syncRef,
+    };
+  }
+
+  return {
+    isConnected: rtcConnected,
+    sendMessage: sendMessageRtc,
+    messages,
+    setLocalStream: setLocalStreamRtc,
+    syncRef,
+  };
 }
