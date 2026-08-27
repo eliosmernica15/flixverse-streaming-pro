@@ -438,6 +438,9 @@ export function useEmbedBridge({
           currentTime: Math.max(0, Math.min(max, prev.currentTime + delta)),
         };
       });
+      // Return the projected new time so callers (e.g. party host) can broadcast it
+      const max = stateRef.current.duration > 0 ? stateRef.current.duration : totalDuration;
+      return Math.max(0, Math.min(max, stateRef.current.currentTime + delta));
     },
     [sendAction, totalDuration]
   );

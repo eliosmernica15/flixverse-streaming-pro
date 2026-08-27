@@ -48,7 +48,7 @@ export function FriendsList({
   const shellClass =
     variant === "page"
       ? "glass-card rounded-2xl border border-white/10 overflow-hidden"
-      : "glass-panel flex h-full flex-col overflow-hidden rounded-2xl";
+      : "flex flex-col flex-1 min-h-0 overflow-hidden";
 
   const handleSearch = useCallback(async () => {
     if (searchQuery.length < 2) {
@@ -180,7 +180,7 @@ export function FriendsList({
         ))}
       </div>
 
-      <div className={`${variant === "sidebar" ? "flex-1 overflow-y-auto" : "min-h-[320px]"}`}>
+      <div className={`${variant === "sidebar" ? "flex-1 min-h-0 overflow-y-auto" : "min-h-[320px]"}`}>
         {activeTab === "friends" && (
           <div className="space-y-1 p-3">
             {loading && (

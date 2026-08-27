@@ -334,8 +334,10 @@ export function PlayerShell({
       const seconds = (percent / 100) * effectiveDuration;
       seek(seconds);
       syncTo(seconds);
+      // Broadcast seek to all party guests immediately
+      party.broadcastPartySeek(seconds);
     },
-    [embedState, effectiveDuration, seek, syncTo]
+    [embedState, effectiveDuration, seek, syncTo, party]
   );
 
   const togglePlayPause = useCallback(() => {
@@ -471,8 +473,16 @@ export function PlayerShell({
 
       if (e.key === " " || e.key === "k" || e.key === "K") togglePlayPause();
       else if (e.key === "m" || e.key === "M") toggleMute();
-      else if (e.key === "ArrowLeft") seekRelative(e.shiftKey ? -30 : -10);
-      else if (e.key === "ArrowRight") seekRelative(e.shiftKey ? 30 : 10);
+      else if (e.key === "ArrowLeft") {
+        const delta = e.shiftKey ? -30 : -10;
+        const newTime = seekRelative(delta);
+        party.broadcastPartySeek(newTime);
+      }
+      else if (e.key === "ArrowRight") {
+        const delta = e.shiftKey ? 30 : 10;
+        const newTime = seekRelative(delta);
+        party.broadcastPartySeek(newTime);
+      }
       else if (e.key === "ArrowUp") adjustVolume(e.shiftKey ? 0.2 : 0.1);
       else if (e.key === "ArrowDown") adjustVolume(e.shiftKey ? -0.2 : -0.1);
       else if (e.key === "+" || e.key === "=") adjustVolume(0.1);

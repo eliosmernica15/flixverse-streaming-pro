@@ -31,12 +31,14 @@ import {
   stripGuestJoinParam,
 } from "@/lib/player/partyUrl";
 
-const JOIN_GRACE_MS = 1200;
+const JOIN_GRACE_MS = 3000;           // longer grace — iframes take 2–5 s to load
 const SYNC_INTERVAL_MS = 1000;
 const DRIFT_SEEK_THRESHOLD_SEC = 1.2;
-const SEEK_COOLDOWN_MS = 900;
+const SEEK_COOLDOWN_MS = 600;         // slightly tighter so rapid corrections land
 const MAX_GUEST_SPLASH_MS = 14_000;
 const HOST_HEARTBEAT_MS = 800;
+// How often the host writes the authoritative Firestore state (separate from WebRTC heartbeats)
+const FIRESTORE_PERSIST_INTERVAL_MS = 4000;
 const MOBILE_BREAKPOINT = 768;
 
 function isMobileViewport(): boolean {
@@ -113,35 +115,6 @@ export function usePlayerPartySync({
 
   const partyParticipantIds = partyRoom?.participants?.map((p) => p.userId) ?? [];
 
-  const handlePartyPlaybackSync = useCallback(
-    (msg: SyncMessage) => {
-      if (isPartyHost) return;
-      if (msg.type === "play") {
-        setPlaying(true);
-        playEmbed();
-      }
-      if (msg.type === "pause") {
-        setPlaying(false);
-        pauseEmbed();
-      }
-      if (msg.type === "seek" && typeof msg.data.currentTime === "number") {
-        seekEmbed(msg.data.currentTime);
-        seekTo(msg.data.currentTime);
-      }
-      if (msg.type === "heartbeat" && typeof msg.data.currentTime === "number") {
-        hostTimeRef.current = msg.data.currentTime;
-        if (!embedReady) return;
-        const hostTime = msg.data.currentTime;
-        if (currentTimeRef.current === 0 && hostTime > 10) return;
-        const drift = Math.abs(currentTimeRef.current - hostTime);
-        if (drift > DRIFT_SEEK_THRESHOLD_SEC) {
-          softSeekTo(hostTime);
-        }
-      }
-    },
-    [isPartyHost, setPlaying, playEmbed, pauseEmbed, seekEmbed, seekTo, embedReady]
-  );
-
   const onRemoteStreamRef = useRef<(peerId: string, stream: MediaStream) => void>(() => {});
   const onRemoteStreamRemovedRef = useRef<(peerId: string) => void>(() => {});
   const partyJoinAttempted = useRef(false);
@@ -177,6 +150,8 @@ export function usePlayerPartySync({
     }
   }, [embedReady]);
 
+  // Rate-limited seek: prevents flooding the iframe with seek commands from
+  // rapid heartbeats or multiple drift-correction triggers firing close together.
   const softSeekTo = useCallback(
     (target: number) => {
       const now = Date.now();
@@ -186,6 +161,51 @@ export function usePlayerPartySync({
       seekTo(target);
     },
     [seekEmbed, seekTo]
+  );
+
+  // Keep a stable ref so handlePartyPlaybackSync can always call the latest
+  // softSeekTo without needing to re-subscribe the WebRTC listener every time.
+  const softSeekToRef = useRef(softSeekTo);
+  softSeekToRef.current = softSeekTo;
+
+  const handlePartyPlaybackSync = useCallback(
+    (msg: SyncMessage) => {
+      if (isPartyHost) return;
+      if (msg.type === "play") {
+        setPlaying(true);
+        playEmbed();
+        // Snap to host position so there's no drift at play-start
+        if (typeof msg.data.currentTime === "number" && msg.data.currentTime > 0) {
+          softSeekToRef.current(msg.data.currentTime);
+        }
+      }
+      if (msg.type === "pause") {
+        setPlaying(false);
+        pauseEmbed();
+        // Snap to exact host frame on pause so both sides land together
+        if (typeof msg.data.currentTime === "number") {
+          softSeekToRef.current(msg.data.currentTime);
+        }
+      }
+      if (msg.type === "seek" && typeof msg.data.currentTime === "number") {
+        // Rate-limited so rapid scrubber drags don't flood the iframe
+        softSeekToRef.current(msg.data.currentTime);
+      }
+      if (msg.type === "heartbeat" && typeof msg.data.currentTime === "number") {
+        hostTimeRef.current = msg.data.currentTime;
+        if (!embedReadyRef.current) return;
+        // Respect join grace period — don't correct while the iframe is still loading
+        if (partyJoinTimeRef.current && Date.now() - partyJoinTimeRef.current < JOIN_GRACE_MS) return;
+        const hostTime = msg.data.currentTime;
+        if (currentTimeRef.current === 0 && hostTime > 10) return;
+        const drift = Math.abs(currentTimeRef.current - hostTime);
+        if (drift > DRIFT_SEEK_THRESHOLD_SEC) {
+          softSeekToRef.current(hostTime);
+        }
+      }
+    },
+    // All mutable state is accessed via refs; only stable callbacks in deps.
+    [isPartyHost, setPlaying, playEmbed, pauseEmbed]
   );
 
   const { isConnected: rtcConnected, sendMessage: sendRtcMessage, setLocalStream } = useWebRTCSync({
@@ -436,8 +456,26 @@ export function usePlayerPartySync({
   const broadcastPartyState = useCallback(
     (state: "playing" | "paused", time: number) => {
       if (!partyRoomId || !isPartyHost) return;
+      // Write authoritative state to Firestore immediately on explicit play/pause
       void updatePlaybackState(state, time, currentServer);
+      // Send the real-time message over WebRTC data channel
       sendRtcMessage(state === "playing" ? "play" : "pause", { currentTime: time });
+    },
+    [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage, currentServer]
+  );
+
+  /**
+   * Broadcast an explicit seek to all guests.
+   * Called by the host whenever the playhead jumps (keyboard shortcuts,
+   * progress-bar click, 0-9 number keys, etc.).
+   */
+  const broadcastPartySeek = useCallback(
+    (time: number) => {
+      if (!partyRoomId || !isPartyHost) return;
+      // Persist to Firestore so late-joining guests get the right position
+      void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, currentServer);
+      // Instant delivery via WebRTC data channel
+      sendRtcMessage("seek", { currentTime: time });
     },
     [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage, currentServer]
   );
@@ -449,18 +487,38 @@ export function usePlayerPartySync({
   partyPlayingRef.current = isPlaying;
   partyServerRef.current = currentServer;
 
+  // Host: fast WebRTC heartbeats (800 ms) so guests correct drift quickly.
+  // Firestore writes happen at a much lower cadence (4 s) to avoid rate limits.
   useEffect(() => {
     if (!partyRoomId || !isPartyHost) return;
+
+    let firestoreTimer = 0;
 
     const tick = () => {
       const time = partyTimeRef.current;
       const playing = partyPlayingRef.current;
       const server = partyServerRef.current;
+
+      // Always send a lightweight WebRTC heartbeat
       sendRtcMessage("heartbeat", { currentTime: time });
-      void updatePlaybackState(playing ? "playing" : "paused", time, server);
+
+      // Throttle the heavier Firestore write
+      firestoreTimer += HOST_HEARTBEAT_MS;
+      if (firestoreTimer >= FIRESTORE_PERSIST_INTERVAL_MS) {
+        firestoreTimer = 0;
+        void updatePlaybackState(playing ? "playing" : "paused", time, server);
+      }
     };
 
+    // Immediate first tick + persist so guests have a value right away
     tick();
+    void updatePlaybackState(
+      partyPlayingRef.current ? "playing" : "paused",
+      partyTimeRef.current,
+      partyServerRef.current
+    );
+    firestoreTimer = 0; // reset after the forced initial write
+
     const id = setInterval(tick, HOST_HEARTBEAT_MS);
     return () => clearInterval(id);
   }, [partyRoomId, isPartyHost, sendRtcMessage, updatePlaybackState]);
@@ -587,6 +645,7 @@ export function usePlayerPartySync({
     handleLeaveParty,
     resetPartySession,
     broadcastPartyState,
+    broadcastPartySeek,
     partyJoinUrl,
     partyRoomCode: partyRoom?.code || (partyRoomId ? partyRoomId.slice(0, 6).toUpperCase() : ""),
     partyMessages,

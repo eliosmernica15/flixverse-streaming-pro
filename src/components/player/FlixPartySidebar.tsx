@@ -450,11 +450,13 @@ export function FlixPartySidebar({
                 )}
               </div>
             )}
-            <FriendsList
-              inviteMode={!!roomId}
-              onInvite={handleInviteFriend}
-              invitingUserId={invitingFriendId}
-            />
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <FriendsList
+                inviteMode={!!roomId}
+                onInvite={handleInviteFriend}
+                invitingUserId={invitingFriendId}
+              />
+            </div>
           </div>
         )}
 

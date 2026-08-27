@@ -301,6 +301,9 @@
     0 0 0 1px rgba(255, 255, 255, 0.04),
     0 20px 60px rgba(0, 0, 0, 0.55);
   animation: player-party-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Ensure party panel always renders above the floating player window */
+  position: relative;
+  z-index: 10002;
 }
 
 @keyframes player-party-slide-in {
