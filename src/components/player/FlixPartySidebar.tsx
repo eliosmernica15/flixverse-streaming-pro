@@ -391,38 +391,6 @@ export function FlixPartySidebar({
 
       {/* Tab content */}
       <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-        {roomId && media && activeTab !== "chat" && (
-          <div className="shrink-0 border-b border-white/10 px-3 py-2 space-y-2">
-            <PartyMediaControls
-              micOn={media.micOn}
-              cameraOn={media.cameraOn}
-              cameraMode={media.cameraMode}
-              anyoneSpeaking={media.anyoneSpeaking}
-              mediaError={media.mediaError}
-              voiceVolume={media.voiceVolume}
-              hostMicForcedOff={media.hostMicForcedOff}
-              hostCamForcedOff={media.hostCamForcedOff}
-              onToggleMic={() => void media.toggleMic()}
-              onToggleCamera={() => void media.toggleCamera()}
-              onVoiceVolumeChange={media.setVoiceVolume}
-              compact={isMobile}
-            />
-            {room && user && (
-              <PartyMembersPanel
-                participants={room.participants}
-                hostId={room.hostId}
-                currentUserId={user.uid}
-                isHost={isHostProp}
-                onKick={(id) => {
-                  void kickParticipant?.(id);
-                  toast({ title: "Guest removed", description: "They were removed from the party." });
-                }}
-                onToggleMic={(id, muted) => void setParticipantMicMuted?.(id, muted)}
-                onToggleCam={(id, off) => void setParticipantCamDisabled?.(id, off)}
-              />
-            )}
-          </div>
-        )}
         {/* Friends tab */}
         {activeTab === "friends" && (
           <div className="flex flex-col flex-1 min-h-0">
@@ -562,23 +530,57 @@ export function FlixPartySidebar({
 
         {/* Party tab */}
         {activeTab === "party" && (
-          <div className="p-3">
-            {movieId && title && (
-              <WatchParty
-                movieId={movieId}
-                mediaType={mediaType || "movie"}
-                season={season}
-                episode={episode}
-                title={title}
-                posterPath={posterPath || null}
-                currentTime={currentTime || 0}
-                isPlaying={isPlaying || false}
-                onSyncToPosition={onSyncToPosition || (() => {})}
-                onStartParty={onStartParty}
-                externalRoomId={roomId}
-                partyJoinUrl={partyJoinUrl}
-              />
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {roomId && media && (
+              <div className="px-3 pt-3 space-y-2">
+                <PartyMediaControls
+                  micOn={media.micOn}
+                  cameraOn={media.cameraOn}
+                  cameraMode={media.cameraMode}
+                  anyoneSpeaking={media.anyoneSpeaking}
+                  mediaError={media.mediaError}
+                  voiceVolume={media.voiceVolume}
+                  hostMicForcedOff={media.hostMicForcedOff}
+                  hostCamForcedOff={media.hostCamForcedOff}
+                  onToggleMic={() => void media.toggleMic()}
+                  onToggleCamera={() => void media.toggleCamera()}
+                  onVoiceVolumeChange={media.setVoiceVolume}
+                  compact={isMobile}
+                />
+                {room && user && (
+                  <PartyMembersPanel
+                    participants={room.participants}
+                    hostId={room.hostId}
+                    currentUserId={user.uid}
+                    isHost={isHostProp}
+                    onKick={(id) => {
+                      void kickParticipant?.(id);
+                      toast({ title: "Guest removed", description: "They were removed from the party." });
+                    }}
+                    onToggleMic={(id, muted) => void setParticipantMicMuted?.(id, muted)}
+                    onToggleCam={(id, off) => void setParticipantCamDisabled?.(id, off)}
+                  />
+                )}
+              </div>
             )}
+            <div className="p-3">
+              {movieId && title && (
+                <WatchParty
+                  movieId={movieId}
+                  mediaType={mediaType || "movie"}
+                  season={season}
+                  episode={episode}
+                  title={title}
+                  posterPath={posterPath || null}
+                  currentTime={currentTime || 0}
+                  isPlaying={isPlaying || false}
+                  onSyncToPosition={onSyncToPosition || (() => {})}
+                  onStartParty={onStartParty}
+                  externalRoomId={roomId}
+                  partyJoinUrl={partyJoinUrl}
+                />
+              )}
+            </div>
           </div>
         )}
       </div>
