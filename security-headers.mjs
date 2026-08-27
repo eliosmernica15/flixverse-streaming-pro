@@ -9,7 +9,7 @@ export const cspDirectives = [
   "font-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com",
-  "connect-src 'self' https://api.themoviedb.org https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com wss://*.firebaseio.com",
+  "connect-src 'self' https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com https://api.themoviedb.org https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com wss://*.firebaseio.com https://*.ably.io wss://*.ably.io https://*.ably-realtime.com wss://*.ably-realtime.com",
   "frame-src 'self' blob: https://accounts.google.com https://*.firebaseapp.com https://vidlink.pro https://player.videasy.net https://vidfast.pro https://vidsrc.me https://vidsrc.net https://www.2embed.cc https://2embed.cc https://multiembed.mov https://embed.su https://www.youtube.com https://www.youtube-nocookie.com",
   "upgrade-insecure-requests",
 ];

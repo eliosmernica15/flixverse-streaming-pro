@@ -90,7 +90,6 @@ export function EmbedFrame({
         src={currentSource.url}
         title={`Watch ${title} on ${currentSource.name}`}
         className={`player-iframe ${embedState === "error" ? "player-iframe--hidden" : ""}`}
-        allowFullScreen
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
         referrerPolicy="origin"
         onLoad={handleLoad}
