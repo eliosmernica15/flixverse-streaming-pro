@@ -9,8 +9,7 @@ import { useAblyPartySync } from "@/hooks/player/useAblyPartySync";
 const ABLY_ENABLED =
   typeof process !== "undefined" &&
   !!process.env.NEXT_PUBLIC_ABLY_API_KEY &&
-  process.env.NEXT_PUBLIC_ABLY_API_KEY !== "undefined" &&
-  !process.env.NEXT_PUBLIC_ABLY_API_KEY.includes("your_ably_api_key");
+  process.env.NEXT_PUBLIC_ABLY_API_KEY.includes(":");
 
 export interface SyncMessage {
   type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";

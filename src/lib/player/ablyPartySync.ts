@@ -35,7 +35,7 @@ let _client: Ably.Realtime | null = null;
 
 function getClient(): Ably.Realtime | null {
   const key = process.env.NEXT_PUBLIC_ABLY_API_KEY;
-  if (!key || typeof key !== "string" || key.trim() === "" || key.includes("your_ably_api_key_here") || key === "undefined") return null;
+  if (!key || typeof key !== "string" || !key.includes(":")) return null;
   if (!_client) {
     _client = new Ably.Realtime({
       key,
