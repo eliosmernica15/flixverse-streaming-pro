@@ -16,7 +16,7 @@ jobs:
       TMDB_ACCESS_TOKEN: test
       TMDB_API_KEY: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -46,7 +46,7 @@ jobs:
   firestore-rules:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 20
