@@ -1,8 +1,7 @@
 import { getCurrentTmdbLanguage, localeToTmdbLanguage } from '@/i18n/config';
-import { getEnv } from './env';
+import { getServerTmdbAuth } from '@/lib/tmdb/serverCredentials';
 
-const TMDB_API_KEY = getEnv('NEXT_PUBLIC_TMDB_API_KEY');
-/** Client uses the server proxy; SSR/build calls TMDB directly with server env keys. */
+/** Browser traffic goes through /api/tmdb so keys stay off the client bundle. */
 const TMDB_BASE_URL =
   typeof window !== "undefined" ? "/api/tmdb" : "https://api.themoviedb.org/3";
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
@@ -19,15 +18,22 @@ const TMDB_POSTER_SIZES = {
   original: `${TMDB_IMAGE_BASE}/original`
 };
 
-const options: RequestInit = {
-  method: "GET",
-  headers: {
-    accept: "application/json",
-    ...(typeof window === "undefined" && getEnv("NEXT_PUBLIC_TMDB_ACCESS_TOKEN")
-      ? { Authorization: `Bearer ${getEnv("NEXT_PUBLIC_TMDB_ACCESS_TOKEN")}` }
-      : {}),
-  },
-};
+function tmdbFetchOptions(): RequestInit {
+  if (typeof window !== "undefined") {
+    return { method: "GET", headers: { accept: "application/json" } };
+  }
+  const auth = getServerTmdbAuth();
+  return { method: "GET", headers: auth.headers };
+}
+
+function withServerApiKey(url: string): string {
+  if (typeof window !== "undefined") return url;
+  const { queryApiKey } = getServerTmdbAuth();
+  if (!queryApiKey) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  if (url.includes("api_key=")) return url;
+  return `${url}${sep}api_key=${encodeURIComponent(queryApiKey)}`;
+}
 
 export interface TMDBMovie {
   id: number;
@@ -183,8 +189,8 @@ const applyAlbanianFallback = async (localizedUrl: string, data: any): Promise<a
   const enUrl = setLanguageParam(localizedUrl, localeToTmdbLanguage('en'), true);
 
   try {
-    const response = await fetch(enUrl, {
-      ...options,
+    const response = await fetch(withServerApiKey(enUrl), {
+      ...tmdbFetchOptions(),
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) return data;
@@ -222,8 +228,8 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
   const requestPromise = (async () => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const response = await fetch(localizedUrl, {
-          ...options,
+        const response = await fetch(withServerApiKey(localizedUrl), {
+          ...tmdbFetchOptions(),
           signal: AbortSignal.timeout(15_000),
         });
 

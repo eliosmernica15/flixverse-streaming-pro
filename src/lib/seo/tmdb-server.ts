@@ -1,14 +1,14 @@
 import { cache } from "react";
+import { getServerTmdbAuth } from "@/lib/tmdb/serverCredentials";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
-function getTmdbHeaders(): HeadersInit {
-  const token = process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN;
-  if (!token) return { accept: "application/json" };
-  return {
-    accept: "application/json",
-    Authorization: `Bearer ${token}`,
-  };
+function tmdbUrl(path: string): string {
+  const auth = getServerTmdbAuth();
+  const url = `${TMDB_BASE}${path}`;
+  if (!auth.queryApiKey) return url;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${url}${sep}api_key=${encodeURIComponent(auth.queryApiKey)}`;
 }
 
 export interface TmdbSeoContent {
@@ -28,8 +28,8 @@ async function fetchTmdbSeoContentUncached(
   mediaType: "movie" | "tv"
 ): Promise<TmdbSeoContent | null> {
   try {
-    const res = await fetch(`${TMDB_BASE}/${mediaType}/${id}`, {
-      headers: getTmdbHeaders(),
+    const res = await fetch(tmdbUrl(`/${mediaType}/${id}`), {
+      headers: getServerTmdbAuth().headers,
       next: { revalidate: 86400 },
     });
     if (!res.ok) return null;

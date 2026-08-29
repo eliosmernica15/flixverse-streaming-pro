@@ -41,15 +41,17 @@ const Index = () => {
   usePartyGuestRoute();
 
   useEffect(() => {
-    if (!data?.hero?.id) return;
-    const contentType = data.hero.media_type === "tv" ? "tv" : "movie";
-    prefetchContentDetails(queryClient, data.hero.id, contentType);
-  }, [data?.hero, queryClient]);
+    const heroes = data?.heroMovies?.length ? data.heroMovies : data?.hero ? [data.hero] : [];
+    for (const m of heroes) {
+      const contentType = m.media_type === "tv" ? "tv" : "movie";
+      prefetchContentDetails(queryClient, m.id, contentType);
+    }
+  }, [data?.hero, data?.heroMovies, queryClient]);
 
   return (
     <div className="page-enter">
       {data?.hero ? (
-        <HeroBanner movie={data.hero} />
+        <HeroBanner movie={data.hero} movies={data.heroMovies} />
       ) : isLoading ? (
         <div className="h-[72vh] sm:h-[88vh] lg:h-[92vh] bg-zinc-950 skeleton shimmer-overlay" />
       ) : null}

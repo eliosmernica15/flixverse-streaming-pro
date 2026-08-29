@@ -1,13 +1,16 @@
+import { getServerTmdbAuth } from "@/lib/tmdb/serverCredentials";
+
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const MAX_ITEMS = 300;
 
-function getTmdbHeaders(): HeadersInit {
-  const token = process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN;
-  if (!token) return { accept: "application/json" };
-  return {
-    accept: "application/json",
-    Authorization: `Bearer ${token}`,
-  };
+function tmdbRequest(path: string): { url: string; headers: HeadersInit } {
+  const auth = getServerTmdbAuth();
+  let url = `${TMDB_BASE}${path}`;
+  if (auth.queryApiKey) {
+    const sep = path.includes("?") ? "&" : "?";
+    url += `${sep}api_key=${encodeURIComponent(auth.queryApiKey)}`;
+  }
+  return { url, headers: auth.headers };
 }
 
 interface TmdbTrendingItem {
@@ -27,8 +30,9 @@ async function fetchTmdbPage(path: string): Promise<TmdbTrendingItem[]> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(`${TMDB_BASE}${path}`, {
-      headers: getTmdbHeaders(),
+    const { url, headers } = tmdbRequest(path);
+    const res = await fetch(url, {
+      headers,
       signal: controller.signal,
       next: { revalidate: 86400 },
     });

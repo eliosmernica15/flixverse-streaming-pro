@@ -6,6 +6,7 @@ export interface CaptionLanguage {
 /** Subtitle languages supported by the captions API. */
 export const CAPTION_LANGUAGES: CaptionLanguage[] = [
   { code: "en", label: "English" },
+  { code: "sq", label: "Albanian" },
   { code: "es", label: "Spanish" },
   { code: "fr", label: "French" },
   { code: "de", label: "German" },

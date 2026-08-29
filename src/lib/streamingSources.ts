@@ -1,3 +1,5 @@
+import { buildYapGridEmbedUrl, YAPGRID_LANES } from "./player/yapgrid";
+
 export interface StreamingSource {
   id: string;
   name: string;
@@ -20,6 +22,7 @@ export const ALLOWED_EMBED_HOSTS = [
   "2embed.cc",
   "multiembed.mov",
   "embed.su",
+  "yapgrid.com",
 ] as const;
 
 export function isAllowedEmbedUrl(url: string): boolean {
@@ -31,13 +34,47 @@ export function isAllowedEmbedUrl(url: string): boolean {
   }
 }
 
+export type BuildStreamingOptions = {
+  /** ISO 639-1, e.g. sq — only applied to hosts with documented params. */
+  lang?: string;
+  title?: string;
+};
+
 export function buildStreamingSources(
   movieId: number,
   mediaType: "movie" | "tv",
   season?: number,
-  episode?: number
+  episode?: number,
+  opts?: BuildStreamingOptions
 ): StreamingSource[] {
   const isTv = mediaType === "tv" && season && episode;
+  const lang = opts?.lang?.toLowerCase();
+
+  const vidfastBase = isTv
+    ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
+    : `https://vidfast.pro/movie/${movieId}?autoPlay=true`;
+  const vidfastUrl = lang === "sq" ? `${vidfastBase}&sub=sq` : vidfastBase;
+
+  const yapgridSources: (Omit<StreamingSource, "url"> & { providerUrl: string })[] =
+    YAPGRID_LANES.map((lane) => {
+      const url = buildYapGridEmbedUrl({
+        movieId,
+        mediaType,
+        season,
+        episode,
+        server: lane,
+        lang,
+        title: opts?.title,
+      });
+      return {
+        id: `yapgrid-${lane}`,
+        name: `YapGrid ${lane.toUpperCase()}`,
+        icon: "🇦🇱",
+        quality: "FHD" as const,
+        reliability: "high" as const,
+        providerUrl: url,
+      };
+    });
 
   const raw: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
     {
@@ -66,9 +103,7 @@ export function buildStreamingSources(
       icon: "⚡",
       quality: "FHD",
       reliability: "high",
-      providerUrl: isTv
-        ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
-        : `https://vidfast.pro/movie/${movieId}?autoPlay=true`,
+      providerUrl: vidfastUrl,
     },
     {
       id: "vidsrc",
@@ -112,8 +147,9 @@ export function buildStreamingSources(
     },
   ];
 
-  // Load providers directly (no sandbox — VidLink and others block sandboxed frames).
-  return raw.map((s) => ({
+  const ordered = lang === "sq" ? [...yapgridSources, ...raw] : [...raw, yapgridSources[0]!];
+
+  return ordered.map((s) => ({
     ...s,
     url: s.providerUrl,
   }));

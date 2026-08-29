@@ -22,6 +22,19 @@ export const HOME_DEFERRED_KEY = ["home-content", "deferred"] as const;
 const STALE = 10 * 60 * 1000;
 const GC = 30 * 60 * 1000;
 
+function pickHeroMovies(hero: TMDBMovie | null, trending: TMDBMovie[]): TMDBMovie[] {
+  const seen = new Set<number>();
+  const out: TMDBMovie[] = [];
+  for (const m of [hero, ...(trending || [])]) {
+    if (!m?.id || seen.has(m.id) || !m.backdrop_path) continue;
+    seen.add(m.id);
+    out.push(m);
+    if (out.length >= 5) break;
+  }
+  if (out.length === 0 && hero) out.push(hero);
+  return out;
+}
+
 async function loadHomePriority() {
   const [heroMovie, trendingMovies, nowPlayingMovies] = await Promise.all([
     getHeroMovieOfTheWeek(),
@@ -31,9 +44,11 @@ async function loadHomePriority() {
 
   const hero =
     heroMovie && !Array.isArray(heroMovie) ? heroMovie : trendingMovies?.[0] ?? null;
+  const heroMovies = pickHeroMovies(hero, trendingMovies || []);
 
   return {
     hero,
+    heroMovies,
     trendingMovies: trendingMovies || [],
     nowPlayingMovies: nowPlayingMovies || [],
   };
@@ -105,6 +120,7 @@ export function useHomeContent() {
       : priority.data
         ? ({
             ...priority.data,
+            heroMovies: priority.data.heroMovies || [],
             topRatedMovies: [],
             popularMovies: [],
             trendingTVShows: [],

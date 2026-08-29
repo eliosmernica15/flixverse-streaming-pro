@@ -6,13 +6,13 @@ import {
   LOCALE_STORAGE_KEY,
   localeToTmdbLanguage,
 } from "@/i18n/config";
+import { getServerTmdbAuth, hasServerTmdbCredentials } from "@/lib/tmdb/serverCredentials";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
+const PATH_SAFE = /^[a-z0-9/_-]+$/i;
 
 /**
- * Server-side TMDB proxy.
- * Hides the API key from client bundles — all TMDB requests go through this route.
- * In production, move the key to a server-only env var (NEXT_PUBLIC_ removed).
+ * Server-side TMDB proxy. Client calls /api/tmdb/* — credentials stay on the server.
  */
 export async function GET(
   request: NextRequest,
@@ -24,10 +24,21 @@ export async function GET(
   const { path } = await params;
   const tmdbPath = path.join("/");
 
-  // Build query string from the incoming request
+  if (!tmdbPath || tmdbPath.includes("..") || !PATH_SAFE.test(tmdbPath)) {
+    return NextResponse.json({ error: "Invalid TMDB path" }, { status: 400 });
+  }
+
+  if (!hasServerTmdbCredentials()) {
+    return NextResponse.json(
+      { error: "TMDB API key or access token not configured" },
+      { status: 500 }
+    );
+  }
+
   const url = new URL(request.url);
   const tmdbParams = new URLSearchParams();
   for (const [key, value] of url.searchParams.entries()) {
+    if (key === "api_key" || key === "api_token") continue;
     tmdbParams.set(key, value);
   }
 
@@ -37,32 +48,17 @@ export async function GET(
     tmdbParams.set("language", localeToTmdbLanguage(locale));
   }
 
-  // Inject API key or Bearer token
-  const apiKey = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  const accessToken = process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN;
+  const auth = getServerTmdbAuth();
+  if (auth.queryApiKey) tmdbParams.set("api_key", auth.queryApiKey);
 
-  const headers: Record<string, string> = { Accept: "application/json" };
-  let tmdbUrl: string;
-
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-    tmdbUrl = `${TMDB_BASE}/${tmdbPath}?${tmdbParams.toString()}`;
-  } else if (apiKey) {
-    tmdbParams.set("api_key", apiKey);
-    tmdbUrl = `${TMDB_BASE}/${tmdbPath}?${tmdbParams.toString()}`;
-  } else {
-    return NextResponse.json(
-      { error: "TMDB API key or access token not configured" },
-      { status: 500 }
-    );
-  }
+  const tmdbUrl = `${TMDB_BASE}/${tmdbPath}?${tmdbParams.toString()}`;
 
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12_000);
 
     const res = await fetch(tmdbUrl, {
-      headers,
+      headers: auth.headers,
       next: { revalidate: 3600 },
       signal: controller.signal,
     });
@@ -81,7 +77,7 @@ export async function GET(
         "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
       },
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch from TMDB" },
       { status: 502 }

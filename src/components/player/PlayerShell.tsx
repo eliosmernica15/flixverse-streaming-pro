@@ -14,6 +14,7 @@ import {
 import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
 import { useTimelineComments } from "@/hooks/player/useTimelineComments";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocale } from "@/hooks/useLocale";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { isSpoilerGuardEnabled } from "@/lib/player/spoilerGuard";
 import { EmbedFrame } from "./EmbedFrame";
@@ -102,6 +103,7 @@ export function PlayerShell({
   const [commentAt, setCommentAt] = useState<number | null>(null);
 
   const { user } = useAuth();
+  const locale = useLocale();
   const timelineEnabled = isFeatureEnabled("timeline-comments");
   const glowEnabled = isFeatureEnabled("ambient-glow");
 
@@ -114,8 +116,12 @@ export function PlayerShell({
   const playerDrag = usePlayerWindowDrag(shellRef, windowRef);
 
   const streamingSources = useMemo(
-    () => buildStreamingSources(movieId, mediaType, season, episode),
-    [movieId, mediaType, season, episode]
+    () =>
+      buildStreamingSources(movieId, mediaType, season, episode, {
+        lang: locale === "sq" ? "sq" : undefined,
+        title,
+      }),
+    [movieId, mediaType, season, episode, locale, title]
   );
   const currentSource = streamingSources[currentServer];
   const effectiveDuration = liveDuration || totalDuration || 120 * 60;

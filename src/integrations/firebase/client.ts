@@ -5,6 +5,7 @@ import { getStorage, type FirebaseStorage } from "firebase/storage";
 import {
   initializeAppCheck,
   ReCaptchaEnterpriseProvider,
+  ReCaptchaV3Provider,
   getToken,
   type AppCheck,
 } from "firebase/app-check";
@@ -48,15 +49,19 @@ function getFirebaseApp(): FirebaseApp | null {
 
 function initAppCheck(firebaseApp: FirebaseApp) {
   if (appCheckInstance) return;
-  const siteKey = getEnv("NEXT_PUBLIC_FIREBASE_RECAPTCHA_KEY");
-  if (!siteKey) return;
+  const enterpriseKey = getEnv("NEXT_PUBLIC_FIREBASE_RECAPTCHA_KEY");
+  const v3Key = getEnv("NEXT_PUBLIC_FIREBASE_RECAPTCHA_V3_KEY");
+  if (!enterpriseKey && !v3Key) return;
 
   try {
     if (process.env.NODE_ENV === "development") {
       (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     }
+    const provider = enterpriseKey
+      ? new ReCaptchaEnterpriseProvider(enterpriseKey)
+      : new ReCaptchaV3Provider(v3Key);
     appCheckInstance = initializeAppCheck(firebaseApp, {
-      provider: new ReCaptchaEnterpriseProvider(siteKey),
+      provider,
       isTokenAutoRefreshEnabled: true,
     });
   } catch (err) {

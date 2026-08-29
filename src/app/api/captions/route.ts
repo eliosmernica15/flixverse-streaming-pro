@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseSubtitles } from "@/lib/player/captionParser";
 import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
+import { getServerTmdbAuth, hasServerTmdbCredentials } from "@/lib/tmdb/serverCredentials";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
@@ -10,24 +11,19 @@ async function fetchTmdbTitle(
   season?: number,
   episode?: number
 ): Promise<string> {
-  const apiKey = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  const token = process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN;
-  if (!apiKey && !token) return "Now playing";
+  if (!hasServerTmdbCredentials()) return "Now playing";
 
   const path =
     mediaType === "tv" && season && episode
       ? `/tv/${tmdbId}/season/${season}/episode/${episode}`
       : `/${mediaType}/${tmdbId}`;
 
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const url = token
-    ? `${TMDB_BASE}${path}`
-    : `${TMDB_BASE}${path}?api_key=${apiKey}`;
+  const auth = getServerTmdbAuth();
+  let url = `${TMDB_BASE}${path}`;
+  if (auth.queryApiKey) url += `?api_key=${encodeURIComponent(auth.queryApiKey)}`;
 
   try {
-    const res = await fetch(url, { next: { revalidate: 86400 } });
+    const res = await fetch(url, { headers: auth.headers, next: { revalidate: 86400 } });
     if (!res.ok) return "Now playing";
     const data = await res.json();
     return data.title || data.name || "Now playing";

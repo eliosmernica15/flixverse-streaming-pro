@@ -29,7 +29,6 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
     ? propMovies.slice(0, MAX_ROTATION)
     : [movie]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const t = useTranslations("hero");
@@ -75,18 +74,13 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
   const goToSlide = useCallback((index: number) => {
     if (timerRef.current) clearInterval(timerRef.current);
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setActiveIndex(index);
-      setIsTransitioning(false);
-    }, 100);
-    // Restart timer
-    if (allMovies.length > 1) {
+    setActiveIndex(index);
+    if (allMovies.length > 1 && !reducedMotion) {
       timerRef.current = setInterval(() => {
         setActiveIndex((prev) => (prev + 1) % allMovies.length);
       }, ROTATION_INTERVAL_MS);
     }
-  }, [allMovies.length]);
+  }, [allMovies.length, reducedMotion]);
 
   const goPrev = useCallback(() => {
     goToSlide(activeIndex === 0 ? allMovies.length - 1 : activeIndex - 1);
@@ -136,7 +130,22 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   };
 
   return (
-    <div className="relative h-[72vh] sm:h-[88vh] lg:h-[92vh] overflow-hidden contain-paint">
+    <div
+      className="relative h-[72vh] sm:h-[88vh] lg:h-[92vh] overflow-hidden contain-paint"
+      onMouseEnter={() => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      }}
+      onMouseLeave={() => {
+        if (allMovies.length <= 1 || reducedMotion) return;
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+          setActiveIndex((prev) => (prev + 1) % allMovies.length);
+        }, ROTATION_INTERVAL_MS);
+      }}
+    >
       {/* Backdrops — crossfade between slides */}
       {allMovies.map((m, i) => {
         const url = m.backdrop_path ? getBackdropUrl(m.backdrop_path, "large") : "";
@@ -144,9 +153,9 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
         return (
           <div
             key={m.id}
-            className={`absolute inset-0 transition-opacity duration-800 ${isActive && !isTransitioning ? "opacity-100" : "opacity-0"}`}
+            className={`absolute inset-0 transition-opacity duration-[800ms] ${isActive ? "opacity-100" : "opacity-0"}`}
           >
-            <div className={`absolute inset-0 ${isActive && !reducedMotion ? "animate-ken-burns" : ""}`}>
+            <div className={`absolute inset-0 ${isActive && !reducedMotion ? "hero-ken-burns" : ""}`}>
               {url ? (
                 <Image src={url} alt={getContentTitle(m)} fill priority={i === 0} sizes="100vw" className="object-cover object-center" />
               ) : (
