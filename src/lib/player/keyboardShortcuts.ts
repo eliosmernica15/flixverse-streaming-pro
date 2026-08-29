@@ -18,6 +18,7 @@ export const PLAYER_SHORTCUTS: PlayerShortcut[] = [
   { keys: ["M"], action: "Mute / unmute", group: "playback" },
   { keys: ["N", "]"], action: "Next server", group: "server" },
   { keys: ["["], action: "Previous server", group: "server" },
+  { keys: ["C"], action: "Comment at current time", group: "playback" },
   { keys: ["0-9"], action: "Jump to 0–90%", group: "playback" },
   { keys: ["?"], action: "Keyboard shortcuts", group: "view" },
 ];

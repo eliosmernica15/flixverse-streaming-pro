@@ -202,7 +202,7 @@ export function PlayerOverlayControls({
         className="video-add-comment"
         onClick={() => onAddComment(currentTime)}
         aria-label="Add comment at current time"
-        title="Add comment (L)"
+        title="Add comment (C)"
       >
         <MessageCircle className="w-3.5 h-3.5" />
         <Plus className="w-3 h-3" />

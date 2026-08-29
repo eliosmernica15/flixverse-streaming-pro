@@ -27,6 +27,11 @@ const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), 
   loading: () => null,
 });
 
+const PersonalizedHomeRows = dynamic(() => import("@/components/PersonalizedHomeRows"), {
+  ssr: false,
+  loading: () => null,
+});
+
 const Index = () => {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
@@ -63,6 +68,10 @@ const Index = () => {
               <ContinueWatching />
             </Reveal>
           )}
+
+          <Reveal>
+            <PersonalizedHomeRows />
+          </Reveal>
 
           <Reveal>
             <MovieCarousel

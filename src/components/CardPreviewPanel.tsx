@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
-import { Play, Plus, Heart, Share2, Users, Star, Film, Tv, Info } from "lucide-react";
+import { Play, Plus, Heart, Share2, Users, Star, Film, Tv } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +21,7 @@ interface CardPreviewPanelProps {
   anchorEl: HTMLElement | null;
   isVisible: boolean;
   onClose: () => void;
+  onKeepOpen?: () => void;
 }
 
 const genreNames: Record<number, string> = {
@@ -29,7 +30,7 @@ const genreNames: Record<number, string> = {
   80: "Crime", 99: "Documentary", 10751: "Family",
 };
 
-function CardPreviewPanel({ movie, anchorEl, isVisible, onClose }: CardPreviewPanelProps) {
+function CardPreviewPanel({ movie, anchorEl, isVisible, onClose, onKeepOpen }: CardPreviewPanelProps) {
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -98,6 +99,12 @@ function CardPreviewPanel({ movie, anchorEl, isVisible, onClose }: CardPreviewPa
     }
   }, [isAuthenticated, isInMyList, movie, addToList, removeFromList, toast]);
 
+  const handleParty = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    router.push(`/movie/${movie.id}?type=${getContentType(movie)}&autoplay=true`);
+    onClose();
+  }, [movie, router, onClose]);
+
   const handleShare = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     const url = `${window.location.origin}/movie/${movie.id}?type=${getContentType(movie)}`;
@@ -116,6 +123,7 @@ function CardPreviewPanel({ movie, anchorEl, isVisible, onClose }: CardPreviewPa
       ref={panelRef}
       style={panelStyle}
       className="card-preview-panel pointer-events-auto animate-scale-in glass-strong rounded-2xl"
+      onMouseEnter={onKeepOpen}
       onMouseLeave={onClose}
     >
       <div className="rounded-2xl border border-white/10 shadow-2xl overflow-hidden bg-transparent">
@@ -177,11 +185,20 @@ function CardPreviewPanel({ movie, anchorEl, isVisible, onClose }: CardPreviewPa
               {isInMyList ? <Heart className="h-4 w-4 fill-current" /> : <Plus className="h-4 w-4" />}
             </button>
             <button
+              type="button"
               onClick={handleShare}
               className="press-effect p-2 rounded-lg border border-white/10 bg-white/5 text-gray-400 transition-colors hover:text-white focus-ring"
               aria-label="Share"
             >
               <Share2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleParty}
+              className="press-effect p-2 rounded-lg border border-white/10 bg-white/5 text-gray-400 transition-colors hover:text-white focus-ring"
+              aria-label="Watch together"
+            >
+              <Users className="h-4 w-4" />
             </button>
           </div>
 

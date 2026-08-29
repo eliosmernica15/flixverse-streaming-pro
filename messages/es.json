@@ -37,6 +37,11 @@
     "myList": "Mi lista",
     "plans": "Planes",
     "offline": "Sin conexión",
+    "browse": "Explorar",
+    "browseMovies": "Películas",
+    "browseTv": "Series",
+    "browseCollections": "Colecciones",
+    "browseMoods": "Ambientes",
     "joinParty": "Unirse a fiesta",
     "billing": "Facturación",
     "myProfile": "Mi perfil",
@@ -279,7 +284,10 @@
     "emptyComingSoon": "Las nuevas películas y series aparecerán aquí antes de su estreno.",
     "checkBack": "Vuelve para ver próximos estrenos.",
     "prevSlide": "Diapositiva anterior",
-    "nextSlide": "Siguiente diapositiva"
+    "nextSlide": "Siguiente diapositiva",
+    "becauseYouWatched": "Porque viste {title}",
+    "becauseYouLike": "Porque te gusta {genre}",
+    "recentTitle": "un título que viste"
   },
   "movieCard": {
     "signInRequired": "Inicio de sesión requerido",

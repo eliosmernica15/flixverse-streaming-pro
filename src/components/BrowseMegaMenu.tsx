@@ -1,135 +1,105 @@
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Film, Tv, Star, Zap } from "lucide-react";
+import { BROWSE_MEGA_MENU } from "@/utils/browseCategories";
+import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
 
-interface MenuSection {
-  title: string;
-  icon: React.ReactNode;
-  items: { label: string; href: string }[];
-}
+const COLUMN_LABEL: Record<(typeof BROWSE_MEGA_MENU)[number]["id"], string> = {
+  movies: "browseMovies",
+  tv: "browseTv",
+  collections: "browseCollections",
+  moods: "browseMoods",
+};
 
-interface BrowseMegaMenuProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export function BrowseMegaMenu({ isOpen, onClose }: BrowseMegaMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const t = useTranslations("browse");
-  const tn = useTranslations("nav");
-
-  const menuSections = useMemo<MenuSection[]>(
-    () => [
-      {
-        title: t("menuBrowse"),
-        icon: <Film className="w-4 h-4" />,
-        items: [
-          { label: tn("movies"), href: "/movies" },
-          { label: tn("tvShows"), href: "/tv-shows" },
-          { label: tn("newAndPopular"), href: "/new-and-popular" },
-        ],
-      },
-      {
-        title: t("menuGenres"),
-        icon: <Zap className="w-4 h-4" />,
-        items: [
-          { label: t("action"), href: "/browse/action" },
-          { label: t("comedy"), href: "/browse/comedy" },
-          { label: t("drama"), href: "/browse/drama" },
-          { label: t("horror"), href: "/browse/horror" },
-          { label: t("sci-fi"), href: "/browse/sci-fi" },
-          { label: t("thriller"), href: "/browse/thriller" },
-          { label: t("animation"), href: "/browse/animation" },
-          { label: t("fantasy"), href: "/browse/fantasy" },
-          { label: t("romance"), href: "/browse/romance" },
-          { label: t("adventure"), href: "/browse/adventure" },
-        ],
-      },
-      {
-        title: t("menuCollections"),
-        icon: <Star className="w-4 h-4" />,
-        items: [
-          { label: t("trending-now"), href: "/browse/trending-now" },
-          { label: t("top-rated"), href: "/browse/top-rated" },
-          { label: t("now-playing"), href: "/browse/now-playing" },
-          { label: t("coming-soon"), href: "/browse/coming-soon" },
-        ],
-      },
-      {
-        title: t("menuTv"),
-        icon: <Tv className="w-4 h-4" />,
-        items: [
-          { label: t("trending-tv"), href: "/browse/trending-tv" },
-          { label: t("popular-tv"), href: "/browse/popular-tv" },
-          { label: t("airing-today"), href: "/browse/airing-today" },
-          { label: t("on-the-air"), href: "/browse/on-the-air" },
-          { label: t("top-rated-tv"), href: "/browse/top-rated-tv" },
-        ],
-      },
-    ],
-    [t, tn]
-  );
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+export function BrowseMegaMenu() {
+  const t = useTranslations("nav");
+  const prefetchRoute = useRoutePrefetch();
 
   return (
-    <div
-      ref={menuRef}
-      className="absolute top-full left-0 right-0 z-50 animate-fade-in-up"
-    >
-      <div className="glass-strong border-b border-white/5 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-            {menuSections.map((section) => (
-              <div key={section.title}>
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="text-red-400">{section.icon}</span>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                    {section.title}
-                  </h3>
+    <NavigationMenu className="relative z-[60] hidden lg:flex">
+      <NavigationMenuList>
+        <NavigationMenuItem>
+          <NavigationMenuTrigger className="h-11 min-h-[44px] rounded-xl bg-transparent px-3 text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white focus:bg-white/10 focus:text-white data-[state=open]:bg-white/10 data-[state=open]:text-white lg:px-4 lg:text-base">
+            {t("browse")}
+          </NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div className="grid w-[min(92vw,720px)] grid-cols-2 gap-6 p-5 md:grid-cols-4 md:p-6">
+              {BROWSE_MEGA_MENU.map((column) => (
+                <div key={column.id}>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                    {t(COLUMN_LABEL[column.id] as "browseMovies" | "browseTv" | "browseCollections" | "browseMoods")}
+                  </p>
+                  <ul className="space-y-0.5">
+                    {column.links.map((link) => {
+                      const href = `/browse/${link.slug}`;
+                      return (
+                        <li key={`${column.id}-${link.slug}-${link.title}`}>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              href={href}
+                              prefetch
+                              onMouseEnter={() => prefetchRoute(href)}
+                              onFocus={() => prefetchRoute(href)}
+                              className="block rounded-lg px-2 py-1.5 text-sm text-gray-300 transition-colors hover:bg-white/8 hover:text-white focus-ring"
+                            >
+                              {link.title}
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-                <ul className="space-y-1.5">
-                  {section.items.map((item) => (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={onClose}
-                        className="block rounded-lg px-3 py-1.5 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-white hover-lift-sm glow-hover focus-ring"
-                      >
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              ))}
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+      </NavigationMenuList>
+    </NavigationMenu>
+  );
+}
+
+export function BrowseMegaMenuMobile({ onNavigate }: { onNavigate: () => void }) {
+  const t = useTranslations("nav");
+  const prefetchRoute = useRoutePrefetch();
+
+  return (
+    <div className="mt-2 space-y-3 border-t border-white/10 pt-3">
+      <p className="px-4 text-xs font-semibold uppercase tracking-wider text-gray-500">{t("browse")}</p>
+      {BROWSE_MEGA_MENU.map((column) => (
+        <div key={column.id}>
+          <p className="px-4 pb-1 text-[11px] font-medium uppercase tracking-wider text-gray-600">
+            {t(COLUMN_LABEL[column.id] as "browseMovies" | "browseTv" | "browseCollections" | "browseMoods")}
+          </p>
+          <div className="grid grid-cols-2 gap-1 px-2">
+            {column.links.map((link) => {
+              const href = `/browse/${link.slug}`;
+              return (
+                <Link
+                  key={`${column.id}-${link.slug}-${link.title}`}
+                  href={href}
+                  prefetch
+                  onMouseEnter={() => prefetchRoute(href)}
+                  onFocus={() => prefetchRoute(href)}
+                  onClick={onNavigate}
+                  className="min-h-[40px] rounded-lg px-2 py-2 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white focus-ring"
+                >
+                  {link.title}
+                </Link>
+              );
+            })}
           </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }

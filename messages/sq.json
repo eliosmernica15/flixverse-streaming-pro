@@ -37,6 +37,11 @@
     "myList": "Lista ime",
     "plans": "Planet",
     "offline": "Jashtë linje",
+    "browse": "Shfleto",
+    "browseMovies": "Filma",
+    "browseTv": "Seriale",
+    "browseCollections": "Koleksione",
+    "browseMoods": "Gjendje",
     "joinParty": "Bashkohu festës",
     "billing": "Faturimi",
     "myProfile": "Profili im",
@@ -279,7 +284,10 @@
     "emptyComingSoon": "Filmat dhe serialet e reja do të shfaqen këtu para premierës.",
     "checkBack": "Kthehu për premierat e ardhshme.",
     "prevSlide": "Diapozitiva e mëparshme",
-    "nextSlide": "Diapozitiva tjetër"
+    "nextSlide": "Diapozitiva tjetër",
+    "becauseYouWatched": "Sepse ke parë {title}",
+    "becauseYouLike": "Sepse të pëlqen {genre}",
+    "recentTitle": "një titull që ke parë"
   },
   "movieCard": {
     "signInRequired": "Kërkohet hyrja",

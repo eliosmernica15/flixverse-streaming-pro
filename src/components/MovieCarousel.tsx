@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, memo } from "react";
+import { useMemo, memo } from "react";
 import Link from "next/link";
 import { ChevronRight, Sparkles } from "lucide-react";
 import MovieCard from "./MovieCard";
@@ -37,7 +37,6 @@ const MovieCarousel = memo(
     exploreAllPath,
     comingSoon = false,
   }: MovieCarouselProps) => {
-    const [isHovered, setIsHovered] = useState(false);
     const prefetchRoute = useRoutePrefetch();
     const tc = useTranslations("common");
     const t = useTranslations("carousel");
@@ -83,11 +82,7 @@ const MovieCarousel = memo(
     }
 
     return (
-      <section
-        className="relative group/section content-auto"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
+      <section className="relative group/section content-auto">
         <div className="flex items-center gap-3 sm:gap-4">
           {icon && (
             <div className="gradient-border flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-gradient-to-br from-red-500/15 to-purple-500/10">
@@ -123,7 +118,8 @@ const MovieCarousel = memo(
               align: "start",
               loop: validMovies.length > 4,
               skipSnaps: false,
-              dragFree: true,
+              dragFree: false,
+              containScroll: "trimSnaps",
             }}
             className="w-full"
           >
@@ -131,7 +127,7 @@ const MovieCarousel = memo(
               {validMovies.map((movie) => (
                 <CarouselItem
                   key={movie.id}
-                  className="pl-3 md:pl-5 basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
+                  className="pl-3 md:pl-5 basis-[48%] sm:basis-[32%] md:basis-[24%] lg:basis-[19%] xl:basis-[15.5%]"
                 >
                   <MovieCard movie={movie} comingSoon={comingSoon} />
                 </CarouselItem>
@@ -141,14 +137,12 @@ const MovieCarousel = memo(
             {validMovies.length > 4 && (
               <>
                 <CarouselPrevious
-                  className={`carousel-side-arrow glow-hover glass-premium press-effect absolute left-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl transition-all duration-300 hover:border-red-600 hover:bg-red-600 focus-ring sm:left-1 md:flex ${
-                    isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
-                  }`}
+                  aria-label={t("prevSlide")}
+                  className="carousel-side-arrow glow-hover glass-premium press-effect absolute left-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl opacity-70 transition-all duration-300 hover:border-red-600 hover:bg-red-600 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring sm:left-1 md:flex"
                 />
                 <CarouselNext
-                  className={`carousel-side-arrow glow-hover glass-premium press-effect absolute right-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl transition-all duration-300 hover:border-red-600 hover:bg-red-600 focus-ring sm:right-1 md:flex ${
-                    isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
-                  }`}
+                  aria-label={t("nextSlide")}
+                  className="carousel-side-arrow glow-hover glass-premium press-effect absolute right-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl opacity-70 transition-all duration-300 hover:border-red-600 hover:bg-red-600 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring sm:right-1 md:flex"
                 />
               </>
             )}

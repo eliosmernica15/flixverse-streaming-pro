@@ -23,10 +23,7 @@ export function AmbientGlowFrame({
   // Load and sync localStorage toggle
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("flixverse-ambient-glow");
-      if (stored !== null) {
-        setIsEnabled(stored === "true");
-      }
+      setIsEnabled(localStorage.getItem("flixverse-ambient-glow") !== "false");
     } catch {
       // ignore storage errors
     }
@@ -62,9 +59,7 @@ export function AmbientGlowFrame({
 
   return (
     <div
-      className={`video-ambient absolute inset-0 -z-10 overflow-hidden pointer-events-none filter blur-[120px] transition-opacity duration-800 ${
-        reducedMotion ? "" : "animate-ambient-glow-pulse"
-      }`}
+      className={`player-ambient-glow ${reducedMotion ? "" : "animate-ambient-glow-pulse"}`}
       style={gradientStyle}
       aria-hidden="true"
     />

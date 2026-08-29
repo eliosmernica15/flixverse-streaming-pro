@@ -12,13 +12,20 @@ import {
   usePlayerWindowResize,
 } from "@/hooks/player/usePlayerWindowResize";
 import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
+import { useTimelineComments } from "@/hooks/player/useTimelineComments";
+import { useAuth } from "@/hooks/useAuth";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { isSpoilerGuardEnabled } from "@/lib/player/spoilerGuard";
 import { EmbedFrame } from "./EmbedFrame";
 import { PlayerShortcutsDropdown } from "./PlayerShortcutsDropdown";
 import { FlixPartySidebar } from "./FlixPartySidebar";
 import { FlixPartyInviteDialog } from "./FlixPartyInviteDialog";
 import { PartyCameraGrid, PartyCameraPiP } from "./PartyMediaPanel";
 import { PartyGuestSplash } from "./PartyGuestSplash";
+import { AmbientGlowFrame } from "./AmbientGlowFrame";
+import { PlayerOverlayControls } from "./PlayerOverlayControls";
+import { AddCommentDialog } from "./AddCommentDialog";
+import { UpNextCountdown } from "./UpNextCountdown";
 import type { SyncStatus } from "./SyncStatusBadge";
 import { trackPlaybackStart } from "@/lib/analytics";
 import { releasePageScrollLock } from "@/lib/player/releaseScrollLock";
@@ -81,6 +88,8 @@ export function PlayerShell({
   posterPath,
   resumePosition = 0,
   totalDuration,
+  episodeCount,
+  onAdvanceEpisode,
   initialServer,
   guestJoinMode = false,
 }: PlayerShellProps) {
@@ -89,6 +98,12 @@ export function PlayerShell({
   const [showShortcutsMenu, setShowShortcutsMenu] = useState(false);
   const [showHint, setShowHint] = useState(true);
   const [liveDuration, setLiveDuration] = useState(0);
+  const [showUpNext, setShowUpNext] = useState(false);
+  const [commentAt, setCommentAt] = useState<number | null>(null);
+
+  const { user } = useAuth();
+  const timelineEnabled = isFeatureEnabled("timeline-comments");
+  const glowEnabled = isFeatureEnabled("ambient-glow");
 
   const autoFailoverRef = useRef(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,6 +132,20 @@ export function PlayerShell({
     isPlaying: embedState === "ready",
   });
 
+  const nextEpisode = useMemo(() => {
+    if (mediaType !== "tv" || !season || !episode) return null;
+    if (episodeCount && episode < episodeCount) {
+      return { season, episode: episode + 1 };
+    }
+    return { season: season + 1, episode: 1 };
+  }, [mediaType, season, episode, episodeCount]);
+
+  const handleEnded = useCallback(() => {
+    if (mediaType === "tv" && onAdvanceEpisode && nextEpisode) {
+      setShowUpNext(true);
+    }
+  }, [mediaType, onAdvanceEpisode, nextEpisode]);
+
   const {
     isPlaying,
     volume,
@@ -137,7 +166,25 @@ export function PlayerShell({
     totalDuration: effectiveDuration,
     onTimeUpdate: (time) => syncTo(time),
     onDurationChange: (duration) => setLiveDuration(duration),
+    onEnded: handleEnded,
   });
+
+  const timeline = useTimelineComments({
+    tmdbId: movieId,
+    enabled: timelineEnabled && embedState === "ready",
+  });
+
+  const overlayMarkers = useMemo(() => {
+    const markers = timeline.getMarkers(effectiveDuration);
+    if (!isSpoilerGuardEnabled()) return markers;
+    return markers.filter((m) => m.timestamp <= currentTime + 1);
+  }, [timeline.getMarkers, timeline.comments, effectiveDuration, currentTime]);
+
+  const overlayNearby = useMemo(() => {
+    const near = timeline.getCommentsNear(currentTime, 8);
+    if (!isSpoilerGuardEnabled()) return near;
+    return near.filter((c) => c.timestampSeconds <= currentTime + 1);
+  }, [timeline.getCommentsNear, timeline.comments, currentTime]);
 
   const party = usePlayerPartySync({
     movieId,
@@ -295,6 +342,42 @@ export function PlayerShell({
   }, [inParty, layout]);
 
   useEffect(() => {
+    setShowUpNext(false);
+    setCommentAt(null);
+  }, [movieId, season, episode]);
+
+  useEffect(() => {
+    if (mediaType !== "tv" || !onAdvanceEpisode || !nextEpisode || effectiveDuration <= 0) return;
+    if (embedState !== "ready") return;
+    if (currentTime >= Math.max(1, effectiveDuration - 1.25)) {
+      setShowUpNext(true);
+    }
+  }, [mediaType, onAdvanceEpisode, nextEpisode, effectiveDuration, embedState, currentTime]);
+
+  const playNextEpisode = useCallback(() => {
+    if (!nextEpisode || !onAdvanceEpisode) return;
+    setShowUpNext(false);
+    onAdvanceEpisode(nextEpisode.season, nextEpisode.episode);
+  }, [nextEpisode, onAdvanceEpisode]);
+
+  const seekOverlay = useCallback(
+    (seconds: number) => {
+      seek(seconds);
+      syncTo(seconds);
+      party.broadcastPartySeek(seconds);
+    },
+    [seek, syncTo, party]
+  );
+
+  const openCommentAt = useCallback(
+    (timestamp: number) => {
+      if (!user) return;
+      setCommentAt(Math.floor(timestamp));
+    },
+    [user]
+  );
+
+  useEffect(() => {
     if (!inParty) {
       mobilePartyPreparedRef.current = false;
       layout.resetPartyPanelMode();
@@ -403,6 +486,7 @@ export function PlayerShell({
 
       const handled = [
         " ", "k", "K", "m", "M", "t", "T", "f", "F", "g", "G", "v", "V", "p", "P",
+        "c", "C",
         "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
         "n", "N", "]", "[", "?", "/", "+", "=", "-", "_",
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -411,6 +495,14 @@ export function PlayerShell({
       if (handled.includes(e.key)) e.preventDefault();
 
       if (e.key === "Escape") {
+        if (commentAt !== null) {
+          setCommentAt(null);
+          return;
+        }
+        if (showUpNext) {
+          setShowUpNext(false);
+          return;
+        }
         if (showShortcutsMenu) {
           setShowShortcutsMenu(false);
           return;
@@ -487,6 +579,7 @@ export function PlayerShell({
       else if (e.key === "ArrowDown") adjustVolume(e.shiftKey ? -0.2 : -0.1);
       else if (e.key === "+" || e.key === "=") adjustVolume(0.1);
       else if (e.key === "-" || e.key === "_") adjustVolume(-0.1);
+      else if (e.key === "c" || e.key === "C") openCommentAt(currentTime);
       else if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
       else if (e.key === "[") prevServer();
       else if (/^[0-9]$/.test(e.key)) seekToPercent(parseInt(e.key, 10) * 10);
@@ -513,6 +606,10 @@ export function PlayerShell({
     isMobile,
     mobilePartyExpanded,
     togglePartyPanel,
+    commentAt,
+    showUpNext,
+    openCommentAt,
+    currentTime,
   ]);
 
   const onIframeLoad = () => {
@@ -564,6 +661,12 @@ export function PlayerShell({
         visible={party.guestSplashVisible}
       />
       <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""} ${inParty ? `player-layout--cam-${effectiveCameraLayout}` : ""}`}>
+        {glowEnabled && (
+          <AmbientGlowFrame
+            posterPath={posterPath || null}
+            isActive={embedState === "ready"}
+          />
+        )}
         <div className="player-layout-main">
           <div
             ref={windowRef}
@@ -668,11 +771,36 @@ export function PlayerShell({
               onIframeError={onIframeError}
               onRetry={nextServer}
             />
+            {timelineEnabled && embedState === "ready" && !showUpNext && (
+              <div className="player-overlay-bar">
+                <PlayerOverlayControls
+                  currentTime={currentTime}
+                  totalDuration={effectiveDuration}
+                  markers={overlayMarkers}
+                  nearbyComments={overlayNearby}
+                  onSeek={seekOverlay}
+                  onAddComment={openCommentAt}
+                  onLikeComment={(id) => {
+                    void timeline.likeComment(id);
+                  }}
+                  isPlaying={isPlaying}
+                  controlsVisible
+                />
+              </div>
+            )}
+            {showUpNext && nextEpisode && onAdvanceEpisode && (
+              <UpNextCountdown
+                nextEpisode={nextEpisode}
+                posterPath={posterPath || null}
+                onPlay={playNextEpisode}
+                onSkip={() => setShowUpNext(false)}
+              />
+            )}
           </div>
 
           {showHint && embedState === "ready" && (
             <p className="player-hint" aria-live="polite">
-              T maximize · G watch together · ↑↓ volume · ? shortcuts
+              T maximize · C comment · G watch together · ? shortcuts
             </p>
           )}
 
@@ -776,6 +904,17 @@ export function PlayerShell({
             <span className="player-party-fab-badge" aria-hidden />
           )}
         </button>
+      )}
+
+      {commentAt !== null && (
+        <AddCommentDialog
+          timestamp={commentAt}
+          onClose={() => setCommentAt(null)}
+          onSubmit={async (text) => {
+            await timeline.addComment(commentAt, text);
+            setCommentAt(null);
+          }}
+        />
       )}
     </div>
   );

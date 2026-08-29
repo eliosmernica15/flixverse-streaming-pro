@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useThrottledScroll } from "@/hooks/useThrottledScroll";
 import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
 import { Button } from "@/components/ui/button";
+import { isFeatureEnabled } from "@/lib/featureFlags";
+import { BrowseMegaMenu, BrowseMegaMenuMobile } from "@/components/BrowseMegaMenu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -146,7 +148,13 @@ const Navigation = () => {
               </div>
             </Link>
 
-            <div className="nav-links hidden min-w-0 flex-1 items-center gap-0.5 overflow-hidden lg:flex lg:gap-1">
+            <div className="nav-links hidden min-w-0 flex-1 items-center gap-0.5 lg:flex lg:gap-1">
+              {isFeatureEnabled("browse-mega-menu") && (
+                <div className="relative z-[60] shrink-0 overflow-visible">
+                  <BrowseMegaMenu />
+                </div>
+              )}
+              <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden lg:gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.key}
@@ -174,6 +182,7 @@ const Navigation = () => {
                   />
                 </Link>
               ))}
+              </div>
             </div>
           </div>
 
@@ -315,6 +324,9 @@ const Navigation = () => {
                     <PartyPopper className="h-4 w-4" />
                     {t("joinParty")}
                   </button>
+                )}
+                {isFeatureEnabled("browse-mega-menu") && (
+                  <BrowseMegaMenuMobile onNavigate={() => setIsMobileMenuOpen(false)} />
                 )}
                 {navLinks.map((link) => (
                   <Link

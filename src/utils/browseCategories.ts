@@ -82,6 +82,80 @@ export const BROWSE_CATEGORIES: Record<string, { title: string; fetch: FetchFn }
   documentaries: { title: "Documentaries", fetch: fetchDocumentaryTVShows },
 };
 
+export type BrowseMenuColumn = {
+  id: "movies" | "tv" | "collections" | "moods";
+  links: { slug: string; title: string }[];
+};
+
+export const BROWSE_MEGA_MENU: BrowseMenuColumn[] = [
+  {
+    id: "movies",
+    links: [
+      { slug: "action", title: "Action" },
+      { slug: "comedy", title: "Comedy" },
+      { slug: "drama", title: "Drama" },
+      { slug: "thriller", title: "Thriller" },
+      { slug: "horror", title: "Horror" },
+      { slug: "sci-fi", title: "Sci-Fi" },
+      { slug: "fantasy", title: "Fantasy" },
+      { slug: "adventure", title: "Adventure" },
+      { slug: "animation", title: "Animation" },
+      { slug: "romance", title: "Romance" },
+    ],
+  },
+  {
+    id: "tv",
+    links: [
+      { slug: "trending-tv", title: "Trending TV" },
+      { slug: "popular-tv", title: "Popular TV" },
+      { slug: "action-adventure", title: "Action & Adventure" },
+      { slug: "drama-series", title: "Drama Series" },
+      { slug: "comedy-shows", title: "Comedy Shows" },
+      { slug: "crime-mystery", title: "Crime & Mystery" },
+      { slug: "sci-fi-fantasy", title: "Sci-Fi & Fantasy" },
+      { slug: "documentaries", title: "Documentaries" },
+    ],
+  },
+  {
+    id: "collections",
+    links: [
+      { slug: "trending-now", title: "Trending Now" },
+      { slug: "now-playing", title: "Now Playing" },
+      { slug: "top-rated", title: "Top Rated" },
+      { slug: "coming-soon", title: "Coming Soon" },
+      { slug: "airing-today", title: "Airing Today" },
+      { slug: "new-releases", title: "New Releases" },
+    ],
+  },
+  {
+    id: "moods",
+    links: [
+      { slug: "comedy", title: "Feel-good" },
+      { slug: "thriller", title: "Heart-pounding" },
+      { slug: "horror", title: "Spine-chilling" },
+      { slug: "sci-fi", title: "Out of this world" },
+      { slug: "adventure", title: "Epic" },
+      { slug: "romance", title: "Love stories" },
+    ],
+  },
+];
+
+/** Maps names stored in userPreferences.favoriteGenres → browse category slugs. */
+export const FAVORITE_GENRE_BROWSE: Record<string, string> = {
+  Action: "action",
+  Comedy: "comedy",
+  Drama: "drama",
+  Horror: "horror",
+  Romance: "romance",
+  "Sci-Fi": "sci-fi",
+  Thriller: "thriller",
+  Animation: "animation",
+  Fantasy: "fantasy",
+  Adventure: "adventure",
+  Crime: "crime-mystery",
+  Documentary: "documentaries",
+};
+
 export const normalizeBrowseMovie = (
   movie: TMDBMovie
 ): TMDBMovie & { title: string; release_date: string } => ({

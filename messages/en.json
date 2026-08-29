@@ -37,6 +37,11 @@
     "myList": "My List",
     "plans": "Plans",
     "offline": "Offline",
+    "browse": "Browse",
+    "browseMovies": "Movies",
+    "browseTv": "TV Shows",
+    "browseCollections": "Collections",
+    "browseMoods": "Moods",
     "joinParty": "Join Party",
     "billing": "Billing",
     "myProfile": "My Profile",
@@ -279,7 +284,10 @@
     "emptyComingSoon": "New movies and series will appear here before they're released.",
     "checkBack": "Check back for upcoming releases.",
     "prevSlide": "Previous slide",
-    "nextSlide": "Next slide"
+    "nextSlide": "Next slide",
+    "becauseYouWatched": "Because you watched {title}",
+    "becauseYouLike": "Because you like {genre}",
+    "recentTitle": "a title you watched"
   },
   "movieCard": {
     "signInRequired": "Sign in required",

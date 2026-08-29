@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Play, X, SkipForward, Loader2 } from "lucide-react";
+import { Play } from "lucide-react";
 import Image from "next/image";
 import { getImageUrl } from "@/utils/tmdbApi";
 
@@ -56,7 +56,7 @@ export function UpNextCountdown({
   const progress = ((countdownSeconds - remaining) / countdownSeconds) * 100;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/90 backdrop-blur-sm">
+    <div className="player-upnext-overlay" role="dialog" aria-label="Up next episode">
       <div className="relative w-full max-w-md mx-4">
         {/* Progress ring */}
         <div className="absolute -top-4 right-0">
@@ -102,7 +102,7 @@ export function UpNextCountdown({
               />
             ) : posterPath ? (
               <Image
-                src={posterPath}
+                src={getImageUrl(posterPath, "medium")}
                 alt={nextEpisode.name || "Next episode"}
                 fill
                 className="object-cover object-top"
