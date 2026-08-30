@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useFlixParty } from "@/hooks/player/useFlixParty";
 import { useWebRTCSync, type SyncMessage } from "@/hooks/player/useWebRTCSync";
+import { usePartyRealtime, type PartyRealtimeEvent } from "@/hooks/player/usePartyRealtime";
 import {
   encryptPayload,
   generateRoomKey,
@@ -220,6 +221,30 @@ export function usePlayerPartySync({
     onPlaybackSync: handlePartyPlaybackSync,
     onRemoteStream: (peerId, stream) => onRemoteStreamRef.current(peerId, stream),
     onRemoteStreamRemoved: (peerId) => onRemoteStreamRemovedRef.current(peerId),
+  });
+
+  // Self-hosted real-time transport — same handler as WebRTC, so any
+  // delivery path (Firestore events or WebRTC data channel) lands the
+  // guest in the same state machine.
+  const realtime = usePartyRealtime({
+    roomId: partyRoomId,
+    isHost: !!isPartyHost,
+    onEvent: (ev) => {
+      if (isPartyHost) return;
+      handlePartyPlaybackSync({
+        type: ev.type as SyncMessage["type"],
+        timestamp: ev.ts,
+        data: ev.data,
+      });
+    },
+    onHeartbeat: (ev) => {
+      if (isPartyHost) return;
+      handlePartyPlaybackSync({
+        type: "heartbeat",
+        timestamp: ev.ts,
+        data: ev.data,
+      });
+    },
   });
 
   const participantNames = useMemo(() => {
@@ -463,10 +488,13 @@ export function usePlayerPartySync({
       if (!partyRoomId || !isPartyHost) return;
       // Write authoritative state to Firestore immediately on explicit play/pause
       void updatePlaybackState(state, time, currentServer);
-      // Send the real-time message over WebRTC data channel
+      // Send the real-time message through the self-hosted realtime transport
+      void realtime.send(state === "playing" ? "play" : "pause", { currentTime: time });
+      // Also send via WebRTC data channel so connected peers get the message
+      // even if the realtime listener hasn't replayed yet.
       sendRtcMessage(state === "playing" ? "play" : "pause", { currentTime: time });
     },
-    [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage, currentServer]
+    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer]
   );
 
   /**
@@ -479,10 +507,12 @@ export function usePlayerPartySync({
       if (!partyRoomId || !isPartyHost) return;
       // Persist to Firestore so late-joining guests get the right position
       void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, currentServer);
-      // Instant delivery via WebRTC data channel
+      // Instant delivery through the realtime transport
+      void realtime.send("seek", { currentTime: time });
+      // Belt-and-braces: also send via WebRTC
       sendRtcMessage("seek", { currentTime: time });
     },
-    [partyRoomId, isPartyHost, updatePlaybackState, sendRtcMessage, currentServer]
+    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer]
   );
 
   const partyTimeRef = useRef(currentTime);
@@ -494,7 +524,7 @@ export function usePlayerPartySync({
   const sourceUrlRef = useRef(currentSourceProviderUrl);
   sourceUrlRef.current = currentSourceProviderUrl;
 
-  // Host: fast WebRTC heartbeats (800 ms) so guests correct drift quickly.
+  // Host: fast realtime heartbeats (800 ms) so guests correct drift quickly.
   // Firestore writes happen at a much lower cadence (4 s) to avoid rate limits.
   useEffect(() => {
     if (!partyRoomId || !isPartyHost) return;
@@ -506,7 +536,10 @@ export function usePlayerPartySync({
       const playing = partyPlayingRef.current;
       const server = partyServerRef.current;
 
-      // Always send a lightweight WebRTC heartbeat
+      // Always send a lightweight heartbeat through the realtime transport.
+      // Both the realtime channel and the WebRTC data channel get it — whichever
+      // delivers first wins, and the other is a free redundancy boost.
+      void realtime.send("heartbeat", { currentTime: time });
       sendRtcMessage("heartbeat", { currentTime: time });
 
       // Throttle the heavier Firestore write
@@ -528,7 +561,7 @@ export function usePlayerPartySync({
 
     const id = setInterval(tick, HOST_HEARTBEAT_MS);
     return () => clearInterval(id);
-  }, [partyRoomId, isPartyHost, sendRtcMessage, updatePlaybackState]);
+  }, [partyRoomId, isPartyHost, realtime.send, sendRtcMessage, updatePlaybackState]);
 
   const handleStartParty = useCallback(async (): Promise<{ roomId: string; joinUrl: string } | null> => {
     if (!user) {
@@ -667,5 +700,9 @@ export function usePlayerPartySync({
     guestJoinHostName: guestJoinSession?.hostName,
     resyncSeekUrl,
     setResyncSeekUrl,
+    realtime: {
+      processed: realtime.processed,
+      isReady: realtime.isReady,
+    },
   };
 }

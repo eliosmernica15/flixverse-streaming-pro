@@ -56,13 +56,15 @@ const LOAD_TIMEOUT_MS = 15_000;
 function partyStatusLabel(status: SyncStatus): string {
   switch (status) {
     case "connected":
-      return "Party live";
+      return "Live · synced";
     case "connecting":
       return "Connecting…";
     case "drift":
       return "Re-syncing…";
+    case "resyncing":
+      return "Hard resync";
     case "disconnected":
-      return "Party offline";
+      return "Offline";
     default:
       return "Party";
   }
@@ -74,6 +76,7 @@ function partyStatusClass(status: SyncStatus): string {
       return "player-party-live";
     case "connecting":
     case "drift":
+    case "resyncing":
       return "player-party-syncing";
     default:
       return "player-party-offline";
@@ -936,6 +939,9 @@ export function PlayerShell({
             kickParticipant={party.kickParticipant}
             setParticipantMicMuted={party.setParticipantMicMuted}
             setParticipantCamDisabled={party.setParticipantCamDisabled}
+            realtimeProcessed={party.realtime?.processed}
+            realtimeReady={party.realtime?.isReady}
+            peerCount={party.partyRoom?.participants?.length}
           />
         )}
       </div>

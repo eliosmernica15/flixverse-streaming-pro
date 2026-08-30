@@ -4,12 +4,6 @@ import { createPartySyncTransport, type PartySyncTransport } from "@/lib/player/
 import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
-import { useAblyPartySync } from "@/hooks/player/useAblyPartySync";
-import { isValidAblyApiKey } from "@/lib/player/ablyPartySync";
-
-function isAblyEnabled(): boolean {
-  return isValidAblyApiKey(process.env.NEXT_PUBLIC_ABLY_API_KEY);
-}
 
 export interface SyncMessage {
   type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";
@@ -37,6 +31,14 @@ interface UseWebRTCSyncOptions {
   onRemoteStreamRemoved?: (peerId: string) => void;
 }
 
+/**
+ * Self-hosted WebRTC party sync (Firestore signaling).
+ *
+ * Handles the media plane (camera/mic forwarding between host and guests)
+ * and a low-latency data-channel channel for playback sync messages. No
+ * third-party pubsub — signaling is Firestore subcollection snapshots,
+ * the same primitives we use for the chat and the room doc.
+ */
 export function useWebRTCSync({
   roomId,
   isHost = false,
@@ -47,18 +49,6 @@ export function useWebRTCSync({
   onRemoteStreamRemoved,
 }: UseWebRTCSyncOptions) {
   const { user } = useAuth();
-
-  // ── Ably path (preferred when API key is configured) ──────────────────────
-  const ablyEnabled = isAblyEnabled();
-  const ably = useAblyPartySync({
-    roomId: ablyEnabled ? roomId : null,
-    isHost,
-    onPlaybackSync,
-    onRemoteStream,
-    onRemoteStreamRemoved,
-  });
-
-  // ── WebRTC path (fallback when no Ably key) ───────────────────────────────
   const [rtcConnected, setRtcConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
   const syncRef = useRef<WebRTCPartySync | PartySyncTransport | null>(null);
@@ -75,8 +65,6 @@ export function useWebRTCSync({
   }, []);
 
   useEffect(() => {
-    // Skip WebRTC setup when Ably is active
-    if (isAblyEnabled()) return;
     if (!roomId || !user) {
       setRtcConnected(false);
       return;
@@ -166,7 +154,6 @@ export function useWebRTCSync({
   }, [roomId, user?.uid, isHost, hostId]);
 
   useEffect(() => {
-    if (isAblyEnabled()) return;
     if (!isHost || !syncRef.current) return;
     syncRef.current.syncParticipants(participantIds);
   }, [isHost, participantIds.join(",")]);
@@ -184,17 +171,6 @@ export function useWebRTCSync({
   const setLocalStreamRtc = useCallback(async (stream: MediaStream | null) => {
     await syncRef.current?.setLocalStream(stream);
   }, []);
-
-  // ── Unified interface ─────────────────────────────────────────────────────
-  if (isAblyEnabled()) {
-    return {
-      isConnected: ably.isConnected,
-      sendMessage: ably.sendMessage,
-      messages: [],
-      setLocalStream: ably.setLocalStream,
-      syncRef,
-    };
-  }
 
   return {
     isConnected: rtcConnected,

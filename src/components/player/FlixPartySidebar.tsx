@@ -56,6 +56,10 @@ interface FlixPartySidebarProps {
   isMobile?: boolean;
   mobileExpanded?: boolean;
   onMinimize?: () => void;
+  /** Telemetry for the SyncStatusBadge. */
+  realtimeProcessed?: number;
+  realtimeReady?: boolean;
+  peerCount?: number;
 }
 
 type SidebarTab = "chat" | "friends" | "party";
@@ -90,6 +94,9 @@ export function FlixPartySidebar({
   isMobile = false,
   mobileExpanded = true,
   onMinimize,
+  realtimeProcessed,
+  realtimeReady,
+  peerCount,
 }: FlixPartySidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>(roomId ? "chat" : "friends");
   const [input, setInput] = useState("");
@@ -292,7 +299,13 @@ export function FlixPartySidebar({
               </p>
             )}
             {roomId && (
-              <SyncStatusBadge status={syncStatus} driftMs={driftMs} className="mt-1" />
+              <SyncStatusBadge
+                status={syncStatus}
+                driftMs={driftMs}
+                processed={realtimeProcessed}
+                peers={peerCount}
+                className="mt-1"
+              />
             )}
           </div>
         </div>

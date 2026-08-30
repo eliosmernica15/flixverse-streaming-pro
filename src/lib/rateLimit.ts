@@ -60,6 +60,8 @@ export const RATE_LIMITS = {
   TIMELINE_COMMENT: { max: 10, windowMs: 60 * 60 * 1000 },
   /** Max party chat messages per minute per user */
   PARTY_CHAT: { max: 60, windowMs: 60 * 1000 },
+  /** Max realtime sync events per second per user (heartbeats are throttled upstream too) */
+  PARTY_REALTIME: { max: 30, windowMs: 1000 },
   /** Max reviews per day per user */
   REVIEW: { max: 5, windowMs: 24 * 60 * 60 * 1000 },
   /** Max search requests per minute */
