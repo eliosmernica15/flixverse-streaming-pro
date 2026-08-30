@@ -4,55 +4,55 @@ overview: Enterprise-grade FlixVerse roadmap — five advanced player features (
 todos:
   - id: phase-0-shell
     content: Refactor VideoPlayer into PlayerShell + EmbedFrame + PlayerChrome; implement usePlaybackClock and wire totalDuration/resumePosition from MovieDetails
-    status: pending
+    status: completed
   - id: feature-1-glow
     content: Build extractDominantColors, AmbientGlowFrame with pulse animation, toggle, cache, and reduced-motion fallback
-    status: pending
+    status: completed
   - id: feature-4-spoiler
     content: Implement useSpoilerProgress, SpoilerProtectedEpisode, integrate MovieDetails grid + ProfileSettings toggle
-    status: pending
+    status: completed
   - id: feature-5-offline
     content: Extend IndexedDB v2 with offline_sync_queue, mutationDispatcher, OfflineSyncProvider, refactor watchlist/rating/profile hooks
-    status: pending
+    status: completed
   - id: feature-3-timeline
     content: Build timeline_comments Firestore layer, PlayerOverlayControls scrubber with markers, popup cards, add-comment-at-time UX
-    status: pending
+    status: completed
   - id: feature-2-party-core
     content: FlixParty Firestore rooms/messages, invite UI, Web Crypto encrypted payload, security rules
-    status: pending
+    status: completed
   - id: feature-2-party-webrtc
     content: WebRTC signaling via Firestore, DataChannel sync protocol, NTP clock calibration, adaptive soft/hard resync via embedSeekUrls
-    status: pending
+    status: completed
   - id: feature-2-party-diagnostics
     content: Buffering/idle diagnostics overlay, sync status badges, Firestore fallback when WebRTC unavailable
-    status: pending
+    status: completed
   - id: netflix-ui-cards
     content: Netflix-style hover preview panel, Top 10 numbered row, hero rotation, expanded MovieCard interactions
-    status: pending
+    status: completed
   - id: discovery-personalization
     content: Personalized home rows from watch history/prefs, Play Something button, browse mega-menu, infinite scroll browse
-    status: pending
+    status: completed
   - id: content-detail-premium
     content: Cast/crew, rich episode cards, Up Next autoplay, share action, certifications, person pages, breadcrumbs UI
-    status: pending
+    status: completed
   - id: profiles-enterprise
     content: Multi-profile picker with PIN, kid profiles, public profiles, account deletion/export, parental controls
-    status: pending
+    status: completed
   - id: design-system-2
     content: Typography tokens, consolidated CSS variables, safe-area insets, extended reduced-motion, optional light mode
-    status: pending
+    status: completed
   - id: enterprise-security
     content: Harden firestore.rules, TMDB server proxy, App Check, rate limiting, Sentry, error boundaries, CI/CD + rules tests
-    status: pending
+    status: completed
   - id: compliance-moderation
     content: Privacy/terms pages, cookie consent, report/flag UGC, moderation pipeline, account data export/delete API
-    status: pending
+    status: completed
   - id: i18n-analytics
     content: next-intl, locale-aware TMDB, hreflang SEO, PostHog/GA4 analytics layer, feature flags, A/B experiment hooks
-    status: pending
+    status: completed
   - id: ux-polish
     content: Command palette content search, a11y pass, fix known bugs (URL space, comment likes, fake online dot), auth flows
-    status: pending
+    status: completed
 isProject: false
 ---
 
