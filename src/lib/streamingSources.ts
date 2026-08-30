@@ -147,7 +147,7 @@ export function buildStreamingSources(
     },
   ];
 
-  const ordered = lang === "sq" ? [...yapgridSources, ...raw] : [...raw, yapgridSources[0]!];
+  const ordered = [...yapgridSources, ...raw];
 
   return ordered.map((s) => ({
     ...s,

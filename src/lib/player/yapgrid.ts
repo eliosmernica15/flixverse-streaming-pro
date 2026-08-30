@@ -16,9 +16,10 @@ export function buildYapGridEmbedUrl(opts: {
   server: YapGridLane;
   lang?: string;
   title?: string;
+  theme?: string;
   autoplay?: boolean;
 }): string {
-  const { movieId, mediaType, season, episode, server, lang, title, autoplay = true } = opts;
+  const { movieId, mediaType, season, episode, server, lang, title, theme, autoplay = true } = opts;
   const isTv = mediaType === "tv" && season && episode;
   const path = isTv
     ? `https://yapgrid.com/embed/tv/${movieId}/${season}/${episode}`
@@ -28,7 +29,8 @@ export function buildYapGridEmbedUrl(opts: {
   if (autoplay) params.set("autoplay", "true");
   params.set("server", server);
   if (lang) params.set("lang", lang);
-  if (title) params.set("title", title);
+  if (title) params.set("title", encodeURIComponent(title));
+  if (theme) params.set("theme", theme);
 
   return `${path}?${params.toString()}`;
 }

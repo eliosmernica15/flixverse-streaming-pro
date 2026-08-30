@@ -97,6 +97,7 @@ export function PlayerShell({
   const [currentServer, setCurrentServer] = useState(initialServer ?? 0);
   const [embedState, setEmbedState] = useState<"loading" | "ready" | "error">("loading");
   const [showShortcutsMenu, setShowShortcutsMenu] = useState(false);
+  const [showServerSelector, setShowServerSelector] = useState(false);
   const [showHint, setShowHint] = useState(true);
   const [liveDuration, setLiveDuration] = useState(0);
   const [showUpNext, setShowUpNext] = useState(false);
@@ -216,7 +217,7 @@ export function PlayerShell({
     guestJoinMode,
   });
 
-  const { media, guestServerIndex } = party;
+   const { media, guestServerIndex, resyncSeekUrl, setResyncSeekUrl } = party;
   const layout = usePartyLayout();
   const guestServerAppliedRef = useRef(false);
   const mobilePartyPreparedRef = useRef(false);
@@ -527,7 +528,7 @@ export function PlayerShell({
         " ", "k", "K", "m", "M", "t", "T", "f", "F", "g", "G", "v", "V", "p", "P",
         "c", "C",
         "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
-        "n", "N", "]", "[", "?", "/", "+", "=", "-", "_",
+        "n", "N", "]", "[", "S", "?", "/", "+", "=", "-", "_",
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
         "Escape",
       ];
@@ -596,11 +597,12 @@ export function PlayerShell({
         void toggleBrowserFullscreen();
         return;
       }
-      if (embedState !== "ready") {
-        if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
-        if (e.key === "[") prevServer();
-        return;
-      }
+       if (embedState !== "ready") {
+         if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
+         if (e.key === "[") prevServer();
+         if (e.key === "S" || e.key === "s") { setShowServerSelector((p) => !p); return; }
+         return;
+       }
 
       if (e.key === " " || e.key === "k" || e.key === "K") togglePlayPause();
       else if (e.key === "m" || e.key === "M") toggleMute();
@@ -619,9 +621,10 @@ export function PlayerShell({
       else if (e.key === "+" || e.key === "=") adjustVolume(0.1);
       else if (e.key === "-" || e.key === "_") adjustVolume(-0.1);
       else if (e.key === "c" || e.key === "C") openCommentAt(currentTime);
-      else if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
-      else if (e.key === "[") prevServer();
-      else if (/^[0-9]$/.test(e.key)) seekToPercent(parseInt(e.key, 10) * 10);
+       else if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
+       else if (e.key === "[") prevServer();
+       else if (e.key === "S" || e.key === "s") setShowServerSelector((p) => !p);
+       else if (/^[0-9]$/.test(e.key)) seekToPercent(parseInt(e.key, 10) * 10);
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -651,13 +654,14 @@ export function PlayerShell({
     currentTime,
   ]);
 
-  const onIframeLoad = () => {
-    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    autoFailoverRef.current = 0;
-    setEmbedState("ready");
-    setReady(true);
-    trackPlaybackStart(movieId, mediaType, currentSource.id);
-  };
+   const onIframeLoad = () => {
+     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+     autoFailoverRef.current = 0;
+     setResyncSeekUrl(null);
+     setEmbedState("ready");
+     setReady(true);
+     trackPlaybackStart(movieId, mediaType, currentSource.id);
+   };
 
   const onIframeError = () => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -729,6 +733,8 @@ export function PlayerShell({
                 <p className="player-window-title">{title}</p>
                 <p className="player-window-sub">
                   {currentSource.name} · {currentServer + 1}/{streamingSources.length}
+                  <span className="text-gray-500" aria-label={`Quality ${currentSource.quality}`}> · {currentSource.quality}</span>
+                  {locale === "sq" && <span className="text-gray-500" aria-label="Albanian subtitles"> · sq</span>}
                   {party.partyRoomId && (
                     <span className={partyStatusClass(party.partySyncStatus)}>
                       {" "}
@@ -810,17 +816,17 @@ export function PlayerShell({
             className="player-window-body"
             style={playerResize.bodyHeight ? { height: playerResize.bodyHeight, aspectRatio: "auto" } : undefined}
           >
-            <EmbedFrame
-              currentSource={currentSource}
-              currentServer={currentServer}
-              streamingSourcesCount={streamingSources.length}
-              embedState={embedState}
-              title={title}
-              iframeRef={iframeRef}
-              onIframeLoad={onIframeLoad}
-              onIframeError={onIframeError}
-              onRetry={nextServer}
-            />
+           <EmbedFrame
+               currentSource={resyncSeekUrl ? { ...currentSource, url: resyncSeekUrl } : currentSource}
+               currentServer={currentServer}
+               streamingSourcesCount={streamingSources.length}
+               embedState={embedState}
+               title={title}
+               iframeRef={iframeRef}
+               onIframeLoad={onIframeLoad}
+               onIframeError={onIframeError}
+               onRetry={nextServer}
+             />
             {timelineEnabled && embedState === "ready" && !showUpNext && (
               <div
                 className={`player-overlay-bar ${cursorIdle ? "is-cursor-idle" : "is-cursor-active"}`}
@@ -959,18 +965,50 @@ export function PlayerShell({
         </button>
       )}
 
-      {commentAt !== null && (
-        <AddCommentDialog
-          timestamp={commentAt}
-          onClose={() => setCommentAt(null)}
-          onSubmit={async (text) => {
-            await timeline.addComment(commentAt, text);
-            setCommentAt(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
+       {commentAt !== null && (
+         <AddCommentDialog
+           timestamp={commentAt}
+           onClose={() => setCommentAt(null)}
+           onSubmit={async (text) => {
+             await timeline.addComment(commentAt, text);
+             setCommentAt(null);
+           }}
+         />
+       )}
+
+       {showServerSelector && (
+         <div className="fixed inset-0 z-[10002] flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Select server" onClick={() => setShowServerSelector(false)}>
+           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
+           <div className="relative z-[10003] w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-gray-900/98 backdrop-blur-xl shadow-2xl shadow-black/50 p-4" onClick={(e) => e.stopPropagation()}>
+             <div className="flex items-center justify-between mb-3">
+               <h2 className="text-lg font-bold text-white">Servers</h2>
+               <button type="button" onClick={() => setShowServerSelector(false)} className="rounded-lg p-1 text-gray-400 hover:text-white focus-ring transition-colors" aria-label="Close server list">
+                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+               </button>
+             </div>
+             <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+               {streamingSources.map((source, index) => (
+                 <button
+                   key={source.id}
+                   type="button"
+                   onClick={() => { switchServer(index); setShowServerSelector(false); }}
+                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left ${currentServer === index ? "bg-red-600/20 border-red-500/40 text-white" : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20"}`}
+                   aria-current={currentServer === index ? "true" : undefined}
+                 >
+                   <span className="text-lg" aria-hidden>{source.icon}</span>
+                   <div className="flex-1 min-w-0">
+                     <p className="text-sm font-semibold truncate">{source.name}</p>
+                     <p className="text-xs text-gray-500">{source.quality} · {source.reliability === "high" ? "Recommended" : "Alternative"}</p>
+                   </div>
+                   {currentServer === index && <span className="text-xs font-bold text-red-400 shrink-0">ACTIVE</span>}
+                 </button>
+               ))}
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   );
+ }
 
 export default PlayerShell;

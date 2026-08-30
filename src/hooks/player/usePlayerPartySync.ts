@@ -30,11 +30,12 @@ import {
   replaceUrlWithoutPartyParams,
   stripGuestJoinParam,
 } from "@/lib/player/partyUrl";
+import { computeResync } from "@/lib/player/embedSeekUrls";
 
-const JOIN_GRACE_MS = 5000;           // wait for iframe to fully load before any sync
-const SYNC_INTERVAL_MS = 1000;
+const JOIN_GRACE_MS = 5000;
+const SYNC_INTERVAL_MS = 250;
 // Drift threshold for postMessage seek attempt (fast, best-effort)
-const DRIFT_SOFT_THRESHOLD_SEC = 2;
+const DRIFT_SOFT_THRESHOLD_SEC = 0.5;
 const SEEK_COOLDOWN_MS = 600;
 const MAX_GUEST_SPLASH_MS = 14_000;
 const HOST_HEARTBEAT_MS = 800;
@@ -73,6 +74,8 @@ export function usePlayerPartySync({
   season,
   episode,
   currentServer,
+  currentSourceUrl,
+  currentSourceProviderUrl,
   currentTime,
   isPlaying,
   embedReady,
@@ -95,6 +98,7 @@ export function usePlayerPartySync({
   const [guestServerIndex, setGuestServerIndex] = useState<number | null>(null);
   const [guestInitialSynced, setGuestInitialSynced] = useState(false);
   const [guestSplashDismissed, setGuestSplashDismissed] = useState(false);
+  const [resyncSeekUrl, setResyncSeekUrl] = useState<string | null>(null);
   const guestJoinSession = useMemo(() => readGuestJoinSession(), []);
   const guestSplashStartedAt = useRef(guestJoinSession?.startedAt ?? Date.now());
 
@@ -299,38 +303,44 @@ export function usePlayerPartySync({
       if (!embedLiveSyncedRef.current && guestTime === 0 && hostTime > 5) return;
       if (guestTime === 0 && hostTime > 10) return;
 
-      const driftSec = Math.abs(guestTime - hostTime);
-      setPartyDriftMs(driftSec * 1000);
+       const driftSec = Math.abs(guestTime - hostTime);
+       setPartyDriftMs(driftSec * 1000);
 
-      // Enforce play/pause state
-      if (partyPlaybackRef.current === "playing" && !isPlayingRef.current) {
-        setPlaying(true);
-        playEmbed();
-      } else if (partyPlaybackRef.current === "paused" && isPlayingRef.current) {
-        setPlaying(false);
-        pauseEmbed();
-      }
+       // Enforce play/pause state
+       if (partyPlaybackRef.current === "playing" && !isPlayingRef.current) {
+         setPlaying(true);
+         playEmbed();
+       } else if (partyPlaybackRef.current === "paused" && isPlayingRef.current) {
+         setPlaying(false);
+         pauseEmbed();
+       }
 
-      if (driftSec >= DRIFT_SOFT_THRESHOLD_SEC) {
-        softSeekTo(hostTime);
-        setPartySyncStatus("drift");
-      } else {
-        setPartySyncStatus(rtcConnected ? "connected" : "connecting");
-      }
-    };
+       // Hard resync check (>30s drift) — rebuild URL with corrected start time
+       const resync = computeResync(hostTime, guestTime, sourceUrlRef.current, String(currentServer));
+       if (resync.kind === "hard") {
+         setResyncSeekUrl(resync.seekUrl);
+         setPartySyncStatus("drift");
+       } else if (driftSec >= DRIFT_SOFT_THRESHOLD_SEC) {
+         softSeekTo(hostTime);
+         setPartySyncStatus("drift");
+       } else {
+         setPartySyncStatus(rtcConnected ? "connected" : "connecting");
+       }
+     };
 
-    tick();
-    const id = setInterval(tick, SYNC_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [
-    partyRoomId,
-    isPartyHost,
-    rtcConnected,
-    setPlaying,
-    playEmbed,
-    pauseEmbed,
-    softSeekTo,
-  ]);
+     tick();
+     const id = setInterval(tick, SYNC_INTERVAL_MS);
+     return () => clearInterval(id);
+   }, [
+     partyRoomId,
+     isPartyHost,
+     rtcConnected,
+     setPlaying,
+     playEmbed,
+     pauseEmbed,
+     softSeekTo,
+     currentServer,
+   ]);
 
   // Guest: one-time seek to host position when embed becomes live-synced
   useEffect(() => {
@@ -481,6 +491,8 @@ export function usePlayerPartySync({
   partyTimeRef.current = currentTime;
   partyPlayingRef.current = isPlaying;
   partyServerRef.current = currentServer;
+  const sourceUrlRef = useRef(currentSourceProviderUrl);
+  sourceUrlRef.current = currentSourceProviderUrl;
 
   // Host: fast WebRTC heartbeats (800 ms) so guests correct drift quickly.
   // Firestore writes happen at a much lower cadence (4 s) to avoid rate limits.
@@ -653,5 +665,7 @@ export function usePlayerPartySync({
     guestSplashPhase,
     guestSplashVisible,
     guestJoinHostName: guestJoinSession?.hostName,
+    resyncSeekUrl,
+    setResyncSeekUrl,
   };
 }

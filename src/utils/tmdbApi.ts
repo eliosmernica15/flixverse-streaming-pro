@@ -264,7 +264,7 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
   try {
     return await requestPromise;
   } finally {
-    pendingRequests.delete(url);
+    pendingRequests.delete(localizedUrl);
   }
 };
 

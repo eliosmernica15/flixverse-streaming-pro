@@ -15,6 +15,7 @@ export type EmbedProvider =
   | "twoembed"
   | "embedsu"
   | "superembed"
+  | "yapgrid"
   | "generic";
 
 export interface ProviderCommands {
@@ -276,6 +277,15 @@ export const PROVIDERS: ProviderConfig[] = [
     id: "generic",
     name: "Generic",
     origins: [],
+    keyboardShortcuts: VIDSRC_KEYBOARD,
+    commands: {},
+    events: {},
+    supportsPostMessage: false,
+  },
+  {
+    id: "yapgrid",
+    name: "YapGrid",
+    origins: ["yapgrid.com"],
     keyboardShortcuts: VIDSRC_KEYBOARD,
     commands: {},
     events: {},
