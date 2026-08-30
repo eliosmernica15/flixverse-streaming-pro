@@ -437,19 +437,17 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
               {/* TV Show Season/Episode Selector - In Hero (only for released content) */}
               {isTV && !isUnreleased && content.seasons && content.seasons.length > 0 && (
-                <div className="mb-6 sm:mb-8 w-full max-w-2xl bg-black/40 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-white/10">
-                  {/* Season & Episode Row */}
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                    {/* Season Selector */}
+                <div className="mb-6 sm:mb-8 w-full max-w-2xl rounded-xl bg-black/50 backdrop-blur-md p-3 sm:p-5 ring-1 ring-white/10">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <div className="flex-1">
-                      <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">{t("season")}</label>
+                      <label className="block text-gray-400 text-xs mb-1.5 font-semibold uppercase tracking-wider">{t("season")}</label>
                       <select
                         value={selectedSeason}
                         onChange={(e) => {
                           setSelectedSeason(Number(e.target.value));
                           setSelectedEpisode(1);
                         }}
-                        className="w-full bg-white/10 border border-white/20 text-white rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-lg font-semibold appearance-none cursor-pointer hover:bg-white/15 transition-all focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full bg-white/5 border border-white/15 text-white rounded-md px-3 py-2.5 text-sm font-semibold appearance-none cursor-pointer hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500/40"
                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
                       >
                         {content.seasons
@@ -462,13 +460,12 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                       </select>
                     </div>
 
-                    {/* Episode Selector */}
                     <div className="flex-1">
-                      <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">{t("episode")}</label>
+                      <label className="block text-gray-400 text-xs mb-1.5 font-semibold uppercase tracking-wider">{t("episode")}</label>
                       <select
                         value={selectedEpisode}
                         onChange={(e) => setSelectedEpisode(Number(e.target.value))}
-                        className="w-full bg-white/10 border border-white/20 text-white rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-lg font-semibold appearance-none cursor-pointer hover:bg-white/15 transition-all focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full bg-white/5 border border-white/15 text-white rounded-md px-3 py-2.5 text-sm font-semibold appearance-none cursor-pointer hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500/40"
                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
                       >
                         {Array.from(
@@ -483,23 +480,22 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     </div>
                   </div>
 
-                  {/* Current Selection Display */}
-                  <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex items-center space-x-2 sm:space-x-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                        <Tv className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-md bg-red-600 flex items-center justify-center">
+                        <Tv className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <p className="text-white font-bold text-sm sm:text-base">S{selectedSeason} E{selectedEpisode}</p>
-                        <p className="text-gray-400 text-xs sm:text-sm">{t("readyToStream")}</p>
+                        <p className="text-white font-bold text-sm">S{selectedSeason} E{selectedEpisode}</p>
+                        <p className="text-gray-400 text-xs">{t("readyToStream")}</p>
                       </div>
                     </div>
                     {!isUnreleased && (
                       <button
                         onClick={() => handleWatch()}
-                        className="bg-red-600 hover:bg-red-500 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-full font-semibold transition-all hover:scale-105 flex items-center space-x-1.5 sm:space-x-2 text-sm sm:text-base"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-bold text-black transition-colors hover:bg-white/85 focus-ring"
                       >
-                        <Play className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
+                        <Play className="w-3.5 h-3.5 fill-current" />
                         <span>{tc("play")}</span>
                       </button>
                     )}
@@ -591,28 +587,26 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
         {/* Seasons & Episodes Section for TV Shows (only for released content) */}
         {isTV && !isUnreleased && content.seasons && content.seasons.length > 0 && (
-          <div className="w-full px-4 md:px-16 py-12 md:py-20 bg-gradient-to-b from-gray-900 to-black">
+          <div className="w-full px-4 md:px-16 py-12 md:py-20">
             <div className="max-w-7xl mx-auto">
-              {/* Season Selector */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 overflow-visible">
-                <h2 className="text-2xl md:text-3xl font-bold text-white leading-tight py-1">{t("episodes")}</h2>
+                <SectionHeader title={t("episodes")} eyebrow={`${content.number_of_seasons || 0} ${content.number_of_seasons === 1 ? "season" : "seasons"}`} />
 
-                {/* Season Dropdown */}
                 <div className="relative z-30">
                   <button
                     onClick={() => setShowSeasonDropdown(!showSeasonDropdown)}
-                    className="flex items-center space-x-3 bg-white/10 hover:bg-white/15 backdrop-blur-sm px-5 py-3 rounded-xl border border-white/10 transition-all min-w-[200px] justify-between"
+                    className="flex items-center gap-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm px-4 py-2.5 rounded-md ring-1 ring-white/10 transition-colors min-w-[200px] justify-between focus-ring"
                   >
-                    <span className="text-white font-medium">
+                    <span className="text-white text-sm font-semibold">
                       {t("season")} {selectedSeason}
                     </span>
-                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showSeasonDropdown ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showSeasonDropdown ? 'rotate-180' : ''}`} />
                   </button>
 
                   {showSeasonDropdown && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowSeasonDropdown(false)} />
-                      <div className="absolute top-full right-0 mt-2 w-[280px] bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl max-h-64 overflow-y-auto">
+                      <div className="absolute top-full right-0 mt-2 w-[280px] bg-[#0a0a0c]/98 backdrop-blur-xl border border-white/10 rounded-md overflow-hidden z-50 shadow-2xl max-h-64 overflow-y-auto">
                         {content.seasons
                           .filter(season => season.season_number > 0)
                           .map((season) => (
@@ -624,13 +618,13 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                                 setSelectedEpisode(1);
                                 setShowSeasonDropdown(false);
                               }}
-                              className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-all ${selectedSeason === season.season_number
-                                ? 'bg-red-600 text-white'
-                                : 'text-gray-300 hover:bg-white/10'
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${selectedSeason === season.season_number
+                                ? 'bg-white text-black font-semibold'
+                                : 'text-gray-300 hover:bg-white/5'
                                 }`}
                             >
                               <span className="font-medium">{season.name}</span>
-                              <span className="text-sm opacity-70">({season.episode_count} eps)</span>
+                              <span className="text-xs opacity-70">({season.episode_count} eps)</span>
                             </button>
                           ))}
                       </div>
@@ -639,7 +633,6 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 </div>
               </div>
 
-              {/* Episodes Grid */}
               {(() => {
                 const currentSeason = content.seasons.find(s => s.season_number === selectedSeason);
                 const episodeCount = currentSeason?.episode_count || 10;
@@ -664,13 +657,13 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                               setSelectedEpisode(episodeNum);
                             }
                           }}
-                          className={`w-full h-full group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all duration-200 hover:scale-105 min-h-[72px] ${selectedEpisode === episodeNum
-                            ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20 ring-2 ring-red-400/40'
-                            : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
+                          className={`w-full h-full group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-md ring-1 transition-all duration-200 hover:scale-105 min-h-[68px] ${selectedEpisode === episodeNum
+                            ? 'bg-white text-black ring-white shadow-lg'
+                            : 'bg-white/5 text-gray-300 ring-white/10 hover:bg-white/10 hover:ring-white/20'
                             }`}
                           aria-label={`${t("episode")} ${episodeNum}${selectedEpisode === episodeNum ? `, ${t("tapToSelect")}` : ''}`}
                         >
-                          <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-white' : 'text-red-500 group-hover:text-red-400'}`} />
+                          <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-black' : 'text-red-500 group-hover:text-red-400'}`} />
                           <span className="font-bold text-xs sm:text-sm">E{episodeNum}</span>
                         </button>
                       </SpoilerProtectedEpisode>
@@ -679,18 +672,17 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 );
               })()}
 
-              {/* Play Selected Episode */}
-              <div className="mt-6 sm:mt-8 p-3 sm:p-5 bg-gradient-to-r from-red-600/10 to-transparent rounded-xl sm:rounded-2xl border border-red-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+              <div className="mt-6 sm:mt-8 p-4 sm:p-5 rounded-xl bg-white/5 ring-1 ring-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 <div className="text-center sm:text-left">
-                  <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">{t("readyToPlay")}</p>
-                  <p className="text-white text-base sm:text-xl font-bold">{t("seasonEpisode", { season: selectedSeason, episode: selectedEpisode })}</p>
-                  <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 sm:mt-1">{t("tapToSelect")}</p>
+                  <p className="text-gray-400 text-xs mb-0.5">{t("readyToPlay")}</p>
+                  <p className="text-white text-base sm:text-lg font-bold">{t("seasonEpisode", { season: selectedSeason, episode: selectedEpisode })}</p>
+                  <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5">{t("tapToSelect")}</p>
                 </div>
                 <button
                   onClick={() => handleWatch()}
-                  className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-5 sm:px-8 py-2.5 sm:py-4 rounded-full font-bold text-sm sm:text-lg transition-all duration-300 hover:scale-105 shadow-lg shadow-red-500/30"
+                  className="cta-primary !rounded-md !px-5 !py-2.5 sm:!px-6 sm:!py-3 !text-sm sm:!text-base"
                 >
-                  <Play className="w-4 h-4 sm:w-6 sm:h-6 fill-current" />
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
                   <span>{tc("play")} S{selectedSeason}E{selectedEpisode}</span>
                 </button>
               </div>
