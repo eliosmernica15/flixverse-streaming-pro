@@ -350,7 +350,17 @@ export function WatchParty({
                     className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/5 transition-colors"
                   >
                     {friend.avatarUrl ? (
-                      <img src={friend.avatarUrl} alt={friend.displayName} className="w-6 h-6 rounded-full object-cover" />
+                      <img
+                        src={friend.avatarUrl}
+                        alt={friend.displayName}
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        className="w-6 h-6 rounded-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
+                      />
                     ) : (
                       <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-[9px] font-bold text-white">
                         {friend.displayName.charAt(0)}

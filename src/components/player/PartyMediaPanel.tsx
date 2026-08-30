@@ -70,7 +70,17 @@ function CameraTile({
           )}
           <div className="party-camera-avatar">
             {participant.avatarUrl ? (
-              <img src={participant.avatarUrl} alt="" className="party-camera-avatar-img" />
+              <img
+                src={participant.avatarUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                className="party-camera-avatar-img"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = "none";
+                }}
+              />
             ) : (
               <span>{initial}</span>
             )}

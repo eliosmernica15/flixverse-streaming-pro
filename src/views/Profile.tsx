@@ -283,11 +283,13 @@ const Profile = () => {
                 <div className="absolute bottom-1 right-1 flex space-x-2 z-20">
                   {profile.avatar_url && (
                     <button
+                      type="button"
                       onClick={() => setDeleteDialogOpen(true)}
                       disabled={uploading}
                       className={`p-2 bg-gray-800 rounded-full border border-white/20 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-900/80 hover:border-red-500 hover:scale-105'
                         }`}
                       title="Remove picture"
+                      aria-label="Remove profile picture"
                     >
                       <Trash2 className="w-4 h-4 text-white" />
                     </button>
@@ -298,6 +300,7 @@ const Profile = () => {
                     className={`p-2 bg-gray-800 rounded-full border border-white/20 transition-all cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-700 hover:scale-105'
                       }`}
                     title="Upload new picture"
+                    aria-label="Upload new picture"
                   >
                     <Camera className="w-4 h-4 text-white" />
                     <input
@@ -309,36 +312,36 @@ const Profile = () => {
                       disabled={uploading}
                     />
                   </label>
-
-                  <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                    <AlertDialogContent className="bg-black/95 border-white/10 text-white">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remove profile picture?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-gray-400">
-                          This action cannot be undone. This will permanently delete your current profile picture.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-transparent border-white/10 text-white hover:bg-white/5 hover:text-white">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleRemoveAvatar}
-                          className="bg-red-600 hover:bg-red-700 text-white border-none"
-                        >
-                          Remove
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-
-                  <ImageCropper
-                    open={cropperOpen}
-                    onOpenChange={setCropperOpen}
-                    imageSrc={selectedImage}
-                    onCropComplete={handleCropComplete}
-                    aspect={1}
-                  />
                 </div>
               </div>
+
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent className="bg-black/95 border-white/10 text-white">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Remove profile picture?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-gray-400">
+                      This action cannot be undone. This will permanently delete your current profile picture.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="bg-transparent border-white/10 text-white hover:bg-white/5 hover:text-white">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleRemoveAvatar}
+                      className="bg-red-600 hover:bg-red-700 text-white border-none"
+                    >
+                      Remove
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <ImageCropper
+                open={cropperOpen}
+                onOpenChange={setCropperOpen}
+                imageSrc={selectedImage}
+                onCropComplete={handleCropComplete}
+                aspect={1}
+              />
 
               {/* Name & Actions */}
               <div className="flex-1 text-center sm:text-left pb-4">
@@ -560,11 +563,15 @@ const Profile = () => {
                                 router.push(url);
                               }}
                             >
-                              <img
-                                src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
-                                alt={item.content_title}
-                                className="w-12 h-18 object-cover rounded-lg"
-                              />
+                              <div className="relative w-12 h-18 shrink-0 overflow-hidden rounded-lg bg-gray-800">
+                                <Image
+                                  src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
+                                  alt={item.content_title}
+                                  fill
+                                  sizes="48px"
+                                  className="object-cover"
+                                />
+                              </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-white font-medium truncate">{item.content_title}</p>
                                 {item.season && item.episode && (
@@ -606,12 +613,15 @@ const Profile = () => {
                               router.push(url);
                             }}
                           >
-                            <img
-                              src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
-                              alt={item.content_title}
-                              loading="lazy"
-                              className="w-12 h-18 object-cover rounded-lg"
-                            />
+                            <div className="relative w-12 h-18 shrink-0 overflow-hidden rounded-lg bg-gray-800">
+                              <Image
+                                src={item.content_poster_path ? getImageUrl(item.content_poster_path, 'large') : '/placeholder.svg'}
+                                alt={item.content_title}
+                                fill
+                                sizes="48px"
+                                className="object-cover"
+                              />
+                            </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-white font-medium truncate">{item.content_title}</p>
                               {item.season && item.episode && (

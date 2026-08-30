@@ -451,10 +451,10 @@ const Auth = () => {
 
               {/* Terms */}
               <p className="text-xs text-gray-500 text-center mt-6">
-                By continuing, you agree to FlixVerse's{' '}
-                <a href="#" className="text-red-400 hover:text-red-300 focus-ring rounded">Terms of Service</a>
+                By continuing, you agree to FlixVerse&apos;s{' '}
+                <Link href="/terms" className="text-red-400 hover:text-red-300 focus-ring rounded">Terms of Service</Link>
                 {' '}and{' '}
-                <a href="#" className="text-red-400 hover:text-red-300 focus-ring rounded">Privacy Policy</a>
+                <Link href="/privacy" className="text-red-400 hover:text-red-300 focus-ring rounded">Privacy Policy</Link>
               </p>
             </CardContent>
           </Card>

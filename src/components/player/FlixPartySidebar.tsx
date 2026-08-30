@@ -461,7 +461,17 @@ export function FlixPartySidebar({
                   {messages.map((msg) => (
                     <div key={msg.id} className="flex gap-2.5">
                       {msg.senderAvatar ? (
-                        <img src={msg.senderAvatar} alt={msg.senderName} className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5" />
+                        <img
+                          src={msg.senderAvatar}
+                          alt={msg.senderName}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
+                        />
                       ) : (
                         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0 mt-0.5">
                           {msg.senderName.charAt(0)}

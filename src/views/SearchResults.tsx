@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
 import Reveal from "@/components/Reveal";
 import { searchMultiWithPagination, getContentImage, TMDBMovie } from "@/utils/tmdbApi";
-import { Search, Clock, X } from "lucide-react";
+import { Search, Clock, X, User } from "lucide-react";
 import { SearchFilters, SearchFilterState } from "@/components/SearchFilters";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { trackSearch } from "@/lib/analytics";
@@ -30,6 +32,7 @@ interface SearchResultItem {
 }
 
 const SearchResults = () => {
+  const router = useRouter();
   const t = useTranslations("search");
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
@@ -73,7 +76,7 @@ const SearchResults = () => {
 
   const runSearch = (value: string) => {
     const trimmed = value.trim();
-    if (trimmed) window.location.href = `/search?q=${encodeURIComponent(trimmed)}`;
+    if (trimmed) router.push(`/search?q=${encodeURIComponent(trimmed)}`);
   };
 
   const { data, isLoading, isFetching } = useQuery({
@@ -205,31 +208,36 @@ const SearchResults = () => {
             <Clock className="w-3.5 h-3.5" /> Recent
           </span>
           {recent.map((r) => (
-            <button
+            <div
               key={r}
-              type="button"
-              onClick={() => runSearch(r)}
-              className="chip hover:bg-white/10 text-gray-300 transition-colors focus-ring min-h-[36px]"
+              className="inline-flex items-center gap-1 chip text-gray-300 transition-colors"
             >
-              {r}
-              <span
-                role="button"
-                tabIndex={-1}
-                aria-hidden
-                className="ml-1 text-gray-500 hover:text-white"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRecent((prev) => prev.filter((x) => x !== r));
-                  try {
-                    localStorage.setItem(RECENT_KEY, JSON.stringify(recent.filter((x) => x !== r)));
-                  } catch {
-                    /* ignore */
-                  }
+              <button
+                type="button"
+                onClick={() => runSearch(r)}
+                className="hover:text-white transition-colors focus-ring rounded"
+              >
+                {r}
+              </button>
+              <button
+                type="button"
+                aria-label={`Remove ${r} from recent searches`}
+                className="p-0.5 text-gray-500 hover:text-white transition-colors focus-ring rounded"
+                onClick={() => {
+                  setRecent((prev) => {
+                    const updated = prev.filter((x) => x !== r);
+                    try {
+                      localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+                    } catch {
+                      /* ignore */
+                    }
+                    return updated;
+                  });
                 }}
               >
                 <X className="w-3 h-3" />
-              </span>
-            </button>
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -280,24 +288,40 @@ const SearchResults = () => {
               <Reveal as="section" className="mb-12 content-auto">
                 <SectionHeader title={t("people")} eyebrow={t("castAndCrew")} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-2">
-                  {filteredPeople.map((person) => (
-                    <a
-                      key={`person-${person.id}`}
-                      href={`/person/${person.id}`}
-                      className="flex flex-col items-center p-4 rounded-2xl surface hover:surface-elevated transition-colors border border-white/10 hover-lift-sm focus-ring"
-                    >
-                      <img
-                        src={getContentImage(person, "profile", "medium")}
-                        alt={person.name ?? "Person"}
-                        loading="lazy"
-                        className="w-20 h-20 rounded-full object-cover border-2 border-white/20"
-                      />
-                      <span className="mt-2 text-sm font-medium text-center line-clamp-2">{person.name}</span>
-                      {person.known_for_department && (
-                        <span className="text-xs text-gray-400">{person.known_for_department}</span>
-                      )}
-                    </a>
-                  ))}
+                  {filteredPeople.map((person) => {
+                    const profileImg = person.profile_path
+                      ? getContentImage(person, "profile", "medium")
+                      : null;
+                    return (
+                      <Link
+                        key={`person-${person.id}`}
+                        href={`/person/${person.id}`}
+                        className="group flex flex-col items-center p-4 rounded-2xl surface hover:surface-elevated transition-all border border-white/10 hover-lift-sm focus-ring"
+                      >
+                        <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-white/20 group-hover:border-red-500/50 transition-colors shrink-0 bg-white/5">
+                          {profileImg ? (
+                            <Image
+                              src={profileImg}
+                              alt={person.name ?? "Person"}
+                              fill
+                              sizes="80px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500/20 to-purple-500/20">
+                              <User className="w-8 h-8 text-white/60" />
+                            </div>
+                          )}
+                        </div>
+                        <span className="mt-2 text-sm font-medium text-center text-white line-clamp-2 group-hover:text-red-400 transition-colors">
+                          {person.name}
+                        </span>
+                        {person.known_for_department && (
+                          <span className="text-xs text-gray-400 mt-0.5">{person.known_for_department}</span>
+                        )}
+                      </Link>
+                    );
+                  })}
                 </div>
               </Reveal>
             )}

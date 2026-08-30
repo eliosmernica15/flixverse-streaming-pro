@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Cookie, X } from "lucide-react";
 import { setConsent, getConsent } from "@/lib/analytics";
 
@@ -46,9 +47,9 @@ export function CookieConsent() {
                 We use cookies and similar technologies to improve your experience, analyze usage,
                 and assist in our marketing efforts. You can accept all cookies or decline
                 non-essential ones. Read our{" "}
-                <a href="/privacy" className="text-red-400 transition-colors hover:underline focus-ring rounded">
+                <Link href="/privacy" className="text-red-400 transition-colors hover:underline focus-ring rounded">
                   Privacy Policy
-                </a>{" "}
+                </Link>{" "}
                 for details.
               </p>
             </div>

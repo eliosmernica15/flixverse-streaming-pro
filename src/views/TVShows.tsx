@@ -3,10 +3,13 @@
 import MovieCarousel from "@/components/MovieCarousel";
 import PageHero from "@/components/PageHero";
 import PageContainer from "@/components/PageContainer";
+import LazySection from "@/components/LazySection";
 import { useTVShowsCatalog } from "@/hooks/queries/useTVShowsCatalog";
 import Reveal from "@/components/Reveal";
 import { Tv, Flame, Trophy, Calendar, Radio, Zap, Laugh, Drama, Search, Rocket, FileText } from "lucide-react";
 import { TMDBMovie } from "@/utils/tmdbApi";
+
+const PRIORITY_KEYS = new Set(["trending", "airingToday", "onTheAir", "popular", "topRated"]);
 
 const SECTIONS = [
   { key: "trending", title: "Trending TV Shows", icon: <Flame className="w-5 h-5 text-orange-400" />, exploreAllPath: "/browse/trending-tv-shows" },
@@ -26,6 +29,25 @@ const TVShows = () => {
   const { data = {}, isLoading, isFetching, isError, refetch } = useTVShowsCatalog();
   const loadedCount = Object.keys(data).length;
 
+  const renderSection = (section: (typeof SECTIONS)[number], index: number) => {
+    const shows = (data as Record<string, TMDBMovie[]>)[section.key];
+    return (
+      <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
+        <MovieCarousel
+          title={section.title}
+          movies={shows || []}
+          loading={!shows?.length && (isLoading || isFetching)}
+          icon={section.icon}
+          exploreAllPath={section.exploreAllPath}
+        />
+        {index < SECTIONS.length - 1 && <div className="divider-glow mt-10" />}
+      </Reveal>
+    );
+  };
+
+  const prioritySections = SECTIONS.filter((s) => PRIORITY_KEYS.has(s.key));
+  const deferredSections = SECTIONS.filter((s) => !PRIORITY_KEYS.has(s.key));
+
   return (
     <>
       <PageHero
@@ -38,21 +60,16 @@ const TVShows = () => {
 
       <PageContainer>
         <div className="space-y-10">
-          {SECTIONS.map((section, index) => {
-            const shows = (data as Record<string, TMDBMovie[]>)[section.key];
-            return (
-              <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
-                <MovieCarousel
-                  title={section.title}
-                  movies={shows || []}
-                  loading={!shows?.length && (isLoading || isFetching)}
-                  icon={section.icon}
-                  exploreAllPath={section.exploreAllPath}
-                />
-                {index < SECTIONS.length - 1 && <div className="divider-glow mt-10" />}
-              </Reveal>
-            );
-          })}
+          {prioritySections.map((section, index) => renderSection(section, index))}
+
+          <LazySection minHeight={480} className="space-y-10">
+            <>
+              <div className="divider-glow" />
+              {deferredSections.map((section, index) =>
+                renderSection(section, prioritySections.length + index)
+              )}
+            </>
+          </LazySection>
 
           {isError && !isLoading && (
             <div className="text-center py-12 glass-card rounded-2xl max-w-md mx-auto border border-white/8">

@@ -12,7 +12,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Film, Tv, Home, Search, Heart, Sparkles, TrendingUp, User, WifiOff } from "lucide-react";
+import { Film, Tv, Home, Search, Heart, Sparkles, TrendingUp, User, WifiOff, CreditCard, HelpCircle } from "lucide-react";
 import { searchMulti, TMDBMovie } from "@/utils/tmdbApi";
 import { playUiSound } from "@/lib/uiSound";
 import { FOCUS_SEARCH_EVENT, OPEN_COMMAND_PALETTE_EVENT } from "@/hooks/useGlobalShortcuts";
@@ -28,7 +28,9 @@ const pages = [
   { href: "/offline-library", label: "Offline Library", icon: WifiOff },
   { href: "/search", label: "Search", icon: Search },
   { href: "/profile", label: "Profile", icon: User },
-  { href: "/auth", label: "Sign In", icon: Sparkles },
+  { href: "/plans", label: "Plans & Pricing", icon: CreditCard },
+  { href: "/help", label: "Help Center", icon: HelpCircle },
+  { href: "/auth", label: "Sign In / Sign Up", icon: Sparkles },
 ];
 
 const itemClass =

@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Film, Tv, Star, Activity } from "lucide-react";
+import { ArrowLeft, Film, Tv, Star, Activity, UserPlus, UserCheck, Users } from "lucide-react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { getFirestore, collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { MemberProfile, ActivityFeedItem } from "@/integrations/firebase/types";
+import { useAuth } from "@/hooks/useAuth";
+import { useFollow } from "@/hooks/useFollow";
+import { useToast } from "@/hooks/use-toast";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
 import Reveal from "@/components/Reveal";
@@ -18,10 +21,14 @@ interface PublicProfileProps {
 
 export default function PublicProfile({ username }: PublicProfileProps) {
   const router = useRouter();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [watchlist, setWatchlist] = useState<TMDBMovie[]>([]);
   const [activity, setActivity] = useState<ActivityFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { isFollowing, followerCount, toggleFollow } = useFollow(profile?.ownerId ?? null);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -117,6 +124,34 @@ export default function PublicProfile({ username }: PublicProfileProps) {
   ];
   const colorIndex = profile.displayName.charCodeAt(0) % AVATAR_COLORS.length;
 
+  const isOwnProfile = user?.uid === profile.ownerId;
+
+  const handleToggleFollow = async () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Sign in to follow other movie fans.",
+      });
+      router.push("/auth");
+      return;
+    }
+    try {
+      await toggleFollow();
+      toast({
+        title: isFollowing ? "Unfollowed" : "Following",
+        description: isFollowing
+          ? `You unfollowed ${profile.displayName}`
+          : `You are now following ${profile.displayName}`,
+      });
+    } catch {
+      toast({
+        title: "Action failed",
+        description: "Could not update follow status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black">
       <div className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5">
@@ -130,25 +165,57 @@ export default function PublicProfile({ username }: PublicProfileProps) {
 
       <div className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
         {/* Profile header */}
-        <Reveal className="flex items-center gap-6 mb-10">
-          {profile.avatarUrl ? (
-            <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-white/10 glow-ring shrink-0">
-              <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="object-cover w-full h-full" />
-            </div>
-          ) : (
-            <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${AVATAR_COLORS[colorIndex]} flex items-center justify-center glow-ring shrink-0`}>
-              <span className="text-3xl font-black text-white">{profile.displayName.charAt(0).toUpperCase()}</span>
-            </div>
-          )}
-          <div>
-            <h1 className="display-title text-2xl font-bold text-white">{profile.displayName}</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className="chip">
-                {profile.type === "kids" ? "Kids Profile" : "Member"}
-                {profile.isPrimary && " · Primary"}
-              </span>
+        <Reveal className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+          <div className="flex items-center gap-6">
+            {profile.avatarUrl ? (
+              <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-white/10 glow-ring shrink-0">
+                <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="object-cover w-full h-full" />
+              </div>
+            ) : (
+              <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${AVATAR_COLORS[colorIndex]} flex items-center justify-center glow-ring shrink-0`}>
+                <span className="text-3xl font-black text-white">{profile.displayName.charAt(0).toUpperCase()}</span>
+              </div>
+            )}
+            <div>
+              <h1 className="display-title text-2xl font-bold text-white">{profile.displayName}</h1>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="chip">
+                  {profile.type === "kids" ? "Kids Profile" : "Member"}
+                  {profile.isPrimary && " · Primary"}
+                </span>
+                <span className="chip text-gray-300">
+                  <Users className="w-3.5 h-3.5 mr-1" />
+                  {followerCount} {followerCount === 1 ? "follower" : "followers"}
+                </span>
+              </div>
             </div>
           </div>
+
+          {!isOwnProfile && (
+            <div className="flex items-center gap-3 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={handleToggleFollow}
+                className={`min-h-[44px] px-6 py-2.5 rounded-xl font-semibold text-sm transition-all focus-ring inline-flex items-center gap-2 ${
+                  isFollowing
+                    ? "bg-white/10 hover:bg-red-500/20 hover:text-red-300 text-white border border-white/15"
+                    : "btn-primary"
+                }`}
+              >
+                {isFollowing ? (
+                  <>
+                    <UserCheck className="w-4 h-4" />
+                    Following
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4" />
+                    Follow
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </Reveal>
 
         <div className="divider-glow mb-10" />

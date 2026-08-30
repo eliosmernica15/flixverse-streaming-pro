@@ -38,7 +38,17 @@ export function PartyMembersPanel({
             <li key={p.userId} className="party-member-row">
               <div className="party-member-info">
                 {p.avatarUrl ? (
-                  <img src={p.avatarUrl} alt="" className="party-member-avatar" />
+                  <img
+                    src={p.avatarUrl}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    className="party-member-avatar"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
                 ) : (
                   <span className="party-member-avatar party-member-avatar--fallback">
                     {p.displayName.charAt(0).toUpperCase()}

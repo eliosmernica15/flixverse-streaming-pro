@@ -51,6 +51,7 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
             <h3 className="text-lg font-bold text-white">Cast</h3>
             {cast.length > maxVisible && (
               <button
+                type="button"
                 onClick={() => setShowAll(!showAll)}
                 className="text-sm text-gray-400 hover:text-white transition-colors"
               >
@@ -62,6 +63,7 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
             {visibleCast.map((person) => (
               <button
                 key={`${person.id}-${person.order}`}
+                type="button"
                 onClick={() => handlePersonClick(person.id)}
                 className="group glass-panel hover-lift-sm focus-ring flex flex-col items-center p-3 rounded-xl"
               >
@@ -103,6 +105,7 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
             {uniqueCrew.map((person) => (
               <button
                 key={person.id}
+                type="button"
                 onClick={() => handlePersonClick(person.id)}
                 className="group glass-panel hover-lift-sm focus-ring flex items-center gap-3 p-3 rounded-xl text-left"
               >
