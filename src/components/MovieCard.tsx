@@ -60,8 +60,6 @@ const genreNames: Record<number, string> = {
   10768: "War & Politics",
 };
 
-const maturityRatings = ["TV-MA", "TV-14", "TV-PG", "R", "PG-13", "PG"];
-
 const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -175,42 +173,48 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
 
   useEffect(() => () => clearPreviewTimers(), [clearPreviewTimers]);
 
-  const handleAddToListClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handlePlay = useCallback(
+    (e: React.MouseEvent | React.KeyboardEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      addToHistory(movie.id);
+      const ct = getContentType(movie);
+      router.push(`/movie/${movie.id}?type=${ct}&autoplay=true`);
+    },
+    [addToHistory, movie, router]
+  );
 
-    if (!isAuthenticated) {
-      toast({
-        title: t("signInRequired"),
-        description: t("signInForList"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const movieTitle = movie.title || movie.name || "Unknown";
-
-    try {
-      if (isInMyList) {
-        await removeFromList(movie.id);
+  const handleAddToListClick = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!isAuthenticated) {
         toast({
-          title: t("removedFromList"),
-          description: t("removedDesc", { title: movieTitle }),
+          title: t("signInRequired"),
+          description: t("signInForList"),
+          variant: "destructive",
         });
-      } else {
-        await addToList(movie);
+        return;
+      }
+      const movieTitle = movie.title || movie.name || "Unknown";
+      try {
+        if (isInMyList) {
+          await removeFromList(movie.id);
+          toast({ title: t("removedFromList"), description: t("removedDesc", { title: movieTitle }) });
+        } else {
+          await addToList(movie);
+          toast({ title: t("addedToList"), description: t("addedDesc", { title: movieTitle }) });
+        }
+      } catch (error: unknown) {
         toast({
-          title: t("addedToList"),
-          description: t("addedDesc", { title: movieTitle }),
+          title: t("error"),
+          description: error instanceof Error ? error.message : t("somethingWrong"),
+          variant: "destructive",
         });
       }
-    } catch (error: unknown) {
-      toast({
-        title: t("error"),
-        description: error instanceof Error ? error.message : t("somethingWrong"),
-        variant: "destructive",
-      });
-    }
-  };
+    },
+    [addToList, isAuthenticated, isInMyList, movie, removeFromList, t, toast]
+  );
 
   const displayTitle = getContentTitle(movie);
   const releaseDate = getContentReleaseDate(movie);
@@ -235,7 +239,6 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
     contentType === "movie"
       ? `${Math.floor(Math.random() * 60) + 90}m`
       : `${Math.floor(Math.random() * 3) + 1} Season${Math.random() > 0.5 ? "s" : ""}`;
-  const isNew = false;
 
   return (
     <div
@@ -270,7 +273,7 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
         }
       }}
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-[6px] bg-gray-900 ring-1 ring-white/5 transition-all duration-300 group-hover:ring-white/20 group-hover:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85),0_0_30px_-8px_rgba(239,68,68,0.35)]">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-[6px] bg-gray-900 ring-1 ring-white/5 transition-all duration-300 group-hover:ring-white/25 group-hover:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85),0_0_30px_-8px_rgba(239,68,68,0.35)]">
         {!imageLoaded && (
           <div className="absolute inset-0 skeleton-shimmer bg-gradient-to-br from-gray-800/80 to-gray-900/80" />
         )}
@@ -291,18 +294,12 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
         />
 
         <div
-          className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent transition-opacity duration-300 ${
-            isHovered ? "opacity-90" : "opacity-50"
+          className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent transition-opacity duration-300 ${
+            isHovered ? "opacity-95" : "opacity-50"
           }`}
         />
 
-        {isNew && (
-          <div className="absolute left-2 top-2">
-            <span className="badge-pill badge-new animate-badge-pulse">New</span>
-          </div>
-        )}
-
-        {!isNew && contentType === "tv" && (
+        {contentType === "tv" && (
           <div className="absolute left-2 top-2">
             <span className="badge-pill badge-hd">Series</span>
           </div>
@@ -317,62 +314,42 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
           </div>
         )}
 
-        {isHovered && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px] transition-opacity duration-200">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                const ct = getContentType(movie);
-                router.push(`/movie/${movie.id}?type=${ct}`);
-              }}
-              className="cta-primary !py-2 !px-4 !text-xs shadow-2xl"
-              aria-label={`Play ${displayTitle}`}
-            >
-              <Play className="h-4 w-4 fill-current" />
-              <span>Play</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-2.5 space-y-1.5">
-        <h3 className="text-[13px] font-bold leading-tight text-white truncate transition-colors duration-200 group-hover:text-white">
-          {displayTitle}
-        </h3>
-
-        <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-          {hasValidRating && (
-            <span className={`badge-pill !py-0 !px-1.5 !text-[10px] ${getRatingBadge(rating)}`}>
-              {rating.toFixed(1)}
-            </span>
-          )}
-          {year && <span className="font-medium">{year}</span>}
-          <span className="meta-dot" />
-          <span className="meta-pill !py-0 !px-1.5 !text-[10px]">{maturity}</span>
-          <span className="meta-dot" />
-          <span className="text-gray-500">{runtime}</span>
-        </div>
-
-        <div className="card-action-row">
+        {/* Center Play button — single primary action. Fades in on hover/focus. */}
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+            isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          aria-hidden={!isHovered}
+        >
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              const ct = getContentType(movie);
-              router.push(`/movie/${movie.id}?type=${ct}`);
-            }}
-            className="card-action-btn card-action-btn-primary"
+            onClick={handlePlay}
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black shadow-2xl shadow-black/50 ring-1 ring-black/10 transition-transform duration-200 hover:scale-110 focus-visible:scale-110 focus:outline-none"
             aria-label={`Play ${displayTitle}`}
+            tabIndex={isHovered ? 0 : -1}
           >
-            <Play className="h-3.5 w-3.5 fill-current" />
+            <Play className="h-5 w-5 fill-current ml-0.5" />
           </button>
+        </div>
+
+        {/* Right-side vertical action stack — only visible on hover, overlays on the card */}
+        <div
+          className={`absolute right-2 bottom-2 flex flex-col gap-1.5 transition-all duration-300 ${
+            isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+          }`}
+          aria-hidden={!isHovered}
+        >
           <button
             type="button"
             onClick={handleAddToListClick}
             disabled={listBusy}
-            className="card-action-btn"
+            className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-md transition-all duration-200 focus:outline-none ${
+              isInMyList
+                ? "border-white bg-white text-black"
+                : "border-white/40 bg-black/40 text-white hover:bg-white hover:text-black hover:border-white"
+            } ${listBusy ? "opacity-60" : ""}`}
             aria-label={isInMyList ? tc("removeFromList") : tc("addToList")}
+            tabIndex={isHovered ? 0 : -1}
           >
             {listBusy ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -386,13 +363,29 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
             type="button"
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               handleCardClick();
             }}
-            className="card-action-btn"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-black/40 text-white backdrop-blur-md transition-all duration-200 hover:bg-white hover:text-black hover:border-white focus:outline-none"
             aria-label={`More about ${displayTitle}`}
+            tabIndex={isHovered ? 0 : -1}
           >
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
+        </div>
+      </div>
+
+      <div className="mt-2 space-y-0.5">
+        <h3 className="text-[13px] font-bold leading-tight text-white truncate">
+          {displayTitle}
+        </h3>
+        <div className="flex items-center gap-1 text-[11px] text-gray-400">
+          {hasValidRating && <span className="font-semibold text-white">{rating.toFixed(1)}</span>}
+          {year && <span className="text-gray-400">{year}</span>}
+          <span className="meta-dot" />
+          <span className="meta-pill !py-0 !px-1.5 !text-[10px]">{maturity}</span>
+          <span className="meta-dot" />
+          <span className="text-gray-500">{runtime}</span>
         </div>
       </div>
 
