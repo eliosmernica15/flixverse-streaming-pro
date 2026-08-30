@@ -12,7 +12,6 @@ import {
   where,
   getDocs,
   deleteDoc,
-  orderBy,
   limit,
   Timestamp,
 } from "firebase/firestore";
@@ -21,7 +20,17 @@ import { useFriends, type Friend } from "@/hooks/useFriends";
 import { useToast } from "@/hooks/use-toast";
 import { sendWatchPartyInvite } from "@/lib/notifications/sendWatchPartyInvite";
 import { firestoreErrorMessage } from "@/lib/firestore/errors";
-import { Send, Users, Copy, Check, X, Loader2 } from "lucide-react";
+import {
+  Send,
+  Users,
+  Copy,
+  Check,
+  X,
+  Loader2,
+  PartyPopper,
+  Link2,
+  Shield,
+} from "lucide-react";
 
 export interface WatchPartyRoom {
   id: string;
@@ -80,7 +89,6 @@ export function WatchParty({
 
   const activeRoomId = externalRoomId ?? localRoomId;
 
-  // Legacy watch_parties listener — skip when using FlixParty (onStartParty)
   useEffect(() => {
     if (!user || onStartParty) return;
 
@@ -167,7 +175,6 @@ export function WatchParty({
     await createRoom();
   }, [creating, onStartParty, createRoom, toast]);
 
-  // Invite a friend to the room
   const inviteFriend = useCallback(async (friend: Friend) => {
     if (!user) return;
 
@@ -214,7 +221,6 @@ export function WatchParty({
     }
   }, [activeRoom, activeRoomId, user, partyJoinUrl, movieId, mediaType, season, episode, title, posterPath, toast]);
 
-  // End the party
   const endParty = useCallback(async () => {
     if (!activeRoom || !user || activeRoom.hostId !== user.uid) return;
 
@@ -225,7 +231,6 @@ export function WatchParty({
     setActiveRoom(null);
   }, [activeRoom, user]);
 
-  // Leave the party
   const leaveParty = useCallback(async () => {
     if (!activeRoom || !user) return;
 
@@ -245,7 +250,6 @@ export function WatchParty({
     setActiveRoom(null);
   }, [activeRoom, user, endParty]);
 
-  // Copy invite link (FlixParty external room or legacy watch_parties room)
   const copyInviteLink = useCallback(() => {
     const link = partyJoinUrl || (() => {
       const roomId = activeRoom?.id ?? activeRoomId;
@@ -265,7 +269,6 @@ export function WatchParty({
     setTimeout(() => setCopiedLink(false), 2000);
   }, [activeRoom, activeRoomId, movieId, mediaType, season, episode, partyJoinUrl]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       unsubscribeRef.current?.();
@@ -273,81 +276,94 @@ export function WatchParty({
   }, []);
 
   return (
-    <div className="space-y-4">
-      {/* No active room — show create/invite */}
+    <div className="space-y-3">
+      {/* Empty state — Netflix-style invite affordance */}
       {!activeRoom && !activeRoomId && (
-        <div>
+        <div className="space-y-2">
           <button
+            type="button"
             onClick={() => void handleStart()}
             disabled={creating}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-sm font-bold text-white transition-all disabled:opacity-50"
+            className="group relative w-full overflow-hidden rounded-md bg-white px-4 py-3 text-sm font-bold text-black transition-all duration-200 hover:bg-white/90 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {creating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Users className="w-4 h-4" />
-            )}
-            {creating ? "Creating party..." : "Start Watch Party"}
+            <span className="relative z-10 inline-flex items-center justify-center gap-2">
+              {creating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <PartyPopper className="w-4 h-4" />
+              )}
+              {creating ? "Creating party…" : "Start Watch Party"}
+            </span>
+            <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/20 to-red-500/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
           </button>
-          <p className="text-[10px] text-gray-500 text-center mt-2">
-            Invite friends to watch together in sync
+          <p className="flex items-center justify-center gap-1.5 text-[11px] text-gray-500">
+            <Shield className="h-3 w-3" />
+            End-to-end synced · invite-only
           </p>
         </div>
       )}
 
-      {/* Active room — show party info + invite */}
+      {/* Active room — clean Netflix-style status + actions */}
       {(activeRoom || activeRoomId) && (
-        <div className="space-y-3">
-          {/* Room status */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between rounded-md border border-emerald-500/25 bg-emerald-500/8 px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs font-medium text-purple-300">Party active</span>
+              <span className="relative inline-flex h-2 w-2">
+                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Live</span>
             </div>
-            <span className="text-[10px] text-gray-500">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-white">
+              <Users className="h-3 w-3 text-emerald-300" />
               {activeRoom?.participants.length ?? 1} watching
-            </span>
+            </div>
           </div>
 
-          {/* Share link */}
           <button
+            type="button"
             onClick={copyInviteLink}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 transition-colors"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2.5 text-[13px] font-semibold text-gray-200 transition-colors hover:bg-white/10 hover:border-white/20"
           >
             {copiedLink ? (
               <>
-                <Check className="w-3.5 h-3.5 text-green-400" />
-                Link copied!
+                <Check className="w-4 h-4 text-emerald-400" />
+                Link copied
               </>
             ) : (
               <>
-                <Copy className="w-3.5 h-3.5" />
+                <Link2 className="w-4 h-4" />
                 Copy invite link
               </>
             )}
           </button>
 
-          {/* Invite friends */}
           <div>
             <button
+              type="button"
               onClick={() => setShowInviteList(!showInviteList)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 transition-colors"
+              className={`w-full inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-[13px] font-semibold transition-colors ${
+                showInviteList
+                  ? "border-white/20 bg-white/10 text-white"
+                  : "border-white/10 bg-white/5 text-gray-200 hover:bg-white/10 hover:border-white/20"
+              }`}
+              aria-expanded={showInviteList}
             >
-              <Send className="w-3.5 h-3.5" />
-              Invite friends
+              <Send className="w-4 h-4" />
+              {showInviteList ? "Hide invite list" : "Invite friends"}
             </button>
 
             {showInviteList && (
-              <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+              <div className="mt-2 space-y-1 rounded-md border border-white/10 bg-black/40 p-1.5 max-h-44 overflow-y-auto custom-scrollbar">
                 {friends.length === 0 && (
-                  <p className="text-[10px] text-gray-500 text-center py-2">
+                  <p className="text-[11px] text-gray-500 text-center py-2">
                     Add friends to invite them
                   </p>
                 )}
                 {friends.map((friend) => (
                   <div
                     key={friend.id}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/5 transition-colors"
+                    className="flex items-center gap-2.5 rounded-md p-2 hover:bg-white/5 transition-colors"
                   >
                     {friend.avatarUrl ? (
                       <img
@@ -356,23 +372,26 @@ export function WatchParty({
                         loading="lazy"
                         decoding="async"
                         referrerPolicy="no-referrer"
-                        className="w-6 h-6 rounded-full object-cover"
+                        className="w-7 h-7 rounded-full object-cover ring-1 ring-white/10"
                         onError={(e) => {
                           (e.currentTarget as HTMLElement).style.display = "none";
                         }}
                       />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-[9px] font-bold text-white">
+                      <div className="grid w-7 h-7 place-items-center rounded-full bg-gradient-to-br from-red-500 to-orange-600 text-[10px] font-bold text-white ring-1 ring-white/10">
                         {friend.displayName.charAt(0)}
                       </div>
                     )}
-                    <span className="flex-1 text-xs text-gray-300 truncate">{friend.displayName}</span>
+                    <span className="flex-1 text-[12px] text-gray-200 truncate font-medium">
+                      {friend.displayName}
+                    </span>
                     <button
+                      type="button"
                       onClick={() => inviteFriend(friend)}
                       disabled={invitedFriend === friend.userId}
-                      className="px-2 py-1 rounded-md bg-red-600 hover:bg-red-500 text-[10px] font-semibold text-white transition-colors disabled:opacity-30"
+                      className="rounded-md bg-red-600 hover:bg-red-500 px-2.5 py-1 text-[11px] font-bold text-white transition-colors disabled:opacity-50 focus-ring"
                     >
-                      {invitedFriend === friend.userId ? "Sent!" : "Invite"}
+                      {invitedFriend === friend.userId ? "Sent" : "Invite"}
                     </button>
                   </div>
                 ))}
@@ -380,22 +399,22 @@ export function WatchParty({
             )}
           </div>
 
-          {/* End party (host only) */}
           {activeRoom?.hostId === user?.uid && (
             <button
+              type="button"
               onClick={endParty}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 hover:bg-red-500/20 transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-red-500/20 bg-red-500/8 px-3 py-2.5 text-[12px] font-bold text-red-300 transition-colors hover:bg-red-500/15 hover:border-red-500/30"
             >
               <X className="w-3.5 h-3.5" />
-              End party
+              End party for everyone
             </button>
           )}
 
-          {/* Leave party (non-host) */}
           {activeRoom && activeRoom.hostId !== user?.uid && (
             <button
+              type="button"
               onClick={leaveParty}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-500 hover:text-white transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2.5 text-[12px] font-semibold text-gray-400 transition-colors hover:text-white hover:bg-white/10"
             >
               Leave party
             </button>
