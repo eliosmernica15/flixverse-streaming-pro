@@ -27,6 +27,8 @@ import Reveal from "./Reveal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { stripPartyQueryParams } from "@/lib/player/partyUrl";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { FeatureErrorBoundary } from "./FeatureErrorBoundary";
+import { PlayerErrorFallback } from "./player/PlayerErrorFallback";
 
 const VideoPlayer = dynamic(() => import("./VideoPlayer"), { ssr: false });
 const ReviewSection = dynamic(() => import("./ReviewSection"), { ssr: false });
@@ -844,7 +846,11 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           const episodeCount = currentSeasonData?.episode_count;
 
           return (
-            <div key={`player-${playerSession}-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ""}`}>
+            <FeatureErrorBoundary
+              key={`player-${playerSession}-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ""}`}
+              featureName="Video player"
+              fallback={<PlayerErrorFallback onClose={handleClosePlayer} />}
+            >
               <VideoPlayer
                 movieId={content.id}
                 title={contentTitle}
@@ -864,7 +870,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   setSelectedEpisode(nextEpisode);
                 }}
               />
-            </div>
+            </FeatureErrorBoundary>
           );
         })(),
         document.body

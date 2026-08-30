@@ -23,6 +23,7 @@ interface HeroBannerProps {
 
 const ROTATION_INTERVAL_MS = 8000;
 const MAX_ROTATION = 5;
+const HINT_TIMEOUT_MS = 10000;
 
 const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const allMovies = (propMovies && propMovies.length > 1

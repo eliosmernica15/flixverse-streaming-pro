@@ -106,6 +106,15 @@ const Navigation = () => {
 
   useBodyScrollLock(isMobileMenuOpen);
 
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMobileMenuOpen]);
+
   return (
     <nav
       style={{ paddingTop: "var(--safe-top)" }}

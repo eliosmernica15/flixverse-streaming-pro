@@ -57,36 +57,43 @@ export function useFollow(targetUserId: string | null) {
     if (!user || !targetUserId || user.uid === targetUserId) return;
 
     const db = getFirestore();
+    const prevIsFollowing = isFollowing;
+    const prevCount = followerCount;
 
-    if (isFollowing) {
-      // Unfollow
-      const followQ = query(
-        collection(db, "follows"),
-        where("follower_id", "==", user.uid),
-        where("following_id", "==", targetUserId)
-      );
-      const snap = await getDocs(followQ);
-      for (const d of snap.docs) {
-        await deleteDoc(doc(db, "follows", d.id));
+    // Optimistic update — rollback on failure
+    setIsFollowing(!prevIsFollowing);
+    setFollowerCount((prev) => Math.max(0, prev + (prevIsFollowing ? -1 : 1)));
+
+    try {
+      if (prevIsFollowing) {
+        const followQ = query(
+          collection(db, "follows"),
+          where("follower_id", "==", user.uid),
+          where("following_id", "==", targetUserId)
+        );
+        const snap = await getDocs(followQ);
+        for (const d of snap.docs) {
+          await deleteDoc(doc(db, "follows", d.id));
+        }
+      } else {
+        await addDoc(collection(db, "follows"), {
+          follower_id: user.uid,
+          following_id: targetUserId,
+          created_at: new Date().toISOString(),
+        });
+        void enqueuePendingJob(user.uid, "follow_notify", {
+          toUserId: targetUserId,
+          fromUserId: user.uid,
+          message: "Someone started following you.",
+        });
       }
-      setIsFollowing(false);
-      setFollowerCount((prev) => Math.max(0, prev - 1));
-    } else {
-      // Follow
-      await addDoc(collection(db, "follows"), {
-        follower_id: user.uid,
-        following_id: targetUserId,
-        created_at: new Date().toISOString(),
-      });
-      void enqueuePendingJob(user.uid, "follow_notify", {
-        toUserId: targetUserId,
-        fromUserId: user.uid,
-        message: "Someone started following you.",
-      });
-      setIsFollowing(true);
-      setFollowerCount((prev) => prev + 1);
+    } catch (err) {
+      // Rollback optimistic state on failure
+      setIsFollowing(prevIsFollowing);
+      setFollowerCount(prevCount);
+      throw err;
     }
-  }, [user, targetUserId, isFollowing]);
+  }, [user, targetUserId, isFollowing, followerCount]);
 
   return { isFollowing, followerCount, loading, toggleFollow };
 }
