@@ -155,7 +155,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
       clearTimeout(previewCloseTimerRef.current);
       previewCloseTimerRef.current = null;
     }
-    previewOpenTimerRef.current = setTimeout(() => setPreviewOpen(true), 280);
+    previewOpenTimerRef.current = setTimeout(() => setPreviewOpen(true), 360);
   }, [previewEnabled, fineHover]);
 
   const schedulePreviewClose = useCallback(() => {
@@ -163,7 +163,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
       clearTimeout(previewOpenTimerRef.current);
       previewOpenTimerRef.current = null;
     }
-    previewCloseTimerRef.current = setTimeout(() => setPreviewOpen(false), 180);
+    previewCloseTimerRef.current = setTimeout(() => setPreviewOpen(false), 120);
   }, []);
 
   useEffect(() => () => clearPreviewTimers(), [clearPreviewTimers]);

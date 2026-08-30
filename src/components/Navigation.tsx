@@ -116,6 +116,7 @@ const Navigation = () => {
 
   return (
     <nav
+      style={{ paddingTop: "var(--safe-top)" }}
       className={`fixed top-0 left-0 right-0 z-50 transition-[background,box-shadow,border-color] duration-500 ${
         isScrolled
           ? "glass-strong shadow-2xl shadow-black/40 border-b border-white/10"

@@ -138,11 +138,11 @@ const MovieCarousel = memo(
               <>
                 <CarouselPrevious
                   aria-label={t("prevSlide")}
-                  className="carousel-side-arrow glow-hover glass-premium press-effect absolute left-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl opacity-70 transition-all duration-300 hover:border-red-600 hover:bg-red-600 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring sm:left-1 md:flex"
+                  className="carousel-side-arrow glow-hover glass-premium press-effect absolute left-1 sm:left-2 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/40 backdrop-blur-md text-white shadow-2xl opacity-80 transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring md:flex"
                 />
                 <CarouselNext
                   aria-label={t("nextSlide")}
-                  className="carousel-side-arrow glow-hover glass-premium press-effect absolute right-0 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl opacity-70 transition-all duration-300 hover:border-red-600 hover:bg-red-600 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring sm:right-1 md:flex"
+                  className="carousel-side-arrow glow-hover glass-premium press-effect absolute right-1 sm:right-2 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/40 backdrop-blur-md text-white shadow-2xl opacity-80 transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring md:flex"
                 />
               </>
             )}
@@ -158,9 +158,6 @@ const MovieCarousel = memo(
             <p className="text-gray-500 text-sm mt-2">{t("checkBack")}</p>
           </div>
         )}
-
-        <div className="absolute left-0 top-16 bottom-0 w-8 bg-gradient-to-r from-black to-transparent pointer-events-none z-10 hidden md:block" />
-        <div className="absolute right-0 top-16 bottom-0 w-8 bg-gradient-to-l from-black to-transparent pointer-events-none z-10 hidden md:block" />
       </section>
     );
   }

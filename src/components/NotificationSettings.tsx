@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Bell, Settings, TestTube } from 'lucide-react';
+import { Bell, Settings, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -8,9 +8,20 @@ import { useNotifications } from '@/hooks/useNotifications';
 
 const NotificationSettings = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { preferences, updatePreferences, sendTestNotification } = useNotifications();
+  const { preferences, updatePreferences, hasPermission, requestPermission } = useNotifications();
 
-  const handlePreferenceChange = (key: keyof typeof preferences, value: boolean) => {
+  const handlePreferenceChange = async (key: keyof typeof preferences, value: boolean) => {
+    if (value && key !== 'allNotifications' && hasPermission === false) {
+      const granted = await requestPermission();
+      if (!granted) return;
+    }
+    if (value && key === 'allNotifications' && hasPermission !== true) {
+      const granted = await requestPermission();
+      if (!granted) {
+        updatePreferences({ allNotifications: false });
+        return;
+      }
+    }
     updatePreferences({ [key]: value });
   };
 
@@ -83,16 +94,18 @@ const NotificationSettings = () => {
             </div>
           )}
 
-          <div className="pt-4 border-t border-white/10">
-            <Button
-              onClick={sendTestNotification}
-              variant="outline"
-              className="w-full border-white/10 text-gray-300 hover:bg-white/10 focus-ring"
-            >
-              <TestTube className="w-4 h-4 mr-2" />
-              Test browser notification
-            </Button>
-          </div>
+          {hasPermission === false && preferences.allNotifications && (
+            <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 p-3">
+              <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-200/90 leading-relaxed">Browser alerts are blocked. Enable notifications in your browser settings to receive desktop alerts. In-app bell alerts always work.</p>
+            </div>
+          )}
+          {hasPermission === true && preferences.allNotifications && (
+            <div className="flex items-center gap-2 rounded-xl bg-green-500/10 border border-green-500/20 p-2.5">
+              <ShieldCheck className="w-4 h-4 text-green-400" />
+              <p className="text-xs text-green-200/90">Browser alerts enabled — you’ll get desktop notifications for new content.</p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

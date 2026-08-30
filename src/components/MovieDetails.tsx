@@ -332,10 +332,10 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
   return (
     <div
-      className={`min-h-screen w-full bg-black transition-all duration-500 ease-out overflow-x-hidden ${isVisible ? 'opacity-100' : 'opacity-0'
+      className={`min-h-screen w-full bg-black transition-all duration-500 ease-out overflow-x-clip ${isVisible ? 'opacity-100' : 'opacity-0'
         }`}
     >
-      <div className="relative w-full">
+      <div className="relative w-full overflow-visible">
         {/* Back Button */}
         <button
           type="button"
@@ -592,8 +592,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           <div className="w-full px-4 md:px-16 py-12 md:py-20 bg-gradient-to-b from-gray-900 to-black">
             <div className="max-w-7xl mx-auto">
               {/* Season Selector */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <h2 className="text-2xl md:text-3xl font-bold text-white">{t("episodes")}</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 overflow-visible">
+                <h2 className="text-2xl md:text-3xl font-bold text-white leading-tight py-1">{t("episodes")}</h2>
 
                 {/* Season Dropdown */}
                 <div className="relative z-30">
@@ -610,7 +610,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   {showSeasonDropdown && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowSeasonDropdown(false)} />
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl max-h-64 overflow-y-auto">
+                      <div className="absolute top-full right-0 mt-2 w-[280px] bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl max-h-64 overflow-y-auto">
                         {content.seasons
                           .filter(season => season.season_number > 0)
                           .map((season) => (

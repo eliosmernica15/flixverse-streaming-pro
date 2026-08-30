@@ -405,6 +405,15 @@ export function PlayerShell({
     }
   }, [isMobile, inParty, party.showPartyPanel, layout.partyPanelMode, layout]);
 
+  // Fix floating video spawning in middle: when party opens, recenter to default flex layout
+  const isFloating = playerDrag.isFloating;
+  useEffect(() => {
+    if ((showPartyPanel || inParty) && isFloating) {
+      playerDrag.resetPosition();
+      playerResize.resetSize();
+    }
+  }, [showPartyPanel, inParty, isFloating, playerDrag, playerResize]);
+
   const toggleBrowserFullscreen = useCallback(async () => {
     const el = windowRef.current;
     if (!el) return;

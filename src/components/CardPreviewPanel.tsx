@@ -55,26 +55,40 @@ function CardPreviewPanel({ movie, anchorEl, isVisible, onClose, onKeepOpen }: C
   useEffect(() => {
     if (!anchorEl || !isVisible) return;
 
-    const rect = anchorEl.getBoundingClientRect();
-    const panelWidth = 320;
-    const panelHeight = 400;
+    const updatePosition = () => {
+      const rect = anchorEl.getBoundingClientRect();
+      const panelWidth = 320;
+      const panelHeight = 380;
 
-    let left = rect.left + rect.width / 2 - panelWidth / 2;
-    let top = rect.top - panelHeight - 8;
+      let left = rect.left + rect.width / 2 - panelWidth / 2;
+      let top = rect.top - panelHeight - 12;
 
-    // Clamp to viewport
-    if (left < 8) left = 8;
-    if (left + panelWidth > window.innerWidth - 8) left = window.innerWidth - panelWidth - 8;
-    if (top < 8) top = rect.bottom + 8;
+      // Clamp to viewport with safe padding
+      if (left < 12) left = 12;
+      if (left + panelWidth > window.innerWidth - 12) left = window.innerWidth - panelWidth - 12;
+      if (top < 12) top = rect.bottom + 12;
+      // If still off bottom, flip above with smaller offset
+      if (top + panelHeight > window.innerHeight - 12 && rect.top - panelHeight - 12 > 12) {
+        top = rect.top - panelHeight - 12;
+      }
 
-    setPanelStyle({
-      position: "fixed",
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${panelWidth}px`,
-      zIndex: 9998,
-    });
-  }, [anchorEl, isVisible]);
+      setPanelStyle({
+        position: "fixed",
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${panelWidth}px`,
+        zIndex: 9998,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, { passive: true });
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [anchorEl, isVisible, movie.id]);
 
   const handlePlay = useCallback(() => {
     const ct = getContentType(movie);

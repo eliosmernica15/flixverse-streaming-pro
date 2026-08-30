@@ -20,7 +20,7 @@ interface Top10RowProps {
 }
 
 const CAROUSEL_ARROW_CLASS =
-  "carousel-side-arrow glow-hover glass-premium press-effect absolute top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 text-white shadow-2xl transition-all duration-300 hover:border-red-600 hover:bg-red-600 focus-ring md:flex";
+  "carousel-side-arrow glow-hover glass-premium press-effect absolute top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/40 backdrop-blur-md text-white shadow-2xl transition-all duration-300 hover:border-red-500 hover:bg-red-600 focus-ring md:flex";
 
 const Top10Row = memo(({ movies, title }: Top10RowProps) => {
   const router = useRouter();
@@ -137,12 +137,12 @@ const Top10Row = memo(({ movies, title }: Top10RowProps) => {
           {top10.length > 4 && (
             <>
               <CarouselPrevious
-                className={`${CAROUSEL_ARROW_CLASS} left-0 sm:left-1 ${
+                className={`${CAROUSEL_ARROW_CLASS} left-1 sm:left-2 ${
                   isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
                 }`}
               />
               <CarouselNext
-                className={`${CAROUSEL_ARROW_CLASS} right-0 sm:right-1 ${
+                className={`${CAROUSEL_ARROW_CLASS} right-1 sm:right-2 ${
                   isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
                 }`}
               />

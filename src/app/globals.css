@@ -110,7 +110,8 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
-    overflow-y: scroll;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   ::selection {

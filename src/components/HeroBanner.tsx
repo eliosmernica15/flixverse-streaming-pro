@@ -261,12 +261,12 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
             <div className="hidden sm:block w-20" /> {/* Spacer for centering */}
           </div>
 
-          {/* Auto-rotation progress bar */}
-          {!reducedMotion && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/5">
+          {/* Auto-rotation progress bar — subtle, Netflix-style, white translucent */}
+          {!reducedMotion && allMovies.length > 1 && (
+            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/10">
               <div
                 key={activeIndex}
-                className="h-full bg-red-500"
+                className="h-full bg-white/60"
                 style={{
                   animation: `hero-progress ${ROTATION_INTERVAL_MS}ms linear`,
                   width: "100%",
