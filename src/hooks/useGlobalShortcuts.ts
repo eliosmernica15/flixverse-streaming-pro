@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { OPEN_SHORTCUTS_EVENT } from "@/components/KeyboardShortcutsHelp";
 
 export const FOCUS_SEARCH_EVENT = "flixverse:focus-search";
+export const OPEN_COMMAND_PALETTE_EVENT = "flixverse:open-command";
 
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -12,6 +13,12 @@ function isEditableTarget(target: EventTarget | null) {
 export function useGlobalShortcuts() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
+        return;
+      }
+
       if (event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey) {
         if (isEditableTarget(event.target)) return;
         event.preventDefault();

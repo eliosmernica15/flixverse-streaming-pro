@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
+import { useLocalMovieListContains } from "@/hooks/useLocalMovieListContains";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -74,21 +75,11 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
   const tc = useTranslations("common");
   const { addToHistory, addFavoriteGenre } = useUserPreferencesContext();
   const { isAuthenticated } = useAuth();
-  const [isInLocalList, setIsInLocalList] = useState(false);
   const { addToList, removeFromList, isInList, isOperating } = useUserMovieListContext();
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      try {
-        const myList = JSON.parse(localStorage.getItem("myMovieList") || "[]");
-        setIsInLocalList(myList.includes(movie.id));
-      } catch {
-        setIsInLocalList(false);
-      }
-    }
-  }, [isAuthenticated, movie.id]);
+  const isInLocalList = useLocalMovieListContains(!isAuthenticated, movie.id);
 
   const isInMyList = isAuthenticated ? isInList(movie.id) : isInLocalList;
   const listBusy = isAuthenticated && isOperating(movie.id);

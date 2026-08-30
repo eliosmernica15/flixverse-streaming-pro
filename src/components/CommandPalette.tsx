@@ -15,9 +15,9 @@ import {
 import { Film, Tv, Home, Search, Heart, Sparkles, TrendingUp, User, WifiOff } from "lucide-react";
 import { searchMulti, TMDBMovie } from "@/utils/tmdbApi";
 import { playUiSound } from "@/lib/uiSound";
-import { FOCUS_SEARCH_EVENT } from "@/hooks/useGlobalShortcuts";
+import { FOCUS_SEARCH_EVENT, OPEN_COMMAND_PALETTE_EVENT } from "@/hooks/useGlobalShortcuts";
 
-export const OPEN_COMMAND_PALETTE_EVENT = "flixverse:open-command";
+export { OPEN_COMMAND_PALETTE_EVENT } from "@/hooks/useGlobalShortcuts";
 
 const pages = [
   { href: "/", label: "Home", icon: Home },

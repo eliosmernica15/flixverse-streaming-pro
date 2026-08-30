@@ -30,6 +30,7 @@ import { UpNextCountdown } from "./UpNextCountdown";
 import type { SyncStatus } from "./SyncStatusBadge";
 import { trackPlaybackStart } from "@/lib/analytics";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import "@/app/video-player.css";
 
 interface PlayerShellProps {
@@ -682,6 +683,8 @@ export function PlayerShell({
     .filter(Boolean)
     .join(" ");
 
+  const isOnline = useOnlineStatus();
+
   return (
     <div
       ref={shellRef}
@@ -689,6 +692,18 @@ export function PlayerShell({
       role="dialog"
       aria-label={`Watching ${title}`}
     >
+      {!isOnline && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[200] -translate-x-1/2 rounded-full border border-amber-500/30 bg-amber-500/15 px-4 py-1.5 text-xs font-medium text-amber-200 backdrop-blur-md"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+            You&apos;re offline. Streaming may be unavailable.
+          </span>
+        </div>
+      )}
       <PartyGuestSplash
         phase={party.guestSplashPhase}
         title={title}

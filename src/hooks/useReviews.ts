@@ -16,6 +16,7 @@ import {
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
+import { useToast } from '@/hooks/use-toast';
 import { Review } from '@/integrations/firebase/types';
 import { enqueuePendingJob } from '@/lib/pendingJobs';
 
@@ -26,6 +27,7 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
   const { profile } = useUserProfileContext();
+  const { toast } = useToast();
 
   // Fetch reviews for a specific content
   useEffect(() => {
@@ -65,6 +67,11 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     }, (error) => {
       console.error('Error fetching reviews:', error);
       if (error.code === 'failed-precondition') {
+        toast({
+          title: 'Reviews temporarily unavailable',
+          description: 'A required database index is missing. The team has been notified.',
+          variant: 'destructive',
+        });
       }
       setLoading(false);
     });

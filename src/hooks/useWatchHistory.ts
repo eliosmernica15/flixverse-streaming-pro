@@ -111,13 +111,19 @@ export const useWatchHistory = () => {
 
   // Clear all history
   const clearHistory = async () => {
-    if (!user || history.length === 0) return;
+    if (!user || history.length === 0) return { success: 0, failed: 0 };
 
     const db = requireFirebaseDb();
-    const promises = history.map(item =>
-      deleteDoc(doc(db, 'watch_history', item.id))
+    const results = await Promise.allSettled(
+      history.map(item => deleteDoc(doc(db, 'watch_history', item.id))
+      )
     );
-    await Promise.all(promises);
+    const success = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.length - success;
+    if (failed > 0) {
+      console.error(`clearHistory: ${failed} of ${results.length} deletions failed`);
+    }
+    return { success, failed };
   };
 
   // Get continue watching items (not completed, with valid duration to avoid NaN/glitches)

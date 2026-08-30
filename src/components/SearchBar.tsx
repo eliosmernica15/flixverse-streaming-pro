@@ -264,14 +264,20 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                     index === activeIndex ? "bg-white/8" : "hover:bg-white/8"
                   }`}
                 >
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <img
                       src={getResultImage(result)}
                       alt={result.title || result.name}
                       loading="lazy"
-                      className={`${result.media_type === 'person' ? 'w-12 h-12 rounded-full' : 'w-12 h-16 rounded'} object-cover shadow-lg`}
+                      decoding="async"
+                      width={48}
+                      height={result.media_type === 'person' ? 48 : 64}
+                      className={`${result.media_type === 'person' ? 'w-12 h-12 rounded-full' : 'w-12 h-16 rounded'} object-cover shadow-lg bg-white/5`}
                       onError={(e) => {
-                        e.currentTarget.src = getResultImage(result);
+                        const target = e.currentTarget;
+                        if (target.dataset.fallback === "1") return;
+                        target.dataset.fallback = "1";
+                        target.src = getResultImage(result);
                       }}
                     />
                     <div className={`absolute -top-1 -right-1 ${getMediaTypeColor(result.media_type || 'movie')} text-white text-xs px-1 rounded flex items-center space-x-1`}>
