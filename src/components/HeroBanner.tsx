@@ -149,7 +149,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
   return (
     <div
-      className="relative h-[72vh] sm:h-[88vh] lg:h-[92vh] overflow-hidden contain-paint"
+      className="group/hero relative h-[72vh] sm:h-[88vh] lg:h-[92vh] overflow-hidden contain-paint"
       onMouseEnter={() => {
         if (timerRef.current) {
           clearInterval(timerRef.current);
@@ -249,50 +249,53 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
       <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black via-black/70 to-transparent pointer-events-none" />
 
-      {/* Rotation controls */}
+      {/* Side slide navigation arrows */}
       {allMovies.length > 1 && (
-        <div className="absolute bottom-8 left-0 right-0 z-20">
-          <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-            {/* Prev/Next arrows */}
-            <div className="hidden sm:flex items-center gap-2">
-              <button onClick={goPrev} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label={t("prevTitle")}>
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button onClick={goNext} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label={t("nextTitle")}>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+        <>
+          <button
+            type="button"
+            onClick={goPrev}
+            className="absolute left-3 sm:left-6 lg:left-8 top-1/2 -translate-y-1/2 z-30 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-white shadow-2xl opacity-0 group-hover/hero:opacity-100 transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:scale-110 focus-visible:opacity-100 focus-ring"
+            aria-label={t("prevTitle")}
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            className="absolute right-3 sm:right-6 lg:right-8 top-1/2 -translate-y-1/2 z-30 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-white shadow-2xl opacity-0 group-hover/hero:opacity-100 transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:scale-110 focus-visible:opacity-100 focus-ring"
+            aria-label={t("nextTitle")}
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </>
+      )}
 
-            {/* Dot indicators */}
-            <div className="flex items-center gap-2 mx-auto sm:mx-0">
-              {allMovies.map((m, i) => (
-                <button
-                  key={`${m.id}-${m.media_type ?? "movie"}`}
-                  onClick={() => goToSlide(i)}
-                  className={`h-1 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 ${
-                    i === activeIndex ? "w-8 bg-red-500" : "w-2 bg-white/30 hover:bg-white/50"
-                  }`}
-                  aria-label={`Go to ${getContentTitle(m)}`}
-                />
-              ))}
-            </div>
-
-            <div className="hidden sm:block w-20" /> {/* Spacer for centering */}
-          </div>
-
-          {/* Auto-rotation progress bar — subtle, Netflix-style, white translucent */}
-          {!reducedMotion && allMovies.length > 1 && (
-            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/10">
-              <div
-                key={activeIndex}
-                className="h-full bg-white/60"
-                style={{
-                  animation: `hero-progress ${ROTATION_INTERVAL_MS}ms linear`,
-                  width: "100%",
-                }}
+      {/* Rotation dot indicators */}
+      {allMovies.length > 1 && (
+        <div className="absolute bottom-8 left-0 right-0 z-20 flex justify-center items-center pointer-events-auto">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
+            {allMovies.map((m, i) => (
+              <button
+                key={`${m.id}-${m.media_type ?? "movie"}`}
+                type="button"
+                onClick={() => goToSlide(i)}
+                className={`h-1.5 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 ${
+                  i === activeIndex ? "w-8 bg-red-500 shadow-md shadow-red-500/50" : "w-2 bg-white/30 hover:bg-white/60"
+                }`}
+                aria-label={`Go to ${getContentTitle(m)}`}
               />
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!reducedMotion && allMovies.length <= 1 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden lg:flex flex-col items-center space-y-2 animate-fade-in">
+          <span className="text-xs text-gray-500 uppercase tracking-widest">Scroll to explore</span>
+          <div className="w-6 h-10 border-2 border-gray-600 rounded-full flex justify-center hero-scroll-indicator">
+            <div className="w-1.5 h-3 bg-red-500 rounded-full mt-2" />
+          </div>
         </div>
       )}
 

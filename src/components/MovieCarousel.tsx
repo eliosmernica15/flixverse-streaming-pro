@@ -138,11 +138,11 @@ const MovieCarousel = memo(
               <>
                 <CarouselPrevious
                   aria-label={t("prevSlide")}
-                  className="carousel-side-arrow glow-hover glass-premium press-effect absolute left-1 sm:left-2 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/40 backdrop-blur-md text-white shadow-2xl opacity-80 transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring md:flex"
+                  className="carousel-side-arrow glow-hover press-effect absolute -left-2 sm:-left-4 lg:-left-5 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/80 backdrop-blur-md text-white shadow-2xl opacity-0 transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:scale-105 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring md:flex"
                 />
                 <CarouselNext
                   aria-label={t("nextSlide")}
-                  className="carousel-side-arrow glow-hover glass-premium press-effect absolute right-1 sm:right-2 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/40 backdrop-blur-md text-white shadow-2xl opacity-80 transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring md:flex"
+                  className="carousel-side-arrow glow-hover press-effect absolute -right-2 sm:-right-4 lg:-right-5 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/80 backdrop-blur-md text-white shadow-2xl opacity-0 transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:scale-105 hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-ring md:flex"
                 />
               </>
             )}

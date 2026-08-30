@@ -20,7 +20,7 @@ interface Top10RowProps {
 }
 
 const CAROUSEL_ARROW_CLASS =
-  "carousel-side-arrow glow-hover glass-premium press-effect absolute top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/40 backdrop-blur-md text-white shadow-2xl transition-all duration-300 hover:border-red-500 hover:bg-red-600 focus-ring md:flex";
+  "carousel-side-arrow glow-hover press-effect absolute top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/80 backdrop-blur-md text-white shadow-2xl transition-all duration-300 hover:border-red-500 hover:bg-red-600 hover:scale-105 focus-ring md:flex";
 
 const Top10Row = memo(({ movies, title }: Top10RowProps) => {
   const router = useRouter();
@@ -43,7 +43,7 @@ const Top10Row = memo(({ movies, title }: Top10RowProps) => {
 
   return (
     <section
-      className="content-auto overflow-hidden"
+      className="relative group/section content-auto"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -137,12 +137,14 @@ const Top10Row = memo(({ movies, title }: Top10RowProps) => {
           {top10.length > 4 && (
             <>
               <CarouselPrevious
-                className={`${CAROUSEL_ARROW_CLASS} left-1 sm:left-2 ${
+                aria-label={t("prevSlide")}
+                className={`${CAROUSEL_ARROW_CLASS} -left-2 sm:-left-4 lg:-left-5 ${
                   isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
                 }`}
               />
               <CarouselNext
-                className={`${CAROUSEL_ARROW_CLASS} right-1 sm:right-2 ${
+                aria-label={t("nextSlide")}
+                className={`${CAROUSEL_ARROW_CLASS} -right-2 sm:-right-4 lg:-right-5 ${
                   isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
                 }`}
               />
