@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User, Settings, Film, Tv, Star, Heart, Clock,
   Calendar, Edit2, Camera, LogOut, ChevronRight, Trash2,
-  MessageCircle, TrendingUp, Award, Filter, CreditCard, Users
+  MessageCircle, TrendingUp, Award, CreditCard, Users
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
@@ -137,12 +137,6 @@ const Profile = () => {
     setDeleteDialogOpen(false);
     setUploading(true);
     try {
-      // Note: Cloudinary deletion requires server-side implementation
-      // For now, we just remove the reference from the profile
-      if (profile.avatar_url.includes('cloudinary.com')) {
-        // Cloudinary deletion requires server-side implementation.
-      }
-
       await updateProfile({
         avatar_url: null
       });

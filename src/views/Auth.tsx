@@ -73,17 +73,22 @@ const Auth = () => {
       const user = userCredential.user;
 
       const name = displayName.trim() || trimmedEmail.split('@')[0];
-      await updateProfile(user, { displayName: name });
+      try {
+        await updateProfile(user, { displayName: name });
 
-      const db = requireFirebaseDb();
-      await setDoc(doc(db, 'profiles', user.uid), {
-        id: user.uid,
-        user_id: user.uid,
-        display_name: name,
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
+        const db = requireFirebaseDb();
+        await setDoc(doc(db, 'profiles', user.uid), {
+          id: user.uid,
+          user_id: user.uid,
+          display_name: name,
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      } catch (profileErr) {
+        await user.delete().catch(() => undefined);
+        throw profileErr;
+      }
 
       toast({
         title: "Welcome to FlixVerse!",
@@ -145,15 +150,20 @@ const Auth = () => {
       const user = result.user;
 
       const name = user.displayName || user.email?.split('@')[0] || 'User';
-      const db = requireFirebaseDb();
-      await setDoc(doc(db, 'profiles', user.uid), {
-        id: user.uid,
-        user_id: user.uid,
-        display_name: name,
-        avatar_url: user.photoURL,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, { merge: true });
+      try {
+        const db = requireFirebaseDb();
+        await setDoc(doc(db, 'profiles', user.uid), {
+          id: user.uid,
+          user_id: user.uid,
+          display_name: name,
+          avatar_url: user.photoURL,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { merge: true });
+      } catch (profileErr) {
+        await user.delete().catch(() => undefined);
+        throw profileErr;
+      }
 
       toast({
         title: "Welcome to FlixVerse!",

@@ -26,7 +26,7 @@ import SectionHeader from "./SectionHeader";
 import Reveal from "./Reveal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { stripPartyQueryParams } from "@/lib/player/partyUrl";
-import { releasePageScrollLock } from "@/lib/player/releaseScrollLock";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 const VideoPlayer = dynamic(() => import("./VideoPlayer"), { ssr: false });
 const ReviewSection = dynamic(() => import("./ReviewSection"), { ssr: false });
@@ -85,6 +85,15 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!showSeasonDropdown) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSeasonDropdown(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showSeasonDropdown]);
+
   const openPlayer = () => {
     userClosedPlayerRef.current = false;
     setPlayerSession((k) => k + 1);
@@ -103,24 +112,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     }
   }, [autoplay, content, showPlayer, guestJoinMode]);
 
-  useEffect(() => {
-    if (!showPlayer) {
-      releasePageScrollLock();
-      return;
-    }
-    const prevBody = document.body.style.overflow;
-    const prevHtml = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevBody;
-      document.documentElement.style.overflow = prevHtml;
-      releasePageScrollLock();
-    };
-  }, [showPlayer]);
+  useBodyScrollLock(showPlayer);
 
   const handleClose = () => {
-    releasePageScrollLock();
     onClose();
   };
 
@@ -128,7 +122,6 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const handleClosePlayer = () => {
     userClosedPlayerRef.current = true;
     setShowPlayer(false);
-    releasePageScrollLock();
     const currentParams = stripPartyQueryParams(new URLSearchParams(searchParams.toString()));
     currentParams.delete("resume");
     const newQs = currentParams.toString();

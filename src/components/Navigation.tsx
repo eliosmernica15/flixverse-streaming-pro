@@ -14,6 +14,7 @@ import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useToast } from "@/hooks/use-toast";
 import { useThrottledScroll } from "@/hooks/useThrottledScroll";
 import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { Button } from "@/components/ui/button";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { BrowseMegaMenu, BrowseMegaMenuMobile } from "@/components/BrowseMegaMenu";
@@ -103,16 +104,7 @@ const Navigation = () => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    if (!isMobileMenuOpen) {
-      document.body.style.overflow = "";
-      return;
-    }
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMobileMenuOpen]);
+  useBodyScrollLock(isMobileMenuOpen);
 
   return (
     <nav

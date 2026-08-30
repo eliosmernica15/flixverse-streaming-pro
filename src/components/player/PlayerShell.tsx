@@ -29,7 +29,7 @@ import { AddCommentDialog } from "./AddCommentDialog";
 import { UpNextCountdown } from "./UpNextCountdown";
 import type { SyncStatus } from "./SyncStatusBadge";
 import { trackPlaybackStart } from "@/lib/analytics";
-import { releasePageScrollLock } from "@/lib/player/releaseScrollLock";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import "@/app/video-player.css";
 
 interface PlayerShellProps {
@@ -298,7 +298,6 @@ export function PlayerShell({
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => undefined);
     }
-    releasePageScrollLock();
     onClose();
   }, [onClose]);
 
@@ -469,20 +468,14 @@ export function PlayerShell({
     };
   }, []);
 
-  useEffect(() => {
-    const prevBody = document.body.style.overflow;
-    const prevHtml = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
+  useBodyScrollLock(true);
 
+  useEffect(() => {
     const hintTimer = setTimeout(() => setShowHint(false), 10000);
 
     return () => {
       clearTimeout(hintTimer);
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-      document.body.style.overflow = prevBody;
-      document.documentElement.style.overflow = prevHtml;
-      releasePageScrollLock();
     };
   }, []);
 

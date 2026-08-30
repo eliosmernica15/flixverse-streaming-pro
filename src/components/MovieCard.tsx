@@ -115,6 +115,21 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
     prefetchTimerRef.current = setTimeout(prefetchMovie, 180);
   }, [prefetchMovie]);
 
+  const clearAllTimers = useCallback(() => {
+    if (prefetchTimerRef.current) {
+      clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = null;
+    }
+    if (previewOpenTimerRef.current) {
+      clearTimeout(previewOpenTimerRef.current);
+      previewOpenTimerRef.current = null;
+    }
+    if (previewCloseTimerRef.current) {
+      clearTimeout(previewCloseTimerRef.current);
+      previewCloseTimerRef.current = null;
+    }
+  }, []);
+
   const cancelPrefetch = useCallback(() => {
     if (prefetchTimerRef.current) {
       clearTimeout(prefetchTimerRef.current);
@@ -122,9 +137,7 @@ const MovieCard = ({ movie, comingSoon = false }: MovieCardProps) => {
     }
   }, []);
 
-  useEffect(() => () => {
-    cancelPrefetch();
-  }, [cancelPrefetch]);
+  useEffect(() => () => clearAllTimers(), [clearAllTimers]);
 
   useEffect(() => {
     const mq = window.matchMedia("(hover: hover) and (pointer: fine)");

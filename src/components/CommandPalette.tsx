@@ -15,6 +15,7 @@ import {
 import { Film, Tv, Home, Search, Heart, Sparkles, TrendingUp, User, WifiOff } from "lucide-react";
 import { searchMulti, TMDBMovie } from "@/utils/tmdbApi";
 import { playUiSound } from "@/lib/uiSound";
+import { FOCUS_SEARCH_EVENT } from "@/hooks/useGlobalShortcuts";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "flixverse:open-command";
 
@@ -174,7 +175,7 @@ export default function CommandPalette() {
             <CommandItem
               onSelect={() => {
                 setOpen(false);
-                window.dispatchEvent(new CustomEvent("flixverse:focus-search"));
+                window.dispatchEvent(new CustomEvent(FOCUS_SEARCH_EVENT));
               }}
               className={itemClass}
             >

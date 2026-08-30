@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   Sparkles,
   Film,
@@ -16,14 +17,38 @@ import {
   Send,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { useTranslations } from "next-intl";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const t = useTranslations("footer");
   const tn = useTranslations("nav");
   const tc = useTranslations("common");
+
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newsletterEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      toast({ title: t("invalidEmail"), variant: "destructive" });
+      return;
+    }
+    setSubscribing(true);
+    try {
+      localStorage.setItem("flixverse:newsletter", trimmed);
+      setNewsletterEmail("");
+      toast({ title: t("subscribed"), description: t("subscribedDesc") });
+    } catch {
+      toast({ title: t("subscribeFailed"), variant: "destructive" });
+    } finally {
+      setSubscribing(false);
+    }
+  };
 
   const navLinks = [
     { path: "/", label: tn("home"), icon: Sparkles },
@@ -105,18 +130,22 @@ const Footer = () => {
             {/* Newsletter */}
             <form
               className="mt-6 flex items-center gap-2"
-              onSubmit={(e) => e.preventDefault()}
+              onSubmit={handleSubscribe}
             >
               <input
                 type="email"
+                required
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
                 placeholder={t("emailPlaceholder")}
                 aria-label={t("emailPlaceholder")}
                 className="input-field min-h-[44px] flex-1 px-3 text-sm"
               />
               <button
                 type="submit"
+                disabled={subscribing}
                 aria-label={t("subscribe")}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20 transition-all hover:from-red-500 hover:to-red-400 focus-ring glow-hover"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20 transition-all hover:from-red-500 hover:to-red-400 focus-ring glow-hover disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Send className="h-4 w-4" />
               </button>

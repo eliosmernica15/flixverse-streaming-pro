@@ -47,8 +47,8 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
     currentMovie.genre_ids
   );
 
-  const c1 = colors[0] ? rgbToCss(colors[0], 0.15) : "rgba(239, 68, 68, 0.15)";
-  const c2 = colors[1] ? rgbToCss(colors[1], 0.10) : "rgba(168, 85, 247, 0.10)";
+  const c1 = colors[0] ? rgbToCss(colors[0], 0.15) : "hsl(var(--primary) / 0.15)";
+  const c2 = colors[1] ? rgbToCss(colors[1], 0.10) : "hsl(var(--neon-purple) / 0.10)";
 
   // Prefetch all hero movies
   useEffect(() => {
@@ -63,12 +63,29 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   useEffect(() => {
     if (allMovies.length <= 1 || reducedMotion) return;
 
-    timerRef.current = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % allMovies.length);
-    }, ROTATION_INTERVAL_MS);
+    const startTimer = () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setActiveIndex((prev) => (prev + 1) % allMovies.length);
+      }, ROTATION_INTERVAL_MS);
+    };
+    const stopTimer = () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+    const onVisibility = () => {
+      if (document.hidden) stopTimer();
+      else startTimer();
+    };
+
+    if (!document.hidden) startTimer();
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      stopTimer();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [allMovies.length, reducedMotion]);
 
@@ -150,9 +167,10 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
       {allMovies.map((m, i) => {
         const url = m.backdrop_path ? getBackdropUrl(m.backdrop_path, "large") : "";
         const isActive = i === activeIndex;
+        const slideKey = `${m.id}-${m.media_type ?? "movie"}`;
         return (
           <div
-            key={m.id}
+            key={slideKey}
             className={`absolute inset-0 transition-opacity duration-[800ms] ${isActive ? "opacity-100" : "opacity-0"}`}
           >
             <div className={`absolute inset-0 ${isActive && !reducedMotion ? "hero-ken-burns" : ""}`}>
@@ -248,7 +266,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
             <div className="flex items-center gap-2 mx-auto sm:mx-0">
               {allMovies.map((m, i) => (
                 <button
-                  key={m.id}
+                  key={`${m.id}-${m.media_type ?? "movie"}`}
                   onClick={() => goToSlide(i)}
                   className={`h-1 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 ${
                     i === activeIndex ? "w-8 bg-red-500" : "w-2 bg-white/30 hover:bg-white/50"
