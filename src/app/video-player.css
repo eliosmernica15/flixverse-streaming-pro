@@ -1777,9 +1777,27 @@
   right: 0;
   bottom: 0;
   z-index: 4;
-  padding: 0.65rem 0.85rem 0.75rem;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+  padding: 0.5rem 0.75rem 0.55rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  /* never block the embed's own controls when we are not interactive */
+}
+
+.player-overlay-bar.is-cursor-idle {
+  opacity: 1;
   pointer-events: auto;
+}
+
+.player-overlay-bar.is-cursor-active {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* while hidden, inner scrubber must also not capture pointer events */
+.player-overlay-bar.is-cursor-active .video-scrubber {
+  pointer-events: none;
 }
 
 .video-scrubber-row {
@@ -1801,42 +1819,43 @@
   left: 0;
   right: 0;
   top: 50%;
-  height: 4px;
+  height: 3px;
   transform: translateY(-50%);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
   overflow: hidden;
 }
 
 .video-scrubber-buffered {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .video-scrubber-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: #e50914;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .video-scrubber-hover {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .video-scrubber-playhead {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
   border-radius: 50%;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.9);
   transform: translateY(-50%);
-  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.35);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
   pointer-events: none;
+  opacity: 0.9;
 }
 
 .video-scrubber-tooltip {
@@ -1855,13 +1874,14 @@
 .video-marker {
   position: absolute;
   top: 50%;
-  width: 7px;
-  height: 7px;
-  margin-left: -3.5px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
   border-radius: 50%;
-  background: #fbbf24;
+  background: rgba(251, 191, 36, 0.85);
   transform: translateY(-50%);
   z-index: 2;
+  opacity: 0.85;
 }
 
 .video-marker-count-mid {

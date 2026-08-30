@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { AblyPartyChannel, type PartySyncMessage } from "@/lib/player/ablyPartySync";
+import { AblyPartyChannel, isValidAblyApiKey, type PartySyncMessage } from "@/lib/player/ablyPartySync";
 import { useAuth } from "@/hooks/useAuth";
 
 // Re-export the message type under the same name the rest of the app uses
@@ -32,7 +32,7 @@ export function useAblyPartySync({
   onPlaybackSyncRef.current = onPlaybackSync;
 
   useEffect(() => {
-    if (!roomId || !user) {
+    if (!roomId || !user || !isValidAblyApiKey(process.env.NEXT_PUBLIC_ABLY_API_KEY)) {
       setIsConnected(false);
       return;
     }

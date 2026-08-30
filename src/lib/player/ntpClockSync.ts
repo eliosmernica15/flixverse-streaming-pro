@@ -14,12 +14,14 @@ export class NTPClient {
   private static async refineOffset() {
     try {
       const start = performance.now();
-      const res = await fetch("https://worldtimeapi.org/api/timezone/Etc/UTC", {
+      const res = await fetch("https://www.cloudflare.com/cdn-cgi/trace", {
         signal: AbortSignal.timeout(2500),
       });
+      const text = await res.text();
+      const match = text.match(/ts=(\d+)/);
+      if (!match) return;
       const end = performance.now();
-      const data = await res.json();
-      const serverTime = new Date(data.utc_datetime).getTime();
+      const serverTime = Number(match[1]) * (match[1].length <= 10 ? 1000 : 1);
       const roundTrip = end - start;
       this.offset = serverTime + roundTrip / 2 - Date.now();
     } catch {

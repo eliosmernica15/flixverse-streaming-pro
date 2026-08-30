@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Maximize2, Minimize2, X, Users, LogOut, GripVertical } from "lucide-react";
+import { Maximize2, Minimize2, X, Users, LogOut, GripVertical, MessageCircle } from "lucide-react";
 import { buildStreamingSources } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
@@ -101,6 +101,8 @@ export function PlayerShell({
   const [liveDuration, setLiveDuration] = useState(0);
   const [showUpNext, setShowUpNext] = useState(false);
   const [commentAt, setCommentAt] = useState<number | null>(null);
+  const [cursorIdle, setCursorIdle] = useState(true);
+  const cursorIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { user } = useAuth();
   const locale = useLocale();
@@ -436,6 +438,28 @@ export function PlayerShell({
   }, [embedState, togglePlay, isPlaying, currentTime, party]);
 
   useEffect(() => {
+    const el = windowRef.current;
+    if (!el) return;
+
+    const markMoving = () => {
+      setCursorIdle(false);
+      if (cursorIdleTimerRef.current) clearTimeout(cursorIdleTimerRef.current);
+      cursorIdleTimerRef.current = setTimeout(() => setCursorIdle(true), 2000);
+    };
+
+    el.addEventListener("mousemove", markMoving);
+    el.addEventListener("pointerdown", markMoving);
+    el.addEventListener("touchstart", markMoving, { passive: true });
+
+    return () => {
+      el.removeEventListener("mousemove", markMoving);
+      el.removeEventListener("pointerdown", markMoving);
+      el.removeEventListener("touchstart", markMoving);
+      if (cursorIdleTimerRef.current) clearTimeout(cursorIdleTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     const prevBody = document.body.style.overflow;
     const prevHtml = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
@@ -732,6 +756,17 @@ export function PlayerShell({
                   <Users className="w-4 h-4" />
                 </button>
               )}
+              {timelineEnabled && (
+                <button
+                  type="button"
+                  className="player-window-btn"
+                  onClick={() => openCommentAt(currentTime)}
+                  aria-label="Add comment at current time"
+                  title="Add comment (C)"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </button>
+              )}
               <PlayerShortcutsDropdown
                 open={showShortcutsMenu}
                 onToggle={() => setShowShortcutsMenu((p) => !p)}
@@ -778,7 +813,10 @@ export function PlayerShell({
               onRetry={nextServer}
             />
             {timelineEnabled && embedState === "ready" && !showUpNext && (
-              <div className="player-overlay-bar">
+              <div
+                className={`player-overlay-bar ${cursorIdle ? "is-cursor-idle" : "is-cursor-active"}`}
+                aria-hidden={!cursorIdle}
+              >
                 <PlayerOverlayControls
                   currentTime={currentTime}
                   totalDuration={effectiveDuration}
@@ -790,7 +828,7 @@ export function PlayerShell({
                     void timeline.likeComment(id);
                   }}
                   isPlaying={isPlaying}
-                  controlsVisible
+                  controlsVisible={cursorIdle}
                 />
               </div>
             )}

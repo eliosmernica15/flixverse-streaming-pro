@@ -5,11 +5,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
 import { useAblyPartySync } from "@/hooks/player/useAblyPartySync";
+import { isValidAblyApiKey } from "@/lib/player/ablyPartySync";
 
-const ABLY_ENABLED =
-  typeof process !== "undefined" &&
-  !!process.env.NEXT_PUBLIC_ABLY_API_KEY &&
-  process.env.NEXT_PUBLIC_ABLY_API_KEY.includes(":");
+function isAblyEnabled(): boolean {
+  return isValidAblyApiKey(process.env.NEXT_PUBLIC_ABLY_API_KEY);
+}
 
 export interface SyncMessage {
   type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";
@@ -49,8 +49,9 @@ export function useWebRTCSync({
   const { user } = useAuth();
 
   // ── Ably path (preferred when API key is configured) ──────────────────────
+  const ablyEnabled = isAblyEnabled();
   const ably = useAblyPartySync({
-    roomId: ABLY_ENABLED ? roomId : null,
+    roomId: ablyEnabled ? roomId : null,
     isHost,
     onPlaybackSync,
     onRemoteStream,
@@ -75,7 +76,7 @@ export function useWebRTCSync({
 
   useEffect(() => {
     // Skip WebRTC setup when Ably is active
-    if (ABLY_ENABLED) return;
+    if (isAblyEnabled()) return;
     if (!roomId || !user) {
       setRtcConnected(false);
       return;
@@ -165,7 +166,7 @@ export function useWebRTCSync({
   }, [roomId, user?.uid, isHost, hostId]);
 
   useEffect(() => {
-    if (ABLY_ENABLED) return;
+    if (isAblyEnabled()) return;
     if (!isHost || !syncRef.current) return;
     syncRef.current.syncParticipants(participantIds);
   }, [isHost, participantIds.join(",")]);
@@ -185,7 +186,7 @@ export function useWebRTCSync({
   }, []);
 
   // ── Unified interface ─────────────────────────────────────────────────────
-  if (ABLY_ENABLED) {
+  if (isAblyEnabled()) {
     return {
       isConnected: ably.isConnected,
       sendMessage: ably.sendMessage,

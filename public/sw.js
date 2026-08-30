@@ -1,4 +1,4 @@
-const CACHE_VERSION = "flixverse-v6";
+const CACHE_VERSION = "flixverse-v8";
 const OFFLINE_URL = "/offline";
 
 /** Static assets only — never precache HTML (avoids stale pages blocking fonts/clicks). */
@@ -28,10 +28,8 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
-  if (url.hostname === "image.tmdb.org") {
-    event.respondWith(cacheFirst(event.request, CACHE_VERSION));
-    return;
-  }
+  // Let the page load TMDB images via img-src. SW fetch() is governed by
+  // connect-src and will fail (and break posters) if CSP is stale/strict.
 
   if (event.request.mode === "navigate") {
     event.respondWith(networkOnlyNavigate(event.request));

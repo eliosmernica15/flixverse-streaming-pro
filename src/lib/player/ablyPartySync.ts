@@ -33,18 +33,33 @@ type MessageHandler = (msg: PartySyncMessage) => void;
 
 let _client: Ably.Realtime | null = null;
 
+export function isValidAblyApiKey(key: string | undefined | null): boolean {
+  if (!key || typeof key !== "string") return false;
+  const trimmed = key.trim();
+  if (!trimmed || /your_ably|placeholder|example|undefined|null/i.test(trimmed)) return false;
+  if (trimmed.length < 20) return false;
+  // Ably keys are always appId.keyName:secret where secret is base64-ish; require dot + colon
+  if (!trimmed.includes(":") || !trimmed.includes(".")) return false;
+  // Strict: xxxx.yyyy:zzzz  (key id part + secret)
+  return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+:[A-Za-z0-9+/_=-]{12,}$/.test(trimmed) || /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+:.{20,}$/.test(trimmed);
+}
+
 function getClient(): Ably.Realtime | null {
   const key = process.env.NEXT_PUBLIC_ABLY_API_KEY;
-  if (!key || typeof key !== "string" || !key.includes(":")) return null;
+  if (!isValidAblyApiKey(key)) return null;
   if (!_client) {
-    _client = new Ably.Realtime({
-      key,
-      autoConnect: true,
-      // Use client-side auth so the key isn't exposed in messages
-      clientId: typeof window !== "undefined"
-        ? `user_${Math.random().toString(36).slice(2)}`
-        : "ssr",
-    });
+    try {
+      _client = new Ably.Realtime({
+        key: key!.trim(),
+        autoConnect: true,
+        clientId: typeof window !== "undefined"
+          ? `user_${Math.random().toString(36).slice(2)}`
+          : "ssr",
+      });
+    } catch {
+      _client = null;
+      return null;
+    }
   }
   return _client;
 }

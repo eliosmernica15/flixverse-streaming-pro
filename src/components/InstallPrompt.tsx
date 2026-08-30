@@ -18,7 +18,8 @@ export default function InstallPrompt() {
     if (window.matchMedia("(display-mode: standalone)").matches) return;
 
     const handler = (e: Event) => {
-      e.preventDefault();
+      // Do not call preventDefault — Chrome requires prompt() after that
+      // and otherwise logs "Banner not shown". Native install UI can appear.
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setDismissed(false);
     };
