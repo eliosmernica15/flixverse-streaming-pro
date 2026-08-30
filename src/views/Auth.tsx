@@ -182,73 +182,77 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen auth-bg flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-[#0a0a0c]">
       <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#1a0509] via-[#0a0a0c] to-[#0a0612]" />
         <div className="auth-orb auth-orb-red" />
         <div className="auth-orb auth-orb-purple" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:80px_80px]" />
+        <div className="absolute inset-0 opacity-[0.025] bg-[linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] bg-[size:64px_64px]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80" />
       </div>
 
-      <div className="w-full max-w-md relative z-10 animate-fade-in-up">
+      <div className="w-full max-w-[440px] relative z-10 animate-fade-in-up">
         <Link
           href="/"
-          className="inline-flex items-center space-x-2 text-gray-400 hover:text-white mb-8 transition-colors focus-ring rounded group"
+          className="inline-flex items-center space-x-1.5 text-gray-400 hover:text-white mb-8 transition-colors focus-ring rounded group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           <span className="text-sm">Back to FlixVerse</span>
         </Link>
 
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center mb-6">
-            <Sparkles className="w-12 h-12 text-red-500 animate-pulse-glow" />
-            <h1 className="text-4xl font-black ml-3">
-              <span className="text-gradient-primary">Flix</span>
-              <span className="gradient-text">Verse</span>
-            </h1>
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-3">
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-red-600 to-red-500 shadow-xl shadow-red-500/40">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
           </div>
-          <p className="text-gray-400 text-lg">Your gateway to unlimited entertainment</p>
+          <h1 className="text-3xl font-black tracking-tight">
+            <span className="text-white">Flix</span>
+            <span className="text-red-500">Verse</span>
+          </h1>
+          <p className="text-gray-400 text-sm mt-2">Your gateway to unlimited entertainment</p>
         </div>
 
-        <Card className="glass-panel glass-strong rounded-3xl overflow-hidden glow-ring">
-            <CardHeader className="pb-2 pt-8">
-              <CardTitle className="text-white text-center text-2xl font-bold">
-                {activeTab === 'signin' ? 'Welcome Back' : 'Join FlixVerse'}
+        <Card className="glass-strong rounded-2xl border border-white/10 shadow-2xl shadow-black/50 overflow-hidden">
+            <CardHeader className="pb-2 pt-7 px-7">
+              <CardTitle className="text-white text-center text-xl font-bold">
+                {activeTab === 'signin' ? 'Sign In' : 'Create Account'}
               </CardTitle>
-              <CardDescription className="text-gray-400 text-center">
+              <CardDescription className="text-gray-400 text-center text-sm">
                 {activeTab === 'signin'
-                  ? 'Sign in to continue your journey'
-                  : 'Create an account to get started'
+                  ? 'Welcome back. Please sign in to continue.'
+                  : 'Join us — it only takes a moment.'
                 }
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="p-7 pt-3">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 glass-card rounded-2xl p-1.5 mb-8">
+                <TabsList className="grid w-full grid-cols-2 glass-soft rounded-lg p-1 mb-6">
                   <TabsTrigger
                     value="signin"
-                    className="text-gray-400 data-[state=active]:text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-red-500 rounded-xl transition-all duration-300 py-3 font-semibold"
+                    className="text-gray-400 data-[state=active]:text-white data-[state=active]:bg-red-600 rounded-md transition-all duration-200 py-2.5 text-sm font-semibold"
                   >
                     Sign In
                   </TabsTrigger>
                   <TabsTrigger
                     value="signup"
-                    className="text-gray-400 data-[state=active]:text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-red-500 rounded-xl transition-all duration-300 py-3 font-semibold"
+                    className="text-gray-400 data-[state=active]:text-white data-[state=active]:bg-red-600 rounded-md transition-all duration-200 py-2.5 text-sm font-semibold"
                   >
                     Sign Up
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="signin" className="space-y-5 mt-0">
+                <TabsContent value="signin" className="space-y-4 mt-0">
                     <form
-                      className="space-y-5"
+                      className="space-y-4"
                       onSubmit={(e) => {
                         e.preventDefault();
                         void signIn();
                       }}
                     >
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
-                          <Mail className="w-4 h-4" />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="email" className="text-gray-300 text-xs font-semibold flex items-center space-x-1.5">
+                          <Mail className="w-3.5 h-3.5" />
                           <span>Email</span>
                         </Label>
                         <Input
@@ -257,12 +261,12 @@ const Auth = () => {
                           placeholder="you@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
+                          className="bg-black/40 border-white/10 text-white placeholder-gray-500 h-12 rounded-md focus:border-red-500/60 focus:ring-red-500/20 transition-all duration-200 focus-ring"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
-                          <Lock className="w-4 h-4" />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="password" className="text-gray-300 text-xs font-semibold flex items-center space-x-1.5">
+                          <Lock className="w-3.5 h-3.5" />
                           <span>Password</span>
                         </Label>
                         <div className="relative">
@@ -272,15 +276,15 @@ const Auth = () => {
                             placeholder="Enter your password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl pr-14 focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
+                            className="bg-black/40 border-white/10 text-white placeholder-gray-500 h-12 rounded-md pr-12 focus:border-red-500/60 focus:ring-red-500/20 transition-all duration-200 focus-ring"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1 focus-ring rounded"
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1 focus-ring rounded"
                             aria-label={showPassword ? "Hide password" : "Show password"}
                           >
-                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
@@ -289,31 +293,29 @@ const Auth = () => {
                         disabled={loading}
                         variant="gradient"
                         loading={loading}
-                        className="w-full h-14 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
+                        className="w-full h-12 text-white font-bold text-base rounded-md bg-red-600 hover:bg-red-500 shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-200 btn-shine mt-2"
                       >
                         Sign In
                       </Button>
 
-                      {/* Divider */}
-                      <div className="relative my-4">
+                      <div className="relative my-5">
                         <div className="absolute inset-0 flex items-center">
                           <div className="w-full border-t border-white/10"></div>
                         </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-transparent px-2 text-gray-500">Or continue with</span>
+                        <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+                          <span className="bg-[#0a0a0c] px-3 text-gray-500">Or continue with</span>
                         </div>
                       </div>
 
-                      {/* Google Sign In Button */}
                       <Button
                         type="button"
                         onClick={signInWithGoogle}
                         disabled={loading}
                         variant="outline-glow"
                         loading={loading}
-                        className="w-full h-14 glass-card border-white/10 text-white font-semibold text-base rounded-xl hover:bg-white/10 transition-all duration-300 flex items-center justify-center space-x-3 press-effect"
+                        className="w-full h-12 bg-white/5 border border-white/15 text-white font-semibold text-sm rounded-md hover:bg-white/10 transition-all duration-200 flex items-center justify-center space-x-2.5 press-effect"
                       >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
                           <path
                             fill="#4285F4"
                             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -336,17 +338,17 @@ const Auth = () => {
                     </form>
                   </TabsContent>
 
-                  <TabsContent value="signup" className="space-y-5 mt-0">
+                  <TabsContent value="signup" className="space-y-4 mt-0">
                     <form
-                      className="space-y-5"
+                      className="space-y-4"
                       onSubmit={(e) => {
                         e.preventDefault();
                         void signUp();
                       }}
                     >
-                      <div className="space-y-2">
-                        <Label htmlFor="displayName" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
-                          <User className="w-4 h-4" />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="displayName" className="text-gray-300 text-xs font-semibold flex items-center space-x-1.5">
+                          <User className="w-3.5 h-3.5" />
                           <span>Display Name</span>
                         </Label>
                         <Input
@@ -355,12 +357,12 @@ const Auth = () => {
                           placeholder="How should we call you?"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
-                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
+                          className="bg-black/40 border-white/10 text-white placeholder-gray-500 h-12 rounded-md focus:border-red-500/60 focus:ring-red-500/20 transition-all duration-200 focus-ring"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email-signup" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
-                          <Mail className="w-4 h-4" />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="email-signup" className="text-gray-300 text-xs font-semibold flex items-center space-x-1.5">
+                          <Mail className="w-3.5 h-3.5" />
                           <span>Email</span>
                         </Label>
                         <Input
@@ -369,12 +371,12 @@ const Auth = () => {
                           placeholder="you@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
+                          className="bg-black/40 border-white/10 text-white placeholder-gray-500 h-12 rounded-md focus:border-red-500/60 focus:ring-red-500/20 transition-all duration-200 focus-ring"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password-signup" className="text-gray-300 text-sm font-medium flex items-center space-x-2">
-                          <Lock className="w-4 h-4" />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="password-signup" className="text-gray-300 text-xs font-semibold flex items-center space-x-1.5">
+                          <Lock className="w-3.5 h-3.5" />
                           <span>Password</span>
                         </Label>
                         <div className="relative">
@@ -384,15 +386,15 @@ const Auth = () => {
                             placeholder="Create a secure password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="glass-card border-white/10 text-white placeholder-gray-500 h-14 rounded-xl pr-14 focus:border-red-500 focus:ring-red-500/20 transition-all duration-300 focus-ring"
+                            className="bg-black/40 border-white/10 text-white placeholder-gray-500 h-12 rounded-md pr-12 focus:border-red-500/60 focus:ring-red-500/20 transition-all duration-200 focus-ring"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1 focus-ring rounded"
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1 focus-ring rounded"
                             aria-label={showPassword ? "Hide password" : "Show password"}
                           >
-                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
@@ -401,31 +403,29 @@ const Auth = () => {
                         disabled={loading}
                         variant="gradient"
                         loading={loading}
-                        className="w-full h-14 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 hover:scale-[1.02] btn-shine mt-2"
+                        className="w-full h-12 text-white font-bold text-base rounded-md bg-red-600 hover:bg-red-500 shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-200 btn-shine mt-2"
                       >
                         Create Account
                       </Button>
 
-                      {/* Divider */}
-                      <div className="relative my-4">
+                      <div className="relative my-5">
                         <div className="absolute inset-0 flex items-center">
                           <div className="w-full border-t border-white/10"></div>
                         </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-transparent px-2 text-gray-500">Or continue with</span>
+                        <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+                          <span className="bg-[#0a0a0c] px-3 text-gray-500">Or continue with</span>
                         </div>
                       </div>
 
-                      {/* Google Sign Up Button */}
                       <Button
                         type="button"
                         onClick={signInWithGoogle}
                         disabled={loading}
                         variant="outline-glow"
                         loading={loading}
-                        className="w-full h-14 glass-card border-white/10 text-white font-semibold text-base rounded-xl hover:bg-white/10 transition-all duration-300 flex items-center justify-center space-x-3 press-effect"
+                        className="w-full h-12 bg-white/5 border border-white/15 text-white font-semibold text-sm rounded-md hover:bg-white/10 transition-all duration-200 flex items-center justify-center space-x-2.5 press-effect"
                       >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
                           <path
                             fill="#4285F4"
                             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -449,8 +449,7 @@ const Auth = () => {
                   </TabsContent>
               </Tabs>
 
-              {/* Terms */}
-              <p className="text-xs text-gray-500 text-center mt-6">
+              <p className="text-[11px] text-gray-500 text-center mt-5">
                 By continuing, you agree to FlixVerse&apos;s{' '}
                 <Link href="/terms" className="text-red-400 hover:text-red-300 focus-ring rounded">Terms of Service</Link>
                 {' '}and{' '}

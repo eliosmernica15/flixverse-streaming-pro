@@ -335,10 +335,10 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         <button
           type="button"
           onClick={handleClose}
-          className="fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] sm:top-6 sm:left-6 z-[999] flex items-center space-x-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur-xl transition-all duration-300 group cursor-pointer hover:bg-white/10 focus-ring sm:px-4"
+          className="fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] sm:top-6 sm:left-6 z-[999] inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/70 px-3.5 py-2 backdrop-blur-xl transition-all duration-200 group cursor-pointer hover:bg-white/10 hover:border-white/30 focus-ring sm:px-4"
         >
-          <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-x-1 transition-transform" />
-          <span className="text-white text-xs sm:text-sm font-medium">{t("back")}</span>
+          <ArrowLeft className="w-4 h-4 sm:w-4 sm:h-4 text-white group-hover:-translate-x-1 transition-transform" />
+          <span className="text-white text-xs sm:text-sm font-semibold">{t("back")}</span>
         </button>
 
         {/* Hero Section */}
@@ -358,54 +358,57 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
             }`}>
             <div className="max-w-4xl w-full">
               {/* Content Type Badge */}
-              <div className="flex items-center space-x-3 mb-4 sm:mb-6">
-                <span className="badge-shine inline-flex items-center space-x-1.5 rounded-full bg-red-600 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white sm:px-3 sm:py-1.5">
-                  {isTV ? <Tv className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <Film className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
-                  <span>{isTV ? tc("series") : tc("movie")}</span>
+              <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap">
+                <span className="badge-pill badge-hd">
+                  {isTV ? <Tv className="h-3 w-3" /> : <Film className="h-3 w-3" />}
+                  <span>{isTV ? "Series" : "Film"}</span>
                 </span>
                 {content.vote_average > 7.5 && !isUnreleased && (
-                  <span className="rounded-full bg-yellow-500/20 px-2 py-1.5 text-[10px] font-bold text-yellow-400 sm:px-3 sm:py-1.5">
-                    ⭐ Top Rated
-                  </span>
+                  <span className="badge-pill badge-top">⭐ Top Rated</span>
                 )}
                 {isUnreleased && (
-                  <span className="rounded-full bg-amber-500/30 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-400 sm:px-3 sm:py-1.5">
+                  <span className="badge-pill bg-amber-500/20 text-amber-400 border border-amber-500/30">
                     {t("comingSoon")}
                   </span>
+                )}
+                {(content as { adult?: boolean }).adult && (
+                  <span className="badge-pill !bg-white/10 !border-white/20 text-white">18+</span>
                 )}
               </div>
 
               {/* Title */}
-              <h1 className="display-title text-balance mb-3 text-white leading-[1.1] tracking-tight sm:mb-4 text-3xl sm:text-4xl md:text-6xl lg:text-7xl">
+              <h1 className="hero-text-shadow-strong mb-3 text-white text-balance font-black tracking-tight sm:mb-4 text-3xl sm:text-4xl md:text-6xl lg:text-7xl" style={{ lineHeight: "1.05" }}>
                 {contentTitle}
               </h1>
 
               {/* Tagline */}
               {content.tagline && (
-                <p className="mb-6 text-lg font-light italic text-gray-400 md:text-xl">{content.tagline}</p>
+                <p className="hero-text-shadow mb-6 text-base font-light italic text-gray-300 md:text-xl">{content.tagline}</p>
               )}
 
               {/* Meta Info */}
-              <div className="mb-6 flex flex-wrap items-center gap-3">
-                <span className="chip bg-yellow-500/15 font-bold text-yellow-400">
-                  <Star className="h-4 w-4 fill-current" />
-                  <span>{content.vote_average.toFixed(1)}</span>
-                </span>
+              <div className="mb-6 flex flex-wrap items-center gap-2.5">
+                {content.vote_average > 0 && (
+                  <span className={`badge-pill ${content.vote_average >= 7 ? "badge-rating-green" : content.vote_average >= 5.5 ? "badge-rating-amber" : "badge-rating-red"}`}>
+                    <Star className="h-3 w-3 fill-current" />
+                    <span>{content.vote_average.toFixed(1)}</span>
+                  </span>
+                )}
                 {releaseDate && (
-                  <span className="chip glass-card">
-                    <Calendar className="h-3.5 w-3.5" />
+                  <span className="meta-pill">
+                    <Calendar className="h-3 w-3" />
                     <span>{isUnreleased ? `Releases ${new Date(releaseDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : new Date(releaseDate).getFullYear()}</span>
                   </span>
                 )}
                 {content.runtime && (
-                  <span className="chip glass-card">
-                    <Clock className="h-3.5 w-3.5" />
+                  <span className="meta-pill">
+                    <Clock className="h-3 w-3" />
                     <span>{Math.floor(content.runtime / 60)}h {content.runtime % 60}m</span>
                   </span>
                 )}
                 {isTV && content.number_of_seasons && (
-                  <span className="chip glass-card">
-                    <Users className="h-3.5 w-3.5" />
+                  <span className="meta-pill">
+                    <Users className="h-3 w-3" />
                     <span>
                       {content.number_of_seasons > 1
                         ? t("seasonsPlural", { count: content.number_of_seasons })
@@ -413,13 +416,14 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     </span>
                   </span>
                 )}
+                <span className="inline-flex items-center rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-black tracking-wider text-white">HD</span>
               </div>
 
               {/* Genres */}
               {content.genres && content.genres.length > 0 && (
                 <div className="mb-8 flex flex-wrap gap-2">
                   {content.genres.map((genre) => (
-                    <span key={genre.id} className="chip border-red-500/20 bg-red-500/10 text-red-300">
+                    <span key={genre.id} className="meta-pill border-red-500/30 bg-red-500/10 text-red-300">
                       {genre.name}
                     </span>
                   ))}
@@ -427,7 +431,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               )}
 
               {/* Overview */}
-              <p className="text-sm sm:text-base md:text-lg text-gray-300 mb-6 sm:mb-10 max-w-3xl leading-relaxed">
+              <p className="hero-text-shadow text-sm sm:text-base md:text-lg text-gray-200/90 mb-6 sm:mb-10 max-w-3xl leading-relaxed">
                 {content.overview}
               </p>
 
@@ -504,55 +508,58 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               )}
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                 {!isUnreleased && (
                   <button
                     onClick={() => handleWatch()}
-                    className="btn-primary group inline-flex items-center space-x-3 rounded-full px-8 py-4 text-lg font-bold shadow-2xl shadow-white/20 transition-all duration-300 hover:scale-105 focus-ring"
+                    className="cta-primary !rounded-md !px-6 !py-2.5 sm:!px-8 sm:!py-3.5 !text-sm sm:!text-base"
+                    aria-label="Play"
                   >
-                    <Play className="h-6 w-6 fill-current group-hover:scale-110 transition-transform" />
+                    <Play className="h-5 w-5 sm:h-6 sm:w-6 fill-current" />
                     <span>{isTV ? `${tc("play")} S${selectedSeason}E${selectedEpisode}` : tc("play")}</span>
                   </button>
                 )}
 
-                <button
-                  onClick={handleWatchTrailer}
-                  className="btn-glass group inline-flex items-center space-x-3 rounded-full border border-white/20 px-6 py-4 font-semibold text-white transition-all duration-300 hover:scale-105 focus-ring"
-                >
-                  <Play className="h-5 w-5" />
-                  <span>{t("trailer")}</span>
-                </button>
+                {trailer && (
+                  <button
+                    onClick={handleWatchTrailer}
+                    className="cta-secondary !rounded-md !px-5 !py-2.5 sm:!px-6 sm:!py-3.5 !text-sm sm:!text-base"
+                  >
+                    <Play className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span>{t("trailer")}</span>
+                  </button>
+                )}
 
                 <button
                   onClick={handleAddToList}
                   disabled={isOperating(movieId) || loadingList}
-                  className={`group rounded-full border p-4 transition-all duration-300 hover:scale-110 focus-ring ${isInList(movieId)
-                    ? 'border-red-500 bg-red-500 text-white'
-                    : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
-                    } ${(isOperating(movieId) || loadingList) ? 'cursor-not-allowed opacity-50' : ''}`}
+                  className={`cta-icon !rounded-full ${isInList(movieId) ? '!bg-red-500/30 !border-red-500' : ''} ${(isOperating(movieId) || loadingList) ? 'cursor-not-allowed opacity-50' : ''}`}
                   title={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
+                  aria-label={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
                 >
                   {isOperating(movieId) ? (
-                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
                   ) : (
-                    <Heart className={`h-6 w-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
+                    <Heart className={`h-5 w-5 sm:h-6 sm:w-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
                   )}
                 </button>
 
                 <button
                   onClick={handleDownload}
-                  className="group rounded-full border border-white/20 bg-white/10 p-4 text-white transition-all duration-300 hover:scale-110 hover:bg-white/20 focus-ring"
+                  className="cta-icon !rounded-full"
                   title={hasPremium ? tc("download") : t("premiumRequired")}
+                  aria-label={tc("download")}
                 >
-                  <Download className={`h-6 w-6 ${!hasPremium ? "opacity-60" : ""}`} />
+                  <Download className={`h-5 w-5 sm:h-6 sm:w-6 ${!hasPremium ? "opacity-60" : ""}`} />
                 </button>
 
                 <button
                   onClick={handleShare}
-                  className="group rounded-full border border-white/20 bg-white/10 p-4 text-white transition-all duration-300 hover:scale-110 hover:bg-white/20 focus-ring"
+                  className="cta-icon !rounded-full"
                   title={tc("share")}
+                  aria-label={tc("share")}
                 >
-                  <Share2 className="h-6 w-6" />
+                  <Share2 className="h-5 w-5 sm:h-6 sm:w-6" />
                 </button>
               </div>
             </div>
@@ -693,15 +700,17 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
         {/* Trailer Section */}
         {trailer && (
-          <div className="w-full px-4 md:px-16 py-12 md:py-20 bg-gray-900">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 md:mb-12 text-center">{t("trailer")}</h2>
-            <div className="aspect-video max-w-6xl mx-auto">
-              <iframe
-                src={`https://www.youtube.com/embed/${trailer.key}`}
-                title={t("trailer")}
-                className="w-full h-full rounded-lg"
-                allowFullScreen
-              ></iframe>
+          <div className="w-full px-4 md:px-16 py-12 md:py-20">
+            <div className="max-w-6xl mx-auto">
+              <SectionHeader title={t("trailer")} eyebrow="Official" />
+              <div className="mt-6 aspect-video overflow-hidden rounded-xl ring-1 ring-white/10">
+                <iframe
+                  src={`https://www.youtube.com/embed/${trailer.key}`}
+                  title={t("trailer")}
+                  className="w-full h-full"
+                  allowFullScreen
+                />
+              </div>
             </div>
           </div>
         )}
@@ -709,47 +718,39 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         {/* Detail tabs */}
         <Tabs defaultValue="overview" className="content-auto w-full px-4 py-12 sm:px-6 md:px-16 md:py-16">
           <div className="max-w-7xl mx-auto">
-            <TabsList className="mb-8 flex flex-wrap gap-2">
-              <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
-              <TabsTrigger value="cast">{t("cast")}</TabsTrigger>
-              <TabsTrigger value="similar">{t("similar")}</TabsTrigger>
-              <TabsTrigger value="reviews">Reviews</TabsTrigger>
+            <TabsList className="mb-8 inline-flex flex-wrap gap-1 glass-soft rounded-lg p-1">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-black rounded-md px-4 py-2 text-sm font-semibold text-gray-300 transition-all">{t("overview")}</TabsTrigger>
+              <TabsTrigger value="cast" className="data-[state=active]:bg-white data-[state=active]:text-black rounded-md px-4 py-2 text-sm font-semibold text-gray-300 transition-all">{t("cast")}</TabsTrigger>
+              <TabsTrigger value="similar" className="data-[state=active]:bg-white data-[state=active]:text-black rounded-md px-4 py-2 text-sm font-semibold text-gray-300 transition-all">{t("similar")}</TabsTrigger>
+              <TabsTrigger value="reviews" className="data-[state=active]:bg-white data-[state=active]:text-black rounded-md px-4 py-2 text-sm font-semibold text-gray-300 transition-all">Reviews</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
               <Reveal>
-                <section className="glass-panel rounded-2xl p-6 sm:p-8">
+                <section className="glass-soft rounded-2xl p-6 sm:p-8">
                   <SectionHeader title={t("overview")} eyebrow={contentTitle} />
                   <div className="mt-6 grid gap-8 md:grid-cols-2 md:gap-12">
-                    <div>
-                      <h3 className="mb-4 text-xl font-semibold text-white sm:text-2xl">{t("overview")}</h3>
-                      <div className="space-y-3 text-sm text-gray-300 sm:text-base lg:text-lg">
-                        {releaseDate && (
-                          <p>
-                            <span className="font-semibold text-white">
-                              {isTV ? 'First Air Date:' : 'Release Date:'}
-                            </span> {new Date(releaseDate).toLocaleDateString()}
-                          </p>
-                        )}
-                        <p><span className="font-semibold text-white">{tc("rating")}:</span> {content.vote_average.toFixed(1)}/10</p>
-                        {content.runtime && <p><span className="font-semibold text-white">Runtime:</span> {content.runtime} minutes</p>}
-                        {isTV && content.number_of_seasons && (
-                          <p><span className="font-semibold text-white">{t("season")}:</span> {content.number_of_seasons}</p>
-                        )}
-                        {content.genres && (
-                          <p><span className="font-semibold text-white">Genres:</span> {content.genres.map(g => g.name).join(', ')}</p>
-                        )}
-                      </div>
+                    <div className="space-y-2.5 text-sm text-gray-300 sm:text-base">
+                      {releaseDate && (
+                        <p><span className="font-semibold text-white">{isTV ? 'First Air Date:' : 'Release Date:'}</span> {new Date(releaseDate).toLocaleDateString()}</p>
+                      )}
+                      <p><span className="font-semibold text-white">{tc("rating")}:</span> {content.vote_average.toFixed(1)}/10</p>
+                      {content.runtime && <p><span className="font-semibold text-white">Runtime:</span> {content.runtime} minutes</p>}
+                      {isTV && content.number_of_seasons && (
+                        <p><span className="font-semibold text-white">{t("season")}:</span> {content.number_of_seasons}</p>
+                      )}
+                      {content.genres && (
+                        <p><span className="font-semibold text-white">Genres:</span> {content.genres.map(g => g.name).join(', ')}</p>
+                      )}
                     </div>
                     <div>
-                      <h3 className="mb-4 text-xl font-semibold text-white sm:text-2xl">{t("overview")}</h3>
                       <p className="text-sm leading-relaxed text-gray-300 sm:text-base lg:text-lg">{content.overview}</p>
                     </div>
                   </div>
                 </section>
               </Reveal>
               <Reveal className="mt-6">
-                <div className="glass-panel rounded-2xl p-6">
+                <div className="glass-soft rounded-2xl p-6">
                   <h3 className="mb-4 text-lg font-semibold text-white">{isTV ? tc("series") : tc("movie")}</h3>
                   <QuickRating
                     contentId={content.id}
@@ -790,7 +791,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               {relatedContent.length > 0 && (
                 <Reveal>
                   <SectionHeader title={t("similar")} />
-                  <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+                  <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 md:grid-cols-5 lg:grid-cols-6">
                     {relatedContent.map((movie, index) => (
                       <MovieCard
                         key={`related-${movie.id}-${index}`}
@@ -813,7 +814,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 />
               </Reveal>
               <Reveal className="mt-6">
-                <div className="glass-panel rounded-2xl p-4">
+                <div className="glass-soft rounded-2xl p-4">
                   <TrendingDiscussions tmdbId={content.id} />
                 </div>
               </Reveal>
