@@ -182,7 +182,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-[#0a0a0c]">
+    <div className="min-h-screen relative flex items-stretch overflow-hidden bg-[#0a0a0c]">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a0509] via-[#0a0a0c] to-[#0a0612]" />
         <div className="auth-orb auth-orb-red" />
@@ -191,29 +191,78 @@ const Auth = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80" />
       </div>
 
-      <div className="w-full max-w-[440px] relative z-10 animate-fade-in-up">
-        <Link
-          href="/"
-          className="inline-flex items-center space-x-1.5 text-gray-400 hover:text-white mb-8 transition-colors focus-ring rounded group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          <span className="text-sm">Back to FlixVerse</span>
-        </Link>
-
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-3">
-            <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-red-600 to-red-500 shadow-xl shadow-red-500/40">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
+      {/* Left brand panel — visible on lg+ */}
+      <div className="relative hidden lg:flex lg:w-1/2 xl:w-3/5 flex-col justify-between p-12 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 60% at 30% 30%, rgba(239, 68, 68, 0.25) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 80%, rgba(168, 85, 247, 0.18) 0%, transparent 60%)",
+          }}
+        />
+        <Link href="/" className="group flex items-center gap-2.5 focus-ring rounded-md w-fit">
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 transition-transform group-hover:scale-105">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-3xl font-black tracking-tight">
+          <span className="text-xl font-black tracking-tight">
             <span className="text-white">Flix</span>
             <span className="text-red-500">Verse</span>
-          </h1>
-          <p className="text-gray-400 text-sm mt-2">Your gateway to unlimited entertainment</p>
+          </span>
+        </Link>
+        <div className="max-w-md">
+          <h2 className="text-3xl xl:text-4xl font-black tracking-tight text-white leading-[1.1] mb-4">
+            Unlimited movies, TV shows, and more.
+          </h2>
+          <p className="text-base text-gray-300 mb-8">
+            Watch anywhere. Cancel anytime. Personalized recommendations across every device.
+          </p>
+          <ul className="space-y-3 text-sm text-gray-300">
+            {[
+              "Cinema-grade streaming in 4K HDR",
+              "Sync watch parties with friends in real time",
+              "Smart lists, ratings, and reviews",
+              "Works on every device you own",
+            ].map((line) => (
+              <li key={line} className="flex items-center gap-2.5">
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/30">
+                  <svg viewBox="0 0 16 16" className="h-2.5 w-2.5 text-emerald-400" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 8.5l3 3 7-7" />
+                  </svg>
+                </span>
+                {line}
+              </li>
+            ))}
+          </ul>
         </div>
+        <p className="text-xs text-gray-500">© {new Date().getFullYear()} FlixVerse. All rights reserved.</p>
+      </div>
 
-        <Card className="glass-strong rounded-2xl border border-white/10 shadow-2xl shadow-black/50 overflow-hidden">
+      {/* Right form panel */}
+      <div className="relative flex flex-1 items-center justify-center p-4 sm:p-8 lg:p-12">
+        <div className="w-full max-w-[440px] relative z-10 animate-fade-in-up">
+          <Link
+            href="/"
+            className="inline-flex items-center space-x-1.5 text-gray-400 hover:text-white mb-8 transition-colors focus-ring rounded group lg:hidden"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm">Back to FlixVerse</span>
+          </Link>
+
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-3 lg:hidden">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-red-600 to-red-500 shadow-xl shadow-red-500/40">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+              <span className="text-white">Flix</span>
+              <span className="text-red-500">Verse</span>
+            </h1>
+            <p className="text-gray-400 text-sm mt-2">Your gateway to unlimited entertainment</p>
+          </div>
+
+          <Card className="glass-strong rounded-2xl border border-white/10 shadow-2xl shadow-black/50 overflow-hidden">
             <CardHeader className="pb-2 pt-7 px-7">
               <CardTitle className="text-white text-center text-xl font-bold">
                 {activeTab === 'signin' ? 'Sign In' : 'Create Account'}
@@ -457,6 +506,7 @@ const Auth = () => {
               </p>
             </CardContent>
           </Card>
+        </div>
       </div>
     </div>
   );

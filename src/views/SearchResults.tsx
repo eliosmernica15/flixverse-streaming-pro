@@ -167,101 +167,112 @@ const SearchResults = () => {
   };
 
   return (
-    <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto page-enter">
-      <div className="mb-8">
-        <span className="eyebrow">{t("results")}</span>
-        <h1 className="display-title text-balance mt-1">
-          {query ? (
-            <>
-              {t("results")} <span className="gradient-text">&quot;{query}&quot;</span>
-            </>
-          ) : (
-            t("findFavorite")
-          )}
-        </h1>
-      </div>
-
-      {/* Inline search input */}
-      <div className="mb-5">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input
-            id="search-input"
-            type="search"
-            defaultValue={query}
-            placeholder={t("placeholderLong")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const val = (e.target as HTMLInputElement).value;
-                runSearch(val);
-              }
-            }}
-            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20 focus-visible:ring-2 focus-visible:ring-red-500/60 transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Recent searches */}
-      {recent.length > 0 && (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-gray-500 mr-1 flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" /> Recent
+    <div className="page-enter">
+      {/* Cinematic header */}
+      <header className="relative pt-24 pb-8 px-4 sm:px-6 lg:px-10 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(239, 68, 68, 0.15) 0%, transparent 60%)",
+          }}
+        />
+        <div className="max-w-[1800px] mx-auto">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-red-500 mb-1.5">
+            {query ? t("results") : "Search"}
           </span>
-          {recent.map((r) => (
-            <div
-              key={r}
-              className="inline-flex items-center gap-1 chip text-gray-300 transition-colors"
-            >
-              <button
-                type="button"
-                onClick={() => runSearch(r)}
-                className="hover:text-white transition-colors focus-ring rounded"
-              >
-                {r}
-              </button>
-              <button
-                type="button"
-                aria-label={`Remove ${r} from recent searches`}
-                className="p-0.5 text-gray-500 hover:text-white transition-colors focus-ring rounded"
-                onClick={() => {
-                  setRecent((prev) => {
-                    const updated = prev.filter((x) => x !== r);
-                    try {
-                      localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
-                    } catch {
-                      /* ignore */
-                    }
-                    return updated;
-                  });
-                }}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-[1.1]">
+            {query ? (
+              <>
+                {t("results")} <span className="text-white">&quot;{query}&quot;</span>
+              </>
+            ) : (
+              t("findFavorite")
+            )}
+          </h1>
         </div>
-      )}
+      </header>
 
-      {!query ? (
-        <div className="text-center py-16">
-          <div className="glass-panel rounded-3xl p-10 max-w-md mx-auto">
-            <Search className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-gray-300">{t("findFavorite")}</p>
+      <main className="pb-16 px-4 sm:px-6 lg:px-10 max-w-[1800px] mx-auto">
+        {/* Inline search input */}
+        <div className="mb-5">
+          <div className="relative max-w-2xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              id="search-input"
+              type="search"
+              defaultValue={query}
+              placeholder={t("placeholderLong")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = (e.target as HTMLInputElement).value;
+                  runSearch(val);
+                }
+              }}
+              className="w-full bg-white/5 border border-white/10 rounded-md pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-red-500/40 focus-visible:ring-2 focus-visible:ring-red-500/40 transition-colors"
+            />
           </div>
         </div>
-      ) : loading && allResults.length === 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] rounded-2xl skeleton-shimmer" />
-          ))}
-        </div>
+
+        {/* Recent searches */}
+        {recent.length > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mr-1 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Recent
+            </span>
+            {recent.map((r) => (
+              <div
+                key={r}
+                className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-gray-300"
+              >
+                <button
+                  type="button"
+                  onClick={() => runSearch(r)}
+                  className="hover:text-white transition-colors focus-ring rounded"
+                >
+                  {r}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Remove ${r} from recent searches`}
+                  className="p-0.5 text-gray-500 hover:text-white transition-colors focus-ring rounded"
+                  onClick={() => {
+                    setRecent((prev) => {
+                      const updated = prev.filter((x) => x !== r);
+                      try {
+                        localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+                      } catch {
+                        /* ignore */
+                      }
+                      return updated;
+                    });
+                  }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!query ? (
+          <div className="glass-soft rounded-2xl py-16 px-8 text-center max-w-md mx-auto">
+            <Search className="w-10 h-10 text-red-500 mx-auto mb-4" />
+            <p className="text-gray-300 text-sm">{t("findFavorite")}</p>
+            <p className="text-gray-500 text-xs mt-2">Try a movie title, actor, or director.</p>
+          </div>
+        ) : loading && allResults.length === 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="aspect-[2/3] rounded-md skeleton-shimmer" />
+            ))}
+          </div>
         ) : sortedResults.length === 0 && filteredPeople.length === 0 && !loading ? (
-          <div className="text-center py-16">
-            <div className="glass-panel rounded-3xl p-10 max-w-md mx-auto">
-              <Search className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-300">{t("noResults")}</p>
-              <p className="mt-2 text-sm text-gray-500">{t("tryDifferent")}</p>
-            </div>
+          <div className="glass-soft rounded-2xl py-16 px-8 text-center max-w-md mx-auto">
+            <Search className="w-10 h-10 text-gray-500 mx-auto mb-4" />
+            <p className="text-gray-300 text-sm">{t("noResults")}</p>
+            <p className="text-gray-500 text-xs mt-2">{t("tryDifferent")}</p>
           </div>
         ) : (
           <>
@@ -272,22 +283,20 @@ const SearchResults = () => {
             />
 
             {sortedResults.length > 0 && (
-              <Reveal as="section" className="stagger mb-12 content-auto">
-                <SectionHeader title={t("moviesAndTv")} eyebrow={t("results")} />
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 mt-2">
+              <section className="mb-12 content-auto">
+                <SectionHeader title={t("moviesAndTv")} eyebrow={`${sortedResults.length} titles`} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3">
                   {sortedResults.map((item) => (
-                    <div key={`${item.id}-${item.media_type}`} className="hover-lift-sm rounded-2xl">
-                      <MovieCard movie={item} />
-                    </div>
+                    <MovieCard key={`${item.id}-${item.media_type}`} movie={item} />
                   ))}
                 </div>
-              </Reveal>
+              </section>
             )}
 
             {filteredPeople.length > 0 && (
-              <Reveal as="section" className="mb-12 content-auto">
-                <SectionHeader title={t("people")} eyebrow={t("castAndCrew")} />
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-2">
+              <section className="mb-12 content-auto">
+                <SectionHeader title={t("people")} eyebrow={`${filteredPeople.length} people`} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 mt-3">
                   {filteredPeople.map((person) => {
                     const profileImg = person.profile_path
                       ? getContentImage(person, "profile", "medium")
@@ -296,9 +305,9 @@ const SearchResults = () => {
                       <Link
                         key={`person-${person.id}`}
                         href={`/person/${person.id}`}
-                        className="group flex flex-col items-center p-4 rounded-2xl surface hover:surface-elevated transition-all border border-white/10 hover-lift-sm focus-ring"
+                        className="group flex flex-col items-center p-4 rounded-xl border border-white/8 bg-white/3 hover:bg-white/5 hover:border-white/15 transition-all hover:-translate-y-0.5 focus-ring"
                       >
-                        <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-white/20 group-hover:border-red-500/50 transition-colors shrink-0 bg-white/5">
+                        <div className="relative w-20 h-20 rounded-full overflow-hidden ring-2 ring-white/15 group-hover:ring-red-500/60 transition-all shrink-0 bg-white/5">
                           {profileImg ? (
                             <Image
                               src={profileImg}
@@ -313,37 +322,38 @@ const SearchResults = () => {
                             </div>
                           )}
                         </div>
-                        <span className="mt-2 text-sm font-medium text-center text-white line-clamp-2 group-hover:text-red-400 transition-colors">
+                        <span className="mt-2 text-sm font-semibold text-center text-white line-clamp-2 group-hover:text-red-400 transition-colors">
                           {person.name}
                         </span>
                         {person.known_for_department && (
-                          <span className="text-xs text-gray-400 mt-0.5">{person.known_for_department}</span>
+                          <span className="text-[11px] text-gray-400 mt-0.5">{person.known_for_department}</span>
                         )}
                       </Link>
                     );
                   })}
                 </div>
-              </Reveal>
+              </section>
             )}
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="h-4" />
+            {/* Infinite scroll sentinel */}
+            <div ref={sentinelRef} className="h-4" />
 
-          {/* Loading more indicator */}
-          {loading && allResults.length > 0 && (
-            <div className="flex justify-center py-8">
-              <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
-            </div>
-          )}
+            {/* Loading more indicator */}
+            {loading && allResults.length > 0 && (
+              <div className="flex justify-center py-8">
+                <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+              </div>
+            )}
 
-          {!hasMore && allResults.length > 0 && (
-            <p className="text-center text-gray-500 text-sm py-8">
-              You&apos;ve reached the end of results
-            </p>
-          )}
-        </>
-      )}
-    </main>
+            {!hasMore && allResults.length > 0 && (
+              <p className="text-center text-gray-500 text-xs py-8 uppercase tracking-wider">
+                You&apos;ve reached the end of results
+              </p>
+            )}
+          </>
+        )}
+      </main>
+    </div>
   );
 };
 

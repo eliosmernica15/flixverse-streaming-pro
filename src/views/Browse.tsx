@@ -92,25 +92,36 @@ const Browse = () => {
 
   return (
     <div className="page-enter">
-      <header className="relative pt-24 pb-6 px-4 sm:px-6 lg:px-10">
-        <div className="max-w-[1800px] mx-auto flex items-center gap-4">
-          <div className="p-2.5 rounded-lg bg-white/5 ring-1 ring-white/10">
-            <Sparkles className="w-5 h-5 text-red-500" />
+      <header className="relative pt-24 pb-8 px-4 sm:px-6 lg:px-10 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 60%)",
+          }}
+        />
+        <div className="max-w-[1800px] mx-auto flex items-end gap-4">
+          <div className="p-3 rounded-lg bg-white/5 ring-1 ring-white/10">
+            <Sparkles className="h-7 w-7 text-indigo-400" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">{categoryTitle}</h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              {isLoading ? tc("loading") : t("titles", { count: movies.length })}
-            </p>
+            <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 mb-1.5">
+              {isLoading ? "Loading…" : t("titles", { count: movies.length })}
+            </span>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-[1.1]">
+              {categoryTitle}
+            </h1>
           </div>
         </div>
       </header>
 
-      <PageContainer className="!pt-0">
+      <main className="pb-16 px-4 sm:px-6 lg:px-10 max-w-[1800px] mx-auto">
+        {/* Filter / sort bar */}
         <div className="glass-soft rounded-lg p-2 mb-6 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm text-gray-400 px-2">
             <ArrowDownWideNarrow className="w-4 h-4 text-red-500" />
-            <span className="hidden sm:inline text-xs font-semibold uppercase tracking-wider">Sort by</span>
+            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-wider">Sort by</span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {sorts.map((s) => (
@@ -118,7 +129,7 @@ const Browse = () => {
                 key={s.key}
                 type="button"
                 onClick={() => setSort(s.key)}
-                className={`inline-flex items-center gap-1.5 min-h-[36px] rounded-md px-3 text-xs font-semibold transition-all focus-ring ${
+                className={`inline-flex items-center gap-1.5 min-h-[36px] rounded-md px-3 text-xs font-semibold transition-colors focus-ring ${
                   sort === s.key
                     ? "bg-white text-black"
                     : "text-gray-300 hover:bg-white/10 hover:text-white"
@@ -141,12 +152,12 @@ const Browse = () => {
         )}
 
         {isError && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 text-center glass-soft rounded-2xl max-w-md mx-auto">
-            <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-            <p className="text-gray-300 mb-4">{tn("tryAgain")}</p>
+          <div className="flex flex-col items-center justify-center py-16 text-center glass-soft rounded-2xl max-w-md mx-auto">
+            <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
+            <p className="text-gray-300 mb-4 text-sm">{tn("tryAgain")}</p>
             <button
               onClick={() => refetch()}
-              className="inline-flex items-center justify-center min-h-[40px] rounded-md px-5 bg-red-600 hover:bg-red-500 text-white font-semibold text-sm transition-colors focus-ring"
+              className="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors focus-ring"
             >
               {t("retry")}
             </button>
@@ -154,27 +165,28 @@ const Browse = () => {
         )}
 
         {!isLoading && !isError && sortedMovies.length > 0 && (
-          <Reveal as="div" className="stagger grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 content-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 content-auto">
             {sortedMovies.map((movie, idx) => (
               <MovieCard
                 key={movie.id}
                 movie={movie}
                 index={idx}
+                priority={idx < 6}
                 comingSoon={category === "coming-soon" || category === "upcoming"}
               />
             ))}
-          </Reveal>
+          </div>
         )}
 
         {!isLoading && !isError && sortedMovies.length === 0 && (
-          <div className="text-center py-20">
+          <div className="text-center py-16">
             <div className="glass-soft rounded-2xl p-10 max-w-md mx-auto">
               <Sparkles className="w-10 h-10 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-300">{t("empty")}</p>
+              <p className="text-gray-300 text-sm">{t("empty")}</p>
             </div>
           </div>
         )}
-      </PageContainer>
+      </main>
     </div>
   );
 };
