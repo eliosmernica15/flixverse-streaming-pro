@@ -241,15 +241,11 @@ const Top10Row = memo(({ movies, title }: Top10RowProps) => {
             <>
               <CarouselPrevious
                 aria-label={t("prevSlide")}
-                className={`carousel-side-arrow press-effect absolute -left-1 sm:left-0 top-[40%] z-30 hidden h-12 w-8 -translate-y-1/2 items-center justify-center bg-gradient-to-r from-black/80 to-transparent text-white transition-opacity duration-300 ${
-                  isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
-                } hover:from-black/95 focus-visible:opacity-100 focus-ring md:flex`}
+                className={`hidden md:inline-flex ${isHovered ? "" : ""}`}
               />
               <CarouselNext
                 aria-label={t("nextSlide")}
-                className={`carousel-side-arrow press-effect absolute -right-1 sm:right-0 top-[40%] z-30 hidden h-12 w-8 -translate-y-1/2 items-center justify-center bg-gradient-to-l from-black/80 to-transparent text-white transition-opacity duration-300 ${
-                  isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
-                } hover:from-black/95 focus-visible:opacity-100 focus-ring md:flex`}
+                className={`hidden md:inline-flex ${isHovered ? "" : ""}`}
               />
             </>
           )}

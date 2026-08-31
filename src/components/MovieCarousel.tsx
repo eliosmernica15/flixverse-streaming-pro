@@ -138,11 +138,11 @@ const MovieCarousel = memo(
                 <>
                   <CarouselPrevious
                     aria-label={t("prevSlide")}
-                    className="carousel-side-arrow press-effect absolute -left-1 sm:left-0 top-1/2 z-30 hidden h-12 w-8 -translate-y-1/2 items-center justify-center bg-gradient-to-r from-black/80 to-transparent text-white opacity-0 transition-opacity duration-300 hover:from-black/95 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-visible:opacity-100 focus-ring md:flex"
+                    className="hidden md:inline-flex"
                   />
                   <CarouselNext
                     aria-label={t("nextSlide")}
-                    className="carousel-side-arrow press-effect absolute -right-1 sm:right-0 top-1/2 z-30 hidden h-12 w-8 -translate-y-1/2 items-center justify-center bg-gradient-to-l from-black/80 to-transparent text-white opacity-0 transition-opacity duration-300 hover:from-black/95 group-hover/section:opacity-100 group-focus-within/section:opacity-100 focus-visible:opacity-100 focus-ring md:flex"
+                    className="hidden md:inline-flex"
                   />
                 </>
               )}

@@ -1437,6 +1437,76 @@ input[type="range"].player-volume::-moz-range-thumb {
   /* Carousel side arrows — Netflix-style flanking */
   .carousel-side-arrow {
     pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 64px;
+    background: transparent;
+    border: 0;
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 220ms ease, background 220ms ease;
+    z-index: 20;
+    padding: 0;
+  }
+  .carousel-side-arrow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.7) 0%,
+      rgba(0, 0, 0, 0) 100%
+    );
+    transition: opacity 220ms ease;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .carousel-side-arrow[data-dir="next"]::after {
+    background: linear-gradient(
+      270deg,
+      rgba(0, 0, 0, 0.7) 0%,
+      rgba(0, 0, 0, 0) 100%
+    );
+  }
+  .carousel-side-arrow:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: -2px;
+  }
+  .carousel-side-arrow[disabled] {
+    display: none;
+  }
+  .row-shell:hover .carousel-side-arrow:not([disabled]),
+  .row-shell:focus-within .carousel-side-arrow:not([disabled]),
+  .carousel-side-arrow:focus-visible {
+    opacity: 1;
+  }
+  .carousel-side-arrow:hover::after {
+    opacity: 1;
+  }
+  .carousel-side-arrow > svg {
+    width: 28px;
+    height: 28px;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+    transition: transform 180ms ease;
+  }
+  .carousel-side-arrow:hover > svg {
+    transform: scale(1.18);
+  }
+  .carousel-side-arrow:active > svg {
+    transform: scale(0.94);
+  }
+  .carousel-side-arrow[data-dir="prev"] {
+    left: 0;
+  }
+  .carousel-side-arrow[data-dir="next"] {
+    right: 0;
   }
 
   /* ── Netflix-grade row layout ── */

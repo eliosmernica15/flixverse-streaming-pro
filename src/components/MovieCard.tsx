@@ -20,8 +20,6 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
-import { isFeatureEnabled } from "@/lib/featureFlags";
-import CardPreviewPanel from "./CardPreviewPanel";
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -64,13 +62,8 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [fineHover, setFineHover] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previewOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previewCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previewEnabled = isFeatureEnabled("card-preview");
   const { toast } = useToast();
   const t = useTranslations("movieCard");
   const tc = useTranslations("common");
@@ -112,14 +105,6 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
       clearTimeout(prefetchTimerRef.current);
       prefetchTimerRef.current = null;
     }
-    if (previewOpenTimerRef.current) {
-      clearTimeout(previewOpenTimerRef.current);
-      previewOpenTimerRef.current = null;
-    }
-    if (previewCloseTimerRef.current) {
-      clearTimeout(previewCloseTimerRef.current);
-      previewCloseTimerRef.current = null;
-    }
   }, []);
 
   const cancelPrefetch = useCallback(() => {
@@ -130,48 +115,6 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
   }, []);
 
   useEffect(() => () => clearAllTimers(), [clearAllTimers]);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const sync = () => setFineHover(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-
-  const clearPreviewTimers = useCallback(() => {
-    if (previewOpenTimerRef.current) clearTimeout(previewOpenTimerRef.current);
-    if (previewCloseTimerRef.current) clearTimeout(previewCloseTimerRef.current);
-    previewOpenTimerRef.current = null;
-    previewCloseTimerRef.current = null;
-  }, []);
-
-  const keepPreviewOpen = useCallback(() => {
-    if (previewCloseTimerRef.current) {
-      clearTimeout(previewCloseTimerRef.current);
-      previewCloseTimerRef.current = null;
-    }
-    setPreviewOpen(true);
-  }, []);
-
-  const schedulePreviewOpen = useCallback(() => {
-    if (!previewEnabled || !fineHover) return;
-    if (previewCloseTimerRef.current) {
-      clearTimeout(previewCloseTimerRef.current);
-      previewCloseTimerRef.current = null;
-    }
-    previewOpenTimerRef.current = setTimeout(() => setPreviewOpen(true), 360);
-  }, [previewEnabled, fineHover]);
-
-  const schedulePreviewClose = useCallback(() => {
-    if (previewOpenTimerRef.current) {
-      clearTimeout(previewOpenTimerRef.current);
-      previewOpenTimerRef.current = null;
-    }
-    previewCloseTimerRef.current = setTimeout(() => setPreviewOpen(false), 120);
-  }, []);
-
-  useEffect(() => () => clearPreviewTimers(), [clearPreviewTimers]);
 
   const handlePlay = useCallback(
     (e: React.MouseEvent | React.KeyboardEvent) => {
@@ -250,12 +193,10 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
       onMouseEnter={() => {
         setIsHovered(true);
         schedulePrefetch();
-        schedulePreviewOpen();
       }}
       onMouseLeave={() => {
         setIsHovered(false);
         cancelPrefetch();
-        schedulePreviewClose();
       }}
       onFocus={() => {
         setIsHovered(true);
@@ -388,16 +329,6 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
           <span className="text-gray-500">{runtime}</span>
         </div>
       </div>
-
-      {previewEnabled && fineHover && (
-        <CardPreviewPanel
-          movie={movie}
-          anchorEl={cardRef.current}
-          isVisible={previewOpen}
-          onClose={() => setPreviewOpen(false)}
-          onKeepOpen={keepPreviewOpen}
-        />
-      )}
     </div>
   );
 };
