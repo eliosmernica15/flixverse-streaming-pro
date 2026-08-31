@@ -250,10 +250,18 @@ const Profile = () => {
       <main className="pt-20 pb-16">
         {/* Profile Header */}
         <div className="relative">
-          {/* Cover Image */}
-          <div className="h-48 md:h-64 bg-gradient-to-r from-red-900/50 via-purple-900/50 to-blue-900/50 relative overflow-hidden">
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599735161-8f4b80604bb9?w=1920')] bg-cover bg-center opacity-20" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+          {/* Cover Image — cinematic */}
+          <div className="relative h-48 md:h-64 overflow-hidden">
+            <div
+              aria-hidden
+              className="absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 80% 60% at 30% 30%, rgba(239, 68, 68, 0.35) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 80%, rgba(168, 85, 247, 0.30) 0%, transparent 60%), linear-gradient(135deg, #1a0509 0%, #0a0a0c 50%, #0a0612 100%)",
+              }}
+            />
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599735161-8f4b80604bb9?w=1920')] bg-cover bg-center opacity-20 mix-blend-overlay" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
           </div>
 
           {/* Profile Info */}
