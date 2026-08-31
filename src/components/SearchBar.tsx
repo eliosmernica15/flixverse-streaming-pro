@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, X, User, Film, Tv } from "lucide-react";
+import { Search, X, User, Film, Tv, Clock, TrendingUp, Compass, Loader2 } from "lucide-react";
 import { TMDBMovie, TMDBPerson, searchMulti, searchPeople, getContentImage } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
 import { FOCUS_SEARCH_EVENT } from "@/hooks/useGlobalShortcuts";
+
+const RECENT_KEY = "flixverse:recent-searches";
 
 interface SearchBarProps {
   onMovieSelect: (movie: TMDBMovie) => void;
@@ -28,18 +31,53 @@ interface SearchResult {
   known_for?: TMDBMovie[];
 }
 
+const TRENDING_SUGGESTIONS = [
+  { label: "Trending Now", href: "/browse/trending-now", icon: TrendingUp },
+  { label: "Action", href: "/browse/action", icon: Film },
+  { label: "Sci-Fi", href: "/browse/sci-fi", icon: Compass },
+  { label: "Series", href: "/tv-shows", icon: Tv },
+];
+
 const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [recent, setRecent] = useState<string[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const router = useRouter();
   const t = useTranslations("search");
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    try {
+      setRecent(JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"));
+    } catch {
+      setRecent([]);
+    }
+  }, []);
+
+  // Push successful query to recent
+  useEffect(() => {
+    if (!query.trim()) return;
+    return () => {
+      const trimmed = query.trim();
+      if (trimmed.length < 2) return;
+      setRecent((prev) => {
+        const next = [trimmed, ...prev.filter((q) => q !== trimmed)].slice(0, 6);
+        try {
+          localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    };
+  }, [query]);
 
   useEffect(() => {
     const focusSearch = () => {
@@ -235,21 +273,24 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
       </div>
 
       {isOpen && (query.length >= 2 || results.length > 0) && (
-        <div ref={listRef} className="absolute top-full left-0 right-0 mt-2 bg-zinc-950/98 border border-white/10 rounded-xl max-h-96 overflow-y-auto z-50 shadow-2xl shadow-black/50 custom-scrollbar">
+        <div ref={listRef} className="absolute top-full left-0 right-0 mt-2 bg-zinc-950/98 border border-white/10 rounded-xl max-h-[28rem] overflow-y-auto z-50 shadow-2xl shadow-black/50 custom-scrollbar">
           {loading && (
-            <div className="p-4 text-center text-gray-400">
-              <div className="animate-pulse">Searching...</div>
+            <div className="flex items-center justify-center gap-2 p-4 text-gray-400 text-sm">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Searching…
             </div>
           )}
 
           {!loading && results.length === 0 && query.length >= 2 && (
-            <div className="p-4 text-center text-gray-400">
-              No content found for "{query}"
+            <div className="p-6 text-center">
+              <Search className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+              <p className="text-sm text-gray-300">No content found for &quot;{query}&quot;</p>
+              <p className="text-[11px] text-gray-500 mt-1">Try a different title or name</p>
             </div>
           )}
 
           {!loading && results.length > 0 && (
-            <div className="py-2">
+            <div className="py-1.5">
               {results.map((result, index) => (
                 <button
                   key={`${result.id}-${result.media_type}`}
@@ -260,8 +301,8 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                       el?.scrollIntoView({ block: "nearest" });
                     }
                   }}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 transition-colors text-left rounded-lg mx-1 ${
-                    index === activeIndex ? "bg-white/8" : "hover:bg-white/8"
+                  className={`w-full flex items-center gap-3 px-3 py-2 transition-colors text-left rounded-md mx-1.5 ${
+                    index === activeIndex ? "bg-white/10" : "hover:bg-white/8"
                   }`}
                 >
                   <div className="relative shrink-0">
@@ -272,7 +313,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                       decoding="async"
                       width={48}
                       height={result.media_type === 'person' ? 48 : 64}
-                      className={`${result.media_type === 'person' ? 'w-12 h-12 rounded-full' : 'w-12 h-16 rounded'} object-cover shadow-lg bg-white/5`}
+                      className={`${result.media_type === 'person' ? 'w-10 h-10 rounded-full' : 'w-10 h-14 rounded'} object-cover shadow-md bg-white/5`}
                       onError={(e) => {
                         const target = e.currentTarget;
                         if (target.dataset.fallback === "1") return;
@@ -280,46 +321,103 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                         target.src = getResultImage(result);
                       }}
                     />
-                    <div className={`absolute -top-1 -right-1 ${getMediaTypeColor(result.media_type || 'movie')} text-white text-xs px-1 rounded flex items-center space-x-1`}>
+                    <div className={`absolute -top-1 -right-1 ${getMediaTypeColor(result.media_type || 'movie')} text-white p-0.5 rounded-sm`}>
                       {getMediaTypeIcon(result.media_type || 'movie')}
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-white font-medium truncate">
+                    <h4 className="text-white text-sm font-semibold truncate">
                       {result.title || result.name}
                     </h4>
-                    <div className="flex items-center space-x-2 text-gray-400 text-sm">
+                    <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mt-0.5">
                       {result.media_type === 'person' ? (
-                        <span>{result.known_for_department || 'Actor'}</span>
+                        <span>{result.known_for_department || "Actor"}</span>
                       ) : (
                         <>
                           <span>
                             {result.release_date || result.first_air_date
                               ? new Date(result.release_date || result.first_air_date).getFullYear()
-                              : 'N/A'}
+                              : "—"}
                           </span>
                           {result.vote_average && result.vote_average > 0 && (
                             <>
-                              <span>•</span>
-                              <div className="flex items-center space-x-1 text-yellow-400">
-                                <span>⭐</span>
-                                <span>{result.vote_average.toFixed(1)}</span>
-                              </div>
+                              <span className="text-gray-600">·</span>
+                              <span className="text-yellow-400 font-semibold">★ {result.vote_average.toFixed(1)}</span>
                             </>
                           )}
                         </>
                       )}
                     </div>
-                    {result.media_type === 'person' && result.known_for && result.known_for.length > 0 && (
-                      <p className="text-gray-500 text-xs truncate">
-                        Known for: {result.known_for.map(item => item.title || item.name).slice(0, 2).join(', ')}
-                      </p>
-                    )}
                   </div>
                 </button>
               ))}
+              <div className="border-t border-white/5 px-3 py-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+                    setIsOpen(false);
+                  }}
+                  className="w-full text-left text-[11px] font-bold uppercase tracking-wider text-red-400 hover:text-red-300 px-1 py-1"
+                >
+                  See all results for &quot;{query.trim()}&quot; →
+                </button>
+              </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Empty-state dropdown: recent + trending */}
+      {isOpen && query.trim().length < 2 && recent.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-950/98 border border-white/10 rounded-xl z-50 shadow-2xl shadow-black/50 overflow-hidden">
+          <div className="p-2">
+            <div className="flex items-center justify-between px-2 py-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Recent searches
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setRecent([]);
+                  try { localStorage.removeItem(RECENT_KEY); } catch { /* ignore */ }
+                }}
+                className="text-[10px] font-semibold text-gray-500 hover:text-white transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5 px-1 pb-2">
+              {recent.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => {
+                    setQuery(r);
+                  }}
+                  className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-gray-300 hover:bg-white/10 hover:text-white transition-colors focus-ring"
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-white/5 mt-1 pt-1.5">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 px-2 py-1.5">
+                Trending
+              </span>
+              {TRENDING_SUGGESTIONS.map((s) => (
+                <Link
+                  key={s.href}
+                  href={s.href}
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px] text-gray-300 hover:bg-white/8 hover:text-white transition-colors"
+                >
+                  <s.icon className="h-3.5 w-3.5 text-red-400" />
+                  {s.label}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
