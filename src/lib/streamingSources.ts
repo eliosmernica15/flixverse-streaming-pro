@@ -49,11 +49,16 @@ export function buildStreamingSources(
 ): StreamingSource[] {
   const isTv = mediaType === "tv" && season && episode;
   const lang = opts?.lang?.toLowerCase();
+  // YapGrid's `lang` parameter is the default *subtitle* and audio language code.
+  // We restrict the user-facing allowlist to English + Albanian so we never
+  // land on a Hindi-dubbed source.
+  const allowedLangs = new Set(["en", "sq"]);
+  const playerLang = lang && allowedLangs.has(lang) ? lang : "en";
 
   const vidfastBase = isTv
     ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
     : `https://vidfast.pro/movie/${movieId}?autoPlay=true`;
-  const vidfastUrl = lang === "sq" ? `${vidfastBase}&sub=sq` : vidfastBase;
+  const vidfastUrl = playerLang === "sq" ? `${vidfastBase}&sub=sq` : vidfastBase;
 
   const yapgridSources: (Omit<StreamingSource, "url"> & { providerUrl: string })[] =
     YAPGRID_LANES.map((lane) => {
@@ -63,7 +68,7 @@ export function buildStreamingSources(
         season,
         episode,
         server: lane,
-        lang,
+        lang: playerLang,
         title: opts?.title,
       });
       return {
