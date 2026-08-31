@@ -49,9 +49,12 @@ export function buildStreamingSources(
 ): StreamingSource[] {
   const isTv = mediaType === "tv" && season && episode;
   const lang = opts?.lang?.toLowerCase();
-  // YapGrid's `lang` parameter is the default *subtitle* and audio language code.
-  // We restrict the user-facing allowlist to English + Albanian so we never
-  // land on a Hindi-dubbed source.
+  // YapGrid's `lang` parameter only sets the default SUBTITLE language, not the
+  // audio. Their public API does not expose audio-track selection, so when
+  // their upstream server happens to return a Hindi-dubbed source we can't
+  // override it. We put the providers that DO honour per-language audio
+  // (Videasy, VidLink, VidFast) first and fall back to YapGrid's Z/Y/X only
+  // when those fail. The user can also switch from the in-player audio menu.
   const allowedLangs = new Set(["en", "sq"]);
   const playerLang = lang && allowedLangs.has(lang) ? lang : "en";
 
@@ -60,6 +63,9 @@ export function buildStreamingSources(
     : `https://vidfast.pro/movie/${movieId}?autoPlay=true`;
   const vidfastUrl = playerLang === "sq" ? `${vidfastBase}&sub=sq` : vidfastBase;
 
+  // YapGrid is reserved as the last-resort fallback (positions 7, 8, 9 below).
+  // We still pass `lang` so that the *subtitle* picker in their player is
+  // pre-set; the audio track is whatever their upstream returns.
   const yapgridSources: (Omit<StreamingSource, "url"> & { providerUrl: string })[] =
     YAPGRID_LANES.map((lane) => {
       const url = buildYapGridEmbedUrl({
@@ -76,12 +82,22 @@ export function buildStreamingSources(
         name: `YapGrid ${lane.toUpperCase()}`,
         icon: "🇦🇱",
         quality: "FHD" as const,
-        reliability: "high" as const,
+        reliability: "medium" as const,
         providerUrl: url,
       };
     });
 
-  const raw: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
+  const primary: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
+    {
+      id: "videasy",
+      name: "Videasy (4K)",
+      icon: "🎬",
+      quality: "4K",
+      reliability: "high",
+      providerUrl: isTv
+        ? `https://player.videasy.net/tv/${movieId}/${season}/${episode}?autoplay=true`
+        : `https://player.videasy.net/movie/${movieId}?autoplay=true`,
+    },
     {
       id: "vidlink",
       name: "VidLink",
@@ -91,16 +107,6 @@ export function buildStreamingSources(
       providerUrl: isTv
         ? `https://vidlink.pro/tv/${movieId}/${season}/${episode}?autoplay=true`
         : `https://vidlink.pro/movie/${movieId}?autoplay=true`,
-    },
-    {
-      id: "videasy",
-      name: "Videasy",
-      icon: "🎬",
-      quality: "4K",
-      reliability: "high",
-      providerUrl: isTv
-        ? `https://player.videasy.net/tv/${movieId}/${season}/${episode}?autoplay=true`
-        : `https://player.videasy.net/movie/${movieId}?autoplay=true`,
     },
     {
       id: "vidfast",
@@ -152,7 +158,10 @@ export function buildStreamingSources(
     },
   ];
 
-  const ordered = [...yapgridSources, ...raw];
+  // YapGrid is intentionally LAST — its audio is upstream-controlled and
+  // we can't force it to English/Albanian, so it should only be tried after
+  // every better-behaved provider has failed.
+  const ordered = [...primary, ...yapgridSources];
 
   return ordered.map((s) => ({
     ...s,
