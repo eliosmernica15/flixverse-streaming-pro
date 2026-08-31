@@ -15,6 +15,7 @@ import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
 import { useTimelineComments } from "@/hooks/player/useTimelineComments";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocale } from "@/hooks/useLocale";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { isSpoilerGuardEnabled } from "@/lib/player/spoilerGuard";
 import { EmbedFrame } from "./EmbedFrame";
@@ -111,24 +112,42 @@ export function PlayerShell({
 
   const { user } = useAuth();
   const locale = useLocale();
+  const { preferences, updatePreferences } = useUserPreferences();
   const timelineEnabled = isFeatureEnabled("timeline-comments");
   const glowEnabled = isFeatureEnabled("ambient-glow");
+
+  // Audio language. The user's `preferredLanguage` preference wins; otherwise we
+  // fall back to the site locale (so Albanian-locale visitors get Albanian by
+  // default and everyone else gets English). We restrict to {en, sq} because
+  // YapGrid will happily serve a Hindi-dubbed source if `lang` is left open.
+  const ALLOWED_LANGS = ["en", "sq"] as const;
+  type StreamLang = (typeof ALLOWED_LANGS)[number];
+  const defaultLang: StreamLang = (() => {
+    if (
+      preferences.preferredLanguage &&
+      (ALLOWED_LANGS as readonly string[]).includes(preferences.preferredLanguage)
+    ) {
+      return preferences.preferredLanguage as StreamLang;
+    }
+    return locale === "sq" ? "sq" : "en";
+  })();
+  const [streamLang, setStreamLang] = useState<StreamLang>(defaultLang);
 
   const autoFailoverRef = useRef(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const windowRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const playerDrag = usePlayerWindowDrag(shellRef, windowRef);
 
   const streamingSources = useMemo(
     () =>
       buildStreamingSources(movieId, mediaType, season, episode, {
-        lang: locale === "sq" ? "sq" : undefined,
+        lang: streamLang,
         title,
       }),
-    [movieId, mediaType, season, episode, locale, title]
+    [movieId, mediaType, season, episode, streamLang, title]
   );
   const currentSource = streamingSources[currentServer];
   const effectiveDuration = liveDuration || totalDuration || 120 * 60;
@@ -296,6 +315,23 @@ export function PlayerShell({
   const prevServer = useCallback(() => {
     switchServer((currentServer - 1 + streamingSources.length) % streamingSources.length);
   }, [currentServer, streamingSources.length, switchServer]);
+
+  // Switch the preferred audio/subtitle language and reload the current server
+  // with the new `lang` query string. YapGrid re-runs its source selection
+  // on every iframe load, so this is the only reliable way to switch.
+  const handleSetStreamLang = useCallback(
+    (next: StreamLang) => {
+      if (next === streamLang) return;
+      setStreamLang(next);
+      // Persist the choice in the user's preferences so it sticks across sessions.
+      updatePreferences({ preferredLanguage: next });
+      // Reset to server 0 so the user sees the new-language source first.
+      setCurrentServer(0);
+      setEmbedState("loading");
+      setLiveDuration(0);
+    },
+    [streamLang, updatePreferences]
+  );
 
   const handleClose = useCallback(() => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -523,7 +559,7 @@ export function PlayerShell({
 
       const handled = [
         " ", "k", "K", "m", "M", "t", "T", "f", "F", "g", "G", "v", "V", "p", "P",
-        "c", "C",
+        "c", "C", "l", "L",
         "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
         "n", "N", "]", "[", "S", "?", "/", "+", "=", "-", "_",
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -592,7 +628,10 @@ export function PlayerShell({
       }
       if (e.key === "f" || e.key === "F") {
         void toggleBrowserFullscreen();
-        return;
+      }
+      else if (e.key === "l" || e.key === "L") {
+        // Cycle audio language: EN → SQ → EN
+        handleSetStreamLang(streamLang === "en" ? "sq" : "en");
       }
        if (embedState !== "ready") {
          if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
@@ -649,6 +688,8 @@ export function PlayerShell({
     showUpNext,
     openCommentAt,
     currentTime,
+    streamLang,
+    handleSetStreamLang,
   ]);
 
    const onIframeLoad = () => {
@@ -687,6 +728,11 @@ export function PlayerShell({
     .join(" ");
 
   const isOnline = useOnlineStatus();
+
+  const LANG_OPTIONS: { code: StreamLang; label: string; flag: string }[] = [
+    { code: "en", label: "English", flag: "🇬🇧" },
+    { code: "sq", label: "Shqip", flag: "🇦🇱" },
+  ];
 
   return (
     <div
@@ -745,7 +791,7 @@ export function PlayerShell({
                 <p className="player-window-sub">
                   {currentSource.name} · {currentServer + 1}/{streamingSources.length}
                   <span className="text-gray-500" aria-label={`Quality ${currentSource.quality}`}> · {currentSource.quality}</span>
-                  {locale === "sq" && <span className="text-gray-500" aria-label="Albanian subtitles"> · sq</span>}
+                  <span className="text-gray-500" aria-label={`Audio language ${streamLang.toUpperCase()}`}> · {streamLang.toUpperCase()}</span>
                   {party.partyRoomId && (
                     <span className={partyStatusClass(party.partySyncStatus)}>
                       {" "}
@@ -782,6 +828,29 @@ export function PlayerShell({
                   <Users className="w-4 h-4" />
                 </button>
               )}
+
+              {/* Audio language picker — rebuilds the embed URL with the new `lang` */}
+              <div className="player-window-btn-group" role="group" aria-label="Audio language">
+                {LANG_OPTIONS.map((opt) => {
+                  const active = streamLang === opt.code;
+                  return (
+                    <button
+                      key={opt.code}
+                      type="button"
+                      onClick={() => handleSetStreamLang(opt.code)}
+                      className={`player-window-btn player-window-lang ${active ? "is-active" : ""}`}
+                      aria-pressed={active}
+                      aria-label={`Audio: ${opt.label}`}
+                      title={`${opt.label} (L)`}
+                    >
+                      <span aria-hidden="true" className="player-window-lang-flag">
+                        {opt.flag}
+                      </span>
+                      <span className="player-window-lang-code">{opt.code.toUpperCase()}</span>
+                    </button>
+                  );
+                })}
+              </div>
               {timelineEnabled && (
                 <button
                   type="button"
@@ -870,7 +939,7 @@ export function PlayerShell({
 
           {showHint && embedState === "ready" && (
             <p className="player-hint" aria-live="polite">
-              T maximize · C comment · G watch together · ? shortcuts
+              T maximize · C comment · G watch together · L language · ? shortcuts
             </p>
           )}
 
