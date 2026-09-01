@@ -13,6 +13,8 @@ import {
 } from "@/hooks/player/usePlayerWindowResize";
 import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
 import { useTimelineComments } from "@/hooks/player/useTimelineComments";
+import { useCaptions } from "@/hooks/player/useCaptions";
+import { CaptionOverlay } from "./CaptionOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocale } from "@/hooks/useLocale";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -204,6 +206,21 @@ export function PlayerShell({
   const timeline = useTimelineComments({
     tmdbId: movieId,
     enabled: timelineEnabled && embedState === "ready",
+  });
+
+  // Self-hosted captions overlay. We only enable this when the user explicitly
+  // picked a non-English language (so they actually want the captions we
+  // ship), and only when the embed is loaded. The captions system is wired
+  // on top of the embed — the embed's own player-side subtitle picker still
+  // works for English sources.
+  const captions = useCaptions({
+    tmdbId: movieId,
+    mediaType,
+    season,
+    episode,
+    duration: effectiveDuration,
+    enabled: embedState === "ready" && streamLang !== "en",
+    lang: streamLang,
   });
 
   const overlayMarkers = useMemo(() => {
@@ -905,8 +922,18 @@ export function PlayerShell({
                iframeRef={iframeRef}
                onIframeLoad={onIframeLoad}
                onIframeError={onIframeError}
-               onRetry={nextServer}
-             />
+                onRetry={nextServer}
+              />
+
+            {/* Self-hosted caption overlay — only when the user wants non-English */}
+            {captions.cues.length > 0 && (
+              <CaptionOverlay
+                cue={captions.getCueAt(currentTime)}
+                visible={!cursorIdle && isPlaying}
+                source={captions.source}
+              />
+            )}
+
             {timelineEnabled && embedState === "ready" && !showUpNext && (
               <div
                 className={`player-overlay-bar ${cursorIdle ? "is-cursor-idle" : "is-cursor-active"}`}

@@ -58,6 +58,23 @@ export function buildStreamingSources(
   const allowedLangs = new Set(["en", "sq"]);
   const playerLang = lang && allowedLangs.has(lang) ? lang : "en";
 
+  // For non-English we ship an external subtitle URL through our own captions
+  // proxy. The proxy returns a CORS-enabled .vtt (real subs when available,
+  // a placeholder VTT otherwise) and we point the embed's `sub_url` at it.
+  // This is the only reliable way to guarantee Albanian subs show on top of
+  // English audio, because none of the public embed providers expose audio
+  // language selection in their query API.
+  const absoluteBase = (() => {
+    if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
+    return process.env.NEXT_PUBLIC_SITE_URL || "https://flixverse.app";
+  })();
+  const subUrl =
+    playerLang === "sq"
+      ? `${absoluteBase}/api/captions?tmdbId=${movieId}&type=${mediaType}${
+          isTv ? `&season=${season}&episode=${episode}` : ""
+        }&lang=sq&format=vtt`
+      : null;
+
   const vidfastBase = isTv
     ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
     : `https://vidfast.pro/movie/${movieId}?autoPlay=true`;
@@ -76,6 +93,9 @@ export function buildStreamingSources(
         server: lane,
         lang: playerLang,
         title: opts?.title,
+        subUrl: subUrl ?? undefined,
+        subLang: subUrl ? "sq" : undefined,
+        subLabel: subUrl ? "Albanian" : undefined,
       });
       return {
         id: `yapgrid-${lane}`,
