@@ -80,9 +80,13 @@ export function buildStreamingSources(
     : `https://vidfast.pro/movie/${movieId}?autoPlay=true`;
   const vidfastUrl = playerLang === "sq" ? `${vidfastBase}&sub=sq` : vidfastBase;
 
-  // YapGrid is reserved as the last-resort fallback (positions 7, 8, 9 below).
-  // We still pass `lang` so that the *subtitle* picker in their player is
-  // pre-set; the audio track is whatever their upstream returns.
+  // YapGrid server tokens. We pin G (sg_g4) first because it's YapGrid's own
+  // default in their test player, runs on the Vidrock Edge direct-MP4 CDN,
+  // and is the most likely source to have clean English audio on popular titles.
+  // The old `?server=x|y|z` short labels are display-only — the real
+  // server tokens are sg_g4 / sx_a1 / sy_b2 / sz_c3. Passing the short
+  // label falls back to YapGrid's "auto" mode, which on the upstream we
+  // hit was returning a Hindi-dubbed mirror.
   const yapgridSources: (Omit<StreamingSource, "url"> & { providerUrl: string })[] =
     YAPGRID_LANES.map((lane) => {
       const url = buildYapGridEmbedUrl({
@@ -90,7 +94,7 @@ export function buildStreamingSources(
         mediaType,
         season,
         episode,
-        server: lane,
+        server: lane.token,
         lang: playerLang,
         title: opts?.title,
         subUrl: subUrl ?? undefined,
@@ -98,11 +102,11 @@ export function buildStreamingSources(
         subLabel: subUrl ? "Albanian" : undefined,
       });
       return {
-        id: `yapgrid-${lane}`,
-        name: `YapGrid ${lane.toUpperCase()}`,
+        id: `yapgrid-${lane.id}`,
+        name: `YapGrid ${lane.label}`,
         icon: "🇦🇱",
         quality: "FHD" as const,
-        reliability: "medium" as const,
+        reliability: lane.id === "g" ? ("high" as const) : ("medium" as const),
         providerUrl: url,
       };
     });
