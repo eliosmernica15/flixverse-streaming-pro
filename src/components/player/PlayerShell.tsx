@@ -110,6 +110,7 @@ export function PlayerShell({
   const [showUpNext, setShowUpNext] = useState(false);
   const [commentAt, setCommentAt] = useState<number | null>(null);
   const [cursorIdle, setCursorIdle] = useState(true);
+  const [captionsOn, setCaptionsOn] = useState(false);
   const cursorIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { user } = useAuth();
@@ -210,16 +211,16 @@ export function PlayerShell({
 
   // Self-hosted captions overlay. We only enable this when the user explicitly
   // picked a non-English language (so they actually want the captions we
-  // ship), and only when the embed is loaded. The captions system is wired
-  // on top of the embed — the embed's own player-side subtitle picker still
-  // works for English sources.
+  // ship), and only when the embed is loaded AND the CC button is on. The
+  // captions system is wired on top of the embed — the embed's own player-side
+  // subtitle picker still works for English sources.
   const captions = useCaptions({
     tmdbId: movieId,
     mediaType,
     season,
     episode,
     duration: effectiveDuration,
-    enabled: embedState === "ready" && streamLang !== "en",
+    enabled: captionsOn && embedState === "ready" && streamLang !== "en",
     lang: streamLang,
   });
 
@@ -673,6 +674,10 @@ export function PlayerShell({
       else if (e.key === "ArrowDown") adjustVolume(e.shiftKey ? -0.2 : -0.1);
       else if (e.key === "+" || e.key === "=") adjustVolume(0.1);
       else if (e.key === "-" || e.key === "_") adjustVolume(-0.1);
+      else if ((e.key === "c" || e.key === "C") && e.shiftKey) {
+        e.preventDefault();
+        setCaptionsOn((v) => !v);
+      }
       else if (e.key === "c" || e.key === "C") openCommentAt(currentTime);
        else if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
        else if (e.key === "[") prevServer();
@@ -868,6 +873,18 @@ export function PlayerShell({
                   );
                 })}
               </div>
+
+              {/* CC button — toggle our self-hosted caption overlay */}
+              <button
+                type="button"
+                onClick={() => setCaptionsOn((v) => !v)}
+                className={`player-window-btn player-window-cc-btn ${captionsOn ? "is-active" : ""}`}
+                aria-label={captionsOn ? "Hide captions" : "Show captions"}
+                aria-pressed={captionsOn}
+                title={`Captions (C) — ${captionsOn ? "on" : "off"}`}
+              >
+                <span className="player-window-cc-text">CC</span>
+              </button>
               {timelineEnabled && (
                 <button
                   type="button"
@@ -966,7 +983,7 @@ export function PlayerShell({
 
           {showHint && embedState === "ready" && (
             <p className="player-hint" aria-live="polite">
-              T maximize · C comment · G watch together · L language · ? shortcuts
+              T maximize · C comment · Shift+C captions · G watch together · L language · ? shortcuts
             </p>
           )}
 

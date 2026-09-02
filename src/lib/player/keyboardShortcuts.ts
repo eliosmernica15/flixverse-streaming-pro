@@ -21,6 +21,7 @@ export const PLAYER_SHORTCUTS: PlayerShortcut[] = [
   { keys: ["S"], action: "Server menu", group: "server" },
   { keys: ["L"], action: "Cycle audio language (English ↔ Albanian)", group: "server" },
   { keys: ["C"], action: "Comment at current time", group: "playback" },
+  { keys: ["Shift+C"], action: "Toggle captions overlay", group: "playback" },
   { keys: ["0-9"], action: "Jump to 0–90%", group: "playback" },
   { keys: ["?"], action: "Keyboard shortcuts", group: "view" },
 ];
