@@ -55,6 +55,12 @@ def run_etl(
     started = time.time()
     # Vercel serverless: subprocess env is empty by default. Forward the
     # secrets the function runtime has, so the ETL can reach Postgres + Firestore.
+    debug_env = {
+        k: ("<set len=" + str(len(v)) + ">" if len(v) > 60 else v)
+        for k, v in os.environ.items()
+        if k.startswith(("FIREBASE_", "POSTGRES_", "PG", "DATABASE_URL", "GOOGLE_APPLICATION_CREDENTIALS"))
+    }
+    print(f"[admin/etl] parent env keys: {debug_env}", flush=True)
     proc = subprocess.run(
         cmd,
         capture_output=True,
@@ -68,6 +74,7 @@ def run_etl(
         "ok": proc.returncode == 0,
         "returncode": proc.returncode,
         "elapsed_seconds": round(elapsed, 1),
+        "parent_env": debug_env,
         "stdout": proc.stdout[-4000:],
         "stderr": proc.stderr[-2000:],
     }
