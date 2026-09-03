@@ -13,16 +13,16 @@ export interface StreamingSource {
 
 /** Allowed embed hostnames — must match security-headers.mjs frame-src. */
 export const ALLOWED_EMBED_HOSTS = [
-  "vidsrc.sbs",
   "vidsrc.me",
+  "vidsrc.pm",
+  "vidsrc.to",
+  "vidsrc.in",
+  "vidsrc.su",
+  "vidlink.pro",
   "videasy.net",
   "player.videasy.net",
   "vidfast.pro",
-  "vidlink.pro",
-  "vidsrc.net",
   "2embed.cc",
-  "multiembed.mov",
-  "embed.su",
   "yapgrid.com",
 ] as const;
 
@@ -50,18 +50,29 @@ export function buildStreamingSources(
 ): StreamingSource[] {
   const isTv = mediaType === "tv" && season && episode;
   const lang = opts?.lang?.toLowerCase();
-  // Vidsrc (`vidsrc.sbs`) exposes a `?sub=<iso639-1>` URL parameter that
-  // auto-loads the chosen subtitle track in its player. It is the only
-  // provider in this list that natively supports a "load Albanian subs by
-  // default" feature without requiring us to ship our own .vtt, so it
-  // gets special handling and is moved up the priority list.
+  // VidSrc exposes a `?sub=<iso639-1>` URL parameter that auto-loads the
+  // chosen subtitle track in its in-player menu. There are several mirror
+  // domains; `vidsrc.sbs` is documented as the canonical one but it
+  // currently 200s with a "blocked, contact the site owner" page in the
+  // body, so we use the live mirrors instead. `vidsrc.me` is the most
+  // reliable based on body-size + content, so it is the primary.
   const allowedLangs = new Set(["en", "sq"]);
   const playerLang = lang && allowedLangs.has(lang) ? lang : "en";
 
   const vidsrcBase = isTv
-    ? `https://vidsrc.sbs/embed/tv/${movieId}/${season}/${episode}`
-    : `https://vidsrc.sbs/embed/movie/${movieId}`;
+    ? `https://vidsrc.me/embed/tv/${movieId}/${season}/${episode}`
+    : `https://vidsrc.me/embed/movie/${movieId}`;
   const vidsrcUrl = `${vidsrcBase}?autoplay=true&sub=${playerLang}`;
+
+  const vidsrcBasePm = isTv
+    ? `https://vidsrc.pm/embed/tv/${movieId}/${season}/${episode}`
+    : `https://vidsrc.pm/embed/movie/${movieId}`;
+  const vidsrcUrlPm = `${vidsrcBasePm}?autoplay=true&sub=${playerLang}`;
+
+  const vidsrcBaseTo = isTv
+    ? `https://vidsrc.to/embed/tv/${movieId}/${season}/${episode}`
+    : `https://vidsrc.to/embed/movie/${movieId}`;
+  const vidsrcUrlTo = `${vidsrcBaseTo}?autoplay=true&sub=${playerLang}`;
 
   const vidfastBase = isTv
     ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
@@ -98,19 +109,36 @@ export function buildStreamingSources(
 
   const primary: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
     {
-      // Vidsrc is promoted to the very top of the list because it is the
-      // only public embed provider that exposes a native subtitle parameter
-      // (`?sub=<iso639-1>`). When the user picks Albanian (or any other
-      // supported language), the in-player CC menu has that track
-      // pre-selected -- no manual picking required. All other providers
-      // require the user to dig into their own (often non-existent)
-      // subtitle menus.
+      // Vidsrc.me — live mirror. The newer vidsrc.sbs domain returns 200
+      // but with a "blocked, contact the site owner" body, so it cannot
+      // be used as a default. vidsrc.me + the .pm / .to mirrors still
+      // serve real embeds with the `?sub=<iso639-1>` parameter that
+      // auto-loads the requested subtitle track in the in-player menu.
       id: "vidsrc",
       name: "VidSrc",
       icon: "📺",
       quality: "HD",
       reliability: "high",
       providerUrl: vidsrcUrl,
+    },
+    {
+      // vidsrc.pm — same API, different mirror, used as second-attempt
+      // fallback when the primary vidsrc.me is down.
+      id: "vidsrc-pm",
+      name: "VidSrc (PM)",
+      icon: "📺",
+      quality: "HD",
+      reliability: "medium",
+      providerUrl: vidsrcUrlPm,
+    },
+    {
+      // vidsrc.to — third mirror, third fallback.
+      id: "vidsrc-to",
+      name: "VidSrc (TO)",
+      icon: "📺",
+      quality: "HD",
+      reliability: "medium",
+      providerUrl: vidsrcUrlTo,
     },
     {
       id: "videasy",
@@ -140,6 +168,14 @@ export function buildStreamingSources(
       reliability: "high",
       providerUrl: vidfastUrl,
     },
+    // The sources below are dead or block us and have been removed:
+    //   - multiembed.mov (SuperEmbed) — returns 200 but body says
+    //     "content is blocked, contact the site owner"
+    //   - embed.su — DNS no longer resolves, domain is dead
+    //   - 2embed.cc — see kept entry below; it returns 200 OK on the
+    //     root path, but the embed route returns a thin page that the
+    //     browser shows as a blank iframe. We keep it because users
+    //     sometimes have a working alternative.
     {
       id: "2embed",
       name: "2Embed",
@@ -149,26 +185,6 @@ export function buildStreamingSources(
       providerUrl: isTv
         ? `https://www.2embed.cc/embedtv/${movieId}&s=${season}&e=${episode}`
         : `https://www.2embed.cc/embed/${movieId}`,
-    },
-    {
-      id: "superembed",
-      name: "SuperEmbed",
-      icon: "📽️",
-      quality: "FHD",
-      reliability: "medium",
-      providerUrl: isTv
-        ? `https://multiembed.mov/?video_id=${movieId}&tmdb=1&s=${season}&e=${episode}`
-        : `https://multiembed.mov/?video_id=${movieId}&tmdb=1`,
-    },
-    {
-      id: "embed-su",
-      name: "Embed SU",
-      icon: "🎥",
-      quality: "HD",
-      reliability: "medium",
-      providerUrl: isTv
-        ? `https://embed.su/embed/tv/${movieId}/${season}/${episode}`
-        : `https://embed.su/embed/movie/${movieId}`,
     },
   ];
 
