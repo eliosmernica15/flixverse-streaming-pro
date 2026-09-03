@@ -53,7 +53,6 @@ def run_etl(
         cmd.extend(["--collections", *collections.split(",")])
 
     started = time.time()
-    env_lens = {k: len(v) for k, v in os.environ.items() if k.startswith(("FIREBASE_", "POSTGRES_", "PG", "DATABASE_URL", "GOOGLE_APPLICATION_CREDENTIALS"))}
     proc = subprocess.run(
         cmd,
         capture_output=True,
@@ -67,7 +66,6 @@ def run_etl(
         "ok": proc.returncode == 0,
         "returncode": proc.returncode,
         "elapsed_seconds": round(elapsed, 1),
-        "env_lens": env_lens,
         "stdout": proc.stdout[-4000:],
         "stderr": proc.stderr[-2000:],
     }
