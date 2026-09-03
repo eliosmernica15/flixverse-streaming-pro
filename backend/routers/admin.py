@@ -53,11 +53,14 @@ def run_etl(
         cmd.extend(["--collections", *collections.split(",")])
 
     started = time.time()
+    # Vercel serverless: subprocess env is empty by default. Forward the
+    # secrets the function runtime has, so the ETL can reach Postgres + Firestore.
     proc = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         timeout=540,  # Vercel function max is 300s for hobby, 900s for pro
+        env={**os.environ},
     )
     elapsed = time.time() - started
 
