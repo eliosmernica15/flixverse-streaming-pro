@@ -37,10 +37,13 @@ from database import (  # type: ignore
     get_conn,
     iso_now,
     new_id,
-    now_ms,
     storage_label,
 )
 import crud  # type: ignore
+
+# Re-export the helpers crud uses, so the ETL can call them unqualified.
+now_ms = crud.now_ms
+to_iso = crud.to_iso
 
 
 COLLECTIONS = [
@@ -286,6 +289,19 @@ def run(dry_run: bool, local: bool, collections: list[str] | None) -> dict[str, 
     print(f"Storage: {storage_label()}")
     if dry_run:
         print("DRY RUN — no writes")
+    # Reading Firestore requires either a service account JSON, ADC, or a
+    # GOOGLE_APPLICATION_CREDENTIALS path. If none is set, we can't proceed.
+    if not (
+        os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+        or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    ):
+        if dry_run and os.environ.get("POSTGRES_URL", "").endswith("/stub"):
+            print("No Firebase credentials in this environment — dry-run only prints the target list.")
+            for name in (collections or COLLECTIONS):
+                print(f"  would-read {name}")
+            return {n: 0 for n in (collections or COLLECTIONS)}
+        print("FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS required", file=sys.stderr)
+        return 2
     db = get_db()
     started = time.time()
     totals: dict[str, int] = {}
@@ -334,8 +350,13 @@ def main() -> int:
         os.environ.pop("POSTGRES_URL", None)
         os.environ.pop("DATABASE_URL", None)
     elif "POSTGRES_URL" not in os.environ and "DATABASE_URL" not in os.environ:
-        print("POSTGRES_URL not set; pass --local to use SQLite instead", file=sys.stderr)
-        return 2
+        if args.dry_run:
+            # Dry run only reads Firestore, so we can stub a dummy URL for
+            # the import-time USE_POSTGRES check in database.py.
+            os.environ["POSTGRES_URL"] = "postgres://stub/stub"
+        else:
+            print("POSTGRES_URL not set; pass --local to use SQLite instead", file=sys.stderr)
+            return 2
 
     run(args.dry_run, args.local, args.collections)
     return 0

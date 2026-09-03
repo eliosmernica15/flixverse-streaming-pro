@@ -4,8 +4,8 @@
   "buildCommand": "next build",
   "functions": {
     "api/flixverse.py": {
-      "memory": 1024,
-      "maxDuration": 30
+      "memory": 3009,
+      "maxDuration": 300
     }
   },
   "rewrites": [
