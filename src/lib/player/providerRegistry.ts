@@ -238,6 +238,11 @@ export function detectProvider(src: string): ProviderConfig {
 export function resolveEmbedSrc(iframeSrc: string): string {
   try {
     const url = new URL(iframeSrc, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    if (url.pathname === "/api/embed") {
+      const embedded = url.searchParams.get("src");
+      if (embedded) return decodeURIComponent(embedded);
+    }
+    // Legacy: also handle the old `?src=` direct querystring pattern.
     const embedded = url.searchParams.get("src");
     if (embedded) return decodeURIComponent(embedded);
   } catch {

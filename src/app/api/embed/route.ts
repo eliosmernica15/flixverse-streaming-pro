@@ -21,6 +21,35 @@ const GUARD_SCRIPT = `<script>(function(){
   }catch(e){}
 })();</script>`;
 
+/**
+ * Provider-side sandbox-detection scripts we strip from the proxied HTML
+ * (defence in depth). These scripts redirect the inner page to a
+ * "This content is blocked" body when they detect the embed parent
+ * has a `sandbox` attribute or an opaque origin. When the page is
+ * served through our same-origin proxy those conditions should not
+ * apply, but stripping the script entirely removes any chance of a
+ * false positive and also defeats a future regression.
+ */
+const ANTI_EMBED_PATTERNS: RegExp[] = [
+  // vidsrcme.ru's sbx.js (self-executing IIFE, contains the literal
+  // "sandbox.php" / "Sandbox-embed blocker" text).
+  /<script[^>]*src=["'][^"']*sbx\.js[^"']*["'][^>]*>\s*<\/script>/gi,
+  /<script[^>]*>\s*\/\*\*[\s\S]*?Sandbox-embed blocker[\s\S]*?<\/script>/gi,
+  // Any inline or external script that explicitly redirects to /sandbox.php.
+  /<script[^>]*>[^<]*location\.(?:replace|href)\s*=\s*['"]\/sandbox\.php[^<]*<\/script>/gi,
+  // The "/sandbox.php" reference in a <link rel="preload"> or similar
+  // (rare but cheap to strip too).
+  /<link[^>]*href=["']\/sandbox\.php[^"']*["'][^>]*>/gi,
+];
+
+function stripAntiEmbedScripts(html: string): string {
+  let out = html;
+  for (const pattern of ANTI_EMBED_PATTERNS) {
+    out = out.replace(pattern, "");
+  }
+  return out;
+}
+
 function rewriteRelativeUrls(html: string, baseOrigin: string): string {
   return html
     .replace(/(href|src)=(["'])\/(?!\/)/g, `$1=$2${baseOrigin}/`)
@@ -67,6 +96,7 @@ export async function GET(request: NextRequest) {
     }
 
     let html = await res.text();
+    html = stripAntiEmbedScripts(html);
     html = rewriteRelativeUrls(html, origin);
 
     if (html.includes("<head")) {

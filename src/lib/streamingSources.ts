@@ -6,6 +6,17 @@ export interface StreamingSource {
   icon: string;
   quality: "HD" | "FHD" | "4K";
   reliability: "high" | "medium";
+  /**
+   * Iframe `src` — same-origin proxy URL (`/api/embed?src=...`) for cross-origin
+   * providers, raw provider URL for same-origin providers. We proxy the embed
+   * through our own origin so:
+   *   1. The iframe is same-origin and can be controlled by the host page.
+   *   2. vidsrcme.ru's `sbx.js` sandbox-detection redirect (which fires when
+   *      it detects a cross-origin / sandboxed parent) never triggers, because
+   *      the page the browser actually loads is served by us.
+   *   3. We can strip any provider-side sandbox-detection script or
+   *      `/sandbox.php` redirect from the proxied HTML.
+   */
   url: string;
   /** Original provider URL (for postMessage origin detection). */
   providerUrl: string;
@@ -29,6 +40,31 @@ export function isAllowedEmbedUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Wrap a provider URL in our same-origin /api/embed proxy so the iframe loads
+ * from our origin. The proxy re-fetches the provider URL server-side, strips
+ * any sandbox-detection scripts, and returns the HTML. The provider's real
+ * origin is still encoded in the response's `X-Embed-Provider` header so
+ * postMessage origin detection (`resolveEmbedSrc`) still works.
+ */
+export function proxyEmbedUrl(providerUrl: string): string {
+  return `/api/embed?src=${encodeURIComponent(providerUrl)}`;
+}
+
+/** Extract the real provider URL when loaded through /api/embed proxy. */
+export function unproxyEmbedUrl(iframeSrc: string): string {
+  try {
+    const url = new URL(iframeSrc, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    if (url.pathname === "/api/embed") {
+      const embedded = url.searchParams.get("src");
+      if (embedded) return decodeURIComponent(embedded);
+    }
+  } catch {
+    // ignore
+  }
+  return iframeSrc;
 }
 
 export type BuildStreamingOptions = {
@@ -187,7 +223,13 @@ export function buildStreamingSources(
 
   return ordered.map((s) => ({
     ...s,
-    url: s.providerUrl,
+    // Route every provider through the same-origin /api/embed proxy so
+    // vidsrcme.ru's sbx.js sandbox-detection redirect (and similar
+    // anti-embed scripts from other providers) never fires. The
+    // `providerUrl` is kept as the raw URL so postMessage origin
+    // detection (`resolveEmbedSrc` / `detectProvider`) can still tell
+    // which provider the inner page is talking to.
+    url: proxyEmbedUrl(s.providerUrl),
   }));
 }
 
