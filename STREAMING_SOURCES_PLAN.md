@@ -7,6 +7,8 @@
 > 4. The original documentation the user pasted, so a new chat session can read everything in one place.
 >
 > **When continuing this work, start with "Step A — Finish the provider registry migration" below.**
+>
+> **Status (2026-09-03):** Step A is **DONE** and pushed to `origin/master` as commit `9929acd`. `npm run build` passes (72 routes). See "Verification" at the bottom of the file for the exact checks that were run.
 
 ---
 
@@ -365,6 +367,21 @@ After A1 and A2:
 ## Verification checklist before pushing
 
 After finishing the provider-registry migration (Step A), confirm:
+
+1. `npm run build` succeeds — 72 routes generated.
+2. `git show origin/master:src/lib/streamingSources.ts` shows the order:
+   `vidsrc → vidsrc-to → videasy → vidlink → vidfast → yapgrid-g`
+3. `git show origin/master:src/lib/streamingSources.ts | grep ALLOWED_EMBED_HOSTS` returns the canonical set:
+   `["vidsrcme.ru", "vidsrc.to", "vidlink.pro", "videasy.to", "player.videasy.to", "vidfast.pro", "yapgrid.com"]`
+4. `git show origin/master:src/lib/security-headers.ts | grep vidsrcme` shows the canonical domain in frame-src.
+5. `git show origin/master:src/lib/player/providerRegistry.ts | grep "origins:"` shows the same canonical domains for the vidsrc and videasy entries.
+6. `git show origin/master:src/lib/player/embedSeekUrls.ts | grep vidsrc` shows the regex updated to match `vidsrcme\.ru|vidsrc\.to|vidsrc\.me`.
+
+## Verification — run on 2026-09-03
+
+All 6 checks above pass. Commit `9929acd` is on `origin/master`.
+
+Build output: `✓ Generating static pages using 15 workers (72/72) in 1219.4ms`.
 
 1. `npm run build` succeeds — 72 routes generated.
 2. `git show origin/master:src/lib/streamingSources.ts` shows the order:
