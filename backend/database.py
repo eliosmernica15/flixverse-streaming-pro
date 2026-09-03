@@ -91,6 +91,198 @@ CREATE TABLE IF NOT EXISTS party_signals (
   payload TEXT NOT NULL,
   created_at BIGINT NOT NULL
 );
+
+-- ── User profiles (migrated from Firestore /profiles) ─────────
+CREATE TABLE IF NOT EXISTS profiles (
+  user_id TEXT PRIMARY KEY,
+  display_name TEXT,
+  username TEXT UNIQUE,
+  avatar_url TEXT,
+  bio TEXT,
+  favorite_genres_json TEXT NOT NULL DEFAULT '[]',
+  followers_count INTEGER NOT NULL DEFAULT 0,
+  following_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- ── Usernames (migrated from Firestore /usernames) ───────────
+CREATE TABLE IF NOT EXISTS usernames (
+  handle TEXT PRIMARY KEY,
+  uid TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+
+-- ── Watch history (migrated from Firestore /watch_history) ───
+CREATE TABLE IF NOT EXISTS watch_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  content_id BIGINT NOT NULL,
+  content_type TEXT NOT NULL,
+  content_title TEXT NOT NULL,
+  content_poster_path TEXT,
+  season INTEGER,
+  episode INTEGER,
+  progress_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
+  total_duration_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
+  completed INTEGER NOT NULL DEFAULT 0,
+  watched_at BIGINT NOT NULL
+);
+
+-- ── User movie lists (migrated from Firestore /user_movie_lists) ──
+CREATE TABLE IF NOT EXISTS user_movie_lists (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  movie_id BIGINT NOT NULL,
+  movie_title TEXT NOT NULL,
+  movie_poster_path TEXT,
+  media_type TEXT NOT NULL DEFAULT 'movie',
+  added_at BIGINT NOT NULL
+);
+
+-- ── Reviews (migrated from Firestore /reviews) ────────────────
+CREATE TABLE IF NOT EXISTS reviews (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  user_display_name TEXT NOT NULL,
+  user_avatar_url TEXT,
+  content_id BIGINT NOT NULL,
+  content_type TEXT NOT NULL,
+  content_title TEXT NOT NULL,
+  content_poster_path TEXT,
+  rating INTEGER NOT NULL,
+  review_text TEXT NOT NULL,
+  likes_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- ── Comments (migrated from Firestore /comments) ──────────────
+CREATE TABLE IF NOT EXISTS comments (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  user_display_name TEXT NOT NULL,
+  user_avatar_url TEXT,
+  content_id BIGINT NOT NULL,
+  content_type TEXT NOT NULL,
+  parent_id TEXT,
+  text TEXT NOT NULL,
+  likes_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- ── Likes (migrated from Firestore /likes) ────────────────────
+CREATE TABLE IF NOT EXISTS likes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  content_id BIGINT,
+  created_at BIGINT NOT NULL
+);
+
+-- ── Follows (migrated from Firestore /follows) ────────────────
+CREATE TABLE IF NOT EXISTS follows (
+  id TEXT PRIMARY KEY,
+  follower_id TEXT NOT NULL,
+  following_id TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  UNIQUE(follower_id, following_id)
+);
+
+-- ── Activity feed (migrated from Firestore /activity_feed) ────
+CREATE TABLE IF NOT EXISTS activity_feed (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  user_display_name TEXT NOT NULL,
+  user_avatar_url TEXT,
+  type TEXT NOT NULL,
+  content_id BIGINT,
+  content_type TEXT,
+  content_title TEXT,
+  content_poster_path TEXT,
+  target_user_id TEXT,
+  target_user_name TEXT,
+  rating INTEGER,
+  review_text TEXT,
+  created_at BIGINT NOT NULL
+);
+
+-- ── Content ratings (migrated from Firestore /content_ratings) ──
+CREATE TABLE IF NOT EXISTS content_ratings (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  content_id BIGINT NOT NULL,
+  content_type TEXT NOT NULL,
+  rating INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(user_id, content_id, content_type)
+);
+
+-- ── Friendships (migrated from Firestore /friendships) ────────
+CREATE TABLE IF NOT EXISTS friendships (
+  id TEXT PRIMARY KEY,
+  user_a TEXT NOT NULL,
+  user_b TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'accepted',
+  created_at BIGINT NOT NULL,
+  UNIQUE(user_a, user_b)
+);
+
+-- ── Friend requests (migrated from Firestore /friend_requests) ──
+CREATE TABLE IF NOT EXISTS friend_requests (
+  id TEXT PRIMARY KEY,
+  from_user_id TEXT NOT NULL,
+  to_user_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at BIGINT NOT NULL,
+  UNIQUE(from_user_id, to_user_id)
+);
+
+-- ── User settings (migrated from Firestore /user_settings) ────
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id TEXT PRIMARY KEY,
+  settings_json TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL
+);
+
+-- ── Member profiles (migrated from Firestore /member_profiles) ──
+CREATE TABLE IF NOT EXISTS member_profiles (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  avatar_url TEXT,
+  type TEXT NOT NULL DEFAULT 'standard',
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  pin_hash TEXT,
+  max_certification TEXT,
+  blocked_genres_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- ── Stripe subscriptions (migrated from Firestore /subscriptions) ──
+CREATE TABLE IF NOT EXISTS subscriptions (
+  user_id TEXT PRIMARY KEY,
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  status TEXT NOT NULL,
+  plan TEXT,
+  current_period_end BIGINT,
+  cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL
+);
+
+-- ── Stripe webhook idempotency (migrated from Firestore /stripe_webhook_events) ──
+CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+  event_id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  received_at BIGINT NOT NULL
+);
 """
 
 INDEX_SQL = """
@@ -98,6 +290,24 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, crea
 CREATE INDEX IF NOT EXISTS idx_party_messages_room ON party_messages(room_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_invites_to ON watch_party_invites(to_user_id, status);
 CREATE INDEX IF NOT EXISTS idx_party_signals_room ON party_signals(room_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_usernames_uid ON usernames(uid);
+CREATE INDEX IF NOT EXISTS idx_watch_history_user ON watch_history(user_id, watched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_movie_lists_user ON user_movie_lists(user_id, added_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reviews_content ON reviews(content_id, content_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_comments_content ON comments(content_id, content_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_likes_target ON likes(target_id, target_type);
+CREATE INDEX IF NOT EXISTS idx_likes_user ON likes(user_id);
+CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);
+CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
+CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_content_ratings_content ON content_ratings(content_id, content_type);
+CREATE INDEX IF NOT EXISTS idx_content_ratings_user ON content_ratings(user_id);
+CREATE INDEX IF NOT EXISTS idx_friendships_a ON friendships(user_a);
+CREATE INDEX IF NOT EXISTS idx_friendships_b ON friendships(user_b);
+CREATE INDEX IF NOT EXISTS idx_friend_requests_to ON friend_requests(to_user_id, status);
+CREATE INDEX IF NOT EXISTS idx_friend_requests_from ON friend_requests(from_user_id, status);
+CREATE INDEX IF NOT EXISTS idx_member_profiles_owner ON member_profiles(owner_id);
 """
 
 

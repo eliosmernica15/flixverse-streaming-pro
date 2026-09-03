@@ -8,16 +8,29 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db, storage_label
-from routers import notifications, parties
+from routers import (
+    content,
+    notifications,
+    parties,
+    profile,
+    settings,
+    social,
+    subscriptions,
+)
 
 init_db()
 
-app = FastAPI(title="FlixVerse API", version="1.1.0")
+app = FastAPI(title="FlixVerse API", version="1.2.0")
 
 API_PREFIX = "/api/flixverse" if os.environ.get("VERCEL") == "1" else ""
 
 app.include_router(notifications.router, prefix=API_PREFIX)
 app.include_router(parties.router, prefix=API_PREFIX)
+app.include_router(profile.router, prefix=API_PREFIX)
+app.include_router(content.router, prefix=API_PREFIX)
+app.include_router(social.router, prefix=API_PREFIX)
+app.include_router(settings.router, prefix=API_PREFIX)
+app.include_router(subscriptions.router, prefix=API_PREFIX)
 
 
 @app.get(f"{API_PREFIX}/health" if API_PREFIX else "/health")
