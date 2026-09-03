@@ -98,6 +98,21 @@ export function buildStreamingSources(
 
   const primary: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
     {
+      // Vidsrc is promoted to the very top of the list because it is the
+      // only public embed provider that exposes a native subtitle parameter
+      // (`?sub=<iso639-1>`). When the user picks Albanian (or any other
+      // supported language), the in-player CC menu has that track
+      // pre-selected -- no manual picking required. All other providers
+      // require the user to dig into their own (often non-existent)
+      // subtitle menus.
+      id: "vidsrc",
+      name: "VidSrc",
+      icon: "📺",
+      quality: "HD",
+      reliability: "high",
+      providerUrl: vidsrcUrl,
+    },
+    {
       id: "videasy",
       name: "Videasy (4K)",
       icon: "🎬",
@@ -124,18 +139,6 @@ export function buildStreamingSources(
       quality: "FHD",
       reliability: "high",
       providerUrl: vidfastUrl,
-    },
-    {
-      // Vidsrc exposes a `?sub=<iso639-1>` parameter that auto-loads the
-      // requested subtitle track in its in-player menu. We promote it to
-      // the top of the list so the user lands on the provider that respects
-      // their preferred-language preference out of the box.
-      id: "vidsrc",
-      name: "VidSrc",
-      icon: "📺",
-      quality: "HD",
-      reliability: "high",
-      providerUrl: vidsrcUrl,
     },
     {
       id: "2embed",
