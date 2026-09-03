@@ -5,7 +5,7 @@
   "functions": {
     "api/flixverse.py": {
       "memory": 2048,
-      "maxDuration": 300
+      "maxDuration": 60
     }
   },
   "rewrites": [

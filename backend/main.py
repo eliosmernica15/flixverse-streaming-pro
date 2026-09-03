@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db, storage_label
 from routers import (
-    admin,
     content,
     notifications,
     parties,
@@ -32,7 +31,6 @@ app.include_router(content.router, prefix=API_PREFIX)
 app.include_router(social.router, prefix=API_PREFIX)
 app.include_router(settings.router, prefix=API_PREFIX)
 app.include_router(subscriptions.router, prefix=API_PREFIX)
-app.include_router(admin.router, prefix=API_PREFIX)
 
 
 @app.get(f"{API_PREFIX}/health" if API_PREFIX else "/health")
