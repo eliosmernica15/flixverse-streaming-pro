@@ -851,40 +851,6 @@ export function PlayerShell({
                 </button>
               )}
 
-              {/* Audio language picker — rebuilds the embed URL with the new `lang` */}
-              <div className="player-window-btn-group" role="group" aria-label="Audio language">
-                {LANG_OPTIONS.map((opt) => {
-                  const active = streamLang === opt.code;
-                  return (
-                    <button
-                      key={opt.code}
-                      type="button"
-                      onClick={() => handleSetStreamLang(opt.code)}
-                      className={`player-window-btn player-window-lang ${active ? "is-active" : ""}`}
-                      aria-pressed={active}
-                      aria-label={`Audio: ${opt.label}`}
-                      title={`${opt.label} (L)`}
-                    >
-                      <span aria-hidden="true" className="player-window-lang-flag">
-                        {opt.flag}
-                      </span>
-                      <span className="player-window-lang-code">{opt.code.toUpperCase()}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* CC button — toggle our self-hosted caption overlay */}
-              <button
-                type="button"
-                onClick={() => setCaptionsOn((v) => !v)}
-                className={`player-window-btn player-window-cc-btn ${captionsOn ? "is-active" : ""}`}
-                aria-label={captionsOn ? "Hide captions" : "Show captions"}
-                aria-pressed={captionsOn}
-                title={`Captions (C) — ${captionsOn ? "on" : "off"}`}
-              >
-                <span className="player-window-cc-text">CC</span>
-              </button>
               {timelineEnabled && (
                 <button
                   type="button"
