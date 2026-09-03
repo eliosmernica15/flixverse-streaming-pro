@@ -39,13 +39,14 @@ export function computeResync(
 
 /**
  * Build a seek URL for a given embed provider by injecting a start-time parameter.
- * Supports VidSrc CC/ICU, VidLink, Embed SU, SuperEmbed, AutoEmbed patterns.
+ * Supports VidSrc (vidsrcme.ru / vidsrc.to / vidsrc.me), VidLink, Videasy, VidFast, YapGrid.
  */
 export function injectSeekParam(url: string, startSeconds: number): string {
   const t = Math.max(0, Math.floor(startSeconds));
 
-  // VidSrc family (vidsrc.me / .net / .xyz / .cc / .icu): add &t= param
-  if (/vidsrc\.(me|net|in|pm|xyz|cc|icu)/.test(url)) {
+  // VidSrc family (canonical vidsrcme.ru + per-domain mirror vidsrc.to +
+  // legacy vidsrc.me): add &t= param.
+  if (/vidsrc(me\.ru|\.to|\.me)/.test(url)) {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}t=${t}`;
   }
@@ -55,8 +56,9 @@ export function injectSeekParam(url: string, startSeconds: number): string {
     return `${url}#t=${t}`;
   }
 
-  // Videasy: add &progress= param (seconds)
-  if (url.includes("videasy.net")) {
+  // Videasy (canonical player.videasy.to + root videasy.to + legacy
+  // player.videasy.net): add &progress= param (seconds).
+  if (/player\.videasy\.to|videasy\.to/.test(url)) {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}progress=${t}`;
   }
@@ -67,8 +69,8 @@ export function injectSeekParam(url: string, startSeconds: number): string {
     return `${url}${sep}startAt=${t}`;
   }
 
-  // Embed SU / SuperEmbed (multiembed): add &start= param
-  if (url.includes("embed.su") || url.includes("multiembed.mov")) {
+  // YapGrid: add &start= param (the builder's known querystring).
+  if (url.includes("yapgrid.com")) {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}start=${t}`;
   }

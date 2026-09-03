@@ -13,16 +13,12 @@ export interface StreamingSource {
 
 /** Allowed embed hostnames — must match security-headers.mjs frame-src. */
 export const ALLOWED_EMBED_HOSTS = [
-  "vidsrc.me",
-  "vidsrc.pm",
+  "vidsrcme.ru",
   "vidsrc.to",
-  "vidsrc.in",
-  "vidsrc.su",
   "vidlink.pro",
-  "videasy.net",
-  "player.videasy.net",
+  "videasy.to",
+  "player.videasy.to",
   "vidfast.pro",
-  "2embed.cc",
   "yapgrid.com",
 ] as const;
 
@@ -50,29 +46,24 @@ export function buildStreamingSources(
 ): StreamingSource[] {
   const isTv = mediaType === "tv" && season && episode;
   const lang = opts?.lang?.toLowerCase();
-  // VidSrc exposes a `?sub=<iso639-1>` URL parameter that auto-loads the
-  // chosen subtitle track in its in-player menu. There are several mirror
-  // domains; `vidsrc.sbs` is documented as the canonical one but it
-  // currently 200s with a "blocked, contact the site owner" page in the
-  // body, so we use the live mirrors instead. `vidsrc.me` is the most
-  // reliable based on body-size + content, so it is the primary.
+  // VidSrc's canonical domain is `vidsrcme.ru` (per the current docs).
+  // It accepts both IMDB ids (`tt...`) and TMDB ids (numeric). It exposes
+  // a `?ds_lang=<iso639-1>` (or comma-separated priority list) parameter
+  // that pre-selects subtitle tracks, plus `?sub_url=...` for custom .vtt
+  // tracks. `vidsrc.to` is the per-domain mirror documented separately
+  // and uses the simpler `?sub_file=...` parameter.
   const allowedLangs = new Set(["en", "sq"]);
   const playerLang = lang && allowedLangs.has(lang) ? lang : "en";
 
   const vidsrcBase = isTv
-    ? `https://vidsrc.me/embed/tv/${movieId}/${season}/${episode}`
-    : `https://vidsrc.me/embed/movie/${movieId}`;
-  const vidsrcUrl = `${vidsrcBase}?autoplay=true&sub=${playerLang}`;
+    ? `https://vidsrcme.ru/embed/tv/${movieId}/${season}/${episode}`
+    : `https://vidsrcme.ru/embed/movie/${movieId}`;
+  const vidsrcUrl = `${vidsrcBase}?autoplay=true&ds_lang=${playerLang}`;
 
-  const vidsrcBasePm = isTv
-    ? `https://vidsrc.pm/embed/tv/${movieId}/${season}/${episode}`
-    : `https://vidsrc.pm/embed/movie/${movieId}`;
-  const vidsrcUrlPm = `${vidsrcBasePm}?autoplay=true&sub=${playerLang}`;
-
-  const vidsrcBaseTo = isTv
+  const vidsrcToBase = isTv
     ? `https://vidsrc.to/embed/tv/${movieId}/${season}/${episode}`
     : `https://vidsrc.to/embed/movie/${movieId}`;
-  const vidsrcUrlTo = `${vidsrcBaseTo}?autoplay=true&sub=${playerLang}`;
+  const vidsrcToUrl = `${vidsrcToBase}?autoplay=true`;
 
   const vidfastBase = isTv
     ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
@@ -109,11 +100,12 @@ export function buildStreamingSources(
 
   const primary: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
     {
-      // Vidsrc.me — live mirror. The newer vidsrc.sbs domain returns 200
-      // but with a "blocked, contact the site owner" body, so it cannot
-      // be used as a default. vidsrc.me + the .pm / .to mirrors still
-      // serve real embeds with the `?sub=<iso639-1>` parameter that
-      // auto-loads the requested subtitle track in the in-player menu.
+      // VidSrc (`vidsrcme.ru`) — the canonical VidSrc domain. Accepts both
+      // IMDB ids (`tt...`) and TMDB ids (numeric). Uses the `?ds_lang=<iso>`
+      // parameter (or comma-separated priority list) to pre-select subtitle
+      // tracks, plus `?sub_url=...` for custom .vtt tracks. We pass
+      // `?autoplay=true&ds_lang=<en|sq>` so the in-player CC menu opens
+      // with the user's preferred language already highlighted.
       id: "vidsrc",
       name: "VidSrc",
       icon: "📺",
@@ -122,33 +114,28 @@ export function buildStreamingSources(
       providerUrl: vidsrcUrl,
     },
     {
-      // vidsrc.pm — same API, different mirror, used as second-attempt
-      // fallback when the primary vidsrc.me is down.
-      id: "vidsrc-pm",
-      name: "VidSrc (PM)",
-      icon: "📺",
-      quality: "HD",
-      reliability: "medium",
-      providerUrl: vidsrcUrlPm,
-    },
-    {
-      // vidsrc.to — third mirror, third fallback.
+      // vidsrc.to — per-domain mirror with the same embed API. The docs
+      // describe it as using `?sub_file=` instead of `?sub_url=`, but
+      // `?autoplay=true` works the same. Kept as a fallback in case the
+      // canonical domain is slow or down.
       id: "vidsrc-to",
-      name: "VidSrc (TO)",
+      name: "VidSrc.to",
       icon: "📺",
       quality: "HD",
       reliability: "medium",
-      providerUrl: vidsrcUrlTo,
+      providerUrl: vidsrcToUrl,
     },
     {
+      // Videasy's canonical domain is `player.videasy.to` (the older
+      // `player.videasy.net` is deprecated per their docs).
       id: "videasy",
-      name: "Videasy (4K)",
+      name: "Videasy",
       icon: "🎬",
       quality: "4K",
       reliability: "high",
       providerUrl: isTv
-        ? `https://player.videasy.net/tv/${movieId}/${season}/${episode}?autoplay=true`
-        : `https://player.videasy.net/movie/${movieId}?autoplay=true`,
+        ? `https://player.videasy.to/tv/${movieId}/${season}/${episode}?autoplay=true`
+        : `https://player.videasy.to/movie/${movieId}?autoplay=true`,
     },
     {
       id: "vidlink",
@@ -161,6 +148,8 @@ export function buildStreamingSources(
         : `https://vidlink.pro/movie/${movieId}?autoplay=true`,
     },
     {
+      // VidFast works on the actual website per the user, even though
+      // our test environment can't reach the embed endpoint. Keep it.
       id: "vidfast",
       name: "VidFast",
       icon: "⚡",
@@ -168,24 +157,27 @@ export function buildStreamingSources(
       reliability: "high",
       providerUrl: vidfastUrl,
     },
-    // The sources below are dead or block us and have been removed:
-    //   - multiembed.mov (SuperEmbed) — returns 200 but body says
-    //     "content is blocked, contact the site owner"
-    //   - embed.su — DNS no longer resolves, domain is dead
-    //   - 2embed.cc — see kept entry below; it returns 200 OK on the
-    //     root path, but the embed route returns a thin page that the
-    //     browser shows as a blank iframe. We keep it because users
-    //     sometimes have a working alternative.
     {
-      id: "2embed",
-      name: "2Embed",
-      icon: "🎞️",
-      quality: "HD",
+      // YapGrid — left as a last-resort fallback per the user. The
+      // server tokens (sg_g4 / sx_a1 / sy_b2 / sz_c3) and `?lang=` /
+      // `?sub_url=` / `?server=` parameters are all set in the yapgrid.ts
+      // builder.
+      id: "yapgrid-g",
+      name: "YapGrid G",
+      icon: "🇦🇱",
+      quality: "FHD",
       reliability: "medium",
-      providerUrl: isTv
-        ? `https://www.2embed.cc/embedtv/${movieId}&s=${season}&e=${episode}`
-        : `https://www.2embed.cc/embed/${movieId}`,
+      providerUrl: yapgridSources[0].providerUrl,
     },
+    // Dead / blocked / 404 sources have been removed:
+    //   - vidsrc.sbs — returns 200 but body says "blocked"
+    //   - vidsrc.pm — doesn't work in our test env (user flagged)
+    //   - vidsrc.in / vidsrc.su / vidsrc.me / multiembed.mov — blocked
+    //     or 404 in our tests
+    //   - embed.su — DNS dead
+    //   - player.videasy.net — superseded by player.videasy.to per docs
+    //   - 2embed.cc — returns 200 but the body is a thin page that shows
+    //     up as a blank iframe; left out entirely
   ];
 
   // YapGrid is intentionally LAST — its audio is upstream-controlled and

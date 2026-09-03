@@ -12,9 +12,6 @@ export type EmbedProvider =
   | "vidlink"
   | "videasy"
   | "vidfast"
-  | "twoembed"
-  | "embedsu"
-  | "superembed"
   | "yapgrid"
   | "generic";
 
@@ -96,14 +93,13 @@ export const PROVIDERS: ProviderConfig[] = [
   {
     id: "vidsrc",
     name: "VidSrc",
+    // Canonical domain per current docs is `vidsrcme.ru`. `vidsrc.to` is
+    // the per-domain mirror, and `vidsrc.me` is a legacy mirror that's
+    // still reachable but no longer documented as primary.
     origins: [
+      "vidsrcme.ru",
+      "vidsrc.to",
       "vidsrc.me",
-      "vidsrc.net",
-      "vidsrc.in",
-      "vidsrc.pm",
-      "vidsrc.xyz",
-      "vidsrc.cc",
-      "vidsrc.icu",
     ],
     keyboardShortcuts: VIDSRC_KEYBOARD,
     commands: VIDSRC_COMMANDS,
@@ -141,61 +137,16 @@ export const PROVIDERS: ProviderConfig[] = [
     supportsPostMessage: true,
   },
   {
-    id: "embedsu",
-    name: "Embed SU",
-    origins: ["embed.su", "embedsu.cc"],
-    keyboardShortcuts: VIDSRC_KEYBOARD,
-    commands: {
-      toggle: { action: "toggle" },
-      play: { action: "play" },
-      pause: { action: "pause" },
-      mute: { action: "mute" },
-      unmute: { action: "unmute" },
-      volumeUp: { action: "volumeUp" },
-      volumeDown: { action: "volumeDown" },
-      seekForward: { action: "seek", seconds: 10 },
-      seekBack: { action: "seek", seconds: -10 },
-      seekTo: (seconds: number) => ({ action: "seek", seconds }),
-      setVolume: (volume: number) => ({ action: "volume", value: volume }),
-    },
-    events: {
-      play: ["play", "playing"],
-      pause: ["pause"],
-      time: ["timeupdate"],
-      ended: ["ended"],
-    },
-    supportsPostMessage: true,
-  },
-  {
-    id: "superembed",
-    name: "SuperEmbed",
-    origins: ["multiembed.mov", "multiembed.cc"],
-    keyboardShortcuts: VIDSRC_KEYBOARD,
-    commands: {
-      toggle: { action: "toggle" },
-      play: { action: "play" },
-      pause: { action: "pause" },
-      mute: { action: "mute" },
-      unmute: { action: "unmute" },
-      volumeUp: { action: "volumeUp" },
-      volumeDown: { action: "volumeDown" },
-      seekForward: { action: "seek", seconds: 10 },
-      seekBack: { action: "seek", seconds: -10 },
-      seekTo: (seconds: number) => ({ action: "seek", seconds }),
-      setVolume: (volume: number) => ({ action: "volume", value: volume }),
-    },
-    events: {
-      play: ["play"],
-      pause: ["pause"],
-      time: ["timeupdate"],
-      ended: ["ended"],
-    },
-    supportsPostMessage: true,
-  },
-  {
     id: "videasy",
     name: "Videasy",
-    origins: ["videasy.net", "player.videasy.net"],
+    // Canonical domain per current docs is `player.videasy.to`. `videasy.to`
+    // is the root host that the player domain redirects to / shares
+    // infrastructure with. `player.videasy.net` is deprecated.
+    origins: [
+      "player.videasy.to",
+      "videasy.to",
+      "player.videasy.net",
+    ],
     keyboardShortcuts: VIDSRC_KEYBOARD,
     commands: {
       toggle: { type: "toggle" },
@@ -250,30 +201,6 @@ export const PROVIDERS: ProviderConfig[] = [
     supportsPostMessage: true,
   },
   {
-    id: "twoembed",
-    name: "2Embed",
-    origins: ["2embed.cc", "www.2embed.cc", "2embed.skin"],
-    keyboardShortcuts: VIDSRC_KEYBOARD,
-    commands: {
-      toggle: { action: "toggle" },
-      play: { action: "play" },
-      pause: { action: "pause" },
-      mute: { action: "mute" },
-      unmute: { action: "unmute" },
-      seekForward: { action: "seek", seconds: 10 },
-      seekBack: { action: "seek", seconds: -10 },
-      seekTo: (seconds: number) => ({ action: "seek", seconds }),
-      setVolume: (volume: number) => ({ action: "volume", value: volume }),
-    },
-    events: {
-      play: ["play"],
-      pause: ["pause"],
-      time: ["timeupdate"],
-      ended: ["ended"],
-    },
-    supportsPostMessage: true,
-  },
-  {
     id: "generic",
     name: "Generic",
     origins: [],
@@ -285,7 +212,7 @@ export const PROVIDERS: ProviderConfig[] = [
   {
     id: "yapgrid",
     name: "YapGrid",
-    origins: ["yapgrid.com"],
+    origins: ["yapgrid.com", "www.yapgrid.com"],
     keyboardShortcuts: VIDSRC_KEYBOARD,
     commands: {},
     events: {},
