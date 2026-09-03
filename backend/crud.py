@@ -132,6 +132,68 @@ def lookup_username(conn: Any, handle: str) -> dict[str, Any] | None:
     }
 
 
+def search_usernames(conn: Any, query: str, limit: int = 12) -> list[dict[str, Any]]:
+    """Prefix/contains search over both `usernames` and `profiles`.
+
+    The Firestore replacement returned a flat list of
+    `{uid, username, displayName, photoURL}` so the front-end
+    `useFriends` search can keep using it unchanged. We:
+      1) prefix-match against `usernames.handle` (case-insensitive),
+      2) prefix/contains-match against `profiles.display_name` and
+         `profiles.username`,
+    then dedupe by uid and exclude the requester.
+    """
+    pattern = f"%{query.lower()}%"
+    prefix = f"{query.lower()}%"
+    exact = query.lower()
+
+    rows = db_fetchall(
+        conn,
+        """
+        SELECT
+          u.uid           AS uid,
+          u.handle        AS username,
+          u.display_name  AS display_name,
+          COALESCE(p.avatar_url, '') AS avatar_url
+        FROM usernames u
+        LEFT JOIN profiles p ON p.user_id = u.uid
+        WHERE LOWER(u.handle) LIKE ?
+        LIMIT ?
+        """,
+        (prefix, limit),
+    )
+    if len(rows) < limit:
+        remaining = limit - len(rows)
+        profile_rows = db_fetchall(
+            conn,
+            """
+            SELECT
+              user_id          AS uid,
+              COALESCE(username, '')      AS username,
+              COALESCE(display_name, '')  AS display_name,
+              COALESCE(avatar_url, '')    AS avatar_url
+            FROM profiles
+            WHERE (LOWER(COALESCE(display_name, '')) LIKE ?
+                OR LOWER(COALESCE(username, '')) LIKE ?)
+              AND user_id NOT IN (SELECT uid FROM usernames WHERE LOWER(handle) LIKE ?)
+            ORDER BY (username = ?) DESC, display_name
+            LIMIT ?
+            """,
+            (pattern, pattern, prefix, exact, remaining),
+        )
+        rows = list(rows) + list(profile_rows)
+
+    return [
+        {
+            "uid": row_get(r, "uid"),
+            "username": row_get(r, "username") or "",
+            "displayName": row_get(r, "display_name") or row_get(r, "username") or "",
+            "photoURL": row_get(r, "avatar_url") or None,
+        }
+        for r in rows
+    ]
+
+
 # ── Watch history ────────────────────────────────────────────────
 
 def upsert_watch_history(

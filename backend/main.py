@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db, storage_label
 from routers import (
+    account,
     content,
     notifications,
     parties,
@@ -24,6 +25,7 @@ app = FastAPI(title="FlixVerse API", version="1.2.0")
 
 API_PREFIX = "/api/flixverse" if os.environ.get("VERCEL") == "1" else ""
 
+app.include_router(account.router, prefix=API_PREFIX)
 app.include_router(notifications.router, prefix=API_PREFIX)
 app.include_router(parties.router, prefix=API_PREFIX)
 app.include_router(profile.router, prefix=API_PREFIX)

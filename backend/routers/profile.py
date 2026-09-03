@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from auth import uid_from_auth, verify_bearer
@@ -12,6 +12,7 @@ from crud import (
     claim_username,
     get_profile,
     lookup_username,
+    search_usernames,
     upsert_profile,
 )
 from database import get_conn
@@ -85,10 +86,33 @@ def reserve_username(body: UsernameBody, auth: dict = Depends(verify_bearer)) ->
     return {"ok": True, "handle": handle}
 
 
+@router.get("/username/search")
+def search_username_route(
+    q: str = Query(..., min_length=2, max_length=30),
+    limit: int = Query(12, ge=1, le=24),
+    auth: dict = Depends(verify_bearer),
+) -> dict[str, Any]:
+    """Prefix/contains search over usernames and profiles.
+
+    Returns the same shape the previous Firestore-backed Next.js route did,
+    so the front-end `useFriends` search and the Next.js `?q=` proxy both
+    keep working unchanged.
+    """
+    me = uid_from_auth(auth)
+    needle = q.strip().lower()
+    with get_conn() as conn:
+        results = search_usernames(conn, needle, limit=limit)
+    return {"results": [r for r in results if r["uid"] != me]}
+
+
 @router.get("/username/{handle}")
 def resolve_username(handle: str, auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
     with get_conn() as conn:
         rec = lookup_username(conn, handle)
     if not rec:
         raise HTTPException(status_code=404, detail="Not found")
-    return {"uid": rec["uid"], "displayName": rec["displayName"]}
+    return {
+        "uid": rec["uid"],
+        "displayName": rec["displayName"],
+        "owned": rec["uid"] == uid_from_auth(auth),
+    }

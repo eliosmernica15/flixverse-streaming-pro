@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { syncSubscriptionToFirestore, type BillingPlan } from "@/lib/billing/subscriptionSync";
-import { verifyAuthHeader } from "@/lib/firebase/verifyAuth";
+import { callPythonJson } from "@/app/api/_lib/pythonOrigin";
 
 export const runtime = "nodejs";
 
@@ -10,6 +10,12 @@ const stripeSecret = process.env.STRIPE_SECRET_KEY;
 function getStripe() {
   if (!stripeSecret) return null;
   return new Stripe(stripeSecret, { apiVersion: "2026-06-24.dahlia" });
+}
+
+interface IdentityResponse {
+  uid: string;
+  email: string | null;
+  name: string | null;
 }
 
 /** Verify a completed Stripe Checkout session and return plan details. */
@@ -24,7 +30,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "session_id required" }, { status: 400 });
   }
 
-  const auth = await verifyAuthHeader(request);
+  const ident = await callPythonJson<IdentityResponse>(request, "/account/identity");
+  const authedUid = ident.data?.uid ?? null;
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -34,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     const userId = session.metadata?.userId;
     const planId = (session.metadata?.planId as BillingPlan) || "standard";
-    if (auth && userId && auth.uid !== userId) {
+    if (authedUid && userId && authedUid !== userId) {
       return NextResponse.json({ error: "Session does not belong to this user" }, { status: 403 });
     }
     let status = "trialing";

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { verifyAuthHeader } from "@/lib/firebase/verifyAuth";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { callPythonJson } from "@/app/api/_lib/pythonOrigin";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -12,6 +11,12 @@ function getStripe() {
 
 export const runtime = "nodejs";
 
+interface SubscriptionResponse {
+  subscription: {
+    stripe_customer_id: string | null;
+  } | null;
+}
+
 /** List recent invoices for the authenticated subscriber. */
 export async function GET(request: NextRequest) {
   const stripe = getStripe();
@@ -19,18 +24,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
   }
 
-  const auth = await verifyAuthHeader(request);
-  if (!auth) {
+  if (!request.headers.get("authorization")?.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = getAdminDb();
-  if (!db) {
-    return NextResponse.json({ error: "Server not configured" }, { status: 503 });
+  const sub = await callPythonJson<SubscriptionResponse>(request, "/subscription");
+  if (sub.error) {
+    return NextResponse.json(
+      { error: "Failed to look up subscription" },
+      { status: sub.status === 401 ? 401 : 502 }
+    );
   }
 
-  const subSnap = await db.collection("subscriptions").doc(auth.uid).get();
-  const customerId = subSnap.data()?.stripeCustomerId as string | undefined;
+  const customerId = sub.data?.subscription?.stripe_customer_id;
   if (!customerId) {
     return NextResponse.json({ invoices: [] });
   }

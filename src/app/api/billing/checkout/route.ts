@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { verifyAuthHeader } from "@/lib/firebase/verifyAuth";
+import { callPythonJson } from "@/app/api/_lib/pythonOrigin";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -18,6 +18,12 @@ const PRICE_MAP: Record<string, string | undefined> = {
 
 export const runtime = "nodejs";
 
+interface IdentityResponse {
+  uid: string;
+  email: string | null;
+  name: string | null;
+}
+
 export async function POST(request: NextRequest) {
   const stripe = getStripe();
   if (!stripe) {
@@ -27,18 +33,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const auth = await verifyAuthHeader(request);
-  if (!auth) {
+  const ident = await callPythonJson<IdentityResponse>(request, "/account/identity");
+  if (ident.error || !ident.data?.uid) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const { uid, email } = ident.data;
 
-  const body = await request.json();
-  const { planId, billingPeriod } = body as {
-    planId: "standard" | "premium";
-    billingPeriod: "monthly" | "yearly";
+  const body = (await request.json().catch(() => ({}))) as {
+    planId?: "standard" | "premium";
+    billingPeriod?: "monthly" | "yearly";
   };
+  const { planId, billingPeriod } = body;
 
-  if (!planId) {
+  if (!planId || !billingPeriod) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -54,12 +61,12 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      customer_email: auth.email,
+      customer_email: email ?? undefined,
       line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { userId: auth.uid, planId },
+      metadata: { userId: uid, planId },
       subscription_data: {
         trial_period_days: 7,
-        metadata: { userId: auth.uid, planId },
+        metadata: { userId: uid, planId },
       },
       success_url: `${origin}/plans?success=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/plans?canceled=1`,
