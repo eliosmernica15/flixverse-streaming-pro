@@ -13,11 +13,12 @@ export interface StreamingSource {
 
 /** Allowed embed hostnames — must match security-headers.mjs frame-src. */
 export const ALLOWED_EMBED_HOSTS = [
-  "vidlink.pro",
+  "vidsrc.sbs",
+  "vidsrc.me",
   "videasy.net",
   "player.videasy.net",
   "vidfast.pro",
-  "vidsrc.me",
+  "vidlink.pro",
   "vidsrc.net",
   "2embed.cc",
   "multiembed.mov",
@@ -49,31 +50,18 @@ export function buildStreamingSources(
 ): StreamingSource[] {
   const isTv = mediaType === "tv" && season && episode;
   const lang = opts?.lang?.toLowerCase();
-  // YapGrid's `lang` parameter only sets the default SUBTITLE language, not the
-  // audio. Their public API does not expose audio-track selection, so when
-  // their upstream server happens to return a Hindi-dubbed source we can't
-  // override it. We put the providers that DO honour per-language audio
-  // (Videasy, VidLink, VidFast) first and fall back to YapGrid's Z/Y/X only
-  // when those fail. The user can also switch from the in-player audio menu.
+  // Vidsrc (`vidsrc.sbs`) exposes a `?sub=<iso639-1>` URL parameter that
+  // auto-loads the chosen subtitle track in its player. It is the only
+  // provider in this list that natively supports a "load Albanian subs by
+  // default" feature without requiring us to ship our own .vtt, so it
+  // gets special handling and is moved up the priority list.
   const allowedLangs = new Set(["en", "sq"]);
   const playerLang = lang && allowedLangs.has(lang) ? lang : "en";
 
-  // For non-English we ship an external subtitle URL through our own captions
-  // proxy. The proxy returns a CORS-enabled .vtt (real subs when available,
-  // a placeholder VTT otherwise) and we point the embed's `sub_url` at it.
-  // This is the only reliable way to guarantee Albanian subs show on top of
-  // English audio, because none of the public embed providers expose audio
-  // language selection in their query API.
-  const absoluteBase = (() => {
-    if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
-    return process.env.NEXT_PUBLIC_SITE_URL || "https://flixverse.app";
-  })();
-  const subUrl =
-    playerLang === "sq"
-      ? `${absoluteBase}/api/captions?tmdbId=${movieId}&type=${mediaType}${
-          isTv ? `&season=${season}&episode=${episode}` : ""
-        }&lang=sq&format=vtt`
-      : null;
+  const vidsrcBase = isTv
+    ? `https://vidsrc.sbs/embed/tv/${movieId}/${season}/${episode}`
+    : `https://vidsrc.sbs/embed/movie/${movieId}`;
+  const vidsrcUrl = `${vidsrcBase}?autoplay=true&sub=${playerLang}`;
 
   const vidfastBase = isTv
     ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
@@ -97,9 +85,6 @@ export function buildStreamingSources(
         server: lane.token,
         lang: playerLang,
         title: opts?.title,
-        subUrl: subUrl ?? undefined,
-        subLang: subUrl ? "sq" : undefined,
-        subLabel: subUrl ? "Albanian" : undefined,
       });
       return {
         id: `yapgrid-${lane.id}`,
@@ -141,14 +126,16 @@ export function buildStreamingSources(
       providerUrl: vidfastUrl,
     },
     {
+      // Vidsrc exposes a `?sub=<iso639-1>` parameter that auto-loads the
+      // requested subtitle track in its in-player menu. We promote it to
+      // the top of the list so the user lands on the provider that respects
+      // their preferred-language preference out of the box.
       id: "vidsrc",
       name: "VidSrc",
       icon: "📺",
       quality: "HD",
       reliability: "high",
-      providerUrl: isTv
-        ? `https://vidsrc.me/embed/tv?tmdb=${movieId}&season=${season}&episode=${episode}`
-        : `https://vidsrc.me/embed/movie?tmdb=${movieId}`,
+      providerUrl: vidsrcUrl,
     },
     {
       id: "2embed",
