@@ -16,8 +16,10 @@ import { TMDBMovie } from '@/utils/tmdbApi';
 import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
 import { trackListAdd, trackListRemove } from '@/lib/analytics';
 import { UserMovieListItem } from '@/integrations/firebase/types';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonUserMovieList } from '@/hooks/useUserMovieListPython';
 
-export const useUserMovieList = () => {
+function useFirestoreUserMovieList() {
   const [movieList, setMovieList] = useState<UserMovieListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [operatingMovies, setOperatingMovies] = useState<Set<number>>(new Set());
@@ -184,4 +186,9 @@ export const useUserMovieList = () => {
     isOperating,
     refetch: fetchMovieList
   };
+}
+
+/** Public facade — Python first on Vercel, Firestore otherwise. */
+export const useUserMovieList = () => {
+  return isPythonBackendEnabled() ? usePythonUserMovieList() : useFirestoreUserMovieList();
 };

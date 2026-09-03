@@ -14,42 +14,12 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { sendNotificationToUser } from "@/lib/notifications/createNotification";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { usePythonFriends, type Friend, type FriendRequest, type UserProfile, type FriendRelationship, type SendFriendResult } from "@/hooks/useFriendsPython";
 
-export interface Friend {
-  id: string;
-  userId: string;
-  displayName: string;
-  avatarUrl: string | null;
-  addedAt: number;
-}
+export type { Friend, FriendRequest, UserProfile, FriendRelationship, SendFriendResult };
 
-export interface FriendRequest {
-  id: string;
-  fromUserId: string;
-  fromDisplayName: string;
-  fromAvatarUrl: string | null;
-  toUserId: string;
-  status: "pending" | "accepted" | "declined";
-  createdAt: number;
-}
-
-export interface UserProfile {
-  uid: string;
-  displayName: string;
-  photoURL: string | null;
-  username?: string | null;
-}
-
-export type FriendRelationship = "friend" | "incoming" | "outgoing" | "none";
-
-export type SendFriendResult =
-  | "sent"
-  | "accepted"
-  | "already_friends"
-  | "already_sent"
-  | "error";
-
-export function useFriends() {
+function useFirestoreFriends() {
   const { user } = useAuth();
   const { profile } = useUserProfileContext();
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -347,4 +317,8 @@ export function useFriends() {
     areFriends,
     getRelationship,
   };
+}
+
+export function useFriends() {
+  return isPythonBackendEnabled() ? usePythonFriends() : useFirestoreFriends();
 }

@@ -19,8 +19,10 @@ import { useUserProfileContext } from '@/contexts/UserProfileContext';
 import { useToast } from '@/hooks/use-toast';
 import { Review } from '@/integrations/firebase/types';
 import { enqueuePendingJob } from '@/lib/pendingJobs';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonReviews } from '@/hooks/useReviewsPython';
 
-export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => {
+function useFirestoreReviews(contentId?: number, contentType?: 'movie' | 'tv') {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [likedReviewIds, setLikedReviewIds] = useState<Set<string>>(new Set());
@@ -288,4 +290,10 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     getAverageRating,
     reviewCount: reviews.length
   };
+}
+
+export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => {
+  return isPythonBackendEnabled()
+    ? usePythonReviews(contentId, contentType)
+    : useFirestoreReviews(contentId, contentType);
 };

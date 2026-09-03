@@ -16,8 +16,10 @@ import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client
 import { useAuth } from './useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
 import { Comment } from '@/integrations/firebase/types';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonComments } from '@/hooks/useCommentsPython';
 
-export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') => {
+function useFirestoreComments(contentId?: number, contentType?: 'movie' | 'tv') {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [likedCommentIds, setLikedCommentIds] = useState<Set<string>>(new Set());
@@ -181,4 +183,10 @@ export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') =>
     getTopLevelComments,
     commentCount: comments.length,
   };
+}
+
+export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') => {
+  return isPythonBackendEnabled()
+    ? usePythonComments(contentId, contentType)
+    : useFirestoreComments(contentId, contentType);
 };

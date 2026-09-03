@@ -14,8 +14,11 @@ import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client
 import { useAuth } from './useAuth';
 import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
 import { WatchHistory } from '@/integrations/firebase/types';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonWatchHistory } from '@/hooks/useWatchHistoryPython';
 
-export const useWatchHistory = () => {
+/** Firestore implementation. Selected when Python backend is disabled. */
+function useFirestoreWatchHistory() {
   const [history, setHistory] = useState<WatchHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
@@ -152,4 +155,10 @@ export const useWatchHistory = () => {
     getContinueWatching,
     getRecentlyWatched
   };
+}
+
+/** Public facade — routes to Python API on Vercel, Firestore elsewhere. */
+export const useWatchHistory = () => {
+  return isPythonBackendEnabled() ? usePythonWatchHistory() : useFirestoreWatchHistory();
 };
+

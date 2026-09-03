@@ -11,8 +11,10 @@ import {
 } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { enqueuePendingJob } from "@/lib/pendingJobs";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { usePythonFollow } from "@/hooks/useFollowPython";
 
-export function useFollow(targetUserId: string | null) {
+function useFirestoreFollow(targetUserId: string | null) {
   const { user } = useAuth();
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
@@ -96,4 +98,8 @@ export function useFollow(targetUserId: string | null) {
   }, [user, targetUserId, isFollowing, followerCount]);
 
   return { isFollowing, followerCount, loading, toggleFollow };
+}
+
+export function useFollow(targetUserId: string | null) {
+  return isPythonBackendEnabled() ? usePythonFollow(targetUserId) : useFirestoreFollow(targetUserId);
 }

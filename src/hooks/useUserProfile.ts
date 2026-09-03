@@ -8,8 +8,10 @@ import {
   hasUsername,
   lookupUsernameByUid,
 } from '@/lib/username/resolveUsername';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonUserProfile } from '@/hooks/useUserProfilePython';
 
-export const useUserProfile = () => {
+function useFirestoreUserProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -144,4 +146,8 @@ export const useUserProfile = () => {
     updateProfile,
     refetch: fetchProfile
   };
+}
+
+export const useUserProfile = () => {
+  return isPythonBackendEnabled() ? usePythonUserProfile() : useFirestoreUserProfile();
 };

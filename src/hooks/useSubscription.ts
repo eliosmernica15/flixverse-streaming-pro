@@ -4,21 +4,17 @@ import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { usePythonSubscription, type PythonSubscription } from "@/hooks/useSubscriptionPython";
 
 export type SubscriptionPlan = "free" | "standard" | "premium";
 export type SubscriptionStatus = "active" | "trialing" | "canceled" | "past_due" | "none";
 
-export interface UserSubscription {
-  plan: SubscriptionPlan;
-  status: SubscriptionStatus;
-  stripeCustomerId?: string;
-  stripeSubscriptionId?: string;
-  currentPeriodEnd?: number;
-}
+export type UserSubscription = PythonSubscription;
 
 const DEFAULT_SUB: UserSubscription = { plan: "free", status: "none" };
 
-export function useSubscription() {
+function useFirestoreSubscription() {
   const { user } = useAuth();
   const [subscription, setSubscription] = useState<UserSubscription>(DEFAULT_SUB);
   const [loading, setLoading] = useState(true);
@@ -66,4 +62,8 @@ export function useSubscription() {
   const hasPremium = isPaid && subscription.plan === "premium";
 
   return { subscription, loading, isPaid, hasStandard, hasPremium };
+}
+
+export function useSubscription() {
+  return isPythonBackendEnabled() ? usePythonSubscription() : useFirestoreSubscription();
 }

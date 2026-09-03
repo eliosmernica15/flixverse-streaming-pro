@@ -13,8 +13,10 @@ import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client
 import { useAuth } from './useAuth';
 import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
 import { ContentRating } from '@/integrations/firebase/types';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonContentRating } from '@/hooks/useContentRatingPython';
 
-export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv') => {
+function useFirestoreContentRating(contentId?: number, contentType?: 'movie' | 'tv') {
   const [userRating, setUserRating] = useState<number | null>(null);
   const [averageRating, setAverageRating] = useState<number>(0);
   const [totalRatings, setTotalRatings] = useState<number>(0);
@@ -101,4 +103,10 @@ export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv
     removeRating,
     isRated: userRating !== null
   };
+}
+
+export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv') => {
+  return isPythonBackendEnabled()
+    ? usePythonContentRating(contentId, contentType)
+    : useFirestoreContentRating(contentId, contentType);
 };

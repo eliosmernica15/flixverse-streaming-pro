@@ -1,3 +1,8 @@
+/**
+ * User activity timeline. Routes to the Python Postgres API when enabled
+ * (Vercel production) and falls back to Firestore for local dev.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   collection,
@@ -11,25 +16,12 @@ import {
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { Review, Comment, ContentRating, UserMovieListItem, WatchHistory } from '@/integrations/firebase/types';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonUserActivity, type UserActivity, type ActivityType } from '@/hooks/useUserActivityPython';
 
-export type ActivityType = 'review' | 'rating' | 'comment' | 'watchlist' | 'watched';
+export type { UserActivity, ActivityType };
 
-export interface UserActivity {
-  id: string;
-  type: ActivityType;
-  timestamp: string;
-  // Content info
-  contentId?: number;
-  contentType?: 'movie' | 'tv';
-  contentTitle?: string;
-  contentPosterPath?: string | null;
-  // Type-specific data
-  rating?: number;
-  reviewText?: string;
-  commentText?: string;
-}
-
-export const useUserActivity = (userId?: string) => {
+function useFirestoreUserActivity(userId?: string) {
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -59,17 +51,17 @@ export const useUserActivity = (userId?: string) => {
         );
         const snapshot = await getDocs(reviewsQuery);
         snapshot.forEach((doc) => {
-          const review = doc.data() as Review;
+          const data = doc.data() as Review;
           allActivities.push({
             id: `review-${doc.id}`,
             type: 'review',
-            timestamp: review.created_at,
-            contentId: review.content_id,
-            contentType: review.content_type,
-            contentTitle: review.content_title,
-            contentPosterPath: review.content_poster_path,
-            rating: review.rating,
-            reviewText: review.review_text,
+            timestamp: data.created_at,
+            contentId: data.content_id,
+            contentType: data.content_type,
+            contentTitle: data.content_title,
+            contentPosterPath: data.content_poster_path,
+            rating: data.rating,
+            reviewText: data.review_text,
           });
         });
       };
@@ -78,25 +70,21 @@ export const useUserActivity = (userId?: string) => {
         const ratingsQuery = query(
           collection(requireFirebaseDb(), 'content_ratings'),
           where('user_id', '==', targetUserId),
-          orderBy('created_at', 'desc'),
+          orderBy('updated_at', 'desc'),
           limit(20)
         );
         const snapshot = await getDocs(ratingsQuery);
         snapshot.forEach((doc) => {
-          const rating = doc.data() as ContentRating;
-          const hasReview = allActivities.some(
-            a => a.type === 'review' && a.contentId === rating.content_id && a.contentType === rating.content_type
-          );
-          if (!hasReview) {
-            allActivities.push({
-              id: `rating-${doc.id}`,
-              type: 'rating',
-              timestamp: rating.created_at,
-              contentId: rating.content_id,
-              contentType: rating.content_type,
-              rating: rating.rating,
-            });
-          }
+          const data = doc.data() as ContentRating;
+          allActivities.push({
+            id: `rating-${doc.id}`,
+            type: 'rating',
+            timestamp: data.updated_at,
+            contentId: data.content_id,
+            contentType: data.content_type,
+            contentPosterPath: null,
+            rating: data.rating,
+          });
         });
       };
 
@@ -109,14 +97,14 @@ export const useUserActivity = (userId?: string) => {
         );
         const snapshot = await getDocs(commentsQuery);
         snapshot.forEach((doc) => {
-          const comment = doc.data() as Comment;
+          const data = doc.data() as Comment;
           allActivities.push({
             id: `comment-${doc.id}`,
             type: 'comment',
-            timestamp: comment.created_at,
-            contentId: comment.content_id,
-            contentType: comment.content_type,
-            commentText: comment.text,
+            timestamp: data.created_at,
+            contentId: data.content_id,
+            contentType: data.content_type,
+            commentText: data.text,
           });
         });
       };
@@ -130,38 +118,37 @@ export const useUserActivity = (userId?: string) => {
         );
         const snapshot = await getDocs(watchlistQuery);
         snapshot.forEach((doc) => {
-          const item = doc.data() as UserMovieListItem;
+          const data = doc.data() as UserMovieListItem;
           allActivities.push({
             id: `watchlist-${doc.id}`,
             type: 'watchlist',
-            timestamp: item.added_at,
-            contentId: item.movie_id,
-            contentType: item.media_type || 'movie',
-            contentTitle: item.movie_title,
-            contentPosterPath: item.movie_poster_path,
+            timestamp: data.added_at,
+            contentId: data.movie_id,
+            contentType: (data.media_type as 'movie' | 'tv') || 'movie',
+            contentTitle: data.movie_title,
+            contentPosterPath: data.movie_poster_path,
           });
         });
       };
 
       const fetchWatched = async () => {
-        const historyQuery = query(
+        const watchedQuery = query(
           collection(requireFirebaseDb(), 'watch_history'),
           where('user_id', '==', targetUserId),
-          where('completed', '==', true),
           orderBy('watched_at', 'desc'),
           limit(20)
         );
-        const snapshot = await getDocs(historyQuery);
+        const snapshot = await getDocs(watchedQuery);
         snapshot.forEach((doc) => {
-          const history = doc.data() as WatchHistory;
+          const data = doc.data() as WatchHistory;
           allActivities.push({
             id: `watched-${doc.id}`,
             type: 'watched',
-            timestamp: history.watched_at,
-            contentId: history.content_id,
-            contentType: history.content_type,
-            contentTitle: history.content_title,
-            contentPosterPath: history.content_poster_path,
+            timestamp: new Date(data.watched_at).toISOString(),
+            contentId: data.content_id,
+            contentType: data.content_type,
+            contentTitle: data.content_title,
+            contentPosterPath: data.content_poster_path,
           });
         });
       };
@@ -234,4 +221,11 @@ export const useUserActivity = (userId?: string) => {
     getStats,
     activityCount: activities.length,
   };
+}
+
+/** Public facade — Python first on Vercel, Firestore otherwise. */
+export const useUserActivity = (userId?: string) => {
+  return isPythonBackendEnabled()
+    ? usePythonUserActivity(userId)
+    : useFirestoreUserActivity(userId);
 };
