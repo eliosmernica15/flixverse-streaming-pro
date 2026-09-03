@@ -74,7 +74,7 @@ def run_etl(
         "ok": proc.returncode == 0,
         "returncode": proc.returncode,
         "elapsed_seconds": round(elapsed, 1),
-        "parent_env": debug_env,
+        "parent_env": {k: f"len={len(v)}" for k, v in debug_env.items()},
         "stdout": proc.stdout[-4000:],
         "stderr": proc.stderr[-2000:],
     }
