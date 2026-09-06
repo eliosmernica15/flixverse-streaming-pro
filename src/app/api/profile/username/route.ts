@@ -90,6 +90,15 @@ export async function POST(request: NextRequest) {
       passQuery: false,
     }
   );
+
+  // On any non-2xx, pass the upstream body and status through unchanged so
+  // the front-end can surface the real error (e.g. 401 "Missing authorization",
+  // 409 "Handle taken"). Re-serializing a failure as `{ ok: true, ... }` would
+  // mask the error and confuse the caller.
+  if (res.status < 200 || res.status >= 300) {
+    return res;
+  }
+
   // The Python API returns `{ ok, handle }`; the front-end
   // (`UsernameSettings.tsx`) reads `{ username }`. Translate the field so
   // the existing client contract keeps working unchanged.

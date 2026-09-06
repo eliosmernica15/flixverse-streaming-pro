@@ -8,11 +8,25 @@ import { NextResponse } from "next/server";
 
 /** Build the absolute origin under which the Python serverless function lives. */
 export function pythonApiOrigin(request: NextRequest): string {
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  // Prefer the host the user actually requested (x-forwarded-host / host).
+  // `VERCEL_URL` is the deployment-specific URL
+  // (e.g. flixverse-abc123-losis-projects.vercel.app) which is behind Vercel
+  // Deployment Protection even when the production domain
+  // (flixverse-streaming-pro.vercel.app) is public. Proxying to VERCEL_URL
+  // from inside a Next route therefore gets intercepted by Vercel SSO and
+  // returns the "Log in to Vercel" HTML page (401/200 text/html) instead of
+  // the Python JSON — surfacing in the browser as
+  // `POST /api/profile/username 401 (Unauthorized)`.
+  // Using the request host keeps the internal fetch on the same public
+  // domain the browser already reached, so no protection bypass is needed.
   const host =
     request.headers.get("x-forwarded-host") || request.headers.get("host");
   const proto = request.headers.get("x-forwarded-proto") || "https";
   if (host) return `${proto}://${host}`;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 }
 
@@ -22,6 +36,38 @@ export function pythonApiUrl(request: NextRequest, path: string): string {
   const prefix = process.env.VERCEL === "1" ? "/api/flixverse" : "";
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return `${origin}${prefix}${normalized}`;
+}
+
+/** Forward auth + deployment-protection context to the Python function. */
+function buildProxyHeaders(request: NextRequest, initBody?: string): Headers {
+  const headers = new Headers();
+  const auth = request.headers.get("authorization");
+  if (auth) headers.set("authorization", auth);
+
+  // If production ever enables Deployment Protection, the browser's request
+  // to the Next route carries the bypass cookie / header, but a bare
+  // server-to-server fetch would not. Forward them so the internal fetch
+  // passes the same Vercel SSO check the browser already passed.
+  const bypass = request.headers.get("x-vercel-protection-bypass");
+  if (bypass) headers.set("x-vercel-protection-bypass", bypass);
+  const cookie = request.headers.get("cookie");
+  if (cookie) headers.set("cookie", cookie);
+
+  const contentType = request.headers.get("content-type");
+  if (initBody !== undefined && contentType) {
+    headers.set("content-type", contentType);
+  }
+  return headers;
+}
+
+/** Warn when the upstream returned the Vercel SSO login page instead of JSON. */
+function warnIfProtectionPage(path: string, status: number, contentType: string | null, text: string): void {
+  if (contentType?.includes("text/html") && /log in to vercel/i.test(text)) {
+    console.error(
+      `[proxy] ${path} hit Vercel Deployment Protection (upstream ${status} text/html). ` +
+        `The internal fetch likely used a protected deployment URL instead of the request host.`
+    );
+  }
 }
 
 /** Forward a POST/GET/PATCH/DELETE through to the Python API. */
@@ -38,14 +84,7 @@ export async function proxyToPython(
     });
   }
 
-  const headers = new Headers();
-  const auth = request.headers.get("authorization");
-  if (auth) headers.set("authorization", auth);
-
-  const contentType = request.headers.get("content-type");
-  if (init.body !== undefined && contentType) {
-    headers.set("content-type", contentType);
-  }
+  const headers = buildProxyHeaders(request, init.body);
 
   try {
     const res = await fetch(url, {
@@ -55,8 +94,9 @@ export async function proxyToPython(
       cache: "no-store",
     });
     const text = await res.text();
-    const responseHeaders = new Headers();
     const ct = res.headers.get("content-type");
+    warnIfProtectionPage(path, res.status, ct, text);
+    const responseHeaders = new Headers();
     if (ct) responseHeaders.set("content-type", ct);
     return new NextResponse(text, { status: res.status, headers: responseHeaders });
   } catch (err) {
@@ -87,14 +127,7 @@ export async function callPythonJson<T = unknown>(
     });
   }
 
-  const headers = new Headers();
-  const auth = request.headers.get("authorization");
-  if (auth) headers.set("authorization", auth);
-
-  const contentType = request.headers.get("content-type");
-  if (init.body !== undefined && contentType) {
-    headers.set("content-type", contentType);
-  }
+  const headers = buildProxyHeaders(request, init.body);
 
   try {
     const res = await fetch(url, {
@@ -104,6 +137,7 @@ export async function callPythonJson<T = unknown>(
       cache: "no-store",
     });
     const text = await res.text();
+    warnIfProtectionPage(path, res.status, res.headers.get("content-type"), text);
     let data: T | null = null;
     try {
       data = text ? (JSON.parse(text) as T) : null;
