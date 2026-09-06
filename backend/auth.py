@@ -116,9 +116,18 @@ def _verify_via_identity_toolkit(token: str) -> dict[str, Any]:
         with urllib.request.urlopen(req, timeout=12) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        # Identity Toolkit explicitly rejected the token (400/401 from Google).
+        # That means the token is bad, not that we couldn't reach the service.
         raise HTTPException(status_code=401, detail="Invalid token") from exc
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=401, detail="Invalid token") from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        # Network failure reaching Firebase (DNS, TCP, TLS, or timeout).
+        # Don't lie and say the token is invalid — the front-end needs to
+        # know the auth backend itself is unreachable so it can back off
+        # and retry instead of forcing the user to sign out.
+        raise HTTPException(
+            status_code=503,
+            detail=f"Auth backend unreachable: {exc}",
+        ) from exc
 
     users = body.get("users") or []
     if not users:
@@ -147,7 +156,15 @@ def verify_bearer(authorization: str | None = Header(default=None)) -> dict[str,
     try:
         _init_firebase()
         return firebase_auth.verify_id_token(token, check_revoked=False)
+    except HTTPException:
+        # Already classified by an inner handler (401 bad token, 503 unreachable).
+        # Don't re-wrap it in a generic 401.
+        raise
     except Exception:
+        # Anything else from firebase_admin (jwt decode error, expired, revoked,
+        # project mismatch, …) falls through to the REST fallback. If that
+        # also fails the same way, _verify_via_identity_toolkit now distinguishes
+        # "bad token" (401) from "unreachable" (503).
         return _verify_via_identity_toolkit(token)
 
 
