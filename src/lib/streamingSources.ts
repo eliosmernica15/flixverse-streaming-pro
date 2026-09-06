@@ -7,15 +7,8 @@ export interface StreamingSource {
   quality: "HD" | "FHD" | "4K";
   reliability: "high" | "medium";
   /**
-   * Iframe `src` — same-origin proxy URL (`/api/embed?src=...`) for cross-origin
-   * providers, raw provider URL for same-origin providers. We proxy the embed
-   * through our own origin so:
-   *   1. The iframe is same-origin and can be controlled by the host page.
-   *   2. vidsrcme.ru's `sbx.js` sandbox-detection redirect (which fires when
-   *      it detects a cross-origin / sandboxed parent) never triggers, because
-   *      the page the browser actually loads is served by us.
-   *   3. We can strip any provider-side sandbox-detection script or
-   *      `/sandbox.php` redirect from the proxied HTML.
+   * Iframe `src` — the raw provider URL (direct cross-origin iframe).
+   * (`providerUrl` duplicates it for postMessage origin detection.)
    */
   url: string;
   /** Original provider URL (for postMessage origin detection). */
@@ -223,13 +216,19 @@ export function buildStreamingSources(
 
   return ordered.map((s) => ({
     ...s,
-    // Route every provider through the same-origin /api/embed proxy so
-    // vidsrcme.ru's sbx.js sandbox-detection redirect (and similar
-    // anti-embed scripts from other providers) never fires. The
-    // `providerUrl` is kept as the raw URL so postMessage origin
-    // detection (`resolveEmbedSrc` / `detectProvider`) can still tell
-    // which provider the inner page is talking to.
-    url: proxyEmbedUrl(s.providerUrl),
+    // Load providers DIRECT (cross-origin iframe), not via /api/embed.
+    // The same-origin proxy is fundamentally unfixable for JS-heavy
+    // providers: their scripts fetch relative endpoints (e.g. vidsrc's
+    // `/vs_src.php`, `/manifest.json`, Cloudflare challenge URLs) that
+    // static href/src rewriting cannot catch, so the requests hit OUR
+    // origin instead of the provider and time out (white player), and our
+    // site CSP (`base-uri 'self'`, `script-src 'self'`) blocks their
+    // scripts and <base> tag. Direct iframes are served from the provider
+    // origin with the provider's own CSP, so all of that works. The
+    // /api/embed route is kept for backward compat but no longer used.
+    // (`providerUrl` stays as the raw URL for postMessage origin
+    // detection in `resolveEmbedSrc` / `detectProvider`.)
+    url: s.providerUrl,
   }));
 }
 

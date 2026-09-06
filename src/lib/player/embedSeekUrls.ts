@@ -4,7 +4,7 @@
  * - Hard resync (>30s): reload iframe with corrected start URL (guest-only, heavily throttled)
  */
 
-import { proxyEmbedUrl, unproxyEmbedUrl } from "../streamingSources";
+import { unproxyEmbedUrl } from "../streamingSources";
 
 export type SyncAction =
   | { kind: "soft"; deltaSeconds: number }
@@ -18,9 +18,9 @@ const HARD_DRIFT_THRESHOLD = 30;
  * Given host time, guest time, and the embed URL, decide whether to soft-seek,
  * hard-resync (URL rewrite), or do nothing.
  *
- * The returned `seekUrl` is always a same-origin `/api/embed?src=...` URL so
- * the iframe can load it directly. We unwrap any existing proxy URL, append
- * the seek param to the underlying provider URL, and re-wrap.
+ * The returned `seekUrl` is the raw provider URL (direct cross-origin
+ * iframe). We unwrap any legacy `/api/embed?src=...` URL first, append the
+ * seek param to the underlying provider URL, and return it directly.
  */
 export function computeResync(
   hostTimeSeconds: number,
@@ -38,13 +38,10 @@ export function computeResync(
     return { kind: "soft", deltaSeconds: hostTimeSeconds - guestTimeSeconds };
   }
 
-  // Hard resync: unwrap any proxy URL, inject the seek param into the raw
-  // provider URL, then re-wrap in the same-origin proxy. The iframe is
-  // always loaded same-origin so the provider's sandbox-detection scripts
-  // (e.g. vidsrcme.ru's sbx.js) never trigger.
+  // Hard resync: unwrap any legacy proxy URL, inject the seek param into
+  // the raw provider URL, and load it direct (cross-origin iframe).
   const rawProviderUrl = unproxyEmbedUrl(embedUrl);
-  const seekedRaw = injectSeekParam(rawProviderUrl, hostTimeSeconds);
-  const seekUrl = proxyEmbedUrl(seekedRaw);
+  const seekUrl = injectSeekParam(rawProviderUrl, hostTimeSeconds);
   return { kind: "hard", seekUrl };
 }
 

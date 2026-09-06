@@ -1,4 +1,4 @@
-import { securityHeaders } from "./security-headers.mjs";
+import { securityHeadersWithoutCsp } from "./security-headers.mjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -78,7 +78,7 @@ const nextConfig = {
         return [
             {
                 source: "/(.*)",
-                headers: securityHeaders,
+                headers: securityHeadersWithoutCsp,
             },
             {
                 source: "/_next/static/(.*)",

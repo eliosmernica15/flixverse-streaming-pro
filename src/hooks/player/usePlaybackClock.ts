@@ -32,6 +32,12 @@ export function usePlaybackClock({
   const lastTickRef = useRef<number | null>(null);
   const lastPersistRef = useRef<number>(Date.now());
   const totalDurationRef = useRef(totalDuration);
+  // Guard against persist pile-up: while the Python API is timing out,
+  // every 5s tick would fire another hanging POST until the browser hits
+  // ERR_INSUFFICIENT_RESOURCES. Skip while one is in flight and back off
+  // 30s after a failure.
+  const persistInFlightRef = useRef(false);
+  const persistBlockedUntilRef = useRef(0);
 
   // Sync refs to avoid re-running effects
   useEffect(() => {
@@ -57,6 +63,9 @@ export function usePlaybackClock({
 
   // Persist function
   const persistProgress = useCallback(async (time: number) => {
+    if (persistInFlightRef.current) return;
+    if (Date.now() < persistBlockedUntilRef.current) return;
+    persistInFlightRef.current = true;
     try {
       await updateProgress(
         movieId,
@@ -71,6 +80,9 @@ export function usePlaybackClock({
       lastPersistRef.current = Date.now();
     } catch (err) {
       console.error("Failed to persist watch progress:", err);
+      persistBlockedUntilRef.current = Date.now() + 30000;
+    } finally {
+      persistInFlightRef.current = false;
     }
   }, [movieId, mediaType, title, posterPath, season, episode, updateProgress]);
 

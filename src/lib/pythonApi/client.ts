@@ -33,6 +33,10 @@ export async function pythonFetch<T>(
 
     const res = await fetch(url, {
       ...options,
+      // Bound hanging Python invocations (cold start / Postgres stall) so
+      // callers fail fast into their backoff instead of piling up sockets
+      // until the browser reports ERR_INSUFFICIENT_RESOURCES.
+      signal: options.signal ?? AbortSignal.timeout(20000),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,

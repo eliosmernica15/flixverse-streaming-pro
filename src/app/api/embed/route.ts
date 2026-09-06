@@ -51,9 +51,19 @@ function stripAntiEmbedScripts(html: string): string {
 }
 
 function rewriteRelativeUrls(html: string, baseOrigin: string): string {
-  return html
+  let out = html
     .replace(/(href|src)=(["'])\/(?!\/)/g, `$1=$2${baseOrigin}/`)
     .replace(/(href|src)=(["'])(?!https?:|\/\/|data:|blob:|#|mailto:)/g, `$1=$2${baseOrigin}/`);
+  // Media attributes the base regex misses: video poster, lazy-load
+  // data-src, and srcset. Without this they resolve against OUR origin
+  // (/api/embed) and 404 as e.g. `/hTNA....jpg` on flixverse instead of the
+  // provider. Only rewrite the first srcset candidate to keep it simple.
+  out = out
+    .replace(/(poster|data-src)=(["'])\/(?!\/)/g, `$1=$2${baseOrigin}/`)
+    .replace(/(poster|data-src)=(["'])(?!https?:|\/\/|data:|blob:|#)/g, `$1=$2${baseOrigin}/`)
+    .replace(/srcset=(["'])\/(?!\/)/g, `srcset=$1${baseOrigin}/`)
+    .replace(/url\(\s*\/(?!\/)/g, `url(${baseOrigin}/`);
+  return out;
 }
 
 export async function GET(request: NextRequest) {
@@ -107,9 +117,12 @@ export async function GET(request: NextRequest) {
       html = GUARD_SCRIPT + html;
     }
 
-    // Add <base> so relative assets resolve against provider origin
-    const baseTag = `<base href="${origin}/">`;
-    html = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
+    // NOTE: no <base> tag on purpose. A `<base href="https://provider/">`
+    // violates our site-wide CSP (`base-uri 'self'`, applied by
+    // next.config `headers()` to every route including /api/embed), so the
+    // browser blocks it and relative sub-assets then resolve against OUR
+    // origin and 404 (e.g. `/hTNA....jpg`). Absolute-rewriting above
+    // already covers href/src/poster/srcset, so <base> is redundant.
 
     return new NextResponse(html, {
       status: 200,

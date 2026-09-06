@@ -50,3 +50,14 @@ export const securityHeaders = [
     value: cspDirectives.join("; "),
   },
 ];
+
+export const cspValue = cspDirectives.join("; ");
+
+/** Global headers WITHOUT CSP — CSP is applied by middleware.ts instead so
+ * `/api/embed` (third-party provider HTML served same-origin) can be
+ * excluded. A global CSP from next.config `headers()` would apply to the
+ * proxied embed HTML too and block the provider's own scripts (`script-src
+ * 'self'`) leaving a white player. */
+export const securityHeadersWithoutCsp = securityHeaders.filter(
+  (h) => h.key !== "Content-Security-Policy"
+);
