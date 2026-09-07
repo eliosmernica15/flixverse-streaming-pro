@@ -66,6 +66,8 @@ function partyStatusLabel(status: SyncStatus): string {
       return "Re-syncing…";
     case "resyncing":
       return "Hard resync";
+    case "staging":
+      return "On hold · syncing start";
     case "disconnected":
       return "Offline";
     default:
@@ -80,6 +82,7 @@ function partyStatusClass(status: SyncStatus): string {
     case "connecting":
     case "drift":
     case "resyncing":
+    case "staging":
       return "player-party-syncing";
     default:
       return "player-party-offline";
@@ -1021,6 +1024,11 @@ export function PlayerShell({
             realtimeProcessed={party.realtime?.processed}
             realtimeReady={party.realtime?.isReady}
             peerCount={party.partyRoom?.participants?.length}
+            syncStage={party.syncStage}
+            staging={party.staging}
+            onSyncStart={party.startSyncedStart}
+            onReleaseSyncNow={party.releaseSyncedStart}
+            onCancelSync={party.cancelSyncedStart}
           />
         )}
       </div>

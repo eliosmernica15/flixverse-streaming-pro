@@ -64,7 +64,12 @@ export type PartyRealtimeEventType =
   | "seek"
   | "heartbeat"
   | "speaking"
-  | "server-change";
+  | "server-change"
+  // Staged simultaneous start (see usePlayerPartySync Synced Start):
+  // host holds everyone paused at a timestamp, then releases both sides
+  // at the same wall-clock moment so the guest never taps anything.
+  | "sync-stage"
+  | "sync-go";
 
 export interface PartyRealtimeEvent {
   type: PartyRealtimeEventType;

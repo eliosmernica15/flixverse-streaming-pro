@@ -1,12 +1,13 @@
 "use client";
 
-import { Radio, RadioTower, Wifi, WifiOff, Loader2, Signal, Activity } from "lucide-react";
+import { Radio, RadioTower, Wifi, WifiOff, Loader2, Signal, Activity, Pause } from "lucide-react";
 
 export type SyncStatus =
   | "connected"
   | "connecting"
   | "drift"
   | "resyncing"
+  | "staging"
   | "disconnected";
 
 interface SyncStatusBadgeProps {
@@ -44,6 +45,12 @@ const STATUS_CONFIG: Record<SyncStatus, { label: string; tone: string; dot: stri
     dot: "bg-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.7)]",
     icon: Loader2,
   },
+  staging: {
+    label: "On hold",
+    tone: "text-sky-300 bg-sky-500/10 border-sky-500/30",
+    dot: "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.7)]",
+    icon: Pause,
+  },
   disconnected: {
     label: "Offline",
     tone: "text-red-300 bg-red-500/10 border-red-500/30",
@@ -62,7 +69,7 @@ export function SyncStatusBadge({ status, driftMs, processed, peers, className =
       : null;
 
   const animateIcon =
-    status === "connecting" || status === "drift" || status === "resyncing";
+    status === "connecting" || status === "drift" || status === "resyncing" || status === "staging";
 
   return (
     <span

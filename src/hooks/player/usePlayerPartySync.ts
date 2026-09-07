@@ -32,6 +32,7 @@ import {
   stripGuestJoinParam,
 } from "@/lib/player/partyUrl";
 import { computeResync, injectSeekParam } from "@/lib/player/embedSeekUrls";
+import { NTPClient } from "@/lib/player/ntpClockSync";
 
 const JOIN_GRACE_MS = 5000;
 const SYNC_INTERVAL_MS = 250;
@@ -41,6 +42,13 @@ const SEEK_COOLDOWN_MS = 600;
 const MAX_GUEST_SPLASH_MS = 14_000;
 const HOST_HEARTBEAT_MS = 800;
 const FIRESTORE_PERSIST_INTERVAL_MS = 4000;
+// Lead time for a joint start: both sides seek first, then play at the
+// shared wall-clock moment so network jitter doesn't stagger the start.
+const SYNC_STAGE_LEAD_MS = 1500;
+// Auto-release a stage after this long so a staged hold can never trap the
+// party if the host walks away. The host pressing pause/play or scrubbing
+// cancels it sooner.
+const SYNC_AUTO_RELEASE_MS = 5000;
 // A host signal newer than this means the event channel is live, even when
 // the WebRTC data channel never opens (no TURN / strict NAT) and the
 // provider iframe never emits PLAYER_EVENTs (cross-origin direct embeds).
@@ -114,6 +122,10 @@ export function usePlayerPartySync({
   // transport) was applied. Drives the freshness-based "connected" status
   // so guests don't sit on "Connecting" forever when WebRTC can't open.
   const [lastSignalAt, setLastSignalAt] = useState(0);
+  // Synced Start — staged simultaneous playback (see block below).
+  // Host holds `syncStage`; guests hold `staging`. Both clear on release.
+  const [syncStage, setSyncStage] = useState<{ targetTime: number; releaseAt: number } | null>(null);
+  const [staging, setStaging] = useState<{ targetTime: number; releaseAt: number } | null>(null);
   const guestJoinSession = useMemo(() => readGuestJoinSession(), []);
   const guestSplashStartedAt = useRef(guestJoinSession?.startedAt ?? Date.now());
 
@@ -156,6 +168,12 @@ export function usePlayerPartySync({
   const firstHostTimeAtRef = useRef(0);
   const fallbackHardSyncDoneRef = useRef(false);
   const lastSignalAtRef = useRef(0);
+  // Synced Start cursors (mirrors of the states above for interval/timer use).
+  const syncStageRef = useRef<{ targetTime: number; releaseAt: number } | null>(null);
+  const stagingRef = useRef<{ targetTime: number; releaseAt: number } | null>(null);
+  const autoReleaseTimerRef = useRef(0);
+  const scheduledGoTimerRef = useRef(0);
+  const prevParticipantCountRef = useRef(0);
 
   // Fresh room → fresh signal cursors.
   useEffect(() => {
@@ -163,12 +181,40 @@ export function usePlayerPartySync({
     fallbackHardSyncDoneRef.current = false;
     lastSignalAtRef.current = 0;
     setLastSignalAt(0);
+    window.clearTimeout(autoReleaseTimerRef.current);
+    autoReleaseTimerRef.current = 0;
+    window.clearTimeout(scheduledGoTimerRef.current);
+    scheduledGoTimerRef.current = 0;
+    setSyncStage(null);
+    setStaging(null);
   }, [partyRoomId]);
 
   currentTimeRef.current = currentTime;
   isPlayingRef.current = isPlaying;
   embedReadyRef.current = embedReady;
   embedLiveSyncedRef.current = embedLiveSynced;
+  syncStageRef.current = syncStage;
+  stagingRef.current = staging;
+
+  // Stable handles to the embed controls for callbacks defined before/after
+  // them in this hook — always call the latest prop without re-subscribing.
+  const playEmbedRef = useRef(playEmbed);
+  playEmbedRef.current = playEmbed;
+  const pauseEmbedRef = useRef(pauseEmbed);
+  pauseEmbedRef.current = pauseEmbed;
+  const setPlayingRef = useRef(setPlaying);
+  setPlayingRef.current = setPlaying;
+  const providerUrlRef = useRef(currentSourceProviderUrl);
+  providerUrlRef.current = currentSourceProviderUrl;
+
+  // Clears any staged hold on this guest (plain play/pause/seek wins over
+  // a stage; a new stage re-arms it). Stable + dependency-free so every
+  // sync path can call it.
+  const clearGuestStaging = useCallback(() => {
+    window.clearTimeout(scheduledGoTimerRef.current);
+    scheduledGoTimerRef.current = 0;
+    setStaging(null);
+  }, []);
 
   useEffect(() => {
     partyPlaybackRef.current = partyRoom?.playbackState ?? "paused";
@@ -200,10 +246,51 @@ export function usePlayerPartySync({
   const softSeekToRef = useRef(softSeekTo);
   softSeekToRef.current = softSeekTo;
 
+  // Guest side of `sync-stage`: hold paused at the host timestamp. No tap
+  // needed — nothing for provider ad scripts to hijack. Silent providers
+  // get one positioned reload so they actually land on T.
+  const handleGuestStage = useCallback((targetTime: number, releaseAt: number) => {
+    window.clearTimeout(scheduledGoTimerRef.current);
+    scheduledGoTimerRef.current = 0;
+    setStaging({ targetTime, releaseAt });
+    setPlayingRef.current(false);
+    pauseEmbedRef.current();
+    softSeekToRef.current(targetTime);
+    if (!embedLiveSyncedRef.current) {
+      setResyncSeekUrl(injectSeekParam(providerUrlRef.current, targetTime));
+    }
+  }, []);
+
+  // Guest side of `sync-go`: seek to T, then play at the shared wall-clock
+  // moment so both sides start the same frame together.
+  const handleGuestGo = useCallback((targetTime: number, startAt: number) => {
+    window.clearTimeout(scheduledGoTimerRef.current);
+    scheduledGoTimerRef.current = 0;
+    setStaging(null);
+    softSeekToRef.current(targetTime);
+    initialSyncDoneRef.current = true;
+    setGuestInitialSynced(true);
+    const delay = startAt > 0 ? startAt - NTPClient.now() : 0;
+    if (delay <= 0) {
+      setPlayingRef.current(true);
+      playEmbedRef.current();
+      return;
+    }
+    setPlayingRef.current(false);
+    pauseEmbedRef.current();
+    scheduledGoTimerRef.current = window.setTimeout(() => {
+      scheduledGoTimerRef.current = 0;
+      lastSeekAtRef.current = 0;
+      setPlayingRef.current(true);
+      playEmbedRef.current();
+    }, delay);
+  }, []);
+
   const handlePartyPlaybackSync = useCallback(
     (msg: SyncMessage) => {
       if (isPartyHost) return;
       if (msg.type === "play") {
+        clearGuestStaging();
         setPlaying(true);
         playEmbed();
         // Snap to host position so there's no drift at play-start
@@ -212,6 +299,7 @@ export function usePlayerPartySync({
         }
       }
       if (msg.type === "pause") {
+        clearGuestStaging();
         setPlaying(false);
         pauseEmbed();
         // Snap to exact host frame on pause so both sides land together
@@ -220,6 +308,7 @@ export function usePlayerPartySync({
         }
       }
       if (msg.type === "seek" && typeof msg.data.currentTime === "number") {
+        clearGuestStaging();
         // Rate-limited so rapid scrubber drags don't flood the iframe
         softSeekToRef.current(msg.data.currentTime);
       }
@@ -236,8 +325,8 @@ export function usePlayerPartySync({
         }
       }
     },
-    // All mutable state is accessed via refs; only stable callbacks in deps.
-    [isPartyHost, setPlaying, playEmbed, pauseEmbed]
+      // All mutable state is accessed via refs; only stable callbacks in deps.
+    [isPartyHost, setPlaying, playEmbed, pauseEmbed, clearGuestStaging]
   );
 
   const { isConnected: rtcConnected, sendMessage: sendRtcMessage, setLocalStream } = useWebRTCSync({
@@ -276,6 +365,20 @@ export function usePlayerPartySync({
     onEvent: (ev) => {
       if (isPartyHost) return;
       noteGuestSignal(ev.data?.currentTime);
+      if (ev.type === "sync-stage" && typeof ev.data?.currentTime === "number") {
+        handleGuestStage(
+          ev.data.currentTime,
+          typeof ev.data?.releaseAt === "number" ? ev.data.releaseAt : 0
+        );
+        return;
+      }
+      if (ev.type === "sync-go" && typeof ev.data?.currentTime === "number") {
+        handleGuestGo(
+          ev.data.currentTime,
+          typeof ev.data?.startAt === "number" ? ev.data.startAt : 0
+        );
+        return;
+      }
       handlePartyPlaybackSync({
         type: ev.type as SyncMessage["type"],
         timestamp: ev.ts,
@@ -285,6 +388,21 @@ export function usePlayerPartySync({
     onHeartbeat: (ev) => {
       if (isPartyHost) return;
       noteGuestSignal(ev.data?.currentTime);
+      // The host re-asserts the staged hold on every heartbeat, so a guest
+      // that missed the stage event (or joined mid-stage) still holds —
+      // and a cancelled stage clears promptly instead of sticking.
+      const staged = ev.data?.staged;
+      const stageTime = ev.data?.stageTime;
+      if (staged === true && typeof stageTime === "number") {
+        const cur = stagingRef.current;
+        if (!cur || cur.targetTime !== stageTime) {
+          window.clearTimeout(scheduledGoTimerRef.current);
+          scheduledGoTimerRef.current = 0;
+          setStaging({ targetTime: stageTime, releaseAt: cur?.releaseAt ?? 0 });
+        }
+      } else if (staged === false && stagingRef.current) {
+        clearGuestStaging();
+      }
       handlePartyPlaybackSync({
         type: "heartbeat",
         timestamp: ev.ts,
@@ -396,6 +514,21 @@ export function usePlayerPartySync({
       if (!embedLiveSyncedRef.current && guestTime === 0 && hostTime > 5) return;
       if (guestTime === 0 && hostTime > 10) return;
 
+      // Staged hold: stay paused exactly on the stage timestamp. Never
+      // chase drift mid-stage — the joint `sync-go` release does the
+      // precise alignment for both sides at once.
+      const stagedHold = stagingRef.current;
+      if (stagedHold) {
+        if (isPlayingRef.current) {
+          setPlaying(false);
+          pauseEmbed();
+        }
+        softSeekTo(stagedHold.targetTime);
+        setPartyDriftMs(Math.abs(currentTimeRef.current - stagedHold.targetTime) * 1000);
+        setPartySyncStatus("staging");
+        return;
+      }
+
        const driftSec = Math.abs(guestTime - hostTime);
        setPartyDriftMs(driftSec * 1000);
 
@@ -463,6 +596,8 @@ export function usePlayerPartySync({
       setPartySyncStatus("connected");
     } else if (!isPartyHost && guestInitialSynced) {
       setPartySyncStatus("connected");
+    } else if (!isPartyHost && staging) {
+      setPartySyncStatus("staging");
     } else if (!isPartyHost && Date.now() - lastSignalAt < SIGNAL_FRESH_MS) {
       // Host signals are arriving over the event channel — the party is
       // live even though the WebRTC data channel never opened (no TURN /
@@ -471,7 +606,7 @@ export function usePlayerPartySync({
     } else if (partyRoom) {
       setPartySyncStatus("connecting");
     }
-  }, [partyRoomId, rtcConnected, partyRoom, isPartyHost, guestInitialSynced, lastSignalAt]);
+  }, [partyRoomId, rtcConnected, partyRoom, isPartyHost, guestInitialSynced, staging, lastSignalAt]);
 
   // Guest: prime position from room state before WebRTC heartbeats arrive
   useEffect(() => {
@@ -557,9 +692,87 @@ export function usePlayerPartySync({
     return () => window.clearTimeout(t);
   }, [guestJoinMode, isPartyHost, guestSplashDismissed, partyRoomId, partyDriftMs]);
 
+  /**
+   * Synced Start — host controls. Pause everyone at the host timestamp,
+   * hold, then release both sides at the same wall-clock moment so the
+   * guest never taps anything (no ad popups) and both land on the exact
+   * same frame.
+   */
+  const cancelSyncedStart = useCallback(() => {
+    window.clearTimeout(autoReleaseTimerRef.current);
+    autoReleaseTimerRef.current = 0;
+    window.clearTimeout(scheduledGoTimerRef.current);
+    scheduledGoTimerRef.current = 0;
+    setSyncStage(null);
+  }, []);
+
+  const releaseSyncedStart = useCallback(() => {
+    if (!partyRoomId || !isPartyHost) return;
+    const st = syncStageRef.current;
+    if (!st) return;
+    window.clearTimeout(autoReleaseTimerRef.current);
+    autoReleaseTimerRef.current = 0;
+    const T = st.targetTime;
+    // Undo PlayerShell's optimistic toggle: re-pause locally, snap to T,
+    // then play exactly at the shared start moment alongside the guests.
+    setPlaying(false);
+    pauseEmbed();
+    softSeekToRef.current(T);
+    const startAt = NTPClient.now() + SYNC_STAGE_LEAD_MS;
+    setSyncStage(null);
+    void updatePlaybackState("paused", T, currentServer);
+    void realtime.send("sync-go", { currentTime: T, startAt });
+    scheduledGoTimerRef.current = window.setTimeout(() => {
+      scheduledGoTimerRef.current = 0;
+      setPlaying(true);
+      playEmbed();
+    }, Math.max(0, startAt - NTPClient.now()));
+  }, [partyRoomId, isPartyHost, setPlaying, pauseEmbed, playEmbed, updatePlaybackState, currentServer, realtime.send]);
+
+  const startSyncedStart = useCallback(() => {
+    if (!partyRoomId || !isPartyHost || !user) return;
+    window.clearTimeout(autoReleaseTimerRef.current);
+    window.clearTimeout(scheduledGoTimerRef.current);
+    scheduledGoTimerRef.current = 0;
+    const T = Math.max(0, Math.floor(partyTimeRef.current));
+    setPlaying(false);
+    pauseEmbed();
+    const releaseAt = NTPClient.now() + SYNC_AUTO_RELEASE_MS;
+    setSyncStage({ targetTime: T, releaseAt });
+    void updatePlaybackState("paused", T, currentServer);
+    void realtime.send("sync-stage", { currentTime: T, releaseAt });
+    autoReleaseTimerRef.current = window.setTimeout(() => {
+      releaseSyncedStart();
+    }, SYNC_AUTO_RELEASE_MS);
+  }, [partyRoomId, isPartyHost, user, setPlaying, pauseEmbed, updatePlaybackState, currentServer, realtime.send, releaseSyncedStart]);
+
+  // Host: a guest just joined → pause at the current position and hold
+  // everyone there until the host releases. Nobody taps anything, so no
+  // provider popups fire on either side.
+  useEffect(() => {
+    if (!partyRoomId || !isPartyHost) {
+      prevParticipantCountRef.current = 0;
+      return;
+    }
+    const count = partyRoom?.participants?.length ?? 0;
+    const prev = prevParticipantCountRef.current;
+    prevParticipantCountRef.current = count;
+    if (prev === 0) return; // baseline (room creation / first load)
+    if (count > prev && !syncStageRef.current) startSyncedStart();
+  }, [partyRoomId, isPartyHost, partyRoom?.participants?.length, partyRoom, startSyncedStart]);
+
   const broadcastPartyState = useCallback(
     (state: "playing" | "paused", time: number) => {
       if (!partyRoomId || !isPartyHost) return;
+      // Staged hold: the host pressing play releases BOTH sides together
+      // at the shared start moment instead of starting the host early.
+      if (state === "playing" && syncStageRef.current) {
+        releaseSyncedStart();
+        return;
+      }
+      // Any explicit pause/scrub intent while staged cancels the hold; the
+      // plain event below clears every guest's banner.
+      if (syncStageRef.current) cancelSyncedStart();
       // Write authoritative state to Firestore immediately on explicit play/pause
       void updatePlaybackState(state, time, currentServer);
       // Send the real-time message through the self-hosted realtime transport
@@ -568,7 +781,7 @@ export function usePlayerPartySync({
       // even if the realtime listener hasn't replayed yet.
       sendRtcMessage(state === "playing" ? "play" : "pause", { currentTime: time });
     },
-    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer]
+    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer, releaseSyncedStart, cancelSyncedStart]
   );
 
   /**
@@ -579,6 +792,7 @@ export function usePlayerPartySync({
   const broadcastPartySeek = useCallback(
     (time: number) => {
       if (!partyRoomId || !isPartyHost) return;
+      if (syncStageRef.current) cancelSyncedStart();
       // Persist to Firestore so late-joining guests get the right position
       void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, currentServer);
       // Instant delivery through the realtime transport
@@ -586,7 +800,7 @@ export function usePlayerPartySync({
       // Belt-and-braces: also send via WebRTC
       sendRtcMessage("seek", { currentTime: time });
     },
-    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer]
+    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer, cancelSyncedStart]
   );
 
   const partyTimeRef = useRef(currentTime);
@@ -613,7 +827,14 @@ export function usePlayerPartySync({
       // Always send a lightweight heartbeat through the realtime transport.
       // Both the realtime channel and the WebRTC data channel get it — whichever
       // delivers first wins, and the other is a free redundancy boost.
-      void realtime.send("heartbeat", { currentTime: time });
+      // The staged hold rides along so guests that missed the stage event
+      // (or joined mid-stage) still hold instead of drifting.
+      const stage = syncStageRef.current;
+      void realtime.send("heartbeat", {
+        currentTime: time,
+        staged: stage !== null,
+        stageTime: stage?.targetTime ?? 0,
+      });
       sendRtcMessage("heartbeat", { currentTime: time });
 
       // Throttle the heavier Firestore write
@@ -711,6 +932,13 @@ export function usePlayerPartySync({
     setPartyRoomKey(null);
     setShowInviteDialog(false);
     setGuestServerIndex(null);
+    setSyncStage(null);
+    setStaging(null);
+    setLastSignalAt(0);
+    window.clearTimeout(autoReleaseTimerRef.current);
+    autoReleaseTimerRef.current = 0;
+    window.clearTimeout(scheduledGoTimerRef.current);
+    scheduledGoTimerRef.current = 0;
     wasInPartyRef.current = false;
     absentPollCountRef.current = 0;
     partyJoinTimeRef.current = null;
@@ -760,6 +988,11 @@ export function usePlayerPartySync({
     resetPartySession,
     broadcastPartyState,
     broadcastPartySeek,
+    syncStage,
+    staging,
+    startSyncedStart,
+    releaseSyncedStart,
+    cancelSyncedStart,
     partyJoinUrl,
     partyRoomCode: partyRoom?.code || (partyRoomId ? partyRoomId.slice(0, 6).toUpperCase() : ""),
     partyMessages,

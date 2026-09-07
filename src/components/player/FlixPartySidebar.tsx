@@ -15,6 +15,7 @@ import { firestoreErrorMessage } from "@/lib/firestore/errors";
 import { FriendsList } from "@/components/FriendsList";
 import { WatchParty } from "./WatchParty";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge";
+import { HostSyncCard, GuestStagingBanner } from "./SyncedStartCard";
 import { PartyMediaControls } from "./PartyMediaPanel";
 import { PartyMembersPanel } from "./PartyMembersPanel";
 import type { usePartyMedia } from "@/hooks/player/usePartyMedia";
@@ -60,6 +61,12 @@ interface FlixPartySidebarProps {
   realtimeProcessed?: number;
   realtimeReady?: boolean;
   peerCount?: number;
+  /** Synced Start: host holds `syncStage`, guests hold `staging`. */
+  syncStage?: { targetTime: number; releaseAt: number } | null;
+  staging?: { targetTime: number; releaseAt: number } | null;
+  onSyncStart?: () => void;
+  onReleaseSyncNow?: () => void;
+  onCancelSync?: () => void;
 }
 
 type SidebarTab = "chat" | "friends" | "party";
@@ -97,6 +104,11 @@ export function FlixPartySidebar({
   realtimeProcessed,
   realtimeReady,
   peerCount,
+  syncStage = null,
+  staging = null,
+  onSyncStart,
+  onReleaseSyncNow,
+  onCancelSync,
 }: FlixPartySidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>(roomId ? "chat" : "friends");
   const [input, setInput] = useState("");
@@ -354,6 +366,10 @@ export function FlixPartySidebar({
         </div>
       </div>
 
+      {roomId && !isHostProp && staging && (
+        <GuestStagingBanner staging={staging} />
+      )}
+
       {roomId && partyJoinUrl && !isMobile && (
         <div className="px-3 py-2 border-b border-white/10 shrink-0">
           <button
@@ -565,7 +581,17 @@ export function FlixPartySidebar({
         {/* Party tab */}
         {activeTab === "party" && (
           <div className="flex-1 overflow-y-auto min-h-0">
-            {roomId && syncStatus === "connecting" && (
+            {roomId && isHostProp && onSyncStart && onReleaseSyncNow && onCancelSync && (
+              <div className="px-3 pt-3">
+                <HostSyncCard
+                  stage={syncStage}
+                  onStart={onSyncStart}
+                  onReleaseNow={onReleaseSyncNow}
+                  onCancel={onCancelSync}
+                />
+              </div>
+            )}
+            {roomId && syncStatus === "connecting" && !staging && (
               <div className="mx-3 mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-200">
                 Waiting for the host signal… your video syncs automatically
                 once it arrives. If this persists, press{" "}

@@ -212,7 +212,7 @@ service cloud.firestore {
           && isInParticipantIds(get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participantIds);
         allow create: if isAuthenticated()
           && request.auth.uid == request.resource.data.senderId
-          && request.resource.data.type in ['play', 'pause', 'seek', 'heartbeat', 'speaking', 'server-change']
+          && request.resource.data.type in ['play', 'pause', 'seek', 'heartbeat', 'speaking', 'server-change', 'sync-stage', 'sync-go']
           && isInParticipantIds(get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participantIds);
         // Host trims old events so the log stays bounded
         allow delete: if isAuthenticated()
