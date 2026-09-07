@@ -334,7 +334,14 @@ def get_conn() -> Iterator[Any]:
         import psycopg
         from psycopg.rows import dict_row
 
-        with psycopg.connect(_postgres_url(), row_factory=dict_row) as conn:
+        # Bound connection setup: without connect_timeout a saturated pool
+        # (or a stalled network path) hangs for TCP-default minutes, which
+        # surfaces in the browser as ERR_CONNECTION_TIMED_OUT and piles up
+        # further requests until ERR_INSUFFICIENT_RESOURCES. Fail fast so
+        # callers hit their backoff instead.
+        with psycopg.connect(
+            _postgres_url(), row_factory=dict_row, connect_timeout=10
+        ) as conn:
             try:
                 yield conn
                 conn.commit()

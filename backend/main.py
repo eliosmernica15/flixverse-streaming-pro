@@ -19,7 +19,17 @@ from routers import (
     subscriptions,
 )
 
-init_db()
+# Schema bootstrap runs ~40 DDL statements per cold start. It must never
+# crash the import: if Postgres is unreachable at cold-start time, a raise
+# here would leave the container unable to serve ANY route (all Python
+# endpoints timing out in the browser). Fail open with a stderr log —
+# individual requests then fail fast with proper 500s instead.
+try:
+    init_db()
+except Exception as exc:  # noqa: BLE001
+    import sys as _sys
+
+    print(f"[init_db] skipped (will retry next cold start): {exc}", file=_sys.stderr)
 
 app = FastAPI(title="FlixVerse API", version="1.2.0")
 

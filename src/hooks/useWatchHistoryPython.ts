@@ -89,13 +89,38 @@ export function usePythonWatchHistory() {
             completed,
           }),
         });
-        void refresh();
+        // Optimistic local update — no refetch. A full GET (100 rows) after
+        // every 5s persist doubles write-path load on the serverless
+        // Postgres pool; the 8s poller + visibility refresh reconcile anyway.
+        const next: WatchHistoryItem = {
+          id: historyId,
+          user_id: user.uid,
+          content_id: contentId,
+          content_type: contentType,
+          content_title: contentTitle,
+          content_poster_path: contentPosterPath,
+          season,
+          episode,
+          progress_seconds: progressSeconds,
+          total_duration_seconds: totalDurationSeconds,
+          completed,
+          watched_at: new Date().toISOString(),
+        };
+        setHistory((prev) => {
+          const idx = prev.findIndex((h) => h.id === historyId);
+          if (idx >= 0) {
+            const copy = prev.slice();
+            copy[idx] = next;
+            return copy;
+          }
+          return [next, ...prev];
+        });
       } catch (err) {
         console.error("[watch-history/python] upsert failed:", err);
         throw err;
       }
     },
-    [user, refresh]
+    [user]
   );
 
   const getProgress = useCallback(

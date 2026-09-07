@@ -1,4 +1,13 @@
-/** Security headers — keep in sync with security-headers.mjs (used by next.config). */
+/**
+ * DEAD CODE — unreferenced. The live headers are:
+ *   - `security-headers.mjs` (non-CSP headers for next.config `headers()`)
+ *   - `middleware.ts` (Content-Security-Policy, so `/api/embed` can be
+ *     excluded — next.config headers cannot exclude a path).
+ * Kept for reference only; edit those files instead, or delete this one.
+ * Last synced with security-headers.mjs CSP frame-src covering:
+ * vidsrcme.ru, vidsrc.to, vidlink.pro, player.videasy.to, videasy.to,
+ * vidfast.pro, yapgrid.com (+ www), youtube.
+ */
 export const securityHeaders = [
   {
     key: "Strict-Transport-Security",
