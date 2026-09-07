@@ -292,7 +292,18 @@ export function FlixPartySidebar({
             </div>
             {!isMobile && (
               <p className="text-xs text-gray-500">
-                {friends.length} friend{friends.length !== 1 ? "s" : ""}
+                {roomId && room ? (
+                  <>
+                    {room.participants?.length ?? 0} here
+                    <span className="ml-1 opacity-70">
+                      · {friends.length} friend{friends.length !== 1 ? "s" : ""}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {friends.length} friend{friends.length !== 1 ? "s" : ""}
+                  </>
+                )}
                 {incomingRequests.length > 0 && (
                   <span className="text-red-400 ml-1">· {incomingRequests.length} request{incomingRequests.length !== 1 ? "s" : ""}</span>
                 )}
@@ -554,6 +565,14 @@ export function FlixPartySidebar({
         {/* Party tab */}
         {activeTab === "party" && (
           <div className="flex-1 overflow-y-auto min-h-0">
+            {roomId && syncStatus === "connecting" && (
+              <div className="mx-3 mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-200">
+                Waiting for the host signal… your video syncs automatically
+                once it arrives. If this persists, press{" "}
+                <kbd className="rounded border border-white/20 bg-white/10 px-1 font-semibold">N</kbd>{" "}
+                to try the next server.
+              </div>
+            )}
             {roomId && media && (
               <div className="px-3 pt-3 space-y-2">
                 <PartyMediaControls

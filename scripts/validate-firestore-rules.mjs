@@ -14,6 +14,9 @@ const required = [
   "match /reviews/{reviewId}",
   "match /timeline_comments/{commentId}",
   "match /flix_parties/{roomId}",
+  "match /events/{eventId}",
+  "match /messages/{messageId}",
+  "match /signals/{signalId}",
 ];
 
 const forbidden = [

@@ -203,6 +203,23 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // Playback sync events subcollection (usePartyRealtime transport).
+      // Append-only log written by the host (play/pause/seek/heartbeat);
+      // guests read + replay. Without this block the default-deny rule
+      // silently drops every sync event and party video never syncs.
+      match /events/{eventId} {
+        allow read: if isAuthenticated()
+          && isInParticipantIds(get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participantIds);
+        allow create: if isAuthenticated()
+          && request.auth.uid == request.resource.data.senderId
+          && request.resource.data.type in ['play', 'pause', 'seek', 'heartbeat', 'speaking', 'server-change']
+          && isInParticipantIds(get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participantIds);
+        // Host trims old events so the log stays bounded
+        allow delete: if isAuthenticated()
+          && isInParticipantIds(get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participantIds);
+        allow update: if false;
+      }
+
       // WebRTC signaling subcollection
       match /signals/{signalId} {
         allow read: if isAuthenticated()

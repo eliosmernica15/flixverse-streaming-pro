@@ -121,6 +121,19 @@ export function usePartyRealtime({
 
   const seqRef = useRef(0);
   const lastSeenSeqRef = useRef(-1);
+  // Wall-clock of the last accepted event. The host's seq restarts at 0 on
+  // every page reload, so a strict `seq > lastSeen` cursor would discard ALL
+  // events after a host refresh as "old". An event that is much newer than
+  // anything seen before is therefore accepted as a new epoch even when its
+  // seq is not greater than the cursor. Heartbeats arrive every ~800ms, so
+  // a 15s gap reliably indicates a fresh epoch, never normal jitter.
+  const lastTsRef = useRef(0);
+  const EPOCH_GAP_MS = 15_000;
+  // Live listener window. limit(1) drops intermediate events when the host
+  // emits twice between snapshots (e.g. pause+seek within one heartbeat
+  // interval) — only the newest survives. A small window replayed in seq
+  // order delivers every event exactly once via the cursor below.
+  const LIVE_WINDOW = 12;
   const onEventRef = useRef(onEvent);
   const onHeartbeatRef = useRef(onHeartbeat);
   onEventRef.current = onEvent;
@@ -154,8 +167,13 @@ export function usePartyRealtime({
 
         for (const { data: ev } of ordered) {
           if (ev.senderId === userId) continue;
-          if (ev.seq <= lastSeenSeqRef.current) continue;
+          if (ev.seq <= lastSeenSeqRef.current && ev.ts <= lastTsRef.current + EPOCH_GAP_MS) continue;
+          // Plain assignment (not max): batches are processed oldest-first,
+          // and after a host reload the seq restarts low — max() would pin
+          // the cursor at the pre-reload high-water mark and reject every
+          // subsequent event as "old".
           lastSeenSeqRef.current = ev.seq;
+          lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
           setProcessed((n) => n + 1);
           if (ev.type === "heartbeat") {
             onHeartbeatRef.current?.(ev);
@@ -165,24 +183,34 @@ export function usePartyRealtime({
         }
 
         // Now attach a live listener for any new events going forward.
-        const liveQ = query(eventsRef, orderBy("seq", "desc"), limit(1));
+        const liveQ = query(eventsRef, orderBy("seq", "desc"), limit(LIVE_WINDOW));
         liveUnsub = onSnapshot(
           liveQ,
           (liveSnap) => {
             if (unsubscribed) return;
-            liveSnap.docChanges().forEach((change) => {
-              if (change.type !== "added") return;
-              const ev = change.doc.data() as PartyRealtimeEvent;
-              if (ev.senderId === userId) return;
-              if (ev.seq <= lastSeenSeqRef.current) return;
+            // A snapshot may contain several new docs at once; deliver them
+            // oldest-first so play/seek/heartbeat apply in host order.
+            const fresh = liveSnap
+              .docChanges()
+              .filter((change) => change.type === "added")
+              .map((change) => change.doc.data() as PartyRealtimeEvent)
+              .filter((ev) => ev.senderId !== userId)
+              .filter(
+                (ev) =>
+                  ev.seq > lastSeenSeqRef.current ||
+                  ev.ts > lastTsRef.current + EPOCH_GAP_MS
+              )
+              .sort((a, b) => a.seq - b.seq);
+            for (const ev of fresh) {
               lastSeenSeqRef.current = ev.seq;
+              lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
               setProcessed((n) => n + 1);
               if (ev.type === "heartbeat") {
                 onHeartbeatRef.current?.(ev);
               } else {
                 onEventRef.current(ev);
               }
-            });
+            }
           },
           (err) => {
             console.warn("[usePartyRealtime] snapshot error:", err);

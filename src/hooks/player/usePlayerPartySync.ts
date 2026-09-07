@@ -31,7 +31,7 @@ import {
   replaceUrlWithoutPartyParams,
   stripGuestJoinParam,
 } from "@/lib/player/partyUrl";
-import { computeResync } from "@/lib/player/embedSeekUrls";
+import { computeResync, injectSeekParam } from "@/lib/player/embedSeekUrls";
 
 const JOIN_GRACE_MS = 5000;
 const SYNC_INTERVAL_MS = 250;
@@ -41,6 +41,16 @@ const SEEK_COOLDOWN_MS = 600;
 const MAX_GUEST_SPLASH_MS = 14_000;
 const HOST_HEARTBEAT_MS = 800;
 const FIRESTORE_PERSIST_INTERVAL_MS = 4000;
+// A host signal newer than this means the event channel is live, even when
+// the WebRTC data channel never opens (no TURN / strict NAT) and the
+// provider iframe never emits PLAYER_EVENTs (cross-origin direct embeds).
+const SIGNAL_FRESH_MS = 6000;
+// Guest fallback: if the provider never reports playback (no PLAYER_EVENT
+// within this window after the first host position arrives), reload the
+// iframe once at the host position via the provider seek param (?t=,
+// ?progress=, …). Soft postMessage seeks are best-effort guesses that
+// silent providers ignore — a positioned reload always works.
+const FALLBACK_SYNC_AFTER_MS = 10_000;
 const MOBILE_BREAKPOINT = 768;
 
 function isMobileViewport(): boolean {
@@ -100,6 +110,10 @@ export function usePlayerPartySync({
   const [guestInitialSynced, setGuestInitialSynced] = useState(false);
   const [guestSplashDismissed, setGuestSplashDismissed] = useState(false);
   const [resyncSeekUrl, setResyncSeekUrl] = useState<string | null>(null);
+  // Last wall-clock time a host signal (event or heartbeat, either
+  // transport) was applied. Drives the freshness-based "connected" status
+  // so guests don't sit on "Connecting" forever when WebRTC can't open.
+  const [lastSignalAt, setLastSignalAt] = useState(0);
   const guestJoinSession = useMemo(() => readGuestJoinSession(), []);
   const guestSplashStartedAt = useRef(guestJoinSession?.startedAt ?? Date.now());
 
@@ -137,6 +151,19 @@ export function usePlayerPartySync({
   const initialSyncDoneRef = useRef(false);
   const partyPlaybackRef = useRef<"playing" | "paused">("paused");
   const partyHostTimeRef = useRef(0);
+  // First wall-clock time a host position (>0) arrived for this guest. Used
+  // to trigger the fallback hard-sync when the provider stays silent.
+  const firstHostTimeAtRef = useRef(0);
+  const fallbackHardSyncDoneRef = useRef(false);
+  const lastSignalAtRef = useRef(0);
+
+  // Fresh room → fresh signal cursors.
+  useEffect(() => {
+    firstHostTimeAtRef.current = 0;
+    fallbackHardSyncDoneRef.current = false;
+    lastSignalAtRef.current = 0;
+    setLastSignalAt(0);
+  }, [partyRoomId]);
 
   currentTimeRef.current = currentTime;
   isPlayingRef.current = isPlaying;
@@ -218,10 +245,27 @@ export function usePlayerPartySync({
     isHost: !!isPartyHost,
     hostId: partyRoom?.hostId ?? null,
     participantIds: partyParticipantIds,
-    onPlaybackSync: handlePartyPlaybackSync,
+    onPlaybackSync: (msg) => {
+      noteGuestSignal(
+        (msg as { data?: { currentTime?: unknown } })?.data?.currentTime
+      );
+      handlePartyPlaybackSync(msg);
+    },
     onRemoteStream: (peerId, stream) => onRemoteStreamRef.current(peerId, stream),
     onRemoteStreamRemoved: (peerId) => onRemoteStreamRemovedRef.current(peerId),
   });
+
+  // Records every host signal landing on this guest (both transports).
+  // Also stamps the first host position so the fallback hard-sync knows
+  // how long the provider has been silent.
+  const noteGuestSignal = useCallback((hostTime: unknown) => {
+    const now = Date.now();
+    lastSignalAtRef.current = now;
+    setLastSignalAt(now);
+    if (typeof hostTime === "number" && hostTime > 0 && !firstHostTimeAtRef.current) {
+      firstHostTimeAtRef.current = now;
+    }
+  }, []);
 
   // Self-hosted real-time transport — same handler as WebRTC, so any
   // delivery path (Firestore events or WebRTC data channel) lands the
@@ -231,6 +275,7 @@ export function usePlayerPartySync({
     isHost: !!isPartyHost,
     onEvent: (ev) => {
       if (isPartyHost) return;
+      noteGuestSignal(ev.data?.currentTime);
       handlePartyPlaybackSync({
         type: ev.type as SyncMessage["type"],
         timestamp: ev.ts,
@@ -239,6 +284,7 @@ export function usePlayerPartySync({
     },
     onHeartbeat: (ev) => {
       if (isPartyHost) return;
+      noteGuestSignal(ev.data?.currentTime);
       handlePartyPlaybackSync({
         type: "heartbeat",
         timestamp: ev.ts,
@@ -325,6 +371,28 @@ export function usePlayerPartySync({
       const guestTime = currentTimeRef.current;
       const hostTime = Math.max(partyHostTimeRef.current, hostTimeRef.current);
 
+      // Fallback initial sync: the provider never reported playback
+      // (no PLAYER_EVENT — silent cross-origin embed) but host positions
+      // have been arriving for a while. Reload the iframe once AT the host
+      // position via the provider seek param — the only mechanism silent
+      // providers honor — and consider the guest synced.
+      if (
+        !initialSyncDoneRef.current &&
+        !embedLiveSyncedRef.current &&
+        !fallbackHardSyncDoneRef.current &&
+        hostTime > 0 &&
+        firstHostTimeAtRef.current > 0 &&
+        Date.now() - firstHostTimeAtRef.current >= FALLBACK_SYNC_AFTER_MS
+      ) {
+        fallbackHardSyncDoneRef.current = true;
+        initialSyncDoneRef.current = true;
+        setGuestInitialSynced(true);
+        lastSeekAtRef.current = 0;
+        setResyncSeekUrl(injectSeekParam(sourceUrlRef.current, hostTime));
+        setPartySyncStatus("resyncing");
+        return;
+      }
+
       if (!embedLiveSyncedRef.current && guestTime === 0 && hostTime > 5) return;
       if (guestTime === 0 && hostTime > 10) return;
 
@@ -349,9 +417,10 @@ export function usePlayerPartySync({
          softSeekTo(hostTime);
          setPartySyncStatus("drift");
        } else {
-         setPartySyncStatus(rtcConnected ? "connected" : "connecting");
+         const fresh = Date.now() - lastSignalAtRef.current < SIGNAL_FRESH_MS;
+         setPartySyncStatus(rtcConnected || guestInitialSynced || fresh ? "connected" : "connecting");
        }
-     };
+    };
 
      tick();
      const id = setInterval(tick, SYNC_INTERVAL_MS);
@@ -394,10 +463,15 @@ export function usePlayerPartySync({
       setPartySyncStatus("connected");
     } else if (!isPartyHost && guestInitialSynced) {
       setPartySyncStatus("connected");
+    } else if (!isPartyHost && Date.now() - lastSignalAt < SIGNAL_FRESH_MS) {
+      // Host signals are arriving over the event channel — the party is
+      // live even though the WebRTC data channel never opened (no TURN /
+      // strict NAT) and the provider iframe stays silent.
+      setPartySyncStatus("connected");
     } else if (partyRoom) {
       setPartySyncStatus("connecting");
     }
-  }, [partyRoomId, rtcConnected, partyRoom, isPartyHost, guestInitialSynced]);
+  }, [partyRoomId, rtcConnected, partyRoom, isPartyHost, guestInitialSynced, lastSignalAt]);
 
   // Guest: prime position from room state before WebRTC heartbeats arrive
   useEffect(() => {

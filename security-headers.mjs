@@ -16,7 +16,11 @@ export const cspDirectives = [
   // canonical Videasy domain is player.videasy.to. The legacy mirrors
   // (vidsrc.me/.net/.pm/.in/.su, player.videasy.net, embed.su, 2embed.cc,
   // multiembed.mov) are all blocked or 404 and have been removed.
-  "frame-src 'self' blob: https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net https://vidsrcme.ru https://*.vidsrcme.ru https://vidsrc.to https://*.vidsrc.to https://vidlink.pro https://*.vidlink.pro https://player.videasy.to https://*.player.videasy.to https://videasy.to https://*.videasy.to https://vidfast.pro https://*.vidfast.pro https://yapgrid.com https://*.yapgrid.com https://www.yapgrid.com https://www.youtube.com https://www.youtube-nocookie.com https://*.youtube.com https://*.youtube-nocookie.com",
+  // VidFast serves/redirects across all of its documented domains
+  // (pro/in/io/me/net/pm/xyz/vc/bz) — the player navigates to vidfast.vc
+  // even when loaded from vidfast.pro, so every mirror must be listed or
+  // the browser blocks the frame.
+  "frame-src 'self' blob: https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net https://vidsrcme.ru https://*.vidsrcme.ru https://vidsrc.to https://*.vidsrc.to https://vidlink.pro https://*.vidlink.pro https://player.videasy.to https://*.player.videasy.to https://videasy.to https://*.videasy.to https://vidfast.pro https://*.vidfast.pro https://vidfast.vc https://*.vidfast.vc https://vidfast.in https://*.vidfast.in https://vidfast.io https://*.vidfast.io https://vidfast.me https://*.vidfast.me https://vidfast.net https://*.vidfast.net https://vidfast.pm https://*.vidfast.pm https://vidfast.xyz https://*.vidfast.xyz https://vidfast.bz https://*.vidfast.bz https://yapgrid.com https://*.yapgrid.com https://www.yapgrid.com https://www.youtube.com https://www.youtube-nocookie.com https://*.youtube.com https://*.youtube-nocookie.com",
   "upgrade-insecure-requests",
 ];
 

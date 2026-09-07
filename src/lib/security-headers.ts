@@ -6,7 +6,8 @@
  * Kept for reference only; edit those files instead, or delete this one.
  * Last synced with security-headers.mjs CSP frame-src covering:
  * vidsrcme.ru, vidsrc.to, vidlink.pro, player.videasy.to, videasy.to,
- * vidfast.pro, yapgrid.com (+ www), youtube.
+ * vidfast.pro + mirrors (.vc/.in/.io/.me/.net/.pm/.xyz/.bz),
+ * yapgrid.com (+ www), youtube.
  */
 export const securityHeaders = [
   {
@@ -46,7 +47,7 @@ export const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com",
       "connect-src 'self' https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com https://api.themoviedb.org https://www.cloudflare.com https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://*.ingest.sentry.io https://*.sentry.io https://www.google.com https://www.recaptcha.net wss://*.firebaseio.com",
-      "frame-src 'self' blob: https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net https://vidsrcme.ru https://*.vidsrcme.ru https://vidsrc.to https://*.vidsrc.to https://vidlink.pro https://*.vidlink.pro https://player.videasy.to https://*.player.videasy.to https://videasy.to https://*.videasy.to https://vidfast.pro https://*.vidfast.pro https://yapgrid.com https://*.yapgrid.com https://www.yapgrid.com https://www.youtube.com https://www.youtube-nocookie.com https://*.youtube.com https://*.youtube-nocookie.com",
+      "frame-src 'self' blob: https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net https://vidsrcme.ru https://*.vidsrcme.ru https://vidsrc.to https://*.vidsrc.to https://vidlink.pro https://*.vidlink.pro https://player.videasy.to https://*.player.videasy.to https://videasy.to https://*.videasy.to https://vidfast.pro https://*.vidfast.pro https://vidfast.vc https://*.vidfast.vc https://vidfast.in https://*.vidfast.in https://vidfast.io https://*.vidfast.io https://vidfast.me https://*.vidfast.me https://vidfast.net https://*.vidfast.net https://vidfast.pm https://*.vidfast.pm https://vidfast.xyz https://*.vidfast.xyz https://vidfast.bz https://*.vidfast.bz https://yapgrid.com https://*.yapgrid.com https://www.yapgrid.com https://www.youtube.com https://www.youtube-nocookie.com https://*.youtube.com https://*.youtube-nocookie.com",
       "upgrade-insecure-requests",
     ].join("; "),
   },
