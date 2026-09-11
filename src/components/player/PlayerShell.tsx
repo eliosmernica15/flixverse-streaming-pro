@@ -263,7 +263,6 @@ export function PlayerShell({
 
    const { media, guestServerIndex, resyncSeekUrl, setResyncSeekUrl } = party;
   const layout = usePartyLayout();
-  const guestServerAppliedRef = useRef(false);
   const mobilePartyPreparedRef = useRef(false);
 
   const inParty = !!party.partyRoomId;
@@ -309,16 +308,22 @@ export function PlayerShell({
     setLiveDuration(0);
     setPlaying(true);
     setReady(false);
-  }, [setPlaying, setReady]);
+    // Host switching mid-party pulls every guest to the same source.
+    if (party.partyRoomId && party.isPartyHost) {
+      party.broadcastServerChange(index, currentTime);
+    }
+  }, [setPlaying, setReady, party, currentTime]);
 
+  const [followedGuestServer, setFollowedGuestServer] = useState<number | null>(null);
   useEffect(() => {
-    if (guestServerIndex === null || guestServerAppliedRef.current || party.isPartyHost) return;
+    if (guestServerIndex === null || party.isPartyHost) return;
     if (guestServerIndex < 0 || guestServerIndex >= streamingSources.length) return;
-    guestServerAppliedRef.current = true;
+    if (guestServerIndex === followedGuestServer) return;
+    setFollowedGuestServer(guestServerIndex);
     if (guestServerIndex !== currentServer) {
       switchServer(guestServerIndex);
     }
-  }, [guestServerIndex, party.isPartyHost, currentServer, streamingSources.length, switchServer]);
+  }, [guestServerIndex, followedGuestServer, party.isPartyHost, currentServer, streamingSources.length, switchServer]);
 
   useVolumeDucking({
     enabled: !!party.partyRoomId && (media.micOn || media.anyoneSpeaking),

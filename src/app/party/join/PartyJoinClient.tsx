@@ -25,8 +25,10 @@ export default function PartyJoinClient() {
   const { user, loading: authLoading } = useAuth();
   const [stage, setStage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
   const { joinRoom, joinRoomById } = useFlixParty({ roomId: null });
   const joinStartedRef = useRef(false);
+  const joinDoneRef = useRef(false);
   const guestMode = searchParams.get("guest") === "1";
 
   // Cycle through stages so the user always sees motion, not a frozen screen.
@@ -49,7 +51,16 @@ export default function PartyJoinClient() {
     }
 
     joinStartedRef.current = true;
+    joinDoneRef.current = false;
     setStage(0);
+
+    // Overall watchdog: the join chain must never spin forever. If the API
+    // stalls past this budget, surface an error with a retry instead.
+    const watchdog = window.setTimeout(() => {
+      if (joinDoneRef.current) return;
+      joinStartedRef.current = false;
+      setError("Join is taking too long — the room may have ended or the connection stalled.");
+    }, 60_000);
 
     const code = searchParams.get("code");
     const roomId = searchParams.get("id");
@@ -99,11 +110,14 @@ export default function PartyJoinClient() {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to join party");
+      } finally {
+        joinDoneRef.current = true;
+        window.clearTimeout(watchdog);
       }
     }
 
     void join();
-  }, [authLoading, user, searchParams, joinRoom, joinRoomById, router]);
+  }, [authLoading, user, searchParams, joinRoom, joinRoomById, router, retryNonce]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center gap-8 p-6 relative overflow-hidden">
@@ -123,13 +137,28 @@ export default function PartyJoinClient() {
             </div>
             <h1 className="text-xl font-bold text-white">Couldn't join the party</h1>
             <p className="text-sm text-gray-400">{error}</p>
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="inline-flex items-center justify-center rounded-md bg-white px-5 py-2.5 text-sm font-bold text-black transition-colors hover:bg-white/85 focus-ring"
-            >
-              Go home
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  joinStartedRef.current = false;
+                  joinDoneRef.current = false;
+                  setError(null);
+                  setStage(0);
+                  setRetryNonce((n) => n + 1);
+                }}
+                className="inline-flex items-center justify-center rounded-md bg-red-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-red-500 focus-ring"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="inline-flex items-center justify-center rounded-md bg-white px-5 py-2.5 text-sm font-bold text-black transition-colors hover:bg-white/85 focus-ring"
+              >
+                Go home
+              </button>
+            </div>
           </div>
         ) : (
           <>

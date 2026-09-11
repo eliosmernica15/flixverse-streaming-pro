@@ -159,7 +159,7 @@ export function usePlayerPartySync({
   const hostTimeRef = useRef(0);
   const embedReadyRef = useRef(embedReady);
   const embedLiveSyncedRef = useRef(embedLiveSynced);
-  const guestServerAppliedRef = useRef(false);
+  const appliedRoomServerRef = useRef(-1);
   const initialSyncDoneRef = useRef(false);
   const partyPlaybackRef = useRef<"playing" | "paused">("paused");
   const partyHostTimeRef = useRef(0);
@@ -219,7 +219,18 @@ export function usePlayerPartySync({
   useEffect(() => {
     partyPlaybackRef.current = partyRoom?.playbackState ?? "paused";
     partyHostTimeRef.current = partyRoom?.lastKnownTime ?? 0;
-  }, [partyRoom?.playbackState, partyRoom?.lastKnownTime]);
+    // Room-doc polling is a third, independent signal channel (alongside
+    // Firestore events and WebRTC): it works even when the events
+    // subcollection is unreachable (unpublished rules, quota, offline
+    // listener). Stamp guest freshness from it so status, splash, and the
+    // silent-provider fallback all engage on polling alone.
+    if (!isPartyHost && (partyRoom?.lastKnownTime ?? 0) > 0) {
+      const now = Date.now();
+      lastSignalAtRef.current = now;
+      setLastSignalAt(now);
+      if (!firstHostTimeAtRef.current) firstHostTimeAtRef.current = now;
+    }
+  }, [partyRoom?.playbackState, partyRoom?.lastKnownTime, isPartyHost]);
 
   useEffect(() => {
     if (!embedReady) {
@@ -311,6 +322,11 @@ export function usePlayerPartySync({
         clearGuestStaging();
         // Rate-limited so rapid scrubber drags don't flood the iframe
         softSeekToRef.current(msg.data.currentTime);
+      }
+      if (msg.type === "server-change" && typeof msg.data.serverIndex === "number") {
+        // Host switched source server mid-party — follow it (bounds-checked
+        // where applied). Works over both transports.
+        setGuestServerIndex(msg.data.serverIndex);
       }
       if (msg.type === "heartbeat" && typeof msg.data.currentTime === "number") {
         hostTimeRef.current = msg.data.currentTime;
@@ -458,8 +474,8 @@ export function usePlayerPartySync({
 
       if (partyContentMatches(content, movieId, mediaType, season, episode)) {
         const serverIdx = partyRoom.serverIndex ?? content.serverIndex ?? 0;
-        if (!guestServerAppliedRef.current) {
-          guestServerAppliedRef.current = true;
+        if (appliedRoomServerRef.current !== serverIdx) {
+          appliedRoomServerRef.current = serverIdx;
           setGuestServerIndex(serverIdx);
         }
         return;
@@ -470,11 +486,13 @@ export function usePlayerPartySync({
     })();
   }, [partyRoomId, isPartyHost, partyRoom, movieId, mediaType, season, episode, router]);
 
-  // Guest: apply host server index once
+  // Guest: follow the host server index — including mid-party switches,
+  // not just the first apply.
   useEffect(() => {
-    if (isPartyHost || !partyRoom || guestServerAppliedRef.current) return;
+    if (isPartyHost || !partyRoom) return;
     const serverIdx = partyRoom.serverIndex ?? partyRoom.contentMeta?.serverIndex ?? 0;
-    guestServerAppliedRef.current = true;
+    if (appliedRoomServerRef.current === serverIdx) return;
+    appliedRoomServerRef.current = serverIdx;
     setGuestServerIndex(serverIdx);
   }, [isPartyHost, partyRoom]);
 
@@ -803,6 +821,22 @@ export function usePlayerPartySync({
     [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer, cancelSyncedStart]
   );
 
+  /**
+   * Broadcast a source-server switch to all guests. Called by the host when
+   * changing servers mid-party so guests follow to the same source instead
+   * of being stranded on the old one.
+   */
+  const broadcastServerChange = useCallback(
+    (serverIndex: number, time: number) => {
+      if (!partyRoomId || !isPartyHost) return;
+      if (syncStageRef.current) cancelSyncedStart();
+      void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, serverIndex);
+      void realtime.send("server-change", { currentTime: time, serverIndex });
+      sendRtcMessage("server-change", { currentTime: time, serverIndex });
+    },
+    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, cancelSyncedStart]
+  );
+
   const partyTimeRef = useRef(currentTime);
   const partyPlayingRef = useRef(isPlaying);
   const partyServerRef = useRef(currentServer);
@@ -904,7 +938,7 @@ export function usePlayerPartySync({
     absentPollCountRef.current = 0;
     partyJoinTimeRef.current = null;
     guestRedirectAttempted.current = false;
-    guestServerAppliedRef.current = false;
+    appliedRoomServerRef.current = -1;
     initialSyncDoneRef.current = false;
     setGuestInitialSynced(false);
     setGuestSplashDismissed(false);
@@ -917,7 +951,7 @@ export function usePlayerPartySync({
   const resetPartySession = useCallback(() => {
     partyJoinAttempted.current = false;
     guestRedirectAttempted.current = false;
-    guestServerAppliedRef.current = false;
+    appliedRoomServerRef.current = -1;
     initialSyncDoneRef.current = false;
     setGuestInitialSynced(false);
   }, []);
@@ -943,7 +977,7 @@ export function usePlayerPartySync({
     absentPollCountRef.current = 0;
     partyJoinTimeRef.current = null;
     guestRedirectAttempted.current = false;
-    guestServerAppliedRef.current = false;
+    appliedRoomServerRef.current = -1;
     initialSyncDoneRef.current = false;
     setShowPartyPanel(false);
     if (partyRoomId) markPartyLeft(partyRoomId);
@@ -988,6 +1022,7 @@ export function usePlayerPartySync({
     resetPartySession,
     broadcastPartyState,
     broadcastPartySeek,
+    broadcastServerChange,
     syncStage,
     staging,
     startSyncedStart,

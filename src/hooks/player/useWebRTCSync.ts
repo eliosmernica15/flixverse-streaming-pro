@@ -6,7 +6,16 @@ import { NTPClient } from "@/lib/player/ntpClockSync";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
 
 export interface SyncMessage {
-  type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";
+  type:
+    | "play"
+    | "pause"
+    | "seek"
+    | "heartbeat"
+    | "chat"
+    | "speaking"
+    | "server-change"
+    | "sync-stage"
+    | "sync-go";
   timestamp: number;
   data: {
     currentTime?: number;

@@ -59,6 +59,7 @@ class SendMessageBody(BaseModel):
 class PlaybackBody(BaseModel):
     state: str
     currentTime: float = 0
+    serverIndex: int | None = None
 
 
 class InviteBody(BaseModel):
@@ -436,15 +437,26 @@ def update_playback(room_id: str, body: PlaybackBody, auth: dict = Depends(verif
         row = db_fetchone(conn, "SELECT host_id FROM party_rooms WHERE id = ?", (room_id,))
         if not row or row_get(row, "host_id") != uid:
             raise HTTPException(status_code=403, detail="Host only")
-        db_execute(
-            conn,
-            """
-            UPDATE party_rooms
-            SET playback_state = ?, last_known_time = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (body.state, body.currentTime, iso_now(), room_id),
-        )
+        if body.serverIndex is None:
+            db_execute(
+                conn,
+                """
+                UPDATE party_rooms
+                SET playback_state = ?, last_known_time = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (body.state, body.currentTime, iso_now(), room_id),
+            )
+        else:
+            db_execute(
+                conn,
+                """
+                UPDATE party_rooms
+                SET playback_state = ?, last_known_time = ?, server_index = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (body.state, body.currentTime, body.serverIndex, iso_now(), room_id),
+            )
     return {"ok": True}
 
 

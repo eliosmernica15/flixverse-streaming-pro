@@ -165,7 +165,11 @@ export async function fetchPartyRoomMeta(
   roomId: string
 ): Promise<{ contentMeta: PartyContentMeta | null; encryptedPayload: string | null }> {
   try {
-    const res = await fetch(`/api/party/room?id=${encodeURIComponent(roomId)}`);
+    // Bounded: the join page/overlay would otherwise hang on this fetch
+    // forever with no error state when the API stalls.
+    const res = await fetch(`/api/party/room?id=${encodeURIComponent(roomId)}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok) return { contentMeta: null, encryptedPayload: null };
     const data = (await res.json()) as {
       contentMeta?: PartyContentMeta | null;

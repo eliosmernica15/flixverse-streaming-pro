@@ -1,13 +1,19 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { AlertCircle, Loader2, PartyPopper, Wifi } from "lucide-react";
 import {
   getGuestJoinBridgeState,
+  resetGuestJoinBridge,
   subscribeGuestJoinBridge,
   type GuestJoinBridgePhase,
 } from "@/lib/party/guestJoinBridge";
+
+// If a join phase makes no progress for this long (hung API, dead room),
+// stop spinning and say so — the popup must never sit on "connecting"
+// forever.
+const STUCK_AFTER_MS = 45_000;
 
 const PHASE_LABEL: Record<Exclude<GuestJoinBridgePhase, "idle" | "error">, string> = {
   accepting: "Confirming your invite…",
@@ -31,14 +37,34 @@ function GuestJoinOverlayContent() {
     getGuestJoinBridgeState,
     () => ({ phase: "idle" as const })
   );
+  const [timedOut, setTimedOut] = useState(false);
+  const watchdogRef = useRef(0);
+
+  // Watchdog: any non-terminal phase that stalls past STUCK_AFTER_MS flips
+  // to a dismissible error instead of spinning forever.
+  useEffect(() => {
+    window.clearTimeout(watchdogRef.current);
+    setTimedOut(false);
+    if (bridge.phase === "idle" || bridge.phase === "error") return;
+    watchdogRef.current = window.setTimeout(() => setTimedOut(true), STUCK_AFTER_MS);
+    return () => window.clearTimeout(watchdogRef.current);
+  }, [bridge.phase]);
 
   if (bridge.phase === "idle") return null;
 
-  const isError = bridge.phase === "error";
+  const handleDismiss = () => {
+    window.clearTimeout(watchdogRef.current);
+    setTimedOut(false);
+    resetGuestJoinBridge();
+  };
+
+  const isError = bridge.phase === "error" || timedOut;
   const phase = bridge.phase;
   const progress = isError ? 0 : PHASE_PROGRESS[phase as keyof typeof PHASE_PROGRESS] ?? 10;
   const label = isError
-    ? bridge.error || "Could not join the party"
+    ? timedOut
+      ? "Taking too long — the room may have ended or the connection stalled. Dismiss and try again."
+      : bridge.error || "Could not join the party"
     : PHASE_LABEL[phase as keyof typeof PHASE_LABEL] ?? "Joining watch party…";
 
   return (
@@ -61,6 +87,15 @@ function GuestJoinOverlayContent() {
           </p>
         )}
         <p className="guest-join-overlay-status">{label}</p>
+        {isError && timedOut && (
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="inline-flex items-center justify-center rounded-md bg-white px-5 py-2.5 text-sm font-bold text-black transition-colors hover:bg-white/85"
+          >
+            Dismiss
+          </button>
+        )}
         {!isError && (
           <>
             <div className="guest-join-overlay-bar" aria-hidden>
