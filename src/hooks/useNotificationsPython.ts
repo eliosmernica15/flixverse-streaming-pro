@@ -42,7 +42,9 @@ export function usePythonNotifications() {
 
     void refresh();
 
-    const pollMs = useHttpTransport() ? 3000 : 15000;
+    // 15s: notification badges don't need realtime granularity, and a 3s
+    // poll on every mounted page was a constant background drain.
+    const pollMs = 15000;
     const poll = setInterval(() => void refresh(), pollMs);
 
     const onVisible = () => {

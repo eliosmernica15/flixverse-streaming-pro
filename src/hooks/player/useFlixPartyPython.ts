@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { isRateLimited } from "@/lib/rateLimit";
 import { trackPartyJoin } from "@/lib/analytics";
-import { pythonFetch } from "@/lib/pythonApi/client";
+import { pythonFetch, PythonApiError } from "@/lib/pythonApi/client";
 import type {
   FlixPartyChatMessage,
   FlixPartyParticipant,
@@ -27,6 +27,13 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
   const [loading, setLoading] = useState(true);
   const roomPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const msgPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Last published snapshots, serialized. Poll responses rebuild fresh
+  // objects every 350ms — publishing them unconditionally re-renders the
+  // entire player tree and re-fires every room effect 3x/second (this is
+  // what froze/crashed machines the moment a guest connected). Only
+  // publish on actual change.
+  const lastRoomJsonRef = useRef<string | null>(null);
+  const lastMessagesJsonRef = useRef<string | null>(null);
 
   const fetchRoom = useCallback(async () => {
     if (!roomId) {
@@ -42,10 +49,21 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
             participants: dedupeRoomParticipants(data.room.participants ?? [], data.room.hostId),
           }
         : null;
-      setRoom(normalized);
+      const json = JSON.stringify(normalized);
+      if (json !== lastRoomJsonRef.current) {
+        lastRoomJsonRef.current = json;
+        setRoom(normalized);
+      }
       return normalized;
-    } catch {
-      setRoom(null);
+    } catch (err) {
+      // Transient stall (timeout/offline) must NEVER clear the room: a null
+      // room triggers the leave-party flow (panel closes, URL stripped,
+      // rejoin blocked) and flaps every effect. Only a 404/403 means the
+      // room is actually gone (ended/kicked).
+      if (err instanceof PythonApiError && (err.status === 404 || err.status === 403)) {
+        lastRoomJsonRef.current = JSON.stringify(null);
+        setRoom(null);
+      }
       return null;
     } finally {
       setLoading(false);
@@ -61,13 +79,20 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
       const data = await pythonFetch<{ messages: FlixPartyChatMessage[] }>(
         `/parties/${roomId}/messages`
       );
-      setMessages(data.messages);
+      const json = JSON.stringify(data.messages);
+      if (json !== lastMessagesJsonRef.current) {
+        lastMessagesJsonRef.current = json;
+        setMessages(data.messages);
+      }
     } catch {
-      setMessages([]);
+      // Keep stale chat on transient failure — wiping it every failed poll
+      // flashes the panel and re-triggers auto-scroll each time.
     }
   }, [roomId]);
 
   useEffect(() => {
+    lastRoomJsonRef.current = null;
+    lastMessagesJsonRef.current = null;
     void fetchRoom();
     void fetchMessages();
     if (!roomId) return;

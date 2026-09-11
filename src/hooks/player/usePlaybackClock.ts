@@ -32,6 +32,11 @@ export function usePlaybackClock({
   const lastTickRef = useRef<number | null>(null);
   const lastPersistRef = useRef<number>(Date.now());
   const totalDurationRef = useRef(totalDuration);
+  // Rendered time is throttled: the ref stays frame-accurate for sync math,
+  // but React state (and the whole player subtree re-render) updates at
+  // most 4x/second. Rendering 60fps melted low-end machines.
+  const lastRenderedRef = useRef(initialPosition);
+  const RENDER_EVERY_SEC = 0.25;
   // Guard against persist pile-up: while the Python API is timing out,
   // every 5s tick would fire another hanging POST until the browser hits
   // ERR_INSUFFICIENT_RESOURCES. Skip while one is in flight and back off
@@ -57,6 +62,7 @@ export function usePlaybackClock({
   useEffect(() => {
     setCurrentTime(initialPosition);
     currentTimeRef.current = initialPosition;
+    lastRenderedRef.current = initialPosition;
     lastTickRef.current = isPlaying ? performance.now() : null;
     lastPersistRef.current = Date.now();
   }, [initialPosition, movieId, season, episode, isPlaying]);
@@ -102,7 +108,10 @@ export function usePlaybackClock({
         }
 
         currentTimeRef.current = nextTime;
-        setCurrentTime(nextTime);
+        if (Math.abs(nextTime - lastRenderedRef.current) >= RENDER_EVERY_SEC) {
+          lastRenderedRef.current = nextTime;
+          setCurrentTime(nextTime);
+        }
 
         // Auto-persist every 5 seconds
         if (Date.now() - lastPersistRef.current >= 5000) {

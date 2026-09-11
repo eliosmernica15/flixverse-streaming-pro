@@ -342,6 +342,11 @@ export function usePartyMedia({
   useEffect(() => {
     if (!roomId) return;
 
+    // Previous speaking set, serialized for cheap change detection. The tick
+    // below runs every animation frame — allocating a fresh Set into state
+    // each frame re-renders the whole player subtree at 60fps even when
+    // nobody is speaking. Only publish on actual change.
+    let prevKey = "";
     const tick = () => {
       const remoteSpeaking = new Set<string>();
 
@@ -365,7 +370,11 @@ export function usePartyMedia({
         if (readLevel(analyser) > SPEAK_THRESHOLD) remoteSpeaking.add(peerId);
       }
 
-      setSpeakingPeers(remoteSpeaking);
+      const key = [...remoteSpeaking].sort().join(",");
+      if (key !== prevKey) {
+        prevKey = key;
+        setSpeakingPeers(remoteSpeaking);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
 

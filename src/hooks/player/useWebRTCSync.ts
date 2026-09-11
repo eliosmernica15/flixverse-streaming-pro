@@ -106,7 +106,20 @@ export function useWebRTCSync({
           setMessages((prev) => [...prev, msg]);
           return;
         }
-        if (["play", "pause", "seek", "heartbeat"].includes(msg.type)) {
+        // Playback + party-control traffic shares one handler so every
+        // delivery path (events, room poll, RTC) lands the same state
+        // machine. Unknown types are ignored, never crash.
+        if (
+          [
+            "play",
+            "pause",
+            "seek",
+            "heartbeat",
+            "server-change",
+            "sync-stage",
+            "sync-go",
+          ].includes(msg.type)
+        ) {
           onPlaybackSyncRef.current?.(msg);
         }
       };

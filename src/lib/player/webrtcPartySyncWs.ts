@@ -279,6 +279,12 @@ export class WebRTCPartySyncWs extends WebRTCPartySyncBase {
 export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
   private since = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollInFlight = false;
+  private destroyed = false;
+  // Fast while establishing the peer connection, slow once live: signals
+  // only matter during setup. 8 req/s forever was melting machines.
+  private static readonly FAST_POLL_MS = 250;
+  private static readonly STEADY_POLL_MS = 2500;
 
   constructor(
     roomId: string,
@@ -289,11 +295,31 @@ export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
     mediaCallbacks: MediaCallbacks = {}
   ) {
     super(roomId, userId, isHost, hostId, onMessage, mediaCallbacks);
-    this.pollTimer = setInterval(() => void this.pollSignals(), 120);
+    this.pollTimer = setInterval(
+      () => void this.pollSignals(),
+      WebRTCPartySyncHttp.FAST_POLL_MS
+    );
     void this.pollSignals();
   }
 
+  private reschedule() {
+    if (this.destroyed) return;
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer = setInterval(
+      () => void this.pollSignals(),
+      this.isConnected
+        ? WebRTCPartySyncHttp.STEADY_POLL_MS
+        : WebRTCPartySyncHttp.FAST_POLL_MS
+    );
+  }
+
   private async pollSignals() {
+    // Background tab: skip (re-aligns on foreground via room polling).
+    // In-flight guard: a stalled request must never stack overlapping ones.
+    if (this.destroyed) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    if (this.pollInFlight) return;
+    this.pollInFlight = true;
     try {
       const data = await pythonFetch<{ signals: SignalMessage[] }>(
         `/parties/${this.roomId}/signals?since=${this.since}`
@@ -303,8 +329,11 @@ export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
         if (sig.targetId && sig.targetId !== this.userId) continue;
         await this.ingestSignal(sig);
       }
+      this.reschedule();
     } catch {
       /* retry on next poll */
+    } finally {
+      this.pollInFlight = false;
     }
   }
 
@@ -325,6 +354,7 @@ export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
   }
 
   destroy() {
+    this.destroyed = true;
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;

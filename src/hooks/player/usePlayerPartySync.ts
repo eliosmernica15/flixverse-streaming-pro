@@ -40,7 +40,10 @@ const SYNC_INTERVAL_MS = 250;
 const DRIFT_SOFT_THRESHOLD_SEC = 0.5;
 const SEEK_COOLDOWN_MS = 600;
 const MAX_GUEST_SPLASH_MS = 14_000;
-const HOST_HEARTBEAT_MS = 800;
+// Host heartbeat cadence. Was 800ms (1.25 Firestore writes/sec per host
+// plus fan-out reads) — 1500ms still corrects drift promptly (threshold
+// 0.5s, room poll ~1s) at roughly half the write/read load.
+const HOST_HEARTBEAT_MS = 1500;
 const FIRESTORE_PERSIST_INTERVAL_MS = 4000;
 // Lead time for a joint start: both sides seek first, then play at the
 // shared wall-clock moment so network jitter doesn't stagger the start.
@@ -174,6 +177,7 @@ export function usePlayerPartySync({
   const autoReleaseTimerRef = useRef(0);
   const scheduledGoTimerRef = useRef(0);
   const prevParticipantCountRef = useRef(0);
+  const driftDisplayRef = useRef(0);
 
   // Fresh room → fresh signal cursors.
   useEffect(() => {
@@ -328,6 +332,20 @@ export function usePlayerPartySync({
         // where applied). Works over both transports.
         setGuestServerIndex(msg.data.serverIndex);
       }
+      if (msg.type === "sync-stage" && typeof msg.data.currentTime === "number") {
+        // RTC-delivered stage (events path intercepts earlier with the same
+        // call, so this is a no-op duplicate there).
+        handleGuestStage(
+          msg.data.currentTime,
+          typeof msg.data.releaseAt === "number" ? msg.data.releaseAt : 0
+        );
+      }
+      if (msg.type === "sync-go" && typeof msg.data.currentTime === "number") {
+        handleGuestGo(
+          msg.data.currentTime,
+          typeof msg.data.startAt === "number" ? msg.data.startAt : 0
+        );
+      }
       if (msg.type === "heartbeat" && typeof msg.data.currentTime === "number") {
         hostTimeRef.current = msg.data.currentTime;
         if (!embedReadyRef.current) return;
@@ -342,7 +360,7 @@ export function usePlayerPartySync({
       }
     },
       // All mutable state is accessed via refs; only stable callbacks in deps.
-    [isPartyHost, setPlaying, playEmbed, pauseEmbed, clearGuestStaging]
+    [isPartyHost, setPlaying, playEmbed, pauseEmbed, clearGuestStaging, handleGuestStage, handleGuestGo]
   );
 
   const { isConnected: rtcConnected, sendMessage: sendRtcMessage, setLocalStream } = useWebRTCSync({
@@ -501,6 +519,9 @@ export function usePlayerPartySync({
     if (!partyRoomId || isPartyHost) return;
 
     const tick = () => {
+      // Background tab: skip all sync work (no seeks, no renders). The next
+      // foreground tick re-aligns from the host position.
+      if (typeof document !== "undefined" && document.hidden) return;
       if (!embedReadyRef.current) return;
       if (partyJoinTimeRef.current && Date.now() - partyJoinTimeRef.current < JOIN_GRACE_MS) return;
 
@@ -548,7 +569,12 @@ export function usePlayerPartySync({
       }
 
        const driftSec = Math.abs(guestTime - hostTime);
-       setPartyDriftMs(driftSec * 1000);
+       // Throttle the drift readout: it only feeds a badge label, and
+       // pushing it 4x/second re-renders the player shell each time.
+       if (Math.abs(driftSec * 1000 - driftDisplayRef.current) >= 250) {
+         driftDisplayRef.current = driftSec * 1000;
+         setPartyDriftMs(driftSec * 1000);
+       }
 
        // Enforce play/pause state
        if (partyPlaybackRef.current === "playing" && !isPlayingRef.current) {
