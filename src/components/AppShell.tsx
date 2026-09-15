@@ -35,7 +35,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         className="scrollbar-thin flex-1 outline-none"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="page-enter mx-auto w-full max-w-[1800px]">{children}</div>
+        <div className="page-enter mx-auto w-full max-w-[1800px] px-4 sm:px-6 lg:px-10 xl:px-12 2xl:px-16 3xl:px-20 4xl:px-24">
+          {children}
+        </div>
       </main>
       <Footer />
     </div>
