@@ -173,9 +173,7 @@ const Navigation = () => {
           </div>
 
           <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
-            <div className="hidden sm:block">
               <SearchBar onMovieSelect={handleMovieSelect} />
-            </div>
 
             <LanguageSwitcher />
             <OfflineSyncBadge />

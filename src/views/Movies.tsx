@@ -85,7 +85,7 @@ const Movies = () => {
             <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-red-500 mb-1.5">
               {loadedCount > 0 ? `${loadedCount} curated collections` : "Loading…"}
             </span>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-[1.05]">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl 2xl:text-6xl 3xl:text-7xl 4xl:text-[8.5rem] font-black tracking-tight text-white leading-[1.05]">
               Movies
             </h1>
             <p className="text-gray-400 text-sm sm:text-base mt-2">

@@ -30,7 +30,7 @@ export function PartyMembersPanel({
         <Crown className="w-3.5 h-3.5 text-amber-400" />
         In this party ({participants.length})
       </p>
-      <ul className="party-members-list">
+      <ul className="party-members-list lg:grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6">
         {participants.map((p) => {
           const isSelf = p.userId === currentUserId;
           const isPartyHost = p.userId === hostId;

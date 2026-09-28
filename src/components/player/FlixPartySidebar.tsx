@@ -276,7 +276,7 @@ export function FlixPartySidebar({
   const participants: FlixPartyParticipant[] = room?.participants || [];
   const panelClass = embedded
     ? `player-party-panel${isMobile ? " player-party-panel--mobile" : ""}${isMobile && mobileExpanded ? " player-party-panel--expanded" : ""}${isMobile && !mobileExpanded ? " player-party-panel--minimized" : ""}`
-    : "fixed inset-y-0 right-0 z-[10000] w-full sm:w-96 flex flex-col bg-zinc-950 border-l border-white/10 shadow-2xl animate-slide-in-right";
+    : "fixed inset-y-0 right-0 z-[10000] w-full sm:w-96 lg:w-[28rem] 2xl:w-[32rem] 3xl:w-[36rem] 4xl:w-[42rem] flex flex-col bg-zinc-950 border-l border-white/10 shadow-2xl animate-slide-in-right";
 
   return (
     <div className={panelClass}>
