@@ -247,7 +247,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
             </div>
 
             <h1
-              className="hero-text-shadow-strong mb-4 sm:mb-6 text-balance font-black tracking-tight text-white animate-letter text-3xl sm:text-5xl md:text-6xl lg:text-7xl"
+              className="hero-text-shadow-strong mb-4 sm:mb-6 text-balance font-black tracking-tight text-white animate-letter text-3xl sm:text-5xl md:text-6xl lg:text-7xl 2xl:text-8xl 3xl:text-[9rem] 4xl:text-[11rem]"
               style={{ lineHeight: "1.05" }}
             >
               {title.split(" ").map((word, i) => (
