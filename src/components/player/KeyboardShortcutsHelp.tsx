@@ -20,6 +20,8 @@ const SHORTCUTS = [
   { keys: ["["], action: "Previous server" },
   { keys: ["0-9"], action: "Jump to 0–90%" },
   { keys: ["?"], action: "Show this help" },
+  { keys: ["/"], action: "Focus search (anywhere)" },
+  { keys: ["Ctrl", "K"], action: "Command palette" },
 ];
 
 export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelpProps) {

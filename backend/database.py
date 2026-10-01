@@ -342,6 +342,12 @@ def get_conn() -> Iterator[Any]:
         with psycopg.connect(
             _postgres_url(), row_factory=dict_row, connect_timeout=10
         ) as conn:
+            # Bound query time too: a single pathological query (e.g. a
+            # sequential scan under load) must not hold the serverless
+            # request past its execution budget. Session-level: persists for
+            # this connection only.
+            with conn.cursor() as cur:
+                cur.execute("SET statement_timeout = '10s'")
             try:
                 yield conn
                 conn.commit()

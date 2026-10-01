@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Search, X, User, Film, Tv, Clock, TrendingUp, Compass, Loader2 } from "lucide-react";
-import { TMDBMovie, TMDBPerson, searchMulti, searchPeople, getContentImage } from "@/utils/tmdbApi";
+import { TMDBMovie, searchMulti, searchPeople, getContentImage } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
 import { FOCUS_SEARCH_EVENT } from "@/hooks/useGlobalShortcuts";
 
@@ -105,7 +105,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
         ]);
 
         // Combine results and prioritize by relevance
-        const allResults: any[] = [
+        const allResults: SearchResult[] = [
           ...multiResults.map(item => ({
             ...item,
             media_type: item.media_type || (item.title ? 'movie' : 'tv')

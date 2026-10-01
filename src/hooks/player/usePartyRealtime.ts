@@ -43,14 +43,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   doc,
+  getDoc,
   limit,
   onSnapshot,
   orderBy,
   query,
   setDoc,
   serverTimestamp,
+  updateDoc,
   writeBatch,
-  deleteDoc,
   getDocs,
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
@@ -91,6 +92,21 @@ const REPLAY_BUFFER = 32;
 const HOUSEKEEP_INTERVAL_MS = 4_000;
 const HOUSEKEEP_KEEP = 64;
 
+/**
+ * Fire-and-forget Sentry breadcrumb for transport anomalies. Loaded lazily
+ * so the Sentry chunk is only fetched when something odd actually happens;
+ * a no-op when Sentry has no DSN configured.
+ */
+function reportSyncAnomaly(message: string, data?: Record<string, unknown>) {
+  import("@sentry/nextjs")
+    .then((Sentry) => {
+      Sentry.addBreadcrumb({ message, level: "warning", data });
+    })
+    .catch(() => {
+      // Sentry unavailable — nothing to do.
+    });
+}
+
 type Unsubscribe = () => void;
 
 interface UsePartyRealtimeOptions {
@@ -125,6 +141,9 @@ export function usePartyRealtime({
   const [processed, setProcessed] = useState(0);
 
   const seqRef = useRef(0);
+  // Flips true the first time a host send has attempted to seed its local
+  // sequence from the persisted room-doc high-water mark.
+  const seqSeededRef = useRef(false);
   const lastSeenSeqRef = useRef(-1);
   // Wall-clock of the last accepted event. The host's seq restarts at 0 on
   // every page reload, so a strict `seq > lastSeen` cursor would discard ALL
@@ -219,6 +238,10 @@ export function usePartyRealtime({
           },
           (err) => {
             console.warn("[usePartyRealtime] snapshot error:", err);
+            reportSyncAnomaly("party-realtime:snapshot-error", {
+              roomId,
+              message: err instanceof Error ? err.message : String(err),
+            });
           }
         );
 
@@ -226,6 +249,10 @@ export function usePartyRealtime({
       })
       .catch((err) => {
         console.warn("[usePartyRealtime] replay fetch failed:", err);
+        reportSyncAnomaly("party-realtime:replay-failed", {
+          roomId,
+          message: err instanceof Error ? err.message : String(err),
+        });
         setIsReady(true); // Still mark ready — we'll just miss the replay tail
       });
 
@@ -274,6 +301,30 @@ export function usePartyRealtime({
       if (isRateLimited("PARTY_REALTIME", userId)) return;
 
       const db = requireFirebaseDb();
+
+      // One-time per session: seed the local sequence from the hostSeq the
+      // previous host session persisted on the room doc. Without this, a
+      // host reload restarts seq at 0 and relies on the wall-clock epoch
+      // gap rule (EPOCH_GAP_MS) to distinguish new events — correct but
+      // fragile; a persisted high-water mark makes the ordering strictly
+      // monotonic across reloads. Reads/writes for this are one per
+      // session plus one per non-heartbeat event (play/pause/seek are
+      // rare; heartbeats skip the write on purpose).
+      if (!seqSeededRef.current) {
+        seqSeededRef.current = true;
+        try {
+          const roomSnap = await getDoc(doc(db, "flix_parties", roomId));
+          const persisted = (
+            roomSnap.data() as { hostSeq?: number } | undefined
+          )?.hostSeq;
+          if (typeof persisted === "number" && persisted > seqRef.current) {
+            seqRef.current = persisted;
+          }
+        } catch {
+          // Best effort — the epoch gap rule still covers us.
+        }
+      }
+
       const seq = seqRef.current + 1;
       seqRef.current = seq;
 
@@ -292,8 +343,24 @@ export function usePartyRealtime({
           ...ev,
           _serverTs: serverTimestamp(),
         });
+        // Persist the high-water mark on ordering-critical events only.
+        if (type !== "heartbeat") {
+          try {
+            await updateDoc(doc(db, "flix_parties", roomId), {
+              hostSeq: seq,
+              hostSeqAt: ev.ts,
+            });
+          } catch {
+            // Best effort — epoch gap rule still covers us.
+          }
+        }
       } catch (err) {
         console.warn("[usePartyRealtime] send failed:", err);
+        reportSyncAnomaly("party-realtime:send-failed", {
+          roomId,
+          type,
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     },
     [roomId, isHost, userId]

@@ -3,16 +3,10 @@
 import { useState, useMemo } from "react";
 import MovieCard from "@/components/MovieCard";
 import PageContainer from "@/components/PageContainer";
-import Reveal from "@/components/Reveal";
 import { useNewAndPopularCatalog } from "@/hooks/queries/useNewAndPopularCatalog";
 import {
   Flame,
-  TrendingUp,
-  Clock,
-  Calendar,
-  Star,
   Tv,
-  Radio,
   AlertCircle,
   Sparkles,
 } from "lucide-react";
@@ -80,7 +74,7 @@ const NewAndPopular = () => {
         />
         <div className="max-w-[1800px] mx-auto">
           <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-orange-400 mb-1.5">
-            What's hot right now
+            What&apos;s hot right now
           </span>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-[1.05]">
             New &amp; Popular

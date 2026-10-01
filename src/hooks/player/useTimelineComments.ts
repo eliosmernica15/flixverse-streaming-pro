@@ -10,7 +10,6 @@ import {
   orderBy,
   limit,
   increment,
-  type DocumentData,
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 import { useAuth } from "@/hooks/useAuth";

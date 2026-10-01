@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
+import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { WatchHistory } from "@/integrations/firebase/types";
 
 type WatchHistoryItem = WatchHistory & { id: string };
@@ -40,7 +40,7 @@ export function usePythonWatchHistory() {
       return;
     }
     void refresh();
-    if (useHttpTransport()) {
+    if (usesHttpTransport()) {
       pollRef.current = setInterval(() => void refresh(), POLL_MS);
       const onVisible = () => {
         if (document.visibilityState === "visible") void refresh();

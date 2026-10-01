@@ -101,5 +101,6 @@ function useFirestoreFollow(targetUserId: string | null) {
 }
 
 export function useFollow(targetUserId: string | null) {
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session
   return isPythonBackendEnabled() ? usePythonFollow(targetUserId) : useFirestoreFollow(targetUserId);
 }

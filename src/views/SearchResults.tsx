@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
-import Reveal from "@/components/Reveal";
+import Stagger from "@/components/Stagger";
 import { searchMultiWithPagination, getContentImage, TMDBMovie } from "@/utils/tmdbApi";
 import { Search, Clock, X, User } from "lucide-react";
 import { SearchFilters, SearchFilterState } from "@/components/SearchFilters";
@@ -286,9 +286,11 @@ const SearchResults = () => {
               <section className="mb-12 content-auto">
                 <SectionHeader title={t("moviesAndTv")} eyebrow={`${sortedResults.length} titles`} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3">
-                  {sortedResults.map((item) => (
-                    <MovieCard key={`${item.id}-${item.media_type}`} movie={item} />
-                  ))}
+                  <Stagger>
+                    {sortedResults.map((item) => (
+                      <MovieCard key={`${item.id}-${item.media_type}`} movie={item} />
+                    ))}
+                  </Stagger>
                 </div>
               </section>
             )}
@@ -297,6 +299,7 @@ const SearchResults = () => {
               <section className="mb-12 content-auto">
                 <SectionHeader title={t("people")} eyebrow={`${filteredPeople.length} people`} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 mt-3">
+                  <Stagger>
                   {filteredPeople.map((person) => {
                     const profileImg = person.profile_path
                       ? getContentImage(person, "profile", "medium")
@@ -326,11 +329,14 @@ const SearchResults = () => {
                           {person.name}
                         </span>
                         {person.known_for_department && (
-                          <span className="text-[11px] text-gray-400 mt-0.5">{person.known_for_department}</span>
+                          <span className="mt-1.5 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-300">
+                            {person.known_for_department}
+                          </span>
                         )}
                       </Link>
                     );
                   })}
+                  </Stagger>
                 </div>
               </section>
             )}

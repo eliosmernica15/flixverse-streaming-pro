@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, memo, useEffect } from "react";
-import { Play, Star, Heart, Film, Tv, Plus, Check, ChevronDown, Loader2 } from "lucide-react";
+import { Play, Star, Plus, Check, ChevronDown, Loader2 } from "lucide-react";
 import Image from "next/image";
 import {
   getImageUrl,
@@ -12,6 +12,7 @@ import {
   getContentType,
 } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
@@ -58,11 +59,32 @@ const genreNames: Record<number, string> = {
   10768: "War & Politics",
 };
 
-const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardProps) => {
+const MovieCard = ({ movie, priority = false }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
+
+  // C1 — pointer-driven 3D poster tilt (±6° max), spring-smoothed via CSS
+  // transition, disabled on touch devices and reduced motion. Sets CSS vars
+  // so it composes with the existing .netflix-card-wrap hover transform.
+  const handleTiltMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const node = cardRef.current;
+    if (!node || e.pointerType === "touch") return;
+    const rect = node.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    node.style.setProperty("--tilt-x", `${(py * -6).toFixed(2)}deg`);
+    node.style.setProperty("--tilt-y", `${(px * 6).toFixed(2)}deg`);
+  }, []);
+
+  const handleTiltLeave = useCallback(() => {
+    const node = cardRef.current;
+    if (!node) return;
+    node.style.setProperty("--tilt-x", "0deg");
+    node.style.setProperty("--tilt-y", "0deg");
+  }, []);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const t = useTranslations("movieCard");
@@ -168,9 +190,6 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
   const hasValidRating = rating > 0;
   const finalPosterUrl = !posterUrl || imageError ? getPlaceholderImage() : posterUrl;
 
-  const primaryGenre =
-    movie.genre_ids && movie.genre_ids.length > 0 ? genreNames[movie.genre_ids[0]] : null;
-
   const getRatingBadge = (value: number): string => {
     if (value >= 7) return "badge-rating-green";
     if (value >= 5.5) return "badge-rating-amber";
@@ -186,6 +205,8 @@ const MovieCard = ({ movie, comingSoon = false, priority = false }: MovieCardPro
   return (
     <div
       ref={cardRef}
+      onPointerMove={reducedMotion ? undefined : handleTiltMove}
+      onPointerLeave={reducedMotion ? undefined : handleTiltLeave}
       className="netflix-card-wrap movie-card content-auto cursor-pointer outline-none focus-ring group"
       role="button"
       tabIndex={0}

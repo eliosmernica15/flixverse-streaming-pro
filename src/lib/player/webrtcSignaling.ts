@@ -1,6 +1,5 @@
 import {
   collection,
-  doc,
   addDoc,
   onSnapshot,
   query,

@@ -1,15 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   collection,
   query,
   where,
   onSnapshot,
-  setDoc,
   deleteDoc,
-  doc,
-  getDocs
+  doc
 } from 'firebase/firestore';
-import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
+import { requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
 import { ContentRating } from '@/integrations/firebase/types';
@@ -21,7 +19,7 @@ function useFirestoreContentRating(contentId?: number, contentType?: 'movie' | '
   const [averageRating, setAverageRating] = useState<number>(0);
   const [totalRatings, setTotalRatings] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   // Fetch ratings for the content
   useEffect(() => {
@@ -106,7 +104,9 @@ function useFirestoreContentRating(contentId?: number, contentType?: 'movie' | '
 }
 
 export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv') => {
+  /* eslint-disable react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session */
   return isPythonBackendEnabled()
     ? usePythonContentRating(contentId, contentType)
     : useFirestoreContentRating(contentId, contentType);
+  /* eslint-enable react-hooks/rules-of-hooks */
 };

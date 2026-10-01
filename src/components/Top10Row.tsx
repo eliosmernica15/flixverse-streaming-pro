@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import CarouselEdgeFades from "./CarouselEdgeFades";
 import {
   Carousel,
   CarouselContent,
@@ -211,6 +212,7 @@ const Top10Row = memo(({ movies, title }: Top10RowProps) => {
           opts={{ align: "start", loop: false, dragFree: true }}
           className="w-full"
         >
+          <CarouselEdgeFades />
           <CarouselContent className="-ml-2 sm:-ml-3 pb-4">
             {top10.map((movie, index) => {
               const rank = index + 1;

@@ -759,11 +759,6 @@ export function PlayerShell({
 
   const isOnline = useOnlineStatus();
 
-  const LANG_OPTIONS: { code: StreamLang; label: string; flag: string }[] = [
-    { code: "en", label: "English", flag: "🇬🇧" },
-    { code: "sq", label: "Shqip", flag: "🇦🇱" },
-  ];
-
   return (
     <div
       ref={shellRef}

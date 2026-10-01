@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NextIntlClientProvider } from "next-intl";
-import { defaultLocale, getStoredLocale, localeToHtmlLang, LOCALE_STORAGE_KEY, type Locale, locales } from "@/i18n/config";
+import { defaultLocale, localeToHtmlLang, LOCALE_STORAGE_KEY, type Locale, locales } from "@/i18n/config";
 import enMessages from "../../messages/en.json";
 import { HtmlLangSetter } from "./HtmlLangSetter";
 

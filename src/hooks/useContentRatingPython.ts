@@ -5,14 +5,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
+import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 
 const POLL_MS = 30000;
 
 export function usePythonContentRating(contentId?: number, contentType?: "movie" | "tv") {
   const [userRating, setUserRating] = useState<number | null>(null);
-  const [averageRating, setAverageRating] = useState<number>(0);
-  const [totalRatings, setTotalRatings] = useState<number>(0);
+  const [averageRating, _setAverageRating] = useState<number>(0);
+  const [totalRatings, _setTotalRatings] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -36,7 +36,7 @@ export function usePythonContentRating(contentId?: number, contentType?: "movie"
       return;
     }
     void refresh();
-    if (useHttpTransport()) {
+    if (usesHttpTransport()) {
       const poll = setInterval(() => void refresh(), POLL_MS);
       return () => clearInterval(poll);
     }

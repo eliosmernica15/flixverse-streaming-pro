@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Film, Tv, Star, Activity, UserPlus, UserCheck, Users } from "lucide-react";
 import Image from "next/image";
-import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { getFirestore, collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { MemberProfile, ActivityFeedItem } from "@/integrations/firebase/types";
 import { useAuth } from "@/hooks/useAuth";
@@ -105,12 +105,12 @@ export default function PublicProfile({ username }: PublicProfileProps) {
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 px-4">
         <div className="glass-soft rounded-2xl p-10 max-w-md w-full text-center">
           <p className="text-white text-lg font-semibold mb-4">Profile not found</p>
-          <a
+          <Link
             href="/"
             className="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors focus-ring"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     );

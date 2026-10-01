@@ -24,6 +24,60 @@ type PartyMediaState = ReturnType<typeof usePartyMedia>;
 
 export type PartyStartResult = { roomId: string; joinUrl: string };
 
+/**
+ * C4 — presence art: stacked member avatars drifting on a gentle sine wave
+ * in the sidebar header. Pure CSS animation, staggered per member, disabled
+ * under prefers-reduced-motion via the party-float guard in globals.css.
+ */
+function PartyPresenceArt({
+  participants,
+  currentUserId,
+}: {
+  participants: FlixPartyParticipant[];
+  currentUserId: string | undefined;
+}) {
+  if (!participants.length) return null;
+  const shown = participants.slice(0, 5);
+  return (
+    <div className="party-presence ml-auto hidden shrink-0 items-center sm:flex" aria-hidden="true">
+      {shown.map((p, i) => (
+        <span
+          key={p.userId}
+          className="party-float -ml-2 first:ml-0"
+          style={{ animationDelay: `${i * 260}ms` }}
+        >
+          <span
+            className={`block h-7 w-7 overflow-hidden rounded-full ring-2 ${
+              p.userId === currentUserId ? "ring-red-500/70" : "ring-white/20"
+            } bg-white/10`}
+          >
+            {p.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.avatarUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="grid h-full w-full place-items-center text-[10px] font-bold text-white/80">
+                {p.displayName.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </span>
+        </span>
+      ))}
+      {participants.length > shown.length && (
+        <span className="-ml-2 grid h-7 w-7 place-items-center rounded-full bg-white/10 text-[10px] font-bold text-white/80 ring-2 ring-white/20">
+          +{participants.length - shown.length}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface FlixPartySidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -102,7 +156,6 @@ export function FlixPartySidebar({
   mobileExpanded = true,
   onMinimize,
   realtimeProcessed,
-  realtimeReady,
   peerCount,
   syncStage = null,
   staging = null,
@@ -131,6 +184,19 @@ export function FlixPartySidebar({
   useEffect(() => {
     if (roomId) setActiveTab("chat");
   }, [roomId]);
+
+  // D5 — toast once when playback drift resolves back into sync.
+  const sawDriftRef = useRef(false);
+  useEffect(() => {
+    if (syncStatus === "drift" || syncStatus === "resyncing") {
+      sawDriftRef.current = true;
+      return;
+    }
+    if (syncStatus === "connected" && sawDriftRef.current) {
+      sawDriftRef.current = false;
+      toast({ title: "Back in sync", description: "Playback caught up with the host." });
+    }
+  }, [syncStatus, toast]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -273,7 +339,7 @@ export function FlixPartySidebar({
 
   if (!isOpen) return null;
 
-  const participants: FlixPartyParticipant[] = room?.participants || [];
+  const _participants: FlixPartyParticipant[] = room?.participants || [];
   const panelClass = embedded
     ? `player-party-panel${isMobile ? " player-party-panel--mobile" : ""}${isMobile && mobileExpanded ? " player-party-panel--expanded" : ""}${isMobile && !mobileExpanded ? " player-party-panel--minimized" : ""}`
     : "fixed inset-y-0 right-0 z-[10000] w-full sm:w-96 lg:w-[28rem] 2xl:w-[32rem] 3xl:w-[36rem] 4xl:w-[42rem] flex flex-col bg-zinc-950 border-l border-white/10 shadow-2xl animate-slide-in-right";
@@ -332,6 +398,9 @@ export function FlixPartySidebar({
             )}
           </div>
         </div>
+        {room && !isMobile && (
+          <PartyPresenceArt participants={room.participants} currentUserId={user?.uid} />
+        )}
         <div className="flex items-center gap-1 shrink-0">
           {roomId && isMobile && (
             <button
@@ -622,8 +691,14 @@ export function FlixPartySidebar({
                     currentUserId={user.uid}
                     isHost={isHostProp}
                     onKick={(id) => {
+                      const kicked = room?.participants?.find((p) => p.userId === id);
                       void kickParticipant?.(id);
-                      toast({ title: "Guest removed", description: "They were removed from the party." });
+                      toast({
+                        title: "Guest removed",
+                        description: kicked?.displayName
+                          ? `${kicked.displayName} was removed from the party.`
+                          : "They were removed from the party.",
+                      });
                     }}
                     onToggleMic={(id, muted) => void setParticipantMicMuted?.(id, muted)}
                     onToggleCam={(id, off) => void setParticipantCamDisabled?.(id, off)}

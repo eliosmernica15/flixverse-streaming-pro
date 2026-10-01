@@ -1,7 +1,6 @@
 "use client";
 
 import MovieCarousel from "@/components/MovieCarousel";
-import PageHero from "@/components/PageHero";
 import PageContainer from "@/components/PageContainer";
 import LazySection from "@/components/LazySection";
 import { useTVShowsCatalog } from "@/hooks/queries/useTVShowsCatalog";

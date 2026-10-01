@@ -186,18 +186,10 @@ export function buildStreamingSources(
       reliability: "high",
       providerUrl: vidfastUrl,
     },
-    {
-      // YapGrid — left as a last-resort fallback per the user. The
-      // server tokens (sg_g4 / sx_a1 / sy_b2 / sz_c3) and `?lang=` /
-      // `?sub_url=` / `?server=` parameters are all set in the yapgrid.ts
-      // builder.
-      id: "yapgrid-g",
-      name: "YapGrid G",
-      icon: "🇦🇱",
-      quality: "FHD",
-      reliability: "medium",
-      providerUrl: yapgridSources[0].providerUrl,
-    },
+    // NOTE: YapGrid lanes are NOT listed here — `ordered` below appends
+    // all four yapgridSources (g/x/y/z) after the primary providers.
+    // Listing yapgrid-g here too produced a duplicate "YapGrid G" entry
+    // in the server selector.
     // Dead / blocked / 404 sources have been removed:
     //   - vidsrc.sbs — returns 200 but body says "blocked"
     //   - vidsrc.pm — doesn't work in our test env (user flagged)

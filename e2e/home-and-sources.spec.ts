@@ -9,34 +9,42 @@ test("home shell renders brand and browse", async ({ page }) => {
   await expect(page.getByText("Flix").first()).toBeVisible();
 });
 
-test("yapgrid URLs use documented server and lang params only", () => {
+test("yapgrid URLs use real server tokens, not short labels", () => {
   const url = buildYapGridEmbedUrl({
     movieId: 550,
     mediaType: "movie",
-    server: "z",
-    lang: "sq",
+    server: "sg_g4",
+    lang: "en",
     title: "Fight Club",
   });
   expect(url).toContain("https://yapgrid.com/embed/movie/550");
-  expect(url).toContain("server=z");
-  expect(url).toContain("lang=sq");
-  expect(url).not.toContain("server=g");
+  expect(url).toContain("server=sg_g4");
+  expect(url).toContain("lang=en");
+  expect(url).toContain("autoplay=true");
+  expect(url).not.toContain("server=z");
   expect(url).not.toContain("subtitle=");
 });
 
-test("Albanian locale prepends YapGrid lanes and VidFast sub=sq", () => {
-  const sq = buildStreamingSources(550, "movie", undefined, undefined, { lang: "sq" });
-  expect(sq[0].id).toBe("yapgrid-z");
-  expect(sq[1].id).toBe("yapgrid-x");
-  expect(sq[2].id).toBe("yapgrid-y");
-  const vidfast = sq.find((s) => s.id === "vidfast");
-  expect(vidfast?.url).toContain("sub=sq");
-  expect(sq.every((s) => !s.url.includes("cc="))).toBeTruthy();
-});
-
-test("non-Albanian does not shotgun subtitle params", () => {
+// buildStreamingSources pins YapGrid LAST for every language: its audio
+// track is upstream-controlled, so it must only be tried after every
+// better-behaved provider. See streamingSources.ts.
+test("default order: vidsrc first, yapgrid lanes last", () => {
   const en = buildStreamingSources(550, "movie");
-  expect(en.some((s) => s.id.startsWith("yapgrid"))).toBeTruthy();
+  expect(en[0].id).toBe("vidsrc");
+  expect(en[1].id).toBe("vidsrc-to");
+  expect(en[2].id).toBe("videasy");
+  const lastFour = en.slice(-4).map((s) => s.id);
+  expect(lastFour).toEqual(["yapgrid-g", "yapgrid-x", "yapgrid-y", "yapgrid-z"]);
   expect(en.find((s) => s.id === "vidfast")?.url).not.toContain("sub=");
   expect(en.find((s) => s.id === "vidlink")?.url).not.toContain("lang=");
+});
+
+test("Albanian locale adds sq subtitle params; yapgrid stays last", () => {
+  const sq = buildStreamingSources(550, "movie", undefined, undefined, { lang: "sq" });
+  expect(sq[0].id).toBe("vidsrc");
+  expect(sq[0].url).toContain("ds_lang=sq");
+  expect(sq.find((s) => s.id === "vidfast")?.url).toContain("sub=sq");
+  const lastFour = sq.slice(-4).map((s) => s.id);
+  expect(lastFour).toEqual(["yapgrid-g", "yapgrid-x", "yapgrid-y", "yapgrid-z"]);
+  expect(sq.every((s) => !s.url.includes("cc="))).toBeTruthy();
 });

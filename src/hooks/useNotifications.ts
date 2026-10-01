@@ -21,7 +21,7 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
 export const useNotifications = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
-  const { toast } = useToast();
+  const { toast: _toast } = useToast();
 
   useEffect(() => {
     if ('Notification' in window) {

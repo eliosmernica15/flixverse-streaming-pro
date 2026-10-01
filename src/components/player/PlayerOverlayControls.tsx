@@ -40,7 +40,6 @@ export function PlayerOverlayControls({
   markers,
   nearbyComments,
   onSeek,
-  onAddComment,
   onLikeComment,
   isPlaying: _isPlaying,
   controlsVisible: _controlsVisible,

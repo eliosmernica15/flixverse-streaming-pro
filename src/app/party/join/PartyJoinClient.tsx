@@ -134,8 +134,7 @@ export default function PartyJoinClient() {
           <div className="space-y-4 animate-fade-in">
             <div className="grid h-12 w-12 place-items-center rounded-full bg-red-500/15 mx-auto">
               <AlertCircle className="w-6 h-6 text-red-400" />
-            </div>
-            <h1 className="text-xl font-bold text-white">Couldn't join the party</h1>
+            </div>              <h1 className="text-xl font-bold text-white">Couldn&apos;t join the party</h1>
             <p className="text-sm text-gray-400">{error}</p>
             <div className="flex items-center justify-center gap-3">
               <button

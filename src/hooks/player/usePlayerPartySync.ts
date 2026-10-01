@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useFlixParty } from "@/hooks/player/useFlixParty";
 import { useWebRTCSync, type SyncMessage } from "@/hooks/player/useWebRTCSync";
-import { usePartyRealtime, type PartyRealtimeEvent } from "@/hooks/player/usePartyRealtime";
+import { usePartyRealtime } from "@/hooks/player/usePartyRealtime";
 import {
   encryptPayload,
   generateRoomKey,
@@ -96,7 +96,6 @@ export function usePlayerPartySync({
   season,
   episode,
   currentServer,
-  currentSourceUrl,
   currentSourceProviderUrl,
   currentTime,
   isPlaying,

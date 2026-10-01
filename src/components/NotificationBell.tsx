@@ -288,7 +288,11 @@ const NotificationBell = () => {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="group relative grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5 text-white transition-colors hover:bg-white/10 focus-ring glow-hover">
+        <button
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+          className={`group relative grid h-10 w-10 place-items-center rounded-xl border bg-white/5 text-white transition-colors hover:bg-white/10 focus-ring glow-hover ${
+            unreadCount > 0 ? "border-red-500/40" : "border-white/10"
+          }`}>
           <Bell className="h-5 w-5 transition-transform group-hover:scale-110" />
           {unreadCount > 0 && (
             <span className="badge-shine absolute -right-0.5 -top-0.5 grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-red-500 to-red-600 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(239,68,68,0.6)]">

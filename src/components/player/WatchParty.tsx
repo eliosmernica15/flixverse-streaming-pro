@@ -10,10 +10,8 @@ import {
   updateDoc,
   query,
   where,
-  getDocs,
   deleteDoc,
   limit,
-  Timestamp,
 } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useFriends, type Friend } from "@/hooks/useFriends";
@@ -23,7 +21,6 @@ import { firestoreErrorMessage } from "@/lib/firestore/errors";
 import {
   Send,
   Users,
-  Copy,
   Check,
   X,
   Loader2,
@@ -69,9 +66,6 @@ export function WatchParty({
   episode,
   title,
   posterPath,
-  currentTime,
-  isPlaying,
-  onSyncToPosition,
   onStartParty,
   externalRoomId,
   partyJoinUrl,

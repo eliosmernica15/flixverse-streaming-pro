@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export function OfflineSyncProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
-  const [isOnline, setIsOnline] = useState(
+  const [_isOnline, setIsOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true
   );
 

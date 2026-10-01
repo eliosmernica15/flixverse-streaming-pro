@@ -9,13 +9,6 @@ interface LogContext {
 }
 
 function log(level: LogLevel, message: string, context?: LogContext) {
-  const entry = {
-    level,
-    message,
-    timestamp: new Date().toISOString(),
-    ...context,
-  };
-
   if (process.env.NODE_ENV === "development") {
     const consoleFn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
     consoleFn(`[${level.toUpperCase()}] ${message}`, context || "");

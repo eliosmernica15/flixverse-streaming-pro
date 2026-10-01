@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "tmdbId required" }, { status: 400 });
   }
 
-  let rawSrt = await fetchExternalSubtitles(tmdbId, mediaType, season, episode, lang);
+  const rawSrt = await fetchExternalSubtitles(tmdbId, mediaType, season, episode, lang);
   let source: "external" | "fallback" = "external";
 
   if (!rawSrt) {

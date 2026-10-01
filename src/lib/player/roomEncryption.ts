@@ -4,8 +4,6 @@
  * Encrypted payload stored in Firestore — only room members can decrypt.
  */
 
-const ALGO: AesGcmParams = { name: "AES-GCM", iv: new Uint8Array(12) };
-
 function bufToBase64(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }

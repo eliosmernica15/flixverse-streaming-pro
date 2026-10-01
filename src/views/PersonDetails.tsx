@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Calendar, MapPin, User as UserIcon, Film, Tv, Sparkles, Briefcase } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { getImageUrl, TMDBMovie, fetchPersonDetails as fetchPersonFromTmdb } from "@/utils/tmdbApi";
 import { localeQueryKey } from "@/i18n/config";
@@ -87,12 +88,12 @@ export default function PersonDetails({ personId }: PersonDetailsProps) {
       <div className="min-h-screen bg-black flex items-center justify-center px-4">
         <div className="text-center glass-soft rounded-2xl p-10 max-w-md w-full">
           <p className="text-white text-lg font-semibold mb-2">Person not found</p>
-          <a
+          <Link
             href="/"
             className="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors focus-ring"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     );

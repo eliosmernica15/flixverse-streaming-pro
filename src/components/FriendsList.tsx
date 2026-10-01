@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from "react";
 import { Search, UserPlus, Check, X, Users, Send, Loader2, Clock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useFriends, type Friend, type UserProfile } from "@/hooks/useFriends";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 interface FriendsListProps {

@@ -2006,3 +2006,27 @@
   background: rgba(0, 0, 0, 0.82);
   backdrop-filter: blur(8px);
 }
+
+/* C4 — party presence art: avatars drifting on a gentle sine wave */
+.party-presence {
+  display: flex;
+  align-items: center;
+}
+.party-float {
+  display: inline-flex;
+  animation: party-float 3.4s ease-in-out infinite;
+}
+@keyframes party-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .party-float {
+    animation: none;
+  }
+}

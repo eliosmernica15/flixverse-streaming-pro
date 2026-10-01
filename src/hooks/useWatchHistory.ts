@@ -5,7 +5,6 @@ import {
   where,
   orderBy,
   onSnapshot,
-  setDoc,
   deleteDoc,
   doc,
   limit
@@ -21,7 +20,7 @@ import { usePythonWatchHistory } from '@/hooks/useWatchHistoryPython';
 function useFirestoreWatchHistory() {
   const [history, setHistory] = useState<WatchHistory[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   // Fetch watch history for the current user
   useEffect(() => {
@@ -73,11 +72,6 @@ function useFirestoreWatchHistory() {
     if (!user) {
       throw new Error('User must be logged in to track watch history');
     }
-
-    // Create a unique ID for this watch entry
-    const historyId = contentType === 'tv' && season && episode
-      ? `${user.uid}_${contentId}_s${season}e${episode}`
-      : `${user.uid}_${contentId}`;
 
     const completed = progressSeconds >= totalDurationSeconds * 0.9;
 
@@ -159,6 +153,7 @@ function useFirestoreWatchHistory() {
 
 /** Public facade — routes to Python API on Vercel, Firestore elsewhere. */
 export const useWatchHistory = () => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session
   return isPythonBackendEnabled() ? usePythonWatchHistory() : useFirestoreWatchHistory();
 };
 

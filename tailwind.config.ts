@@ -213,6 +213,6 @@ export default {
 			'shimmer-fast': 'shimmer-fast 1.4s linear infinite'
 		}
 		}
-	},
-	plugins: [require("tailwindcss-animate")],
+	},  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Tailwind loads this config through jiti, which supports CJS require
+  plugins: [require("tailwindcss-animate")],
 } satisfies Config;

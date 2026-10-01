@@ -2,25 +2,21 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Heart, LogIn, Film, Tv, Search, Sparkles, ArrowRight, Trash2, Check } from "lucide-react";
+import { Heart, LogIn, Film, Tv, Search, Sparkles, ArrowRight, Check } from "lucide-react";
 import MovieCard from "@/components/MovieCard";
 import PageContainer from "@/components/PageContainer";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
-import { useToast } from "@/hooks/use-toast";
 import { TMDBMovie, getContentTitle, getContentType } from "@/utils/tmdbApi";
-import { useRouter } from "next/navigation";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 
 type ListTab = "all" | "movies" | "series";
 
 const MyList = () => {
   const { isAuthenticated } = useAuth();
-  const { movieList, loading, removeFromList } = useUserMovieListContext();
+  const { movieList, loading } = useUserMovieListContext();
   const { profile } = useUserProfileContext();
-  const { toast } = useToast();
-  const router = useRouter();
   const [tab, setTab] = useState<ListTab>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"recent" | "az">("recent");

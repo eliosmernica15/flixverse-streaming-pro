@@ -186,7 +186,9 @@ function useFirestoreComments(contentId?: number, contentType?: 'movie' | 'tv') 
 }
 
 export const useComments = (contentId?: number, contentType?: 'movie' | 'tv') => {
+  /* eslint-disable react-hooks/rules-of-hooks -- transport dispatch: isPythonBackendEnabled() is environment-constant per origin, so exactly one backend hook ever runs per session */
   return isPythonBackendEnabled()
     ? usePythonComments(contentId, contentType)
     : useFirestoreComments(contentId, contentType);
+  /* eslint-enable react-hooks/rules-of-hooks */
 };

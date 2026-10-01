@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react";
 import { Shuffle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
@@ -11,7 +10,6 @@ import {
   fetchTrendingMovies,
   fetchPopularMovies,
   fetchTopRatedMovies,
-  TMDBMovie,
 } from "@/utils/tmdbApi";
 
 /**
@@ -21,7 +19,6 @@ import {
 export function PlaySomething() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const { history } = useWatchHistoryContext();
   const { preferences } = useUserPreferencesContext();

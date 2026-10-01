@@ -4,8 +4,8 @@ import { getServerTmdbAuth } from '@/lib/tmdb/serverCredentials';
 /** Browser traffic goes through /api/tmdb so keys stay off the client bundle. */
 const TMDB_BASE_URL =
   typeof window !== "undefined" ? "/api/tmdb" : "https://api.themoviedb.org/3";
-const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
-const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces';
+export const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
+export const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces';
 
 // TMDB image base URL - only use officially supported sizes to avoid 404s
 // Supported poster sizes: w92, w154, w185, w342, w500, w780, original

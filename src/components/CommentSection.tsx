@@ -149,7 +149,6 @@ const CommentSection = ({ contentId, contentType }: CommentSectionProps) => {
   const [likingComments, setLikingComments] = useState<Set<string>>(new Set());
 
   const {
-    comments,
     loading,
     addComment,
     deleteComment,

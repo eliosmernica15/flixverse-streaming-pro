@@ -13,7 +13,8 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { Film, Tv, Home, Search, Heart, Sparkles, TrendingUp, User, WifiOff, CreditCard, HelpCircle } from "lucide-react";
-import { searchMulti, TMDBMovie } from "@/utils/tmdbApi";
+import Image from "next/image";
+import { searchMulti, TMDBMovie, getImageUrl } from "@/utils/tmdbApi";
 import { playUiSound } from "@/lib/uiSound";
 import { FOCUS_SEARCH_EVENT, OPEN_COMMAND_PALETTE_EVENT } from "@/hooks/useGlobalShortcuts";
 
@@ -139,7 +140,17 @@ export default function CommandPalette() {
                 const isTv = item.media_type === "tv" || !!item.first_air_date;
                 return (
                   <CommandItem key={`${item.id}-${item.media_type}`} onSelect={() => handleContentSelect(item)} className={itemClass}>
-                    {isTv ? (
+                    {item.poster_path ? (
+                      <span className="mr-2 h-10 w-7 shrink-0 overflow-hidden rounded-[4px] ring-1 ring-white/15">
+                        <Image
+                          src={getImageUrl(item.poster_path, "small")}
+                          alt=""
+                          width={28}
+                          height={40}
+                          className="h-full w-full object-cover"
+                        />
+                      </span>
+                    ) : isTv ? (
                       <Tv className="mr-2 h-4 w-4 text-blue-400" />
                     ) : (
                       <Film className="mr-2 h-4 w-4 text-red-400" />

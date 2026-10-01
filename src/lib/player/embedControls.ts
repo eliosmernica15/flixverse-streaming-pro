@@ -123,7 +123,21 @@ function dispatchKeyEvent(
     // Legacy fallback
     try {
       const legacy = document.createEvent("KeyboardEvent") as KeyboardEvent;
-      (legacy as any).initKeyboardEvent(type, true, true, window, key, 0, false, false, false, false);
+      const legacyInit = legacy as unknown as {
+        initKeyboardEvent(
+          type: string,
+          bubbles: boolean,
+          cancelable: boolean,
+          view: Window,
+          key: string,
+          location: number,
+          ctrlKey: boolean,
+          altKey: boolean,
+          shiftKey: boolean,
+          metaKey: boolean
+        ): void;
+      };
+      legacyInit.initKeyboardEvent(type, true, true, window, key, 0, false, false, false, false);
       target.dispatchEvent(legacy);
     } catch {
       // ignore

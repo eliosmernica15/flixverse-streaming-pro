@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { Home, Search, Compass, Film, Tv, Heart, Bookmark, Sparkles } from "lucide-react";
+import { Home, Search, Compass, Film, Tv, Heart, Sparkles } from "lucide-react";
 
 const QUICK_LINKS = [
   { href: "/", label: "Home", icon: Home },

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  User, Settings, Film, Tv, Star, Heart, Clock,
+  Settings, Film, Tv, Star, Heart, Clock,
   Calendar, Edit2, Camera, LogOut, ChevronRight, Trash2,
   MessageCircle, TrendingUp, Award, CreditCard, Users
 } from 'lucide-react';
@@ -212,7 +212,7 @@ const Profile = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Error",
         description: "Failed to sign out",
@@ -557,7 +557,7 @@ const Profile = () => {
                         <span>Continue Watching</span>
                       </h3>
                       <div className="space-y-3 mb-6">
-                        {continueWatching.map((item, index) => {
+                        {continueWatching.map((item) => {
                           const progressPercentage = Math.round((item.progress_seconds / item.total_duration_seconds) * 100);
                           return (
                       <div
@@ -610,7 +610,7 @@ const Profile = () => {
                     <div>
                       <h3 className="text-lg font-semibold text-white mb-3">Recently Watched</h3>
                       <div className="space-y-3">
-                        {recentlyWatched.map((item, index) => (
+                        {recentlyWatched.map((item) => (
                           <div
                             key={item.id}
                             className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"

@@ -9,7 +9,7 @@ export const cspDirectives = [
   "font-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com",
-  "connect-src 'self' https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com https://api.themoviedb.org https://www.cloudflare.com https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://*.ingest.sentry.io https://*.sentry.io https://www.google.com https://www.recaptcha.net wss://*.firebaseio.com https://*.ably.io wss://*.ably.io https://*.ably-realtime.com wss://*.ably-realtime.com",
+  "connect-src 'self' https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com https://api.themoviedb.org https://www.cloudflare.com https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://*.ingest.sentry.io https://*.sentry.io https://www.google.com https://www.recaptcha.net wss://*.firebaseio.com",
   // frame-src must list every host the player iframes. Keep in sync with
   // src/lib/streamingSources.ts -> ALLOWED_EMBED_HOSTS. The canonical VidSrc
   // domain is vidsrcme.ru (vidsrc.to is the per-domain mirror). The

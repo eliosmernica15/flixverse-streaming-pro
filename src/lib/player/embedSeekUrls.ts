@@ -26,7 +26,7 @@ export function computeResync(
   hostTimeSeconds: number,
   guestTimeSeconds: number,
   embedUrl: string,
-  serverId: string
+  _serverId: string
 ): SyncAction {
   const drift = Math.abs(hostTimeSeconds - guestTimeSeconds);
 

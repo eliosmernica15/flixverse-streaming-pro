@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
-import { Play, Plus, Info, Check, ChevronLeft, ChevronRight, Volume2, Sparkles, ChevronDown } from "lucide-react";
+import { Play, Plus, Check, ChevronLeft, ChevronRight, Volume2, Sparkles, ChevronDown } from "lucide-react";
 import { TMDBMovie, getBackdropUrl, getContentTitle, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
@@ -32,7 +32,6 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const t = useTranslations("hero");
-  const tCommon = useTranslations("common");
   const { isAuthenticated } = useAuth();
   const { addToList, isInList } = useUserMovieListContext();
   const { toast } = useToast();
@@ -46,6 +45,32 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
     currentMovie.poster_path ? getBackdropUrl(currentMovie.poster_path, "large") : null,
     currentMovie.genre_ids
   );
+
+  // Phase A hero parallax: the backdrop layer eases down at 0.3× scroll.
+  // rAF-throttled, capped at one viewport, disabled for reduced motion.
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (reducedMotion) return;
+    if (typeof window === "undefined") return;
+    let raf = 0;
+    const applyParallax = () => {
+      raf = 0;
+      const node = backdropRef.current;
+      if (!node) return;
+      const y = Math.min(window.scrollY, window.innerHeight);
+      node.style.transform = `translate3d(0, ${(y * 0.3).toFixed(1)}px, 0)`;
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(applyParallax);
+    };
+    applyParallax();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [reducedMotion]);
 
   const c1 = colors[0] ? rgbToCss(colors[0], 0.18) : "rgba(229, 9, 20, 0.18)";
   const c2 = colors[1] ? rgbToCss(colors[1], 0.12) : "rgba(124, 58, 237, 0.12)";
@@ -106,7 +131,6 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   }, [activeIndex, allMovies.length, goToSlide]);
 
   const title = getContentTitle(currentMovie);
-  const backdropUrl = currentMovie.backdrop_path ? getBackdropUrl(currentMovie.backdrop_path, "large") : "";
   const releaseYear = currentMovie.release_date
     ? new Date(currentMovie.release_date).getFullYear()
     : currentMovie.first_air_date
@@ -165,6 +189,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
         }, ROTATION_INTERVAL_MS);
       }}
     >
+      <div ref={backdropRef} className="absolute inset-0 will-change-transform">
       {allMovies.map((m, i) => {
         const url = m.backdrop_path ? getBackdropUrl(m.backdrop_path, "large") : "";
         const isActive = i === activeIndex;
@@ -192,10 +217,15 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
           </div>
         );
       })}
+      </div>
 
       <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-black/10" />
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/50" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-transparent to-transparent h-32" />
+      {/* Depth vignette — pulls focus to the title without changing the palette. */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_52%,rgba(0,0,0,0.4)_100%)]" />
+      {/* Mobile-only stronger bottom fade so the title never crowds the CTA row. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/60 to-transparent sm:hidden" />
 
       {!reducedMotion && (
         <>

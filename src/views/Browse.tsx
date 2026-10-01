@@ -4,8 +4,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
-import PageContainer from "@/components/PageContainer";
-import Reveal from "@/components/Reveal";
 import { Sparkles, AlertCircle, ArrowDownWideNarrow, Star, CalendarDays, ArrowDownAZ } from "lucide-react";
 import { useBrowseCategory, getBrowseCategoryConfig } from "@/hooks/queries/useBrowseCategory";
 
@@ -15,7 +13,6 @@ const Browse = () => {
   const { category } = useParams<{ category: string }>();
   const router = useRouter();
   const t = useTranslations("browse");
-  const tc = useTranslations("common");
   const tn = useTranslations("nav");
   const config = getBrowseCategoryConfig(category);
   const { data: movies = [], isLoading, isError, refetch } = useBrowseCategory(category);

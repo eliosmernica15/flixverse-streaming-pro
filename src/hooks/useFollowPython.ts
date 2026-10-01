@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
+import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { enqueuePendingJob } from "@/lib/pendingJobs";
 
 const POLL_MS = 60000;
@@ -44,7 +44,7 @@ export function usePythonFollow(targetUserId: string | null) {
       return;
     }
     void refresh();
-    if (useHttpTransport()) {
+    if (usesHttpTransport()) {
       const poll = setInterval(() => void refresh(), POLL_MS);
       return () => clearInterval(poll);
     }

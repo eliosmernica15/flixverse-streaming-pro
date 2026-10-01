@@ -3,10 +3,22 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from "next-intl";
-import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2, Download } from "lucide-react";
-import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, isNotReleasedYet } from "@/utils/tmdbApi";
+import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2, Download, Volume2, VolumeX } from "lucide-react";
+import { getBackdropUrl, TMDBMovie, isNotReleasedYet } from "@/utils/tmdbApi";
+
+/** Minimal cast/crew entry shape returned inside TMDB `credits` payloads. */
+interface TmdbCreditsPerson {
+  id: number;
+  name: string;
+  character?: string;
+  order?: number;
+  job?: string;
+  department?: string;
+  profile_path?: string;
+}
 import { useContentDetails } from "@/hooks/queries/useContentDetails";
 import { useRelatedContent } from "@/hooks/queries/useRelatedContent";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +36,8 @@ import QuickRating from "./QuickRating";
 import MovieCard from "./MovieCard";
 import SectionHeader from "./SectionHeader";
 import Reveal from "./Reveal";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { AmbientGlowFrame } from "./player/AmbientGlowFrame";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { stripPartyQueryParams } from "@/lib/player/partyUrl";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
@@ -352,6 +366,8 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"></div>
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent"></div>
           </div>
+          {/* C3 — poster-dominant ambient glow over the backdrop, under the content (respects the user's ambient-glow setting) */}
+          <AmbientGlowFrame posterPath={content.poster_path} isActive />
 
           {/* Content */}
           <div className={`relative z-10 flex flex-col justify-center min-h-screen w-full px-4 sm:px-6 md:px-12 lg:px-20 py-20 sm:py-24 transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
@@ -690,18 +706,27 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           </div>
         )}
 
-        {/* Trailer Section */}
+        {/* Trailer Section — cinematic card with viewport autoplay + mute toggle */}
         {trailer && (
           <div className="w-full px-4 md:px-16 py-12 md:py-20">
             <div className="max-w-6xl mx-auto">
               <SectionHeader title={t("trailer")} eyebrow="Official" />
-              <div className="mt-6 aspect-video overflow-hidden rounded-xl ring-1 ring-white/10">
-                <iframe
-                  src={`https://www.youtube.com/embed/${trailer.key}`}
-                  title={t("trailer")}
-                  className="w-full h-full"
-                  allowFullScreen
-                />
+              <div className="mt-6 rounded-2xl bg-gradient-to-r from-red-500/30 via-white/10 to-purple-500/30 p-[1.5px]">
+                <div className="relative overflow-hidden rounded-2xl bg-black">
+                  <TrailerEmbed videoKey={trailer.key} title={t("trailer")} />
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {[
+                  { label: tc("rating"), value: `${content.vote_average.toFixed(1)}/10` },
+                  ...(releaseDate ? [{ label: isTV ? "First air date" : "Release date", value: new Date(releaseDate).toLocaleDateString() }] : []),
+                  ...(content.runtime ? [{ label: "Runtime", value: `${content.runtime} min` }] : []),
+                ].map((stat) => (
+                  <div key={stat.label} className="glass-soft rounded-xl p-3 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">{stat.label}</p>
+                    <p className="mt-0.5 text-sm font-semibold text-white">{stat.value}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -759,18 +784,18 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   <SectionHeader title={t("cast")} />
                   <div className="mt-6">
                     <CastCrewGrid
-                      cast={content.credits.cast.map((c) => ({
+                      cast={content.credits.cast.map((c: TmdbCreditsPerson) => ({
                         id: c.id,
                         name: c.name || "Unknown",
-                        character: (c as any).character || "",
+                        character: c.character || "",
                         profile_path: c.profile_path,
-                        order: (c as any).order || 0,
+                        order: c.order || 0,
                       }))}
-                      crew={content.credits.crew.map((c) => ({
+                      crew={content.credits.crew.map((c: TmdbCreditsPerson) => ({
                         id: c.id,
                         name: c.name || "Unknown",
-                        job: (c as any).job || "",
-                        department: (c as any).department || "",
+                        job: c.job || "",
+                        department: c.department || "",
                         profile_path: c.profile_path,
                       }))}
                     />
@@ -873,3 +898,83 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 };
 
 export default MovieDetails;
+
+/**
+ * B2 — trailer embed that autoplays muted only once scrolled into view and
+ * pauses when scrolled away. Falls back to a static facade tap-to-play for
+ * reduced-motion users. A mute/unmute control sits over the player.
+ */
+function TrailerEmbed({ videoKey, title }: { videoKey: string; title: string }) {
+  const reducedMotion = useReducedMotion();
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [inView, setInView] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    const node = wrapRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => setInView(entries[0]?.isIntersecting ?? false),
+      { rootMargin: "0px 0px -25% 0px", threshold: 0.35 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (playing && reducedMotion) setPlaying(false);
+  }, [playing, reducedMotion]);
+
+  const shouldEmbed = (inView && !reducedMotion) || playing;
+  const src = `https://www.youtube.com/embed/${videoKey}?rel=0&modestbranding=1${
+    playing ? "&autoplay=1" : ""
+  }${muted ? "&mute=1" : ""}`;
+
+  return (
+    <div ref={wrapRef} className="relative aspect-video">
+      {shouldEmbed ? (
+        <iframe
+          src={src}
+          title={title}
+          className="h-full w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPlaying(true)}
+          aria-label={`Play trailer: ${title}`}
+          className="group relative block h-full w-full"
+        >
+          <Image
+            src={`https://i.ytimg.com/vi/${videoKey}/maxresdefault.jpg`}
+            alt=""
+            fill
+            sizes="(max-width: 768px) 100vw, 1152px"
+            className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+          />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+          <span className="cta-primary absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !px-6 !py-3">
+            <Play className="h-5 w-5 fill-current" />
+            <span>Play trailer</span>
+          </span>
+        </button>
+      )}
+      {shouldEmbed && (
+        <button
+          type="button"
+          onClick={() => setMuted((m) => !m)}
+          aria-label={muted ? "Unmute trailer" : "Mute trailer"}
+          className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-black/70 text-white backdrop-blur-md transition-colors hover:bg-black/90 focus-ring"
+        >
+          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+        </button>
+      )}
+    </div>
+  );
+}

@@ -1,6 +1,7 @@
 "use client";
 
-import { Radio, RadioTower, Wifi, WifiOff, Loader2, Signal, Activity, Pause } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Radio, Wifi, WifiOff, Loader2, Signal, Activity, Pause } from "lucide-react";
 
 export type SyncStatus =
   | "connected"
@@ -60,6 +61,18 @@ const STATUS_CONFIG: Record<SyncStatus, { label: string; tone: string; dot: stri
 };
 
 export function SyncStatusBadge({ status, driftMs, processed, peers, className = "" }: SyncStatusBadgeProps) {
+  // D5 — pulse the Live badge briefly whenever a fresh event batch lands.
+  const prevProcessedRef = useRef(processed);
+  const [pulse, setPulse] = useState(false);
+  useEffect(() => {
+    const before = prevProcessedRef.current;
+    prevProcessedRef.current = processed;
+    if (status !== "connected" || typeof processed !== "number") return;
+    if (typeof before === "number" && processed <= before) return;
+    setPulse(true);
+    const t = setTimeout(() => setPulse(false), 1200);
+    return () => clearTimeout(t);
+  }, [processed, status]);
   const config = STATUS_CONFIG[status];
   const Icon = config.icon;
 
@@ -73,7 +86,11 @@ export function SyncStatusBadge({ status, driftMs, processed, peers, className =
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border ${config.tone} ${className}`}
+      role="status"
+      aria-live="polite"
+      className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border transition-shadow ${config.tone} ${
+        pulse ? "shadow-[0_0_16px_rgba(16,185,129,0.45)]" : ""
+      } ${className ?? ""}`}
       title={
         typeof processed === "number" || typeof peers === "number"
           ? `Events: ${processed ?? 0} · Peers: ${peers ?? 0}`

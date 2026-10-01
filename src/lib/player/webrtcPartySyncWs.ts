@@ -1,5 +1,5 @@
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { getPythonWsBase, useHttpTransport } from "@/lib/pythonApi/config";
+import { getPythonWsBase, usesHttpTransport } from "@/lib/pythonApi/config";
 
 export interface SignalMessage {
   senderId: string;
@@ -381,7 +381,7 @@ export async function createPartySyncTransport(
   onMessage: (msg: unknown) => void,
   mediaCallbacks: MediaCallbacks = {}
 ): Promise<PartySyncTransport> {
-  if (useHttpTransport()) {
+  if (usesHttpTransport()) {
     return new WebRTCPartySyncHttp(roomId, userId, isHost, hostId, onMessage, mediaCallbacks);
   }
 

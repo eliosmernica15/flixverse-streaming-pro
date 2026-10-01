@@ -1,9 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  getOutboxMutations,
-  clearOutboxMutation,
-  type MutationAction,
-} from "@/lib/offlineStorage";
+import { getOutboxMutations } from "@/lib/offlineStorage";
 import { MutationDispatcher } from "@/lib/offline/mutationDispatcher";
 
 interface UseOfflineSyncQueueReturn {

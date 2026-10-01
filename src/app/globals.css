@@ -1552,10 +1552,12 @@ input[type="range"].player-volume::-moz-range-thumb {
     transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
     will-change: transform;
     z-index: 1;
+    transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
   }
   .netflix-card-wrap:hover,
   .netflix-card-wrap:focus-within {
-    transform: translateY(-6px) scale(1.085);
+    transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg))
+      translateY(-6px) scale(1.085);
     z-index: 30;
   }
   @media (max-width: 768px) {
@@ -1590,8 +1592,8 @@ input[type="range"].player-volume::-moz-range-thumb {
     box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
   }
   .badge-top {
-    background: linear-gradient(135deg, #fbbf24, #f59e0b);
-    color: #1a0a00;
+    background: linear-gradient(135deg, #fcd34d, #fbbf24);
+    color: #211500;
     box-shadow: 0 0 16px rgba(251, 191, 36, 0.35);
   }
   .badge-match {
@@ -1604,8 +1606,8 @@ input[type="range"].player-volume::-moz-range-thumb {
     color: #fff;
   }
   .badge-rating-amber {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: #1a0a00;
+    background: linear-gradient(135deg, #fbbf24, #d97706);
+    color: #211500;
   }
   .badge-rating-red {
     background: linear-gradient(135deg, #ef4444, #dc2626);
@@ -1635,6 +1637,10 @@ input[type="range"].player-volume::-moz-range-thumb {
   .cta-primary:active {
     transform: scale(0.98);
   }
+  .cta-primary:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 3px;
+  }
   .cta-secondary {
     display: inline-flex;
     align-items: center;
@@ -1657,6 +1663,10 @@ input[type="range"].player-volume::-moz-range-thumb {
   }
   .cta-secondary:active {
     transform: scale(0.98);
+  }
+  .cta-secondary:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 3px;
   }
   .cta-icon {
     display: inline-flex;
@@ -1920,3 +1930,11 @@ input[type="range"].player-volume::-moz-range-thumb {
   .group:hover .hover-scale-img {
     transform: scale(1.06);
   }
+/* Phase E — reduced-motion guards for the advancement-layer motion */
+@media (prefers-reduced-motion: reduce) {
+  .netflix-card-wrap,
+  .netflix-card-wrap:hover,
+  .netflix-card-wrap:focus-within {
+    transform: none;
+  }
+}

@@ -120,7 +120,7 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
       setNewName("");
       setNewType("standard");
       toast({ title: "Profile created", description: `${newProfile.displayName} has been added.` });
-    } catch (err) {
+    } catch (_err) {
       toast({ title: "Error", description: "Failed to create profile.", variant: "destructive" });
     }
   }, [newName, newType, user, profiles.length, maxProfiles, toast]);

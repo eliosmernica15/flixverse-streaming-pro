@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { WifiOff, Download, Film, Trash2, Play } from "lucide-react";
+import { WifiOff, Download, Film, Trash2, Play, HardDrive } from "lucide-react";
 import { loadOfflineCache, type OfflineCachePayload } from "@/lib/offlineStorage";
 import { listDownloads, removeDownload, formatDownloadSize } from "@/lib/offline/downloadManager";
 import type { OfflineDownloadRecord } from "@/lib/offlineStorage";
+
+// ~50 MB browser quota the download manager targets.
+const DOWNLOAD_QUOTA_BYTES = 50 * 1024 * 1024;
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getImageUrl } from "@/utils/tmdbApi";
 import PageContainer from "@/components/PageContainer";
@@ -42,14 +45,50 @@ const OfflineLibrary = () => {
     void refresh();
   };
 
+  // B4 — storage meter: total size of completed downloads against the
+  // ~50 MB browser quota used by the download manager.
+  const storage = useMemo(() => {
+    const usedBytes = downloads
+      .filter((d) => d.status === "complete")
+      .reduce((sum, d) => sum + (d.sizeBytes || 0), 0);
+    const pct = Math.min(100, Math.round((usedBytes / DOWNLOAD_QUOTA_BYTES) * 100));
+    return { usedBytes, pct, fmt: formatDownloadSize(usedBytes) };
+  }, [downloads]);
+
   return (
-    <div className="pt-20 min-h-screen">
-      <PageHero
-        title="Offline Library"
-        subtitle="Browse cached titles and play downloaded trailers offline. Full video downloads require Premium and hosted content."
-        icon={<WifiOff className="w-6 h-6 text-white" />}
-        accent="amber"
-      />
+    <div className="pt-20 min-h-screen">        <PageHero
+          title="Offline Library"
+          subtitle="Browse cached titles and play downloaded trailers offline. Full video downloads require Premium and hosted content."
+          icon={<WifiOff className="w-6 h-6 text-white" />}
+          accent="amber"
+        />
+
+        {downloads.length > 0 && (
+          <div className="mb-8 flex items-center gap-3 glass-panel rounded-2xl border border-white/10 p-4">
+            <HardDrive className="w-5 h-5 shrink-0 text-amber-300" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between text-xs text-gray-300 mb-1.5">
+                <span>
+                  {storage.fmt} of downloads stored
+                </span>
+                <span className="text-gray-500 tabular-nums">{storage.pct}%</span>
+              </div>
+              <div
+                className="h-1.5 w-full overflow-hidden rounded-full bg-white/10"
+                role="progressbar"
+                aria-valuenow={storage.pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Offline storage used"
+              >
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
+                  style={{ width: `${storage.pct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
       <PageContainer>
         {!isOnline && (
