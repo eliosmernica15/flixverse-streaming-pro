@@ -4,9 +4,9 @@ import { RefObject, useCallback, useEffect, type MutableRefObject } from "react"
 import { RefreshCw, AlertCircle } from "lucide-react";
 import { StreamingSource } from "@/lib/streamingSources";
 
-function enforceSandbox(iframe: HTMLIFrameElement | null) {
+function stripSandbox(iframe: HTMLIFrameElement | null) {
   if (!iframe) return;
-  iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-presentation");
+  iframe.removeAttribute("sandbox");
 }
 
 interface EmbedFrameProps {
@@ -37,7 +37,7 @@ export function EmbedFrame({
       if (iframeRef && "current" in iframeRef) {
         (iframeRef as MutableRefObject<HTMLIFrameElement | null>).current = node;
       }
-      enforceSandbox(node);
+      stripSandbox(node);
     },
     [iframeRef]
   );
@@ -45,24 +45,21 @@ export function EmbedFrame({
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
-    enforceSandbox(iframe);
+    stripSandbox(iframe);
     const observer = new MutationObserver(() => {
-      if (!iframe.hasAttribute("sandbox")) enforceSandbox(iframe);
+      if (iframe.hasAttribute("sandbox")) stripSandbox(iframe);
     });
     observer.observe(iframe, { attributes: true, attributeFilter: ["sandbox"] });
     return () => observer.disconnect();
   }, [iframeRef, currentSource.url, currentServer]);
 
   const handleLoad = () => {
-    enforceSandbox(iframeRef.current);
+    stripSandbox(iframeRef.current);
     onIframeLoad();
   };
 
   return (
-    <div
-      className="player-frame"
-      style={{ contain: "strict", willChange: "transform" }}
-    >
+    <div className="player-frame">
       {embedState === "loading" && (
         <div className="player-overlay player-overlay--loading" role="status">
           <div className="player-spinner" aria-hidden="true" />
@@ -92,7 +89,6 @@ export function EmbedFrame({
         ref={bindIframeRef}
         src={currentSource.url}
         title={`Watch ${title} on ${currentSource.name}`}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
         className={`player-iframe ${embedState === "error" ? "player-iframe--hidden" : ""}`}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
         referrerPolicy="origin"

@@ -44,8 +44,7 @@ function isMobileDevice(): boolean {
 
 function createAnalyser(stream: MediaStream): { ctx: AudioContext; analyser: AnalyserNode } | null {
   try {
-    const ctx = getGlobalAudioContext();
-    if (!ctx) return null;
+    const ctx = new AudioContext();
     const source = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
@@ -397,22 +396,10 @@ export function usePartyMedia({
 
   useEffect(() => {
     return () => {
-      // Cleanup: stop all local tracks and disable rather than destroy
-      // to prevent GPU memory leaks from repeated getUserMedia calls.
-      localStreamRef.current?.getTracks().forEach((t) => {
-        t.enabled = false;
-        t.stop();
-      });
-      localStreamRef.current = null;
-      // Do NOT close the singleton AudioContext here — it is shared globally.
-      // Just disconnect sources from the analyser nodes.
-      try {
-        analyserRef.current?.analyser.disconnect();
-        for (const a of remoteAnalysersRef.current.values()) {
-          a.analyser.disconnect();
-        }
-      } catch {
-        // ignore disconnect errors
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      analyserRef.current?.ctx.close().catch(() => undefined);
+      for (const a of remoteAnalysersRef.current.values()) {
+        a.ctx.close().catch(() => undefined);
       }
     };
   }, []);

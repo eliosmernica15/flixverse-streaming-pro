@@ -259,7 +259,6 @@ export function PlayerShell({
     seekTo,
     seekRelative,
     guestJoinMode,
-    onAdvanceEpisode,
   });
 
    const { media, guestServerIndex, resyncSeekUrl, setResyncSeekUrl } = party;
@@ -1022,9 +1021,6 @@ export function PlayerShell({
             kickParticipant={party.kickParticipant}
             setParticipantMicMuted={party.setParticipantMicMuted}
             setParticipantCamDisabled={party.setParticipantCamDisabled}
-            delegateHost={party.delegateHost}
-            updateControlsMode={party.updateControlsMode}
-            sendNextEpisode={party.sendNextEpisode}
             realtimeProcessed={party.realtime?.processed}
             realtimeReady={party.realtime?.isReady}
             peerCount={party.partyRoom?.participants?.length}

@@ -601,20 +601,6 @@
         rgba(59, 130, 246, 0.1) 360deg);
   }
 
-  .ambient-canvas {
-    background: radial-gradient(
-      ellipse at center,
-      var(--ambient-color, rgba(239, 68, 68, 0.15)) 0%,
-      transparent 70%
-    );
-    animation: ambient-pulse 8s ease-in-out infinite alternate;
-  }
-
-  @keyframes ambient-pulse {
-    from { opacity: 0.6; }
-    to { opacity: 1; }
-  }
-
   /* Glass effects */
   .glass-effect {
     backdrop-filter: blur(24px) saturate(180%);

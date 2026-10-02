@@ -199,7 +199,7 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
   }, [roomId]);
 
   const sendMessage = useCallback(
-    async (text: string, emoji?: string, timestampAnchor?: number) => {
+    async (text: string, emoji?: string) => {
       if (!roomId || !user) return;
       if (isRateLimited("PARTY_CHAT", user.uid)) {
         throw new Error("Slow down — too many messages");
@@ -208,7 +208,7 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
         `/parties/${roomId}/messages`,
         {
           method: "POST",
-          body: JSON.stringify({ text, emoji, timestampAnchor: timestampAnchor ?? null }),
+          body: JSON.stringify({ text, emoji }),
         }
       );
       setMessages((prev) => [...prev, data.message]);
@@ -336,40 +336,6 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
 
   const isHost = room?.hostId === user?.uid;
 
-  const delegateHost = useCallback(
-    async (targetUserId: string) => {
-      if (!roomId || !user || room?.hostId !== user.uid) return false;
-      try {
-        await pythonFetch(`/parties/${roomId}/host`, {
-          method: "PATCH",
-          body: JSON.stringify({ targetUserId }),
-        });
-        void fetchRoom();
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [roomId, user, room?.hostId, fetchRoom]
-  );
-
-  const updateControlsMode = useCallback(
-    async (mode: "HOST_ONLY" | "COLLABORATIVE") => {
-      if (!roomId || !user || room?.hostId !== user.uid) return false;
-      try {
-        await pythonFetch(`/parties/${roomId}/controls`, {
-          method: "PATCH",
-          body: JSON.stringify({ mode }),
-        });
-        void fetchRoom();
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [roomId, user, room?.hostId, fetchRoom]
-  );
-
   return {
     room,
     messages,
@@ -384,8 +350,6 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
-    delegateHost,
-    updateControlsMode,
     refreshRoom: fetchRoom,
   };
 }

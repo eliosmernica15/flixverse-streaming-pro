@@ -38,11 +38,12 @@ const JOIN_GRACE_MS = 5000;
 const SYNC_INTERVAL_MS = 250;
 // Drift threshold for postMessage seek attempt (fast, best-effort)
 const DRIFT_SOFT_THRESHOLD_SEC = 0.5;
-const SEEK_COOLDOWN_MS = 400;
+const SEEK_COOLDOWN_MS = 600;
 const MAX_GUEST_SPLASH_MS = 14_000;
-// Host heartbeat cadence — throttled to 5 s (0.2 Firestore writes/sec) to prevent
-// high-frequency DB/state thrashing that crashes the browser tab.
-const HOST_HEARTBEAT_MS = 5000;
+// Host heartbeat cadence. Was 800ms (1.25 Firestore writes/sec per host
+// plus fan-out reads) — 1500ms still corrects drift promptly (threshold
+// 0.5s, room poll ~1s) at roughly half the write/read load.
+const HOST_HEARTBEAT_MS = 1500;
 const FIRESTORE_PERSIST_INTERVAL_MS = 4000;
 // Lead time for a joint start: both sides seek first, then play at the
 // shared wall-clock moment so network jitter doesn't stagger the start.
@@ -87,7 +88,6 @@ interface UsePlayerPartySyncOptions {
   seekTo: (time: number) => void;
   seekRelative: (delta: number) => void;
   guestJoinMode?: boolean;
-  onAdvanceEpisode?: (nextSeason: number, nextEpisode: number) => void;
 }
 
 export function usePlayerPartySync({
@@ -107,7 +107,6 @@ export function usePlayerPartySync({
   seekEmbed,
   seekTo,
   guestJoinMode = false,
-  onAdvanceEpisode,
 }: UsePlayerPartySyncOptions) {
   const { user } = useAuth();
   const router = useRouter();
@@ -145,8 +144,6 @@ export function usePlayerPartySync({
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
-    delegateHost,
-    updateControlsMode,
   } = useFlixParty({ roomId: partyRoomId });
 
   const partyParticipantIds = partyRoom?.participants?.map((p) => p.userId) ?? [];
@@ -180,10 +177,6 @@ export function usePlayerPartySync({
   const scheduledGoTimerRef = useRef(0);
   const prevParticipantCountRef = useRef(0);
   const driftDisplayRef = useRef(0);
-  // Anti-ping-pong execution lock: when a remote playback event arrives,
-  // suppress outgoing broadcasts for 350 ms to prevent infinite loops.
-  const isRemoteActionRef = useRef(false);
-  const remoteLockTimerRef = useRef(0);
 
   // Fresh room → fresh signal cursors.
   useEffect(() => {
@@ -309,14 +302,6 @@ export function usePlayerPartySync({
 
   const handlePartyPlaybackSync = useCallback(
     (msg: SyncMessage) => {
-      // Anti-ping-pong: set remote-action lock so outgoing broadcasts are
-      // suppressed for 350 ms while this remote event is processed.
-      isRemoteActionRef.current = true;
-      window.clearTimeout(remoteLockTimerRef.current);
-      remoteLockTimerRef.current = window.setTimeout(() => {
-        isRemoteActionRef.current = false;
-      }, 350);
-
       if (isPartyHost) return;
       if (msg.type === "play") {
         clearGuestStaging();
@@ -425,10 +410,6 @@ export function usePlayerPartySync({
           ev.data.currentTime,
           typeof ev.data?.startAt === "number" ? ev.data.startAt : 0
         );
-        return;
-      }
-      if (ev.type === "next-episode" && typeof ev.data?.nextSeason === "number" && typeof ev.data?.nextEpisode === "number") {
-        onAdvanceEpisode?.(ev.data.nextSeason as number, ev.data.nextEpisode as number);
         return;
       }
       handlePartyPlaybackSync({
@@ -825,9 +806,6 @@ export function usePlayerPartySync({
 
   const broadcastPartyState = useCallback(
     (state: "playing" | "paused", time: number) => {
-      // Suppress outgoing broadcasts during remote-action lock window
-      // to prevent infinite ping-pong loops.
-      if (isRemoteActionRef.current) return;
       if (!partyRoomId || !isPartyHost) return;
       // Staged hold: the host pressing play releases BOTH sides together
       // at the shared start moment instead of starting the host early.
@@ -856,7 +834,6 @@ export function usePlayerPartySync({
    */
   const broadcastPartySeek = useCallback(
     (time: number) => {
-      if (isRemoteActionRef.current) return;
       if (!partyRoomId || !isPartyHost) return;
       if (syncStageRef.current) cancelSyncedStart();
       // Persist to Firestore so late-joining guests get the right position
@@ -876,7 +853,6 @@ export function usePlayerPartySync({
    */
   const broadcastServerChange = useCallback(
     (serverIndex: number, time: number) => {
-      if (isRemoteActionRef.current) return;
       if (!partyRoomId || !isPartyHost) return;
       if (syncStageRef.current) cancelSyncedStart();
       void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, serverIndex);
@@ -1084,23 +1060,6 @@ export function usePlayerPartySync({
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
-    delegateHost,
-    updateControlsMode,
-    sendNextEpisode: useCallback(
-      async (nextSeason?: number, nextEpisode?: number) => {
-        if (!partyRoomId || !isPartyHost || !realtime?.send) return;
-        try {
-          await realtime.send("next-episode", {
-            currentTime: 0,
-            nextSeason: nextSeason ?? season,
-            nextEpisode: nextEpisode ?? episode,
-          });
-        } catch {
-          // ignore
-        }
-      },
-      [partyRoomId, isPartyHost, realtime?.send, season, episode]
-    ),
     media,
     guestServerIndex,
     guestSplashPhase,

@@ -44,7 +44,6 @@ export interface FlixPartyRoom {
   encryptedPayload: string;
   /** Public metadata for guest redirect without decryption key. */
   contentMeta?: PartyContentMeta | null;
-  controlsMode?: "HOST_ONLY" | "COLLABORATIVE";
   playbackState: "playing" | "paused";
   lastKnownTime: number;
   serverIndex: number;
@@ -60,8 +59,6 @@ export interface FlixPartyChatMessage {
   senderAvatar: string | null;
   text: string;
   emoji?: string;
-  /** Playback time (seconds) at which this message was pinned — enables "Pin Moment" timestamp anchors */
-  timestampAnchor?: number | null;
   createdAt: number;
 }
 
@@ -152,7 +149,6 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
           senderAvatar: data.senderAvatar,
           text: data.text,
           emoji: data.emoji,
-          timestampAnchor: data.timestampAnchor ?? null,
           createdAt: data.createdAt,
         });
       });
@@ -358,7 +354,7 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
   }, [roomId, user]);
 
   const sendMessage = useCallback(
-    async (text: string, emoji?: string, timestampAnchor?: number) => {
+    async (text: string, emoji?: string) => {
       if (!roomId || !user) return;
       if (isRateLimited("PARTY_CHAT", user.uid)) {
         throw new Error("Slow down — too many messages");
@@ -373,7 +369,6 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
         senderAvatar: user.photoURL,
         text,
         emoji: emoji || null,
-        timestampAnchor: timestampAnchor ?? null,
         createdAt: Date.now(),
       });
     },
@@ -466,47 +461,6 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
     [roomId, user, room?.hostId]
   );
 
-  const delegateHost = useCallback(
-    async (targetUserId: string) => {
-      if (!roomId || !user || room?.hostId !== user.uid) return false;
-      const db = requireFirebaseDb();
-      const roomRef = doc(db, "flix_parties", roomId);
-      try {
-        await updateDoc(roomRef, { hostId: targetUserId, updatedAt: Date.now() });
-        const snap = await import("firebase/firestore").then((m) => m.getDoc(roomRef));
-        if (snap.exists()) {
-          const data = snap.data();
-          const participants: FlixPartyParticipant[] = data.participants || [];
-          const updatedParticipants = participants.map((p) =>
-            p.userId === targetUserId ? { ...p, role: "host" as const } : p.userId === user.uid ? { ...p, role: "guest" as const } : p
-          );
-          await updateDoc(roomRef, { participants: updatedParticipants });
-        }
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [roomId, user, room?.hostId]
-  );
-
-  const updateControlsMode = useCallback(
-    async (mode: "HOST_ONLY" | "COLLABORATIVE") => {
-      if (!roomId || !user || room?.hostId !== user.uid) return false;
-      const db = requireFirebaseDb();
-      try {
-        await updateDoc(doc(db, "flix_parties", roomId), {
-          controlsMode: mode,
-          updatedAt: Date.now(),
-        });
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [roomId, user, room?.hostId]
-  );
-
   const isHost = room?.hostId === user?.uid;
 
   return {
@@ -523,7 +477,5 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
-    delegateHost,
-    updateControlsMode,
   };
 }

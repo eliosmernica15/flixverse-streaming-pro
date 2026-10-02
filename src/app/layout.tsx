@@ -4,7 +4,6 @@ import "./video-player.css";
 import "./ui-polish.css";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
-import { ChunkReloadBoundary } from "@/components/ChunkReloadBoundary";
 import { WebsiteJsonLd, OrganizationJsonLd } from "@/components/seo/JsonLd";
 import type { Metadata, Viewport } from "next";
 import { DEFAULT_DESCRIPTION, DEFAULT_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo/metadata";
@@ -116,7 +115,6 @@ export default async function RootLayout({
                 <WebsiteJsonLd />
                 <OrganizationJsonLd />
                 <Providers>
-                    <ChunkReloadBoundary />
                     <AppShell>{children}</AppShell>
                 </Providers>
             </body>

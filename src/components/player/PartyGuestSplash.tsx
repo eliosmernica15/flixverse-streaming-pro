@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, memo } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, PartyPopper, Radio, Wifi } from "lucide-react";
 
 export type GuestSplashPhase =
@@ -31,7 +31,7 @@ interface PartyGuestSplashProps {
   visible: boolean;
 }
 
-export const PartyGuestSplash = memo(function PartyGuestSplash({
+export function PartyGuestSplash({
   phase,
   title,
   hostName,
@@ -109,4 +109,4 @@ export const PartyGuestSplash = memo(function PartyGuestSplash({
       </div>
     </div>
   );
-});
+}

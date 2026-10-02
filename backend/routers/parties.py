@@ -54,7 +54,6 @@ class JoinPartyBody(BaseModel):
 class SendMessageBody(BaseModel):
     text: str
     emoji: str | None = None
-    timestampAnchor: float | None = None
 
 
 class PlaybackBody(BaseModel):
@@ -178,7 +177,6 @@ def _room_doc(conn, room_id: str) -> dict[str, Any] | None:
         "code": row_get(row, "code"),
         "hostId": row_get(row, "host_id"),
         "encryptedPayload": row_get(row, "encrypted_payload"),
-        "controlsMode": row_get(row, "controls_mode") or "HOST_ONLY",
         "contentMeta": _parse_content_meta(row_get(row, "content_meta_json")),
         "playbackState": row_get(row, "playback_state"),
         "lastKnownTime": row_get(row, "last_known_time"),
@@ -280,8 +278,8 @@ def create_party(body: CreatePartyBody, auth: dict = Depends(verify_bearer)) -> 
         db_execute(
             conn,
             """
-            INSERT INTO party_rooms (id, code, host_id, encrypted_payload, controls_mode, content_meta_json, playback_state, last_known_time, server_index, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 'HOST_ONLY', ?, 'playing', 0, ?, ?, ?)
+            INSERT INTO party_rooms (id, code, host_id, encrypted_payload, content_meta_json, playback_state, last_known_time, server_index, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 'playing', 0, ?, ?, ?)
             """,
             (room_id, code, uid, body.encryptedPayload, meta_json, server_index, now, now),
         )
@@ -462,68 +460,6 @@ def update_playback(room_id: str, body: PlaybackBody, auth: dict = Depends(verif
     return {"ok": True}
 
 
-class DelegateHostBody(BaseModel):
-    targetUserId: str
-
-
-@router.patch("/parties/{room_id}/host")
-def delegate_host(
-    room_id: str,
-    body: DelegateHostBody,
-    auth: dict = Depends(verify_bearer),
-) -> dict[str, Any]:
-    uid = uid_from_auth(auth)
-    with get_conn() as conn:
-        row = db_fetchone(conn, "SELECT host_id, controls_mode FROM party_rooms WHERE id = ?", (room_id,))
-        if not row:
-            raise HTTPException(status_code=404, detail="Room not found")
-        if row_get(row, "host_id") != uid:
-            raise HTTPException(status_code=403, detail="Host only")
-        target = body.targetUserId
-        # Update room host
-        db_execute(
-            conn,
-            "UPDATE party_rooms SET host_id = ?, updated_at = ? WHERE id = ?",
-            (target, iso_now(), room_id),
-        )
-        # Update participant roles: target becomes host, previous host becomes guest
-        db_execute(
-            conn,
-            "UPDATE party_participants SET role = ? WHERE room_id = ? AND user_id = ?",
-            ("host", room_id, target),
-        )
-        db_execute(
-            conn,
-            "UPDATE party_participants SET role = ? WHERE room_id = ? AND user_id = ?",
-            ("guest", room_id, uid),
-        )
-        room = _room_doc(conn, room_id)
-    return {"ok": True, "room": room}
-
-
-@router.patch("/parties/{room_id}/controls")
-def update_controls(
-    room_id: str,
-    body: dict,
-    auth: dict = Depends(verify_bearer),
-) -> dict[str, Any]:
-    uid = uid_from_auth(auth)
-    mode = body.get("mode")
-    if mode not in ("HOST_ONLY", "COLLABORATIVE"):
-        raise HTTPException(status_code=400, detail="Invalid controls_mode")
-    with get_conn() as conn:
-        row = db_fetchone(conn, "SELECT host_id FROM party_rooms WHERE id = ?", (room_id,))
-        if not row or row_get(row, "host_id") != uid:
-            raise HTTPException(status_code=403, detail="Host only")
-        db_execute(
-            conn,
-            "UPDATE party_rooms SET controls_mode = ?, updated_at = ? WHERE id = ?",
-            (mode, iso_now(), room_id),
-        )
-        room = _room_doc(conn, room_id)
-    return {"ok": True, "room": room}
-
-
 @router.get("/parties/{room_id}/messages")
 def list_messages(room_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, Any]:
     uid_from_auth(auth)
@@ -544,7 +480,6 @@ def list_messages(room_id: str, auth: dict = Depends(verify_bearer)) -> dict[str
             "senderAvatar": row_get(r, "sender_avatar"),
             "text": row_get(r, "text"),
             "emoji": row_get(r, "emoji"),
-            "timestampAnchor": row_get(r, "timestamp_anchor"),
             "createdAt": row_get(r, "created_at"),
         }
         for r in reversed(rows)
@@ -575,10 +510,10 @@ def send_message(room_id: str, body: SendMessageBody, auth: dict = Depends(verif
         db_execute(
             conn,
             """
-            INSERT INTO party_messages (id, room_id, sender_id, sender_name, sender_avatar, text, emoji, timestamp_anchor, created_at)
-            VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)
+            INSERT INTO party_messages (id, room_id, sender_id, sender_name, sender_avatar, text, emoji, created_at)
+            VALUES (?, ?, ?, ?, NULL, ?, ?, ?)
             """,
-            (msg_id, room_id, uid, sender_name, body.text if not body.emoji else body.emoji, body.emoji, body.timestampAnchor, ts),
+            (msg_id, room_id, uid, sender_name, body.text if not body.emoji else body.emoji, body.emoji, ts),
         )
 
     msg = {
@@ -588,7 +523,6 @@ def send_message(room_id: str, body: SendMessageBody, auth: dict = Depends(verif
         "senderAvatar": None,
         "text": body.text if not body.emoji else body.emoji,
         "emoji": body.emoji,
-        "timestampAnchor": body.timestampAnchor,
         "createdAt": ts,
     }
     return {"message": msg}

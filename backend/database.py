@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS party_rooms (
   code TEXT NOT NULL UNIQUE,
   host_id TEXT NOT NULL,
   encrypted_payload TEXT NOT NULL,
-  controls_mode TEXT NOT NULL DEFAULT 'HOST_ONLY',
   playback_state TEXT NOT NULL DEFAULT 'paused',
   last_known_time DOUBLE PRECISION NOT NULL DEFAULT 0,
   server_index INTEGER NOT NULL DEFAULT 0,
@@ -65,7 +64,6 @@ CREATE TABLE IF NOT EXISTS party_messages (
   sender_avatar TEXT,
   text TEXT NOT NULL,
   emoji TEXT,
-  timestamp_anchor REAL,
   created_at BIGINT NOT NULL
 );
 

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  X, Users, Send, Crown, LogOut, PartyPopper, Smile, UserPlus, ChevronDown, Copy, Check, Link2, Bookmark
+  X, Users, Send, Crown, LogOut, PartyPopper, Smile, UserPlus, ChevronDown, Copy, Check, Link2
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { FlixPartyParticipant, FlixPartyChatMessage, FlixPartyRoom } from "@/hooks/player/useFlixParty";
@@ -18,9 +18,7 @@ import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge";
 import { HostSyncCard, GuestStagingBanner } from "./SyncedStartCard";
 import { PartyMediaControls } from "./PartyMediaPanel";
 import { PartyMembersPanel } from "./PartyMembersPanel";
-import { PassCrownDialog } from "./PassCrownDialog";
 import type { usePartyMedia } from "@/hooks/player/usePartyMedia";
-import { availableReactions } from "@/lib/player/spatialReactions";
 
 type PartyMediaState = ReturnType<typeof usePartyMedia>;
 
@@ -105,13 +103,10 @@ interface FlixPartySidebarProps {
   media?: PartyMediaState;
   partyRoom?: FlixPartyRoom | null;
   partyMessages?: FlixPartyChatMessage[];
-  sendPartyMessage?: (text: string, emoji?: string, timestampAnchor?: number) => Promise<void>;
+  sendPartyMessage?: (text: string, emoji?: string) => Promise<void>;
   kickParticipant?: (targetUserId: string) => Promise<void>;
   setParticipantMicMuted?: (targetUserId: string, muted: boolean) => Promise<void>;
   setParticipantCamDisabled?: (targetUserId: string, disabled: boolean) => Promise<void>;
-  delegateHost?: (targetUserId: string) => Promise<void>;
-  updateControlsMode?: (mode: "HOST_ONLY" | "COLLABORATIVE") => Promise<boolean>;
-  sendNextEpisode?: (nextSeason?: number, nextEpisode?: number) => Promise<void>;
   /** Mobile bottom-sheet mode */
   isMobile?: boolean;
   mobileExpanded?: boolean;
@@ -167,11 +162,7 @@ export function FlixPartySidebar({
   onSyncStart,
   onReleaseSyncNow,
   onCancelSync,
-  delegateHost,
-  updateControlsMode,
-  sendNextEpisode,
 }: FlixPartySidebarProps) {
-  const [showPassCrown, setShowPassCrown] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>(roomId ? "chat" : "friends");
   const [input, setInput] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
@@ -189,17 +180,6 @@ export function FlixPartySidebar({
   const sendMessage = sendPartyMessage ?? (async () => undefined);
 
   const QUICK_EMOJIS = ["😂", "🔥", "❤️", "👏", "😮", "💀", "🎬", "🍿"];
-
-  /** Format seconds into MM:SS or HH:MM:SS */
-  const formatTimeLabel = (totalSeconds: number) => {
-    const s = Math.max(0, Math.round(totalSeconds));
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    const pad = (n: number) => String(n).padStart(2, "0");
-    if (h > 0) return `${h}:${pad(m)}:${pad(sec)}`;
-    return `${m}:${pad(sec)}`;
-  };
 
   useEffect(() => {
     if (roomId) setActiveTab("chat");
@@ -228,17 +208,6 @@ export function FlixPartySidebar({
     }
   }, [isOpen, activeTab]);
 
-  const handleSendReaction = useCallback(
-    (emoji: string) => {
-      if (!roomId || !sendMessage) return;
-      // Broadcast reaction through realtime layer if available; otherwise fall back to chat emoji
-      sendMessage(emoji, emoji);
-      // In a full implementation, this would also call realtime.send("reaction", { emoji })
-      // and render floating particles. For Phase 1: quick emoji broadcast + chat echo.
-    },
-    [roomId, sendMessage]
-  );
-
   const handleSend = useCallback(() => {
     const text = input.trim();
     if (!text || !roomId) return;
@@ -246,18 +215,6 @@ export function FlixPartySidebar({
     setInput("");
     setShowEmoji(false);
   }, [input, roomId, sendMessage]);
-
-  /** Timestamped chat anchor — "Pin Moment" — sends current playback time with message */
-  const handlePinMoment = useCallback(
-    async (anchorTime?: number) => {
-      if (!roomId || !sendMessage) return;
-      const time = anchorTime ?? currentTime ?? 0;
-      const label = formatTimeLabel(Math.round(time));
-      await sendMessage(`[${label}] Pin Moment`, undefined, time);
-      toast({ title: "Moment pinned", description: `Timestamp anchored at ${label}` });
-    },
-    [roomId, sendMessage, currentTime, toast]
-  );
 
   const handleSendEmoji = useCallback(
     (emoji: string) => {
@@ -409,18 +366,6 @@ export function FlixPartySidebar({
                   <Crown className="w-3 h-3" />
                   {t("host")}
                 </span>
-              )}
-              {isHostProp && roomId && delegateHost && (
-                <button
-                  type="button"
-                  onClick={() => setShowPassCrown(true)}
-                  className="ml-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 transition-colors shrink-0"
-                  title="Pass the crown — delegate host"
-                  aria-label="Pass the crown"
-                >
-                  <Crown className="w-3 h-3 inline mr-0.5" />
-                  Pass
-                </button>
               )}
             </div>
             {!isMobile && (
@@ -648,19 +593,7 @@ export function FlixPartySidebar({
                         {msg.emoji ? (
                           <span className="text-2xl">{msg.emoji}</span>
                         ) : (
-                          <>
-                            <p className="text-xs text-gray-200 break-words">{msg.text}</p>
-                            {msg.timestampAnchor !== undefined && msg.timestampAnchor !== null && (
-                              <button
-                                onClick={() => onSyncToPosition?.(msg.timestampAnchor!)}
-                                className="inline-flex items-center gap-1 mt-1.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300 hover:bg-amber-500/25 hover:text-amber-200 transition-colors"
-                                title="Jump to timestamp"
-                              >
-                                <Bookmark className="w-3 h-3 text-amber-400" />
-                                <span>{formatTimeLabel(Math.round(msg.timestampAnchor!))}</span>
-                              </button>
-                            )}
-                          </>
+                          <p className="text-xs text-gray-200 break-words">{msg.text}</p>
                         )}
                       </div>
                     </div>
@@ -679,21 +612,6 @@ export function FlixPartySidebar({
                         {emoji}
                       </button>
                     ))}
-                    <div className="flex-1" />
-                    <span className="text-[9px] text-gray-600 font-medium uppercase tracking-wider">Reactions</span>
-                    <div className="flex gap-0.5">
-                      {availableReactions().map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => handleSendReaction(r)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-amber-500/15 text-sm transition-colors"
-                          title={`Send ${r}`}
-                          aria-label={`Send reaction ${r}`}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
 
@@ -704,16 +622,6 @@ export function FlixPartySidebar({
                       className={`p-2 rounded-lg transition-colors shrink-0 ${showEmoji ? "bg-white/10 text-white" : "hover:bg-white/5 text-gray-500"}`}
                     >
                       <Smile className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handlePinMoment(currentTime)}
-                      disabled={!roomId}
-                      title="Pin Moment — anchor current playback time"
-                      className="p-2 rounded-lg hover:bg-amber-500/15 text-amber-400 hover:text-amber-300 disabled:opacity-25 disabled:hover:bg-transparent transition-colors shrink-0"
-                      aria-label="Pin Moment"
-                    >
-                      <Bookmark className="w-4 h-4" />
                     </button>
                     <input
                       ref={inputRef}
@@ -750,44 +658,6 @@ export function FlixPartySidebar({
                   onReleaseNow={onReleaseSyncNow}
                   onCancel={onCancelSync}
                 />
-              </div>
-            )}
-            {roomId && isHostProp && room?.controlsMode !== undefined && updateControlsMode && (
-              <div className="px-3 pt-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-gray-300">Controls Mode</span>
-                    <div className="flex gap-1">
-                      {(["HOST_ONLY", "COLLABORATIVE"] as const).map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => void updateControlsMode(mode)}
-                          className={`rounded-md px-2 py-0.5 text-[10px] font-bold transition-colors ${
-                            room?.controlsMode === mode
-                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                              : "bg-white/5 text-gray-500 hover:text-gray-300 border border-transparent hover:border-white/10"
-                          }`}
-                        >
-                          {mode === "HOST_ONLY" ? "Host Only" : "Collaborative"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {roomId && isHostProp && mediaType === "tv" && sendNextEpisode && (
-              <div className="px-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => void sendNextEpisode(season ? season + 1 : undefined, episode ? episode + 1 : undefined)}
-                  className="w-full rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/25 px-3 py-2.5 text-xs font-bold text-amber-300 hover:bg-amber-500/30 hover:border-amber-500/40 transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Next Episode</span>
-                  <span className="opacity-50">·</span>
-                  <span className="text-[10px] opacity-70">Broadcast binge sync</span>
-                </button>
               </div>
             )}
             {roomId && syncStatus === "connecting" && !staging && (
@@ -877,22 +747,6 @@ export function FlixPartySidebar({
             compact
           />
         </div>
-      )}
-
-      {showPassCrown && room && (
-        <PassCrownDialog
-          open={showPassCrown}
-          participants={room.participants}
-          currentHostId={room.hostId}
-          onSelect={async (id) => {
-            setShowPassCrown(false);
-            if (delegateHost) {
-              await delegateHost(id);
-              toast({ title: "Crown passed", description: "Host authority delegated." });
-            }
-          }}
-          onCancel={() => setShowPassCrown(false)}
-        />
       )}
     </div>
   );
