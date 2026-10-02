@@ -1,0 +1,393 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { isRateLimited } from "@/lib/rateLimit";
+import { trackPartyJoin } from "@/lib/analytics";
+import { pythonFetch, PythonApiError } from "@/lib/pythonApi/client";
+import type {
+  FlixPartyChatMessage,
+  FlixPartyParticipant,
+  FlixPartyRoom,
+} from "@/hooks/player/useFlixParty";
+import type { PartyContentMeta } from "@/lib/player/roomEncryption";
+import { dedupeRoomParticipants } from "@/lib/party/participantUtils";
+
+interface UseFlixPartyOptions {
+  roomId: string | null;
+}
+
+const FAST_ROOM_POLL_MS = 350;
+const STEADY_ROOM_POLL_MS = 1000;
+const FAST_POLL_WINDOW_MS = 20_000;
+const MESSAGE_POLL_MS = 1200;
+
+export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
+  const { user } = useAuth();
+  const [room, setRoom] = useState<FlixPartyRoom | null>(null);
+  const [messages, setMessages] = useState<FlixPartyChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const roomPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const msgPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Last published snapshots, serialized. Poll responses rebuild fresh
+  // objects every 350ms — publishing them unconditionally re-renders the
+  // entire player tree and re-fires every room effect 3x/second (this is
+  // what froze/crashed machines the moment a guest connected). Only
+  // publish on actual change.
+  const lastRoomJsonRef = useRef<string | null>(null);
+  const lastMessagesJsonRef = useRef<string | null>(null);
+
+  const fetchRoom = useCallback(async () => {
+    if (!roomId) {
+      setRoom(null);
+      setLoading(false);
+      return null;
+    }
+    try {
+      const data = await pythonFetch<{ room: FlixPartyRoom }>(`/parties/${roomId}`);
+      const normalized = data.room
+        ? {
+            ...data.room,
+            participants: dedupeRoomParticipants(data.room.participants ?? [], data.room.hostId),
+          }
+        : null;
+      const json = JSON.stringify(normalized);
+      if (json !== lastRoomJsonRef.current) {
+        lastRoomJsonRef.current = json;
+        setRoom(normalized);
+      }
+      return normalized;
+    } catch (err) {
+      // Transient stall (timeout/offline) must NEVER clear the room: a null
+      // room triggers the leave-party flow (panel closes, URL stripped,
+      // rejoin blocked) and flaps every effect. Only a 404/403 means the
+      // room is actually gone (ended/kicked).
+      if (err instanceof PythonApiError && (err.status === 404 || err.status === 403)) {
+        lastRoomJsonRef.current = JSON.stringify(null);
+        setRoom(null);
+      }
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [roomId]);
+
+  const fetchMessages = useCallback(async () => {
+    if (!roomId) {
+      setMessages([]);
+      return;
+    }
+    try {
+      const data = await pythonFetch<{ messages: FlixPartyChatMessage[] }>(
+        `/parties/${roomId}/messages`
+      );
+      const json = JSON.stringify(data.messages);
+      if (json !== lastMessagesJsonRef.current) {
+        lastMessagesJsonRef.current = json;
+        setMessages(data.messages);
+      }
+    } catch {
+      // Keep stale chat on transient failure — wiping it every failed poll
+      // flashes the panel and re-triggers auto-scroll each time.
+    }
+  }, [roomId]);
+
+  useEffect(() => {
+    lastRoomJsonRef.current = null;
+    lastMessagesJsonRef.current = null;
+    void fetchRoom();
+    void fetchMessages();
+    if (!roomId) return;
+
+    const pollRoom = () => void fetchRoom();
+    pollRoom();
+    roomPollRef.current = setInterval(pollRoom, FAST_ROOM_POLL_MS);
+    const slowSwitch = window.setTimeout(() => {
+      if (roomPollRef.current) clearInterval(roomPollRef.current);
+      roomPollRef.current = setInterval(pollRoom, STEADY_ROOM_POLL_MS);
+    }, FAST_POLL_WINDOW_MS);
+
+    msgPollRef.current = setInterval(() => void fetchMessages(), MESSAGE_POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void fetchRoom();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      window.clearTimeout(slowSwitch);
+      if (roomPollRef.current) clearInterval(roomPollRef.current);
+      if (msgPollRef.current) clearInterval(msgPollRef.current);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [roomId, fetchRoom, fetchMessages]);
+
+  const createRoom = useCallback(
+    async (encryptedPayload: string, contentMeta?: PartyContentMeta): Promise<string> => {
+      if (!user) throw new Error("Must be signed in");
+      const data = await pythonFetch<{ roomId: string; room: FlixPartyRoom }>("/parties", {
+        method: "POST",
+        body: JSON.stringify({
+          encryptedPayload,
+          contentMeta: contentMeta ?? null,
+          hostName: user.displayName || "Host",
+          hostAvatar: user.photoURL,
+        }),
+      });
+      setRoom(data.room);
+      return data.roomId;
+    },
+    [user]
+  );
+
+  const joinRoomById = useCallback(
+    async (targetRoomId: string): Promise<boolean> => {
+      if (!user) return false;
+      try {
+        const data = await pythonFetch<{ ok: boolean; room: FlixPartyRoom }>(
+          `/parties/${targetRoomId}/join`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              displayName: user.displayName || "Guest",
+              avatarUrl: user.photoURL,
+            }),
+          }
+        );
+        setRoom(data.room);
+        trackPartyJoin(targetRoomId);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [user]
+  );
+
+  const joinRoom = useCallback(
+    async (code: string): Promise<string | null> => {
+      if (!user) return null;
+      try {
+        const data = await pythonFetch<{ roomId: string; room: FlixPartyRoom }>(
+          "/parties/join-by-code",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              code: code.trim().toUpperCase(),
+              displayName: user.displayName || "Guest",
+              avatarUrl: user.photoURL,
+            }),
+          }
+        );
+        setRoom(data.room);
+        trackPartyJoin(data.roomId);
+        return data.roomId;
+      } catch {
+        return null;
+      }
+    },
+    [user]
+  );
+
+  const leaveRoom = useCallback(async () => {
+    if (!roomId) return;
+    try {
+      await pythonFetch(`/parties/${roomId}/leave`, { method: "POST" });
+    } catch {
+      /* ignore */
+    }
+    setRoom(null);
+    setMessages([]);
+  }, [roomId]);
+
+  const sendMessage = useCallback(
+    async (text: string, emoji?: string, timestampAnchor?: number) => {
+      if (!roomId || !user) return;
+      if (isRateLimited("PARTY_CHAT", user.uid)) {
+        throw new Error("Slow down — too many messages");
+      }
+      const data = await pythonFetch<{ message: FlixPartyChatMessage }>(
+        `/parties/${roomId}/messages`,
+        {
+          method: "POST",
+          body: JSON.stringify({ text, emoji, timestampAnchor: timestampAnchor ?? null }),
+        }
+      );
+      setMessages((prev) => [...prev, data.message]);
+    },
+    [roomId, user]
+  );
+
+  const updatePlaybackState = useCallback(
+    async (state: "playing" | "paused", currentTime: number, serverIndex?: number) => {
+      if (!roomId) return;
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              playbackState: state,
+              lastKnownTime: currentTime,
+              serverIndex: typeof serverIndex === "number" ? serverIndex : prev.serverIndex,
+              updatedAt: Date.now(),
+            }
+          : prev
+      );
+      try {
+        await pythonFetch(`/parties/${roomId}/playback`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            state,
+            currentTime,
+            ...(typeof serverIndex === "number" ? { serverIndex } : {}),
+          }),
+        });
+      } catch {
+        /* host-only */
+      }
+    },
+    [roomId]
+  );
+
+  const kickParticipant = useCallback(
+    async (targetUserId: string) => {
+      if (!roomId || !user || room?.hostId !== user.uid || targetUserId === user.uid) return;
+
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              participants: prev.participants.filter((p) => p.userId !== targetUserId),
+            }
+          : prev
+      );
+
+      try {
+        const data = await pythonFetch<{ room: FlixPartyRoom }>(
+          `/parties/${roomId}/participants/${targetUserId}`,
+          { method: "DELETE" }
+        );
+        setRoom(data.room);
+      } catch {
+        void fetchRoom();
+      }
+    },
+    [roomId, user, room?.hostId, fetchRoom]
+  );
+
+  const setParticipantMicMuted = useCallback(
+    async (targetUserId: string, muted: boolean) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return;
+
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.userId === targetUserId ? { ...p, micMutedByHost: muted } : p
+              ),
+            }
+          : prev
+      );
+
+      try {
+        const data = await pythonFetch<{ room: FlixPartyRoom }>(
+          `/parties/${roomId}/participants/${targetUserId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ micMutedByHost: muted }),
+          }
+        );
+        setRoom(data.room);
+      } catch {
+        void fetchRoom();
+      }
+    },
+    [roomId, user, room?.hostId, fetchRoom]
+  );
+
+  const setParticipantCamDisabled = useCallback(
+    async (targetUserId: string, disabled: boolean) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return;
+
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.userId === targetUserId ? { ...p, camDisabledByHost: disabled } : p
+              ),
+            }
+          : prev
+      );
+
+      try {
+        const data = await pythonFetch<{ room: FlixPartyRoom }>(
+          `/parties/${roomId}/participants/${targetUserId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ camDisabledByHost: disabled }),
+          }
+        );
+        setRoom(data.room);
+      } catch {
+        void fetchRoom();
+      }
+    },
+    [roomId, user, room?.hostId, fetchRoom]
+  );
+
+  const isHost = room?.hostId === user?.uid;
+
+  const delegateHost = useCallback(
+    async (targetUserId: string) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return false;
+      try {
+        await pythonFetch(`/parties/${roomId}/host`, {
+          method: "PATCH",
+          body: JSON.stringify({ targetUserId }),
+        });
+        void fetchRoom();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [roomId, user, room?.hostId, fetchRoom]
+  );
+
+  const updateControlsMode = useCallback(
+    async (mode: "HOST_ONLY" | "COLLABORATIVE") => {
+      if (!roomId || !user || room?.hostId !== user.uid) return false;
+      try {
+        await pythonFetch(`/parties/${roomId}/controls`, {
+          method: "PATCH",
+          body: JSON.stringify({ mode }),
+        });
+        void fetchRoom();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [roomId, user, room?.hostId, fetchRoom]
+  );
+
+  return {
+    room,
+    messages,
+    loading,
+    isHost,
+    createRoom,
+    joinRoom,
+    joinRoomById,
+    leaveRoom,
+    sendMessage,
+    updatePlaybackState,
+    kickParticipant,
+    setParticipantMicMuted,
+    setParticipantCamDisabled,
+    delegateHost,
+    updateControlsMode,
+    refreshRoom: fetchRoom,
+  };
+}
+
+export type { FlixPartyParticipant, FlixPartyRoom, FlixPartyChatMessage };

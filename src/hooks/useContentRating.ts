@@ -1,0 +1,112 @@
+import { useState, useEffect } from 'react';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  deleteDoc,
+  doc
+} from 'firebase/firestore';
+import { requireFirebaseDb } from '@/integrations/firebase/client';
+import { useAuth } from './useAuth';
+import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
+import { ContentRating } from '@/integrations/firebase/types';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonContentRating } from '@/hooks/useContentRatingPython';
+
+function useFirestoreContentRating(contentId?: number, contentType?: 'movie' | 'tv') {
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [averageRating, setAverageRating] = useState<number>(0);
+  const [totalRatings, setTotalRatings] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  // Fetch ratings for the content
+  useEffect(() => {
+    if (!contentId || !contentType) {
+      setLoading(false);
+      return;
+    }
+
+    const q = query(
+      collection(requireFirebaseDb(), 'content_ratings'),
+      where('content_id', '==', contentId),
+      where('content_type', '==', contentType)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let total = 0;
+      let count = 0;
+      let userRatingValue: number | null = null;
+
+      snapshot.forEach((doc) => {
+        const rating = doc.data() as ContentRating;
+        total += rating.rating;
+        count++;
+        
+        if (user && rating.user_id === user.uid) {
+          userRatingValue = rating.rating;
+        }
+      });
+
+      setAverageRating(count > 0 ? total / count : 0);
+      setTotalRatings(count);
+      setUserRating(userRatingValue);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error fetching ratings:', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [contentId, contentType, user]);
+
+  // Rate content
+  const rateContent = async (rating: number) => {
+    if (!user || !contentId || !contentType) {
+      throw new Error('User must be logged in to rate content');
+    }
+
+    if (rating < 1 || rating > 10) {
+      throw new Error('Rating must be between 1 and 10');
+    }
+
+    await MutationDispatcher.dispatch('RATE_CONTENT', {
+      userId: user.uid,
+      contentId,
+      contentType,
+      rating,
+    });
+
+    setUserRating(rating);
+  };
+
+  // Remove rating
+  const removeRating = async () => {
+    if (!user || !contentId || !contentType) {
+      throw new Error('User must be logged in to remove rating');
+    }
+
+    const ratingId = `${user.uid}_${contentId}_${contentType}`;
+    await deleteDoc(doc(requireFirebaseDb(), 'content_ratings', ratingId));
+    setUserRating(null);
+  };
+
+  return {
+    userRating,
+    averageRating,
+    totalRatings,
+    loading,
+    rateContent,
+    removeRating,
+    isRated: userRating !== null
+  };
+}
+
+export const useContentRating = (contentId?: number, contentType?: 'movie' | 'tv') => {
+  /* eslint-disable react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session */
+  return isPythonBackendEnabled()
+    ? usePythonContentRating(contentId, contentType)
+    : useFirestoreContentRating(contentId, contentType);
+  /* eslint-enable react-hooks/rules-of-hooks */
+};

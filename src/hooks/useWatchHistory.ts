@@ -1,0 +1,159 @@
+import { useState, useEffect } from 'react';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  deleteDoc,
+  doc,
+  limit
+} from 'firebase/firestore';
+import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
+import { useAuth } from './useAuth';
+import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
+import { WatchHistory } from '@/integrations/firebase/types';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonWatchHistory } from '@/hooks/useWatchHistoryPython';
+
+/** Firestore implementation. Selected when Python backend is disabled. */
+function useFirestoreWatchHistory() {
+  const [history, setHistory] = useState<WatchHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  // Fetch watch history for the current user
+  useEffect(() => {
+    if (!user) {
+      setHistory([]);
+      setLoading(false);
+      return;
+    }
+
+    const db = getFirebaseDb();
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'watch_history'),
+      where('user_id', '==', user.uid),
+      orderBy('watched_at', 'desc'),
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const historyList: WatchHistory[] = [];
+      snapshot.forEach((doc) => {
+        historyList.push({ id: doc.id, ...doc.data() } as WatchHistory);
+      });
+      setHistory(historyList);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error fetching watch history:', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Update or add watch progress
+  const updateProgress = async (
+    contentId: number,
+    contentType: 'movie' | 'tv',
+    contentTitle: string,
+    contentPosterPath: string | null,
+    progressSeconds: number,
+    totalDurationSeconds: number,
+    season?: number,
+    episode?: number
+  ) => {
+    if (!user) {
+      throw new Error('User must be logged in to track watch history');
+    }
+
+    const completed = progressSeconds >= totalDurationSeconds * 0.9;
+
+    await MutationDispatcher.dispatch('UPDATE_PROGRESS', {
+      userId: user.uid,
+      contentId,
+      contentType,
+      contentTitle,
+      posterPath: contentPosterPath,
+      progressSeconds,
+      totalDurationSeconds,
+      completed,
+      season: season ?? null,
+      episode: episode ?? null,
+    });
+  };
+
+  // Get progress for a specific content
+  const getProgress = (contentId: number, season?: number, episode?: number): WatchHistory | undefined => {
+    if (season && episode) {
+      return history.find(
+        h => h.content_id === contentId && h.season === season && h.episode === episode
+      );
+    }
+    return history.find(h => h.content_id === contentId && !h.season);
+  };
+
+  // Remove from history
+  const removeFromHistory = async (historyId: string) => {
+    if (!user) return;
+    const db = requireFirebaseDb();
+    await deleteDoc(doc(db, 'watch_history', historyId));
+  };
+
+  // Clear all history
+  const clearHistory = async () => {
+    if (!user || history.length === 0) return { success: 0, failed: 0 };
+
+    const db = requireFirebaseDb();
+    const results = await Promise.allSettled(
+      history.map(item => deleteDoc(doc(db, 'watch_history', item.id))
+      )
+    );
+    const success = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.length - success;
+    if (failed > 0) {
+      console.error(`clearHistory: ${failed} of ${results.length} deletions failed`);
+    }
+    return { success, failed };
+  };
+
+  // Get continue watching items (not completed, with valid duration to avoid NaN/glitches)
+  const getContinueWatching = () => {
+    return history.filter(
+      (h) =>
+        !h.completed &&
+        h.progress_seconds > 60 &&
+        h.total_duration_seconds != null &&
+        h.total_duration_seconds > 0
+    );
+  };
+
+  // Get recently watched (completed)
+  const getRecentlyWatched = () => {
+    return history.filter(h => h.completed).slice(0, 20);
+  };
+
+  return {
+    history,
+    loading,
+    updateProgress,
+    getProgress,
+    removeFromHistory,
+    clearHistory,
+    getContinueWatching,
+    getRecentlyWatched
+  };
+}
+
+/** Public facade — routes to Python API on Vercel, Firestore elsewhere. */
+export const useWatchHistory = () => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session
+  return isPythonBackendEnabled() ? usePythonWatchHistory() : useFirestoreWatchHistory();
+};
+
