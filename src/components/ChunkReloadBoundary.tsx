@@ -11,7 +11,8 @@ export function ChunkReloadBoundary() {
       const stored = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("flixverse_last_deploy_hash") : null;
       if (current && current !== stored && stored) {
         // Deployment changed — reload only if no active user interaction
-        const active = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA" || document.activeElement.contentEditable === "true");
+        const activeEl = document.activeElement as HTMLElement | null;
+        const active = activeEl && ((activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA") || activeEl.getAttribute("contenteditable") === "true");
         if (!active && document.visibilityState === "visible" && !document.hidden) {
           sessionStorage.setItem("flixverse_last_deploy_hash", current);
           window.location.reload();
