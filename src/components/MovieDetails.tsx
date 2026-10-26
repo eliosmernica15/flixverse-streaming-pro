@@ -878,6 +878,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 season={isTV ? selectedSeason : undefined}
                 episode={isTV ? selectedEpisode : undefined}
                 posterPath={content.poster_path}
+                genreIds={content.genres?.map((g: { id: number }) => g.id)}
                 resumePosition={effectiveResumePosition}
                 totalDuration={totalDuration}
                 episodeCount={isTV ? episodeCount : undefined}

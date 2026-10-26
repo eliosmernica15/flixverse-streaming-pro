@@ -52,20 +52,44 @@ async function networkOnlyNavigate(request) {
   } catch {
     const cache = await caches.open(CACHE_VERSION);
     const offline = await cache.match(OFFLINE_URL);
-    return offline || Response.error();
+    if (offline) return offline;
+    // `Response.error()` is a network-error response: responding with it for
+    // a navigation surfaces the browser's own error page but is at least a
+    // valid Response. Prefer a real document so the user sees our UI.
+    return new Response(
+      "<!doctype html><meta charset=utf-8><title>Offline</title><body style=\"background:#0a0a0c;color:#fff;font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0\"><div style=\"text-align:center\"><h1 style=\"font-size:1.25rem\">You are offline</h1><p style=\"color:#9ca3af;font-size:.875rem\">FlixVerse will resume when your connection returns.</p></div></body>",
+      { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
+    );
   }
 }
 
 async function staleWhileRevalidate(request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
+
   const fetchPromise = fetch(request)
     .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
+      // Only cache complete, successful, same-origin responses. Caching a
+      // partial (206) or an opaque response poisons the cache and produces
+      // the "ChunkLoadError" the app then has to reload away from.
+      if (response.ok && response.status === 200 && response.type === "basic") {
+        void cache.put(request, response.clone());
+      }
       return response;
     })
     .catch(() => {
-      return cached ? cached : new Response("", { status: 503, statusText: "Service Unavailable" });
+      // Nothing cached and the network is gone: a bare 503 with no body is
+      // what a chunk request wants (Next retries / the boundary reloads).
+      return cached
+        ? cached
+        : new Response("", {
+            status: 503,
+            statusText: "Service Unavailable",
+            headers: { "Cache-Control": "no-store" },
+          });
     });
+
+  // Serve the cached copy instantly when present; the revalidation above
+  // keeps it fresh. Without a cached copy, wait for the network.
   return cached || fetchPromise;
 }

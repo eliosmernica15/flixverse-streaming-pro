@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+
 import { WebRTCPartySync } from "@/lib/player/webrtcPartySync";
 import { createPartySyncTransport, type PartySyncTransport } from "@/lib/player/webrtcPartySyncWs";
 import { useAuth } from "@/hooks/useAuth";
@@ -73,8 +74,20 @@ export function useWebRTCSync({
     void NTPClient.calibrate();
   }, []);
 
+  // Depend on the uid, not the whole Firebase user object: that object is
+  // replaced on every token refresh / profile update, which would tear down
+  // the peer connections mid-call. `uid` is the only field this effect reads.
+  const uid = user?.uid ?? null;
+
+  /**
+   * Stable ref for the roster. Declared above the effect that builds the
+   * transport so that effect can seed it without a stale read; the value is
+   * refreshed on every render below.
+   */
+  const participantKeyRef = useRef("");
+
   useEffect(() => {
-    if (!roomId || !user) {
+    if (!roomId || !uid) {
       setRtcConnected(false);
       return;
     }
@@ -134,7 +147,7 @@ export function useWebRTCSync({
       if (isPythonBackendEnabled()) {
         sync = await createPartySyncTransport(
           roomId,
-          user.uid,
+          uid,
           isHost,
           isHost ? null : hostId,
           onMsg,
@@ -147,7 +160,7 @@ export function useWebRTCSync({
       } else {
         const firestoreSync = new WebRTCPartySync(
           roomId,
-          user.uid,
+          uid,
           isHost,
           isHost ? null : hostId,
           onMsg,
@@ -159,6 +172,13 @@ export function useWebRTCSync({
 
       syncRef.current = sync;
       syncInitRef.current = { roomId, isHost, hostId: resolvedHostId };
+
+      // Apply the roster that is current *now* — the effect that watches it
+      // already ran while this async IIFE was still awaiting.
+      if (isHost) {
+        const key = participantKeyRef.current;
+        sync.syncParticipants(key ? key.split("|") : []);
+      }
     })();
 
     const poll = setInterval(() => {
@@ -173,12 +193,30 @@ export function useWebRTCSync({
       syncInitRef.current = null;
       setRtcConnected(false);
     };
-  }, [roomId, user?.uid, isHost, hostId]);
+  }, [roomId, uid, isHost, hostId]);
+
+  // Participants arrive as a fresh array every render. Key the effect on the
+  // *stable* joined id list (computed with useMemo) so an unchanged roster
+  // never re-runs `syncParticipants`, which would tear down and rebuild every
+  // RTCPeerConnection on each parent render.
+  const participantKey = useMemo(() => participantIds.join("|"), [participantIds]);
 
   useEffect(() => {
     if (!isHost || !syncRef.current) return;
-    syncRef.current.syncParticipants(participantIds);
-  }, [isHost, participantIds.join(",")]);
+    // Read the ids back from the key so the effect has no array identity
+    // dependency and stays statically checkable.
+    const ids = participantKey ? participantKey.split("|") : [];
+    syncRef.current.syncParticipants(ids);
+  }, [isHost, participantKey]);
+
+  // Latest roster, read by the connection effect when the transport is
+  // finally constructed.
+  //
+  // The transport is created asynchronously, so a roster that arrived while it
+  // was being built used to be dropped on the floor: the host's first guest
+  // got no peer connection until some *unrelated* roster change happened
+  // later, which is why the first camera in a party often stayed black.
+  participantKeyRef.current = participantKey;
 
   const sendMessageRtc = useCallback((type: SyncMessage["type"], data: SyncMessage["data"]) => {
     if (!syncRef.current) return;

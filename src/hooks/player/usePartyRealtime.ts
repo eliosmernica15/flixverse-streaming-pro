@@ -70,7 +70,10 @@ export type PartyRealtimeEventType =
   // host holds everyone paused at a timestamp, then releases both sides
   // at the same wall-clock moment so the guest never taps anything.
   | "sync-stage"
-  | "sync-go";
+  | "sync-go"
+  // Collaborative controls (F9): a guest requests a playback action; the
+  // host applies it and re-broadcasts so everyone converges.
+  | "guest-control";
 
 export interface PartyRealtimeEvent {
   type: PartyRealtimeEventType;
@@ -89,8 +92,20 @@ export interface PartyRealtimeEvent {
 }
 
 const REPLAY_BUFFER = 32;
-const HOUSEKEEP_INTERVAL_MS = 4_000;
+const HOUSEKEEP_INTERVAL_MS = 20_000;
 const HOUSEKEEP_KEEP = 64;
+
+/**
+ * Heartbeats are the only high-frequency traffic on this channel and they do
+ * not need durability: a guest that misses one is corrected by the next one
+ * 1.5 s later, and a late joiner reads the room doc for its starting
+ * position. Persisting them costs one Firestore write per participant per
+ * second — enough to exhaust a free-tier quota inside a single film and make
+ * every *other* write (chat, presence, signaling) start failing. So the host
+ * keeps ONE document for heartbeats and overwrites it in place; only
+ * meaningful transport events (play/pause/seek/…) are appended to the log.
+ */
+const HEARTBEAT_DOC_ID = "heartbeat";
 
 /**
  * Fire-and-forget Sentry breadcrumb for transport anomalies. Loaded lazily
@@ -139,6 +154,21 @@ export function usePartyRealtime({
   const { user } = useAuth();
   const [isReady, setIsReady] = useState(false);
   const [processed, setProcessed] = useState(0);
+
+  // `processed` is display-only telemetry (it feeds a badge). Publishing a
+  // state update for every heartbeat re-renders the entire player subtree at
+  // the heartbeat cadence — the single biggest source of "the party is laggy"
+  // reports. The authoritative count lives in a ref; state is refreshed at
+  // most twice a second.
+  const processedRef = useRef(0);
+  const processedPublishAtRef = useRef(0);
+  const bumpProcessed = useCallback(() => {
+    processedRef.current += 1;
+    const now = Date.now();
+    if (now - processedPublishAtRef.current < 500) return;
+    processedPublishAtRef.current = now;
+    setProcessed(processedRef.current);
+  }, []);
 
   const seqRef = useRef(0);
   // Flips true the first time a host send has attempted to seed its local
@@ -198,7 +228,7 @@ export function usePartyRealtime({
           // subsequent event as "old".
           lastSeenSeqRef.current = ev.seq;
           lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
-          setProcessed((n) => n + 1);
+          bumpProcessed();
           if (ev.type === "heartbeat") {
             onHeartbeatRef.current?.(ev);
           } else {
@@ -214,9 +244,12 @@ export function usePartyRealtime({
             if (unsubscribed) return;
             // A snapshot may contain several new docs at once; deliver them
             // oldest-first so play/seek/heartbeat apply in host order.
+            //
+            // `modified` matters as much as `added`: heartbeats overwrite a
+            // single document, so they only ever arrive as modifications.
             const fresh = liveSnap
               .docChanges()
-              .filter((change) => change.type === "added")
+              .filter((change) => change.type === "added" || change.type === "modified")
               .map((change) => change.doc.data() as PartyRealtimeEvent)
               .filter((ev) => ev.senderId !== userId)
               .filter(
@@ -228,7 +261,7 @@ export function usePartyRealtime({
             for (const ev of fresh) {
               lastSeenSeqRef.current = ev.seq;
               lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
-              setProcessed((n) => n + 1);
+              bumpProcessed();
               if (ev.type === "heartbeat") {
                 onHeartbeatRef.current?.(ev);
               } else {
@@ -261,25 +294,35 @@ export function usePartyRealtime({
       liveUnsub?.();
       setIsReady(false);
     };
-  }, [roomId, userId]);
+  }, [roomId, userId, bumpProcessed]);
 
   // Host: keep the buffer trimmed so it doesn't grow forever. We delete
   // the oldest events beyond HOUSEKEEP_KEEP so the subcollection stays
   // bounded. This is cheap, idempotent, and safe.
+  //
+  // Two things matter here: the trim is driven by the *number of events the
+  // host has sent* rather than a wall-clock interval (a 20 s timer deleting
+  // 16 docs at a time never keeps up with a 1.5 s heartbeat cadence), and it
+  // is skipped entirely when the host has sent nothing since the last pass.
+  const sentSinceTrimRef = useRef(0);
+
   useEffect(() => {
     if (!roomId || !isHost) return;
     const db = requireFirebaseDb();
     const eventsRef = collection(db, "flix_parties", roomId, "events");
     const trim = async () => {
+      // Nothing new to trim; avoid a read per tick.
+      if (sentSinceTrimRef.current === 0) return;
+      sentSinceTrimRef.current = 0;
       try {
-        const snap = await getDocs(query(eventsRef, orderBy("seq", "desc"), limit(HOUSEKEEP_KEEP + 16)));
-        const old = snap.docs
-          .map((d) => ({ id: d.id, seq: (d.data() as PartyRealtimeEvent).seq }))
-          .filter((d) => d.seq < snap.docs[HOUSEKEEP_KEEP - 1]?.data?.()?.seq)
-          .slice(0, 16);
+        const snap = await getDocs(
+          query(eventsRef, orderBy("seq", "desc"), limit(HOUSEKEEP_KEEP + 16))
+        );
+        if (snap.docs.length <= HOUSEKEEP_KEEP) return;
+        const old = snap.docs.slice(HOUSEKEEP_KEEP, HOUSEKEEP_KEEP + 16);
         if (old.length === 0) return;
         const batch = writeBatch(db);
-        old.forEach((o) => batch.delete(doc(eventsRef, o.id)));
+        old.forEach((o) => batch.delete(o.ref));
         await batch.commit();
       } catch {
         // best-effort
@@ -288,6 +331,13 @@ export function usePartyRealtime({
     const id = setInterval(trim, HOUSEKEEP_INTERVAL_MS);
     return () => clearInterval(id);
   }, [roomId, isHost]);
+
+  // Re-seed whenever this client (re)gains the crown: after a Pass the Crown
+  // the persisted high-water mark jumps ahead, and a previously-seeded local
+  // counter would otherwise emit sequence numbers guests reject as stale.
+  useEffect(() => {
+    if (isHost) seqSeededRef.current = false;
+  }, [isHost, roomId]);
 
   const nextSeq = useCallback(() => {
     seqRef.current += 1;
@@ -338,21 +388,39 @@ export function usePartyRealtime({
       };
 
       const eventsRef = collection(db, "flix_parties", roomId, "events");
+
+      // Heartbeats overwrite a single well-known document. A listener on the
+      // subcollection still sees the change (it is an update, so delivery is
+      // via `modified`, not `added`), which the live listener handles below.
+      if (type === "heartbeat") {
+        try {
+          await setDoc(doc(eventsRef, HEARTBEAT_DOC_ID), {
+            ...ev,
+            _serverTs: serverTimestamp(),
+          });
+        } catch (err) {
+          reportSyncAnomaly("party-realtime:heartbeat-failed", {
+            roomId,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
       try {
         await setDoc(doc(eventsRef, `${seq.toString().padStart(20, "0")}_${type}`), {
           ...ev,
           _serverTs: serverTimestamp(),
         });
+        sentSinceTrimRef.current += 1;
         // Persist the high-water mark on ordering-critical events only.
-        if (type !== "heartbeat") {
-          try {
-            await updateDoc(doc(db, "flix_parties", roomId), {
-              hostSeq: seq,
-              hostSeqAt: ev.ts,
-            });
-          } catch {
-            // Best effort — epoch gap rule still covers us.
-          }
+        try {
+          await updateDoc(doc(db, "flix_parties", roomId), {
+            hostSeq: seq,
+            hostSeqAt: ev.ts,
+          });
+        } catch {
+          // Best effort — epoch gap rule still covers us.
         }
       } catch (err) {
         console.warn("[usePartyRealtime] send failed:", err);

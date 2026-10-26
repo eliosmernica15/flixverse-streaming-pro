@@ -32,7 +32,7 @@ export function IntlProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <NextIntlClientProvider locale={locale} messages={messages}>
+    <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
       <HtmlLangSetter />
       {children}
     </NextIntlClientProvider>

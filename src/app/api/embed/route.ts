@@ -66,9 +66,24 @@ function rewriteRelativeUrls(html: string, baseOrigin: string): string {
   return out;
 }
 
+/** Hard cap on proxied HTML. Provider player pages are ~100–500 KB. */
+const MAX_HTML_BYTES = 3 * 1024 * 1024;
+const UPSTREAM_TIMEOUT_MS = 12_000;
+
 export async function GET(request: NextRequest) {
   const limit = await rateLimitByIp(request, "embed", 60, "1 m");
   if (!limit.success) return rateLimitResponse(limit);
+
+  // This route renders third-party HTML on our origin. Only allow it to be
+  // framed by us, and only from a same-site navigation context — without
+  // these a hostile page could embed our proxy in an invisible frame and
+  // drive the provider (session/CSRF amortization for ad fraud).
+  if (request.headers.get("sec-fetch-dest") === "document") {
+    const site = request.headers.get("sec-fetch-site");
+    if (site && site !== "same-origin" && site !== "same-site") {
+      return NextResponse.json({ error: "Cross-site embed denied" }, { status: 403 });
+    }
+  }
 
   const src = request.nextUrl.searchParams.get("src");
   if (!src) {
@@ -86,6 +101,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Provider not allowed" }, { status: 403 });
   }
 
+  // Reject non-http(s) schemes outright (file:, data:, gopher: …).
+  try {
+    const parsed = new URL(targetUrl);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return NextResponse.json({ error: "Unsupported scheme" }, { status: 400 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Malformed URL" }, { status: 400 });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+
   try {
     const origin = new URL(targetUrl).origin;
     const res = await fetch(targetUrl, {
@@ -96,6 +124,7 @@ export async function GET(request: NextRequest) {
         Referer: origin,
       },
       redirect: "follow",
+      signal: controller.signal,
     });
 
     const contentType = res.headers.get("content-type") || "";
@@ -105,7 +134,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(targetUrl);
     }
 
+    // Bound the body: an unresponsive or hostile provider streaming an
+    // infinite chunked response would otherwise hold the function open
+    // until maxDuration and OOM the instance.
+    const declaredLength = Number.parseInt(res.headers.get("content-length") || "", 10);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_HTML_BYTES) {
+      return NextResponse.json({ error: "Provider response too large" }, { status: 502 });
+    }
+
     let html = await res.text();
+    if (html.length > MAX_HTML_BYTES) html = html.slice(0, MAX_HTML_BYTES);
     html = stripAntiEmbedScripts(html);
     html = rewriteRelativeUrls(html, origin);
 
@@ -124,22 +162,37 @@ export async function GET(request: NextRequest) {
     // origin and 404 (e.g. `/hTNA....jpg`). Absolute-rewriting above
     // already covers href/src/poster/srcset, so <base> is redundant.
 
+    // CSP-driven framing instead of X-Frame-Options.
+    //
+    // `X-Frame-Options: SAMEORIGIN` was actively wrong here: this route's
+    // whole purpose is to serve provider HTML *into an iframe*, and while
+    // /api/embed is same-origin with us today, the header also blocks the
+    // legitimate case where the proxy is served from an alternate origin
+    // (preview deploys, custom domains) — the player would silently render
+    // an empty frame. `frame-ancestors 'self'` expresses the actual intent
+    // (only we may frame this) without breaking those deployments.
+    //
+    // `no-store` remains: the payload is live provider HTML with ad scripts
+    // amended in, and caching it would pin a stale player across deploys.
     return new NextResponse(html, {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "X-Frame-Options": "SAMEORIGIN",
+        "Content-Security-Policy": "frame-ancestors 'self'",
         "Cache-Control": "no-store",
         "X-Embed-Provider": new URL(targetUrl).hostname,
         "X-Embed-Source": targetUrl,
       },
     });
   } catch (err) {
-    console.error("Embed proxy error:", err);
+    const aborted = err instanceof Error && err.name === "AbortError";
+    console.error(aborted ? "Embed proxy timed out:" : "Embed proxy error:", err);
     return NextResponse.json(
-      { error: "Failed to load embed. Try another server." },
-      { status: 502 }
+      { error: aborted ? "Provider timed out. Try another server." : "Failed to load embed. Try another server." },
+      { status: aborted ? 504 : 502, headers: { "Cache-Control": "no-store" } }
     );
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

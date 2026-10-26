@@ -32,6 +32,11 @@ const PersonalizedHomeRows = dynamic(() => import("@/components/PersonalizedHome
   loading: () => null,
 });
 
+const PickedForYou = dynamic(() => import("@/components/PickedForYou"), {
+  ssr: false,
+  loading: () => null,
+});
+
 const Index = () => {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
@@ -73,6 +78,10 @@ const Index = () => {
 
           <Reveal>
             <PersonalizedHomeRows />
+          </Reveal>
+
+          <Reveal delay={20}>
+            <PickedForYou />
           </Reveal>
 
           <Reveal>

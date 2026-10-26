@@ -167,10 +167,22 @@ service cloud.firestore {
     match /flix_parties/{roomId} {
       // Room IDs are UUIDs — authenticated users may read to join
       allow read: if isAuthenticated();
-      // Host controls playback; participants can join/leave/update presence
+      // Host controls playback; participants can join/leave/update presence.
+      // Only the current host may move `hostId` (Pass the Crown), and only to
+      // someone who is in the room after the write. Participants can never
+      // promote themselves.
       allow update: if isAuthenticated() && (
-        request.auth.uid == resource.data.hostId
-        || isInParticipantIds(resource.data.participantIds)
+        (
+          request.auth.uid == resource.data.hostId
+          && (
+            request.resource.data.hostId == resource.data.hostId
+            || request.resource.data.hostId in request.resource.data.participantIds
+          )
+        )
+        || (
+          isInParticipantIds(resource.data.participantIds)
+          && request.resource.data.hostId == resource.data.hostId
+        )
         || (
           !isInParticipantIds(resource.data.participantIds)
           && request.resource.data.participants.size() == resource.data.participants.size() + 1
@@ -212,7 +224,7 @@ service cloud.firestore {
           && isInParticipantIds(get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participantIds);
         allow create: if isAuthenticated()
           && request.auth.uid == request.resource.data.senderId
-          && request.resource.data.type in ['play', 'pause', 'seek', 'heartbeat', 'speaking', 'server-change', 'sync-stage', 'sync-go']
+          && request.resource.data.type in ['play', 'pause', 'seek', 'heartbeat', 'speaking', 'server-change', 'sync-stage', 'sync-go', 'guest-control']
           && isInParticipantIds(get(/databases/$(database)/documents/flix_parties/$(roomId)).data.participantIds);
         // Host trims old events so the log stays bounded
         allow delete: if isAuthenticated()

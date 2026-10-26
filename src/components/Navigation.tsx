@@ -185,6 +185,7 @@ const Navigation = () => {
                   onClick={() => setShowJoinParty(true)}
                   className="group hidden min-h-[40px] min-w-[40px] items-center justify-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium text-gray-300 transition-all hover:text-white focus-ring lg:flex"
                   title="Join a watch party with a 6-letter code"
+                  aria-label="Join a watch party"
                 >
                   <PartyPopper className="h-4 w-4 transition-transform group-hover:scale-110" />
                 </button>

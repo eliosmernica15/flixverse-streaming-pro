@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -83,6 +83,13 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
     const focusSearch = () => {
       inputRef.current?.focus();
       setIsOpen(true);
+      // Announce focus change to assistive tech.
+      const live = document.createElement("span");
+      live.setAttribute("aria-live", "polite");
+      live.setAttribute("class", "sr-only");
+      live.textContent = "Search input focused";
+      document.body.appendChild(live);
+      setTimeout(() => document.body.removeChild(live), 1000);
     };
 
     window.addEventListener(FOCUS_SEARCH_EVENT, focusSearch);
@@ -277,7 +284,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
           {loading && (
             <div className="flex items-center justify-center gap-2 p-4 text-gray-400 text-sm">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Searching…
+              Searchingâ€¦
             </div>
           )}
 
@@ -337,12 +344,12 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                           <span>
                             {result.release_date || result.first_air_date
                               ? new Date(result.release_date || result.first_air_date).getFullYear()
-                              : "—"}
+                              : "â€”"}
                           </span>
                           {result.vote_average && result.vote_average > 0 && (
                             <>
-                              <span className="text-gray-600">·</span>
-                              <span className="text-yellow-400 font-semibold">★ {result.vote_average.toFixed(1)}</span>
+                              <span className="text-gray-600">Â·</span>
+                              <span className="text-yellow-400 font-semibold">â˜… {result.vote_average.toFixed(1)}</span>
                             </>
                           )}
                         </>
@@ -360,7 +367,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                   }}
                   className="w-full text-left text-[11px] font-bold uppercase tracking-wider text-red-400 hover:text-red-300 px-1 py-1"
                 >
-                  See all results for &quot;{query.trim()}&quot; →
+                  See all results for &quot;{query.trim()}&quot; â†’
                 </button>
               </div>
             </div>

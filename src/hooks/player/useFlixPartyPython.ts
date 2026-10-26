@@ -216,6 +216,10 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     [roomId, user]
   );
 
+  const setControlsMode = useCallback(async (_mode: "HOST_ONLY" | "COLLABORATIVE") => {
+    // Python backend path: controlsMode is a Firestore-era concept; no-op here.
+  }, []);
+
   const updatePlaybackState = useCallback(
     async (state: "playing" | "paused", currentTime: number, serverIndex?: number) => {
       if (!roomId) return;
@@ -347,9 +351,17 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     leaveRoom,
     sendMessage,
     updatePlaybackState,
+    setControlsMode,
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
+    /**
+     * The Python party API has no host-transfer endpoint, so Pass the Crown
+     * is unavailable on this transport. `null` (rather than a silent no-op)
+     * lets the UI hide the control instead of offering a button that does
+     * nothing.
+     */
+    transferHost: null as ((targetUserId: string) => Promise<boolean>) | null,
     refreshRoom: fetchRoom,
   };
 }

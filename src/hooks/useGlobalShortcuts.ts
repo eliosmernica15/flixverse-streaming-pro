@@ -22,7 +22,10 @@ export function useGlobalShortcuts() {
       if (event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey) {
         if (isEditableTarget(event.target)) return;
         event.preventDefault();
+        // Announce to assistive tech that search is open.
         window.dispatchEvent(new CustomEvent(FOCUS_SEARCH_EVENT));
+        const live = document.querySelector('[aria-live="polite"]');
+        if (live) (live as HTMLElement).textContent = "Search field focused";
         return;
       }
 

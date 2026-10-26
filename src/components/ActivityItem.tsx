@@ -1,6 +1,7 @@
 import { Star, Tv, Film, ChevronRight, Clock, MessageCircle, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getImageUrl } from '@/utils/tmdbApi';
+import Image from 'next/image';
 import { UserActivity, ActivityType } from '@/hooks/useUserActivity';
 
 interface ActivityItemProps {
@@ -80,12 +81,12 @@ const ActivityItem = ({ activity }: ActivityItemProps) => {
         >
             {activity.contentPosterPath ? (
                 <div className="relative h-20 w-14 flex-shrink-0 overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-105">
-                    <img
+                    <Image
                         src={getImageUrl(activity.contentPosterPath, 'medium')}
                         alt={activity.contentTitle || 'Content'}
-                        loading="lazy"
-                        decoding="async"
-                        className="h-full w-full object-cover"
+                        fill
+                        sizes="56px"
+                        className="object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className="absolute bottom-1 left-1">

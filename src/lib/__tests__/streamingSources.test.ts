@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildStreamingSources, isAllowedEmbedUrl } from "../streamingSources";
+import { buildStreamingSources, isAllowedEmbedUrl, pickServerByQuality, proxyEmbedUrl, unproxyEmbedUrl } from "../streamingSources";
 
 describe("buildStreamingSources", () => {
   const en = buildStreamingSources(550, "movie");
@@ -42,5 +42,43 @@ describe("buildStreamingSources", () => {
     expect(sq.find((s) => s.id === "vidfast")?.url).toContain("sub=sq");
     expect(sq.find((s) => s.id === "vidsrc-to")?.url).not.toContain("sub=");
     expect(sq.every((s) => !s.url.includes("cc="))).toBe(true);
+  });
+});
+
+describe("pickServerByQuality", () => {
+  const sources = buildStreamingSources(550, "movie");
+
+  it("returns current index for Auto when no FHD exists (falls back)", () => {
+    const idx = pickServerByQuality(sources, "Auto", 2);
+    expect(typeof idx).toBe("number");
+  });
+
+  it("prefers FHD for Auto when available", () => {
+    const idx = pickServerByQuality(sources, "Auto", 0);
+    expect(sources[idx].quality).toBe("FHD");
+  });
+
+  it("picks 4K when requested and available", () => {
+    const idx = pickServerByQuality(sources, "4K", 0);
+    expect(sources[idx].quality).toBe("4K");
+  });
+
+  it("picks HD for 720p/low requests", () => {
+    const idx = pickServerByQuality(sources, "720p", 0);
+    expect(sources[idx].quality).toBe("HD");
+  });
+});
+
+describe("proxy/unproxy embed url", () => {
+  it("round-trips a provider url through the proxy", () => {
+    const url = "https://vidsrcme.ru/embed/movie/550";
+    const proxied = proxyEmbedUrl(url);
+    expect(proxied).toContain("/api/embed?src=");
+    expect(unproxyEmbedUrl(proxied)).toBe(url);
+  });
+
+  it("returns the input unchanged when not proxied", () => {
+    const url = "https://vidsrcme.ru/embed/movie/550";
+    expect(unproxyEmbedUrl(url)).toBe(url);
   });
 });

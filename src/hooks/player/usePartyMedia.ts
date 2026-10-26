@@ -1,5 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { FlixPartyParticipant } from "@/hooks/player/useFlixParty";
+import {
+  createStreamAnalyser,
+  getGlobalAudioContext,
+  releaseAudioContext,
+  retainAudioContext,
+} from "@/lib/player/audioSingleton";
 
 export interface PartyMediaParticipant {
   peerId: string;
@@ -42,26 +48,57 @@ function isMobileDevice(): boolean {
   return typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
 }
 
-function createAnalyser(stream: MediaStream): { ctx: AudioContext; analyser: AnalyserNode } | null {
-  try {
-    const ctx = new AudioContext();
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.65;
-    source.connect(analyser);
-    return { ctx, analyser };
-  } catch {
-    return null;
-  }
+/**
+ * Analyser attached to a stream, on the app-wide shared AudioContext.
+ *
+ * Each instance owns only its `source` node; the context is global and is
+ * never closed here. Disposing disconnects the source so the graph can be
+ * collected when a stream ends — previously every analyser allocated a
+ * whole `AudioContext` and leaked it on camera toggles, exhausting the
+ * browser's 6-context budget and crashing the tab.
+ */
+interface StreamAnalyserHandle {
+  analyser: AnalyserNode;
+  source: MediaStreamAudioSourceNode;
+  /** Reusable gain buffer sized to the analyser. */
+  levelBuffer: Uint8Array;
+  dispose: () => void;
 }
 
-function readLevel(analyser: AnalyserNode): number {
-  const data = new Uint8Array(analyser.frequencyBinCount);
-  analyser.getByteFrequencyData(data);
+function createAnalyser(stream: MediaStream): StreamAnalyserHandle | null {
+  const created = createStreamAnalyser(stream, 512, 0.65);
+  if (!created) return null;
+  retainAudioContext();
+  const { analyser, source } = created;
+  let disposed = false;
+  return {
+    analyser,
+    source,
+    levelBuffer: new Uint8Array(analyser.frequencyBinCount),
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      try {
+        source.disconnect();
+        analyser.disconnect();
+      } catch {
+        // already detached
+      }
+      releaseAudioContext();
+    },
+  };
+}
+
+function readLevel(handle: StreamAnalyserHandle): number {
+  const data = handle.levelBuffer;
+  handle.analyser.getByteFrequencyData(data);
   let sum = 0;
   for (let i = 0; i < data.length; i++) sum += data[i];
   return sum / (data.length * 255);
+}
+
+function disposeAnalyser(handle: StreamAnalyserHandle | undefined | null): void {
+  handle?.dispose();
 }
 
 function loadVoiceVolume(): number {
@@ -107,8 +144,8 @@ export function usePartyMedia({
   const [localStream, setLocalStreamState] = useState<MediaStream | null>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
-  const analyserRef = useRef<{ ctx: AudioContext; analyser: AnalyserNode } | null>(null);
-  const remoteAnalysersRef = useRef<Map<string, { ctx: AudioContext; analyser: AnalyserNode }>>(new Map());
+  const analyserRef = useRef<StreamAnalyserHandle | null>(null);
+  const remoteAnalysersRef = useRef<Map<string, StreamAnalyserHandle>>(new Map());
   const rafRef = useRef<number | null>(null);
   const wasSpeakingRef = useRef(false);
   const micOnRef = useRef(micOn);
@@ -127,7 +164,7 @@ export function usePartyMedia({
   }, []);
 
   const resumeAnalyser = useCallback(async () => {
-    const ctx = analyserRef.current?.ctx;
+    const ctx = getGlobalAudioContext();
     if (ctx && ctx.state === "suspended") {
       try {
         await ctx.resume();
@@ -146,7 +183,7 @@ export function usePartyMedia({
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       setLocalStreamState(null);
-      analyserRef.current?.ctx.close().catch(() => undefined);
+      disposeAnalyser(analyserRef.current);
       analyserRef.current = null;
       await setLocalStream(null);
       return;
@@ -168,6 +205,9 @@ export function usePartyMedia({
           analyserRef.current = createAnalyser(existing);
         }
         await resumeAnalyser();
+      } else {
+        disposeAnalyser(analyserRef.current);
+        analyserRef.current = null;
       }
       await setLocalStream(existing);
       return;
@@ -231,11 +271,11 @@ export function usePartyMedia({
       });
 
       if (effectiveMic && stream.getAudioTracks().length) {
-        analyserRef.current?.ctx.close().catch(() => undefined);
+        disposeAnalyser(analyserRef.current);
         analyserRef.current = createAnalyser(stream);
         await resumeAnalyser();
       } else {
-        analyserRef.current?.ctx.close().catch(() => undefined);
+        disposeAnalyser(analyserRef.current);
         analyserRef.current = null;
       }
 
@@ -247,6 +287,36 @@ export function usePartyMedia({
       setCameraOn(false);
     }
   }, [setLocalStream, hostMicForcedOff, hostCamForcedOff, resumeAnalyser]);
+
+  /**
+   * Push-to-talk helper: mute/unmute the mic track without flipping the
+   * `micOn` preference. Used by hold-to-talk so the stream is not rebuilt
+   * on every key press.
+   */
+  const setMicLive = useCallback(
+    (live: boolean) => {
+      if (hostMicForcedOff) return;
+      const stream = localStreamRef.current;
+      if (!stream?.getAudioTracks().length) return;
+      stream.getAudioTracks().forEach((t) => {
+        t.enabled = live;
+      });
+      if (live) {
+        if (!analyserRef.current) {
+          analyserRef.current = createAnalyser(stream);
+        }
+        void resumeAnalyser();
+      } else {
+        wasSpeakingRef.current = false;
+        setLocalSpeaking(false);
+        sendSpeakingState?.(false);
+        disposeAnalyser(analyserRef.current);
+        analyserRef.current = null;
+      }
+      void setLocalStream(stream);
+    },
+    [hostMicForcedOff, resumeAnalyser, sendSpeakingState, setLocalStream]
+  );
 
   const toggleMic = useCallback(async () => {
     if (hostMicForcedOff) return;
@@ -267,6 +337,10 @@ export function usePartyMedia({
         wasSpeakingRef.current = false;
         setLocalSpeaking(false);
         sendSpeakingState?.(false);
+        // Release the analyser's source node on mute. Leaving it connected
+        // kept a Web Audio graph alive per toggle for the whole session.
+        disposeAnalyser(analyserRef.current);
+        analyserRef.current = null;
       }
       await setLocalStream(stream);
       if (!next && !cameraOn) {
@@ -276,7 +350,7 @@ export function usePartyMedia({
     }
 
     await buildLocalStream(next, cameraOn);
-  }, [micOn, cameraOn, buildLocalStream, hostMicForcedOff, resumeAnalyser, sendSpeakingState]);
+  }, [micOn, cameraOn, buildLocalStream, hostMicForcedOff, resumeAnalyser, sendSpeakingState, setLocalStream]);
 
   const toggleCamera = useCallback(async () => {
     if (hostCamForcedOff) return;
@@ -296,7 +370,7 @@ export function usePartyMedia({
     }
 
     await buildLocalStream(micOn, next);
-  }, [micOn, cameraOn, buildLocalStream, hostCamForcedOff]);
+  }, [micOn, cameraOn, buildLocalStream, hostCamForcedOff, setLocalStream]);
 
   // Host forced mute/cam — apply immediately
   useEffect(() => {
@@ -315,11 +389,14 @@ export function usePartyMedia({
 
   const onRemoteStream = useCallback((peerId: string, stream: MediaStream) => {
     setRemoteStreams((prev) => new Map(prev).set(peerId, stream));
+    // Re-register the analyser for every new stream: a peer that retoggles
+    // their camera emits a fresh MediaStream and the old source node goes
+    // dead. Always dispose the stale handle or sources pile up.
+    disposeAnalyser(remoteAnalysersRef.current.get(peerId));
+    remoteAnalysersRef.current.delete(peerId);
     if (stream.getAudioTracks().length) {
-      const existing = remoteAnalysersRef.current.get(peerId);
-      existing?.ctx.close().catch(() => undefined);
-      const a = createAnalyser(stream);
-      if (a) remoteAnalysersRef.current.set(peerId, a);
+      const handle = createAnalyser(stream);
+      if (handle) remoteAnalysersRef.current.set(peerId, handle);
     }
   }, []);
 
@@ -330,28 +407,53 @@ export function usePartyMedia({
       return next;
     });
     setSpeakingPeers((prev) => {
+      if (!prev.has(peerId)) return prev;
       const next = new Set(prev);
       next.delete(peerId);
       return next;
     });
-    const a = remoteAnalysersRef.current.get(peerId);
-    a?.ctx.close().catch(() => undefined);
+    disposeAnalyser(remoteAnalysersRef.current.get(peerId));
     remoteAnalysersRef.current.delete(peerId);
   }, []);
 
   useEffect(() => {
     if (!roomId) return;
 
+    // Speaking detection runs at ~15 Hz, not 60. The analyser's own smoothing
+    // constant already damps the signal, a human voice cannot start and stop
+    // faster than that, and at a 20-person party the per-frame cost was one
+    // FFT read per participant on the main thread — the single largest
+    // contributor to "the player stutters whenever cameras are on".
+    const DETECT_INTERVAL_MS = 66;
+
     // Previous speaking set, serialized for cheap change detection. The tick
-    // below runs every animation frame — allocating a fresh Set into state
-    // each frame re-renders the whole player subtree at 60fps even when
-    // nobody is speaking. Only publish on actual change.
+    // below allocates a fresh Set every pass — publishing it into state
+    // unconditionally re-renders the whole player subtree even when nobody is
+    // speaking. Only publish on actual change.
     let prevKey = "";
-    const tick = () => {
+    let lastRun = 0;
+    let raf = 0;
+
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (now - lastRun < DETECT_INTERVAL_MS) return;
+      lastRun = now;
+
+      // Nothing to analyse: skip the whole pass. Previously this still
+      // allocated a Set 60 times a second in every quiet party.
+      const hasLocal = analyserRef.current && micOn && !hostMicForcedOff;
+      if (!hasLocal && remoteAnalysersRef.current.size === 0) {
+        if (wasSpeakingRef.current) {
+          wasSpeakingRef.current = false;
+          setLocalSpeaking(false);
+        }
+        return;
+      }
+
       const remoteSpeaking = new Set<string>();
 
-      if (analyserRef.current && micOn && !hostMicForcedOff) {
-        const level = readLevel(analyserRef.current.analyser);
+      if (hasLocal && analyserRef.current) {
+        const level = readLevel(analyserRef.current);
         const speaking = wasSpeakingRef.current
           ? level > SPEAK_HYSTERESIS
           : level > SPEAK_THRESHOLD;
@@ -361,26 +463,28 @@ export function usePartyMedia({
           setLocalSpeaking(speaking);
           sendSpeakingState?.(speaking);
         }
-      } else {
+      } else if (wasSpeakingRef.current) {
         wasSpeakingRef.current = false;
         setLocalSpeaking(false);
       }
 
-      for (const [peerId, { analyser }] of remoteAnalysersRef.current) {
-        if (readLevel(analyser) > SPEAK_THRESHOLD) remoteSpeaking.add(peerId);
+      for (const [peerId, handle] of remoteAnalysersRef.current) {
+        if (readLevel(handle) > SPEAK_THRESHOLD) remoteSpeaking.add(peerId);
       }
 
-      const key = [...remoteSpeaking].sort().join(",");
+      const key =
+        remoteSpeaking.size === 0 ? "" : [...remoteSpeaking].sort().join(",");
       if (key !== prevKey) {
         prevKey = key;
         setSpeakingPeers(remoteSpeaking);
       }
-      rafRef.current = requestAnimationFrame(tick);
     };
 
-    rafRef.current = requestAnimationFrame(tick);
+    raf = requestAnimationFrame(tick);
+    rafRef.current = raf;
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      cancelAnimationFrame(raf);
+      rafRef.current = null;
     };
   }, [roomId, micOn, localUserId, sendSpeakingState, hostMicForcedOff]);
 
@@ -391,16 +495,26 @@ export function usePartyMedia({
       void buildLocalStream(false, false);
       setRemoteStreams(new Map());
       setSpeakingPeers(new Set());
+      // Remote analysers belong to streams from the room we just left. Left
+      // running they keep reading dead `MediaStream` sources forever, which
+      // is one of the ways a long session accumulated memory.
+      for (const handle of remoteAnalysersRef.current.values()) disposeAnalyser(handle);
+      remoteAnalysersRef.current.clear();
     }
   }, [roomId, buildLocalStream]);
 
+  // Full hardware teardown. Capture the maps in local bindings — reading
+  // `.current` inside a cleanup closure would see whatever the ref holds at
+  // unmount time, which for a map that gets replaced is not the same set.
   useEffect(() => {
+    const remoteAnalysers = remoteAnalysersRef.current;
     return () => {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
-      analyserRef.current?.ctx.close().catch(() => undefined);
-      for (const a of remoteAnalysersRef.current.values()) {
-        a.ctx.close().catch(() => undefined);
-      }
+      localStreamRef.current = null;
+      disposeAnalyser(analyserRef.current);
+      analyserRef.current = null;
+      for (const handle of remoteAnalysers.values()) disposeAnalyser(handle);
+      remoteAnalysers.clear();
     };
   }, []);
 
@@ -476,6 +590,7 @@ export function usePartyMedia({
     voiceVolume,
     setVoiceVolume,
     toggleMic,
+    setMicLive,
     toggleCamera,
     participants: mergedParticipants,
     anyoneSpeaking,

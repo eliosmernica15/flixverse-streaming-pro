@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useSyncedCaptionPreferences } from "@/hooks/player/useSyncedCaptionPreferences";
+import { CinemaSenseSettings } from "@/components/player/CinemaSenseSettings";
 
 interface ProfileSettingsProps {
   onOpenTab?: (tab: string) => void;
@@ -115,15 +116,22 @@ export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
             />
           </div>
 
-          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
-            <div className="flex items-center gap-3">
-              <Palette className="w-4 h-4 text-purple-400 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-white">Ambient glow</p>
-                <p className="text-xs text-gray-500 mt-0.5">Dynamic backlight effect during playback</p>
+          <div className="rounded-xl bg-white/5 border border-white/5 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Palette className="w-4 h-4 text-purple-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-white">Ambient glow</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Dynamic backlight effect during playback</p>
+                </div>
               </div>
+              <Switch checked={ambientGlow} onCheckedChange={toggleAmbientGlow} />
             </div>
-            <Switch checked={ambientGlow} onCheckedChange={toggleAmbientGlow} />
+            {ambientGlow && (
+              <div className="mt-4 border-t border-white/5 pt-4">
+                <CinemaSenseSettings />
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/5">

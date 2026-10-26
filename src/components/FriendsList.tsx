@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useEffect } from "react";
 import { Search, UserPlus, Check, X, Users, Send, Loader2, Clock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useFriends, type Friend, type UserProfile } from "@/hooks/useFriends";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 
 interface FriendsListProps {
   inviteMode?: boolean;
@@ -200,10 +201,11 @@ export function FriendsList({
                 className="group flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-white/5"
               >
                 {friend.avatarUrl ? (
-                  <img
+                  <Image
                     src={friend.avatarUrl}
                     alt={friend.displayName}
-                    loading="lazy"
+                    width={36}
+                    height={36}
                     className="h-9 w-9 rounded-full object-cover ring-2 ring-white/15"
                   />
                 ) : (
@@ -248,10 +250,11 @@ export function FriendsList({
                 className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-2.5"
               >
                 {req.fromAvatarUrl ? (
-                  <img
+                  <Image
                     src={req.fromAvatarUrl}
                     alt={req.fromDisplayName}
-                    loading="lazy"
+                    width={36}
+                    height={36}
                     className="h-9 w-9 rounded-full object-cover ring-2 ring-white/15"
                   />
                 ) : (
@@ -317,10 +320,11 @@ export function FriendsList({
                   className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-white/5"
                 >
                   {u.photoURL ? (
-                    <img
+                    <Image
                       src={u.photoURL}
                       alt={u.displayName}
-                      loading="lazy"
+                      width={36}
+                      height={36}
                       className="h-9 w-9 rounded-full object-cover ring-2 ring-white/15"
                     />
                   ) : (

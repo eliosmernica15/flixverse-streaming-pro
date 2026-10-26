@@ -22,6 +22,7 @@ import { CookieConsent } from "@/components/CookieConsent";
 import UsernameReminder from "@/components/UsernameReminder";
 import InviteAlertListener from "@/components/InviteAlertListener";
 import GuestJoinOverlay from "@/components/party/GuestJoinOverlay";
+import { ChunkReloadBoundary } from "@/components/ChunkReloadBoundary";
 
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"), { ssr: false });
 const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcutsHelp"), {
@@ -60,6 +61,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 <OfflineSyncProvider>
                 <ExperimentProvider>
                 <TooltipProvider>
+                    <ChunkReloadBoundary />
                     <RouteProgress />
                     <GlobalShortcuts />
                     <CommandPalette />

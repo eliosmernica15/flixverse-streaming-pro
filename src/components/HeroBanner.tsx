@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { Play, Plus, Check, ChevronLeft, ChevronRight, Volume2, Sparkles, ChevronDown } from "lucide-react";
 import { TMDBMovie, getBackdropUrl, getContentTitle, getContentType } from "@/utils/tmdbApi";
@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 import { useDominantColors } from "@/hooks/player/useDominantColors";
+import { useDepthParallax } from "@/hooks/useDepthParallax";
 import { rgbToCss } from "@/lib/player/extractDominantColors";
 import { useTranslations } from "next-intl";
 
@@ -24,9 +25,13 @@ const ROTATION_INTERVAL_MS = 9000;
 const MAX_ROTATION = 5;
 
 const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
-  const allMovies = (propMovies && propMovies.length > 1
-    ? propMovies.slice(0, MAX_ROTATION)
-    : [movie]);
+  // Memoised: this array feeds a prefetch effect. Rebuilding it every render
+  // made that effect re-run on every state change (rotation tick, mute
+  // toggle, hover) and re-issue `router.prefetch` for up to five routes.
+  const allMovies = useMemo(
+    () => (propMovies && propMovies.length > 1 ? propMovies.slice(0, MAX_ROTATION) : [movie]),
+    [propMovies, movie]
+  );
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -38,6 +43,11 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const reducedMotion = useReducedMotion();
+
+  // Layered depth: the backdrop, the atmospheric glows and the copy sit on
+  // three planes and drift by different amounts as the pointer moves. The
+  // hook writes CSS variables only — pointer movement never re-renders React.
+  const heroRef = useDepthParallax<HTMLDivElement>(26);
 
   const currentMovie = allMovies[activeIndex];
   const contentType = getContentType(currentMovie);
@@ -139,8 +149,21 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const isInMyList = isAuthenticated ? isInList(currentMovie.id) : false;
   const rating = typeof currentMovie.vote_average === "number" ? currentMovie.vote_average : 0;
   const isSeries = currentMovie.media_type === "tv";
-  const maturity = isSeries ? "TV-MA" : "R";
-  const seasons = isSeries ? `${(currentMovie as TMDBMovie & { number_of_seasons?: number }).number_of_seasons ?? 1} Season${((currentMovie as TMDBMovie & { number_of_seasons?: number }).number_of_seasons ?? 1) > 1 ? "s" : ""}` : `${Math.floor(Math.random() * 60) + 90}m`;
+  // Real metadata only. The movie branch used to render a random runtime
+  // during SSR, which both invented data and produced a hydration mismatch
+  // (server HTML ≠ client HTML) on every home-page load.
+  const metaLabel = (() => {
+    if (isSeries) {
+      const seasons = currentMovie.number_of_seasons;
+      if (!seasons || seasons <= 0) return null;
+      return `${seasons} Season${seasons > 1 ? "s" : ""}`;
+    }
+    const minutes = currentMovie.runtime;
+    if (!minutes || minutes <= 0) return null;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  })();
 
   const handlePlayClick = () => {
     if (!isAuthenticated) {
@@ -174,7 +197,8 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
   return (
     <div
-      className="group/hero relative h-[78vh] sm:h-[88vh] lg:h-[92vh] min-h-[520px] overflow-hidden contain-paint bg-black"
+      ref={heroRef}
+      className="group/hero hero-depth relative h-[78vh] sm:h-[88vh] lg:h-[92vh] min-h-[520px] overflow-hidden contain-paint bg-black"
       onMouseEnter={() => {
         if (timerRef.current) {
           clearInterval(timerRef.current);
@@ -189,7 +213,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
         }, ROTATION_INTERVAL_MS);
       }}
     >
-      <div ref={backdropRef} className="absolute inset-0 will-change-transform">
+      <div ref={backdropRef} className="hero-depth-backdrop absolute inset-0 will-change-transform">
       {allMovies.map((m, i) => {
         const url = m.backdrop_path ? getBackdropUrl(m.backdrop_path, "large") : "";
         const isActive = i === activeIndex;
@@ -242,7 +266,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
       <div className="relative z-10 flex items-end lg:items-center h-full pb-24 sm:pb-32 lg:pb-0">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div className="max-w-2xl lg:max-w-3xl" key={currentMovie.id}>
+          <div className="hero-depth-content max-w-2xl lg:max-w-3xl" key={currentMovie.id}>
             <div className="anim-slide-up-soft flex flex-wrap items-center gap-2 mb-4">
               <span className="inline-flex items-center gap-1.5 rounded-md border border-white/30 bg-white/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
                 <Sparkles className="h-3 w-3 text-yellow-400" />
@@ -254,14 +278,15 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
                   {rating.toFixed(1)}
                 </span>
               )}
-              <span className="inline-flex items-center rounded-md border border-white/20 bg-white/5 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
-                {maturity}
-              </span>
               {releaseYear && (
                 <span className="text-sm font-medium text-white/80">{releaseYear}</span>
               )}
-              <span className="text-white/40">•</span>
-              <span className="text-sm font-medium text-white/80">{seasons}</span>
+              {metaLabel && (
+                <>
+                  <span className="text-white/40">•</span>
+                  <span className="text-sm font-medium text-white/80">{metaLabel}</span>
+                </>
+              )}
               <span className="text-white/40">•</span>
               <span className="inline-flex items-center gap-1 rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-black tracking-wider text-white">
                 HD

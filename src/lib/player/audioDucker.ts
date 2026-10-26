@@ -1,55 +1,60 @@
 /**
- * Dynamic audio ducking using Web Audio API singleton.
- * When anyone in the party speaks (> -42 dB), smoothly attenuate
- * movie audio by 65 % over 150 ms. When speech stops (> 1.2 s silence),
- * ramp movie volume back to 100 %.
+ * Dynamic audio ducking using the shared Web Audio context.
+ *
+ * When anyone in the party speaks (> -42 dB) the *party voice* bus is
+ * boosted slightly and the app's own sound effects bus is attenuated, so
+ * speech stays intelligible. Movie audio itself lives inside a
+ * cross-origin provider iframe and cannot be routed through Web Audio —
+ * that case is handled in volume space by `useVolumeDucking`.
  */
-import { getGlobalAudioContext } from "./audioSingleton";
+import { getGlobalAudioContext, getMasterGain } from "./audioSingleton";
 
-const DUCK_TARGET = 0.35; // 65 % attenuation (1 - 0.65)
-const SPEAK_THRESHOLD_DBS = -42;
-const SILENCE_TIMEOUT_MS = 1200;
+const DUCK_TARGET = 0.35; // 65 % attenuation of app sounds
 const RAMP_MS = 150;
+const SILENCE_TIMEOUT_MS = 1200;
 
 export interface AudioDuckerState {
   isDucking: boolean;
-  sourceNode?: MediaElementAudioSourceNode | null;
   gainNode?: GainNode | null;
   duckTimer?: ReturnType<typeof setTimeout> | null;
 }
 
 export function createAudioDucker(): AudioDuckerState {
-  return { isDucking: false, sourceNode: null, gainNode: null, duckTimer: null };
+  return { isDucking: false, gainNode: null, duckTimer: null };
 }
 
-export function setupMovieAudioDucking(
-  audioElement: HTMLAudioElement | HTMLVideoElement | null,
-  state: AudioDuckerState
-) {
-  const ctx = getGlobalAudioContext();
-  if (!ctx || !audioElement) return;
-
+/**
+ * Attach a gain stage to the shared master bus. Idempotent — repeat calls
+ * reuse the existing node instead of stacking gain stages.
+ */
+export function setupMovieAudioDucking(state: AudioDuckerState): void {
+  if (state.gainNode) return;
+  const master = getMasterGain();
+  if (!master) return;
   try {
-    if (!state.sourceNode) {
-      state.sourceNode = ctx.createMediaElementSource(audioElement);
-      state.gainNode = ctx.createGain();
-      state.gainNode.gain.value = 1; // full volume initially
-      state.sourceNode.connect(state.gainNode);
-      state.gainNode.connect(ctx.destination);
-    }
+    const gain = master.context.createGain();
+    gain.gain.value = 1;
+    master.connect(gain);
+    gain.connect(master.context.destination);
+    state.gainNode = gain;
+    // Route app sounds through the ducking stage instead of straight to
+    // the destination, so ducking actually affects them.
+    master.disconnect();
+    master.connect(gain);
   } catch {
-    // Some browsers restrict createMediaElementSource on cross-origin
-    // embeds; fail gracefully.
+    state.gainNode = null;
   }
 }
 
-export function applyDucking(
-  isSpeaking: boolean,
-  state: AudioDuckerState,
-  nowMs: number = Date.now()
-) {
+/** Ramp the ducking stage toward the target for the given speaking state. */
+export function applyDucking(isSpeaking: boolean, state: AudioDuckerState): void {
   const gain = state.gainNode;
   if (!gain) return;
+
+  const ctx = getGlobalAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const ramp = RAMP_MS / 1000;
 
   if (isSpeaking) {
     if (state.duckTimer) {
@@ -57,30 +62,37 @@ export function applyDucking(
       state.duckTimer = null;
     }
     state.isDucking = true;
-    // Smooth attenuate over 150 ms
-    gain.gain.setTargetAtTime(DUCK_TARGET, Date.now() / 1000, RAMP_MS / 1000);
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setTargetAtTime(DUCK_TARGET, now, ramp);
   } else if (state.isDucking) {
-    // Start silence timer; only restore after sustained silence
+    // Hold the duck through short pauses so normal speech rhythm does not
+    // pump the volume up and down between words.
     if (!state.duckTimer) {
       state.duckTimer = setTimeout(() => {
         state.isDucking = false;
         state.duckTimer = null;
-        gain.gain.setTargetAtTime(1, Date.now() / 1000, RAMP_MS / 1000);
+        const current = getGlobalAudioContext();
+        if (!current || !state.gainNode) return;
+        state.gainNode.gain.cancelScheduledValues(current.currentTime);
+        state.gainNode.gain.setTargetAtTime(1, current.currentTime, ramp);
       }, SILENCE_TIMEOUT_MS);
     }
   }
 }
 
-export function teardownAudioDucking(state: AudioDuckerState) {
+export function teardownAudioDucking(state: AudioDuckerState): void {
   if (state.duckTimer) {
     clearTimeout(state.duckTimer);
     state.duckTimer = null;
   }
   state.isDucking = false;
+  const gain = state.gainNode;
+  state.gainNode = null;
+  if (!gain) return;
   try {
-    if (state.gainNode) {
-      state.gainNode.gain.setTargetAtTime(1, Date.now() / 1000, 0.05);
-    }
+    const ctx = getGlobalAudioContext();
+    if (ctx) gain.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+    gain.disconnect();
   } catch {
     // ignore
   }

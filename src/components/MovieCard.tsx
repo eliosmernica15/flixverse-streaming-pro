@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, memo, useEffect } from "react";
-import { Play, Star, Plus, Check, ChevronDown, Loader2 } from "lucide-react";
+import { Play, Star, Plus, Check, ChevronDown, Loader2, Sparkles } from "lucide-react";
 import Image from "next/image";
 import {
   getImageUrl,
@@ -12,8 +12,9 @@ import {
   getContentType,
 } from "@/utils/tmdbApi";
 import { useToast } from "@/hooks/use-toast";
-import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { use3DTilt } from "@/hooks/use3DTilt";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
 import { useLocalMovieListContains } from "@/hooks/useLocalMovieListContains";
@@ -27,6 +28,8 @@ interface MovieCardProps {
   index?: number;
   comingSoon?: boolean;
   priority?: boolean;
+  /** Match badge — overrides default genre display when non-zero. */
+  matchScore?: number;
 }
 
 const genreNames: Record<number, string> = {
@@ -59,32 +62,19 @@ const genreNames: Record<number, string> = {
   10768: "War & Politics",
 };
 
-const MovieCard = ({ movie, priority = false }: MovieCardProps) => {
+const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const reducedMotion = useReducedMotion();
-
-  // C1 — pointer-driven 3D poster tilt (±6° max), spring-smoothed via CSS
-  // transition, disabled on touch devices and reduced motion. Sets CSS vars
-  // so it composes with the existing .netflix-card-wrap hover transform.
-  const handleTiltMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const node = cardRef.current;
-    if (!node || e.pointerType === "touch") return;
-    const rect = node.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    node.style.setProperty("--tilt-x", `${(py * -6).toFixed(2)}deg`);
-    node.style.setProperty("--tilt-y", `${(px * 6).toFixed(2)}deg`);
-  }, []);
-
-  const handleTiltLeave = useCallback(() => {
-    const node = cardRef.current;
-    if (!node) return;
-    node.style.setProperty("--tilt-x", "0deg");
-    node.style.setProperty("--tilt-y", "0deg");
-  }, []);
+  // Spring-smoothed 3D tilt + cursor-tracked specular sheen. Writes CSS
+  // variables only — no React state — so a grid of 40 posters costs no
+  // re-renders while the pointer moves across it.
+  const tilt = use3DTilt<HTMLDivElement>({
+    max: 7,
+    lift: 18,
+    hoverScale: 1.02,
+    enabled: true,
+  });
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const t = useTranslations("movieCard");
@@ -196,18 +186,33 @@ const MovieCard = ({ movie, priority = false }: MovieCardProps) => {
     return "badge-rating-red";
   };
 
-  const maturity = contentType === "tv" ? "TV-14" : "PG-13";
-  const runtime =
-    contentType === "movie"
-      ? `${Math.floor(Math.random() * 60) + 90}m`
-      : `${Math.floor(Math.random() * 3) + 1} Season${Math.random() > 0.5 ? "s" : ""}`;
+  // Use real TMDB metadata when the payload carries it; otherwise omit the
+  // field entirely.
+  //
+  // Previously these two were `Math.random()` calls evaluated during render.
+  // That is wrong twice over: it invents runtimes and season counts the user
+  // may act on, and it makes the server-rendered HTML differ from the client
+  // render, which React reports as a hydration mismatch and then has to patch
+  // by discarding the server tree.
+  const runtimeLabel: string | null = (() => {
+    if (contentType === "movie") {
+      const minutes = movie.runtime;
+      if (!minutes || minutes <= 0) return null;
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+    const seasons = movie.number_of_seasons;
+    if (!seasons || seasons <= 0) return null;
+    return `${seasons} Season${seasons > 1 ? "s" : ""}`;
+  })();
 
   return (
     <div
-      ref={cardRef}
-      onPointerMove={reducedMotion ? undefined : handleTiltMove}
-      onPointerLeave={reducedMotion ? undefined : handleTiltLeave}
-      className="netflix-card-wrap movie-card content-auto cursor-pointer outline-none focus-ring group"
+      ref={tilt.ref}
+      onPointerMove={tilt.onPointerMove}
+      onPointerLeave={tilt.onPointerLeave}
+      className="netflix-card-wrap movie-card-3d content-auto cursor-pointer outline-none focus-ring group"
       role="button"
       tabIndex={0}
       aria-label={`${displayTitle}${year ? ` (${year})` : ""}`}
@@ -235,25 +240,42 @@ const MovieCard = ({ movie, priority = false }: MovieCardProps) => {
         }
       }}
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-[6px] bg-gray-900 ring-1 ring-white/5 transition-all duration-300 group-hover:ring-white/25 group-hover:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85),0_0_30px_-8px_rgba(239,68,68,0.35)]">
+      <div className="movie-card-stage relative aspect-[2/3] overflow-hidden rounded-[6px] bg-gray-900 ring-1 ring-white/5 transition-all duration-300 group-hover:ring-white/25 group-hover:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85),0_0_30px_-8px_rgba(239,68,68,0.35)]">
         {!imageLoaded && (
           <div className="absolute inset-0 skeleton-shimmer bg-gradient-to-br from-gray-800/80 to-gray-900/80" />
         )}
 
-        <Image
-          src={finalPosterUrl}
-          alt={displayTitle}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
-          className={`object-cover transition-transform duration-700 ease-out ${
-            isHovered ? "scale-[1.06]" : "scale-100"
-          }`}
-          loading={priority ? "eager" : "lazy"}
-          priority={priority}
-          decoding="async"
-          onError={() => setImageError(true)}
-          onLoad={() => setImageLoaded(true)}
-        />
+        {/* Poster sits on its own depth plane so it parallaxes against the
+            badges and typography above it when the card tilts. */}
+        <div className="movie-card-poster absolute inset-0">
+          <Image
+            src={finalPosterUrl}
+            alt={displayTitle}
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
+            className={`object-cover transition-transform duration-700 ease-out ${
+              isHovered ? "scale-[1.06]" : "scale-100"
+            }`}
+            loading={priority ? "eager" : "lazy"}
+            priority={priority}
+            decoding="async"
+            onError={() => setImageError(true)}
+            onLoad={() => setImageLoaded(true)}
+          />
+        </div>
+
+        {/* Specular sheen — a soft highlight that tracks the cursor across
+            the poster, reading as a light source raking across a glossy print. */}
+        <div className="movie-card-sheen absolute inset-0" aria-hidden="true" />
+
+        {/* Directional key light: a broader, softer pool than the sheen,
+            blended with `soft-light` so it lifts the poster's own colours
+            instead of washing them out. Depth plane 1. */}
+        <div className="movie-card-keylight" aria-hidden="true" />
+
+        {/* Rim light on the leading edge — what makes the card read as a
+            physical object catching a light from off-camera. */}
+        <div className="movie-card-rim" aria-hidden="true" />
 
         <div
           className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent transition-opacity duration-300 ${
@@ -261,14 +283,22 @@ const MovieCard = ({ movie, priority = false }: MovieCardProps) => {
           }`}
         />
 
-        {contentType === "tv" && (
-          <div className="absolute left-2 top-2">
-            <span className="badge-pill badge-hd">Series</span>
+        {/* Top-left badge column: match score and the Series tag stack
+            instead of rendering on top of each other. */}
+        {((matchScore !== undefined && matchScore > 0) || contentType === "tv") && (
+          <div className="movie-card-layer movie-card-layer--badge absolute left-2 top-2 z-20 flex flex-col items-start gap-1">
+            {matchScore !== undefined && matchScore > 0 && (
+              <span className="badge-pill badge-match bg-gradient-to-r from-amber-500/90 to-rose-400/90 text-white shadow-[0_2px_12px_rgba(245,158,11,0.35)]">
+                <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
+                {matchScore}% match
+              </span>
+            )}
+            {contentType === "tv" && <span className="badge-pill badge-hd">Series</span>}
           </div>
         )}
 
         {hasValidRating && (
-          <div className="absolute right-2 top-2">
+          <div className="movie-card-layer movie-card-layer--badge absolute right-2 top-2">
             <span className={`badge-pill ${getRatingBadge(rating)}`}>
               <Star className="h-2.5 w-2.5 fill-current" />
               {rating.toFixed(1)}
@@ -337,17 +367,30 @@ const MovieCard = ({ movie, priority = false }: MovieCardProps) => {
         </div>
       </div>
 
-      <div className="mt-2 space-y-0.5">
+      {/* Grounded contact shadow — sits under the card in the page plane and
+          tightens as the poster lifts, which is what makes the lift read as
+          height rather than as a scale-up. */}
+      <div className="movie-card-shadow" aria-hidden="true" />
+
+      <div className="movie-card-layer movie-card-layer--meta mt-2 space-y-0.5">
         <h3 className="text-[13px] font-bold leading-tight text-white truncate">
           {displayTitle}
         </h3>
         <div className="flex items-center gap-1 text-[11px] text-gray-400">
           {hasValidRating && <span className="font-semibold text-white">{rating.toFixed(1)}</span>}
           {year && <span className="text-gray-400">{year}</span>}
-          <span className="meta-dot" />
-          <span className="meta-pill !py-0 !px-1.5 !text-[10px]">{maturity}</span>
-          <span className="meta-dot" />
-          <span className="text-gray-500">{runtime}</span>
+          {contentType === "tv" && (
+            <>
+              <span className="meta-dot" />
+              <span className="meta-pill !py-0 !px-1.5 !text-[10px]">Series</span>
+            </>
+          )}
+          {runtimeLabel && (
+            <>
+              <span className="meta-dot" />
+              <span className="text-gray-500">{runtimeLabel}</span>
+            </>
+          )}
         </div>
       </div>
     </div>

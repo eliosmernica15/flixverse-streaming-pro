@@ -1,6 +1,8 @@
 import "./globals.css";
 import "./advanced-ui.css";
 import "./video-player.css";
+import "./cinema-stage.css";
+import "./depth-parallax.css";
 import "./ui-polish.css";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";

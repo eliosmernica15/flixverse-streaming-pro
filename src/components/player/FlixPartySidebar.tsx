@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   X, Users, Send, Crown, LogOut, PartyPopper, Smile, UserPlus, ChevronDown, Copy, Check, Link2
 } from "lucide-react";
@@ -10,6 +10,7 @@ import { useFriends, type Friend } from "@/hooks/useFriends";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 import { sendWatchPartyInvite } from "@/lib/notifications/sendWatchPartyInvite";
 import { firestoreErrorMessage } from "@/lib/firestore/errors";
 import { FriendsList } from "@/components/FriendsList";
@@ -17,7 +18,9 @@ import { WatchParty } from "./WatchParty";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge";
 import { HostSyncCard, GuestStagingBanner } from "./SyncedStartCard";
 import { PartyMediaControls } from "./PartyMediaPanel";
+import { usePushToTalk } from "@/hooks/player/usePushToTalk";
 import { PartyMembersPanel } from "./PartyMembersPanel";
+import { PassCrownDialog } from "./PassCrownDialog";
 import type { usePartyMedia } from "@/hooks/player/usePartyMedia";
 
 type PartyMediaState = ReturnType<typeof usePartyMedia>;
@@ -25,7 +28,7 @@ type PartyMediaState = ReturnType<typeof usePartyMedia>;
 export type PartyStartResult = { roomId: string; joinUrl: string };
 
 /**
- * C4 — presence art: stacked member avatars drifting on a gentle sine wave
+ * C4 â€” presence art: stacked member avatars drifting on a gentle sine wave
  * in the sidebar header. Pure CSS animation, staggered per member, disabled
  * under prefers-reduced-motion via the party-float guard in globals.css.
  */
@@ -52,7 +55,7 @@ function PartyPresenceArt({
             } bg-white/10`}
           >
             {p.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={p.avatarUrl}
                 alt=""
@@ -107,6 +110,8 @@ interface FlixPartySidebarProps {
   kickParticipant?: (targetUserId: string) => Promise<void>;
   setParticipantMicMuted?: (targetUserId: string, muted: boolean) => Promise<void>;
   setParticipantCamDisabled?: (targetUserId: string, disabled: boolean) => Promise<void>;
+  /** Pass the Crown. Omitted on transports that cannot transfer host. */
+  transferHost?: (targetUserId: string) => Promise<boolean>;
   /** Mobile bottom-sheet mode */
   isMobile?: boolean;
   mobileExpanded?: boolean;
@@ -121,6 +126,9 @@ interface FlixPartySidebarProps {
   onSyncStart?: () => void;
   onReleaseSyncNow?: () => void;
   onCancelSync?: () => void;
+  /** Collaborative controls toggle (host only). */
+  controlsMode?: "HOST_ONLY" | "COLLABORATIVE";
+  onSetControlsMode?: (mode: "HOST_ONLY" | "COLLABORATIVE") => void;
 }
 
 type SidebarTab = "chat" | "friends" | "party";
@@ -152,6 +160,7 @@ export function FlixPartySidebar({
   kickParticipant,
   setParticipantMicMuted,
   setParticipantCamDisabled,
+  transferHost,
   isMobile = false,
   mobileExpanded = true,
   onMinimize,
@@ -162,14 +171,29 @@ export function FlixPartySidebar({
   onSyncStart,
   onReleaseSyncNow,
   onCancelSync,
+  controlsMode = "HOST_ONLY",
+  onSetControlsMode,
 }: FlixPartySidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>(roomId ? "chat" : "friends");
   const [input, setInput] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
   const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showPassCrown, setShowPassCrown] = useState(false);
+  const [passingCrown, setPassingCrown] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Push-to-talk: when the mic is off, holding Space transmits. When the mic
+  // is already on, PTT is a no-op (mic stays live). This keeps the behaviour
+  // predictable for users who prefer always-on mics.
+  const ptt = usePushToTalk({
+    enabled: Boolean(media && !media.micOn),
+    mode: "hold",
+    onStateChange: (live) => {
+      if (!media?.micOn) media?.setMicLive?.(live);
+    },
+  });
 
   const { user } = useAuth();
   const { profile } = useUserProfileContext();
@@ -177,15 +201,20 @@ export function FlixPartySidebar({
   const { toast } = useToast();
   const t = useTranslations("party");
 
-  const sendMessage = sendPartyMessage ?? (async () => undefined);
+  // Memoised so the chat callbacks below stay referentially stable â€” the
+  // inline fallback otherwise re-created them on every sidebar render.
+  const sendMessage = useMemo(
+    () => sendPartyMessage ?? (async (_text: string, _emoji?: string) => undefined),
+    [sendPartyMessage]
+  );
 
-  const QUICK_EMOJIS = ["😂", "🔥", "❤️", "👏", "😮", "💀", "🎬", "🍿"];
+  const QUICK_EMOJIS = ["ðŸ˜‚", "ðŸ”¥", "â¤ï¸", "ðŸ‘", "ðŸ˜®", "ðŸ’€", "ðŸŽ¬", "ðŸ¿"];
 
   useEffect(() => {
     if (roomId) setActiveTab("chat");
   }, [roomId]);
 
-  // D5 — toast once when playback drift resolves back into sync.
+  // D5 â€” toast once when playback drift resolves back into sync.
   const sawDriftRef = useRef(false);
   useEffect(() => {
     if (syncStatus === "drift" || syncStatus === "resyncing") {
@@ -225,6 +254,39 @@ export function FlixPartySidebar({
     [roomId, sendMessage]
   );
 
+  const handlePassCrown = useCallback(
+    async (targetUserId: string) => {
+      if (!transferHost || passingCrown) return;
+      const target = room?.participants?.find((p) => p.userId === targetUserId);
+      setPassingCrown(true);
+      try {
+        const ok = await transferHost(targetUserId);
+        setShowPassCrown(false);
+        toast(
+          ok
+            ? {
+                title: "Crown passed",
+                description: `${target?.displayName ?? "They"} now control${target ? "s" : ""} playback for the room.`,
+              }
+            : {
+                title: "Could not pass the crown",
+                description: "They may have left the party. Try again.",
+                variant: "destructive",
+              }
+        );
+      } catch (err) {
+        toast({
+          title: "Could not pass the crown",
+          description: firestoreErrorMessage(err),
+          variant: "destructive",
+        });
+      } finally {
+        setPassingCrown(false);
+      }
+    },
+    [transferHost, passingCrown, room?.participants, toast]
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -261,7 +323,7 @@ export function FlixPartySidebar({
 
       try {
         if (!joinUrl && onStartParty) {
-          toast({ title: "Starting party…", description: "Creating your watch room." });
+          toast({ title: "Starting partyâ€¦", description: "Creating your watch room." });
           const result = await onStartParty();
           if (result && typeof result === "object") {
             joinUrl = result.joinUrl;
@@ -374,7 +436,7 @@ export function FlixPartySidebar({
                   <>
                     {room.participants?.length ?? 0} here
                     <span className="ml-1 opacity-70">
-                      · {friends.length} friend{friends.length !== 1 ? "s" : ""}
+                      Â· {friends.length} friend{friends.length !== 1 ? "s" : ""}
                     </span>
                   </>
                 ) : (
@@ -383,7 +445,7 @@ export function FlixPartySidebar({
                   </>
                 )}
                 {incomingRequests.length > 0 && (
-                  <span className="text-red-400 ml-1">· {incomingRequests.length} request{incomingRequests.length !== 1 ? "s" : ""}</span>
+                  <span className="text-red-400 ml-1">Â· {incomingRequests.length} request{incomingRequests.length !== 1 ? "s" : ""}</span>
                 )}
               </p>
             )}
@@ -395,6 +457,30 @@ export function FlixPartySidebar({
                 peers={peerCount}
                 className="mt-1"
               />
+            )}
+            {roomId && isHostProp && onSetControlsMode && (
+              <button
+                type="button"
+                className="mt-1 inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-white/70 hover:bg-white/10"
+                onClick={() =>
+                  onSetControlsMode(controlsMode === "COLLABORATIVE" ? "HOST_ONLY" : "COLLABORATIVE")
+                }
+                title="Toggle who can control playback"
+                aria-pressed={controlsMode === "COLLABORATIVE"}
+              >
+                {controlsMode === "COLLABORATIVE" ? "Collaborative" : "Host only"}
+              </button>
+            )}
+            {roomId && isHostProp && transferHost && (room?.participants?.length ?? 0) > 1 && (
+              <button
+                type="button"
+                className="mt-1 ml-1 inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200 hover:bg-amber-500/20"
+                onClick={() => setShowPassCrown(true)}
+                title="Hand host controls to someone else"
+              >
+                <Crown className="w-3 h-3" aria-hidden="true" />
+                Pass crown
+              </button>
             )}
           </div>
         </div>
@@ -562,6 +648,7 @@ export function FlixPartySidebar({
                       onToggleMic={() => void media.toggleMic()}
                       onToggleCamera={() => void media.toggleCamera()}
                       onVoiceVolumeChange={media.setVoiceVolume}
+                      pttState={ptt.state}
                       compact={isMobile}
                     />
                   </div>
@@ -570,12 +657,11 @@ export function FlixPartySidebar({
                   {messages.map((msg) => (
                     <div key={msg.id} className="flex gap-2.5">
                       {msg.senderAvatar ? (
-                        <img
+                        <Image
                           src={msg.senderAvatar}
                           alt={msg.senderName}
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
+                          width={24}
+                          height={24}
                           className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
                           onError={(e) => {
                             (e.currentTarget as HTMLElement).style.display = "none";
@@ -629,7 +715,7 @@ export function FlixPartySidebar({
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Say something…"
+                      placeholder="Say somethingâ€¦"
                       maxLength={500}
                       className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20 transition-colors"
                     />
@@ -662,7 +748,7 @@ export function FlixPartySidebar({
             )}
             {roomId && syncStatus === "connecting" && !staging && (
               <div className="mx-3 mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-200">
-                Waiting for the host signal… your video syncs automatically
+                Waiting for the host signalâ€¦ your video syncs automatically
                 once it arrives. If this persists, press{" "}
                 <kbd className="rounded border border-white/20 bg-white/10 px-1 font-semibold">N</kbd>{" "}
                 to try the next server.
@@ -682,6 +768,7 @@ export function FlixPartySidebar({
                   onToggleMic={() => void media.toggleMic()}
                   onToggleCamera={() => void media.toggleCamera()}
                   onVoiceVolumeChange={media.setVoiceVolume}
+                  pttState={ptt.state}
                   compact={isMobile}
                 />
                 {room && user && (
@@ -744,9 +831,21 @@ export function FlixPartySidebar({
             onToggleMic={() => void media.toggleMic()}
             onToggleCamera={() => void media.toggleCamera()}
             onVoiceVolumeChange={media.setVoiceVolume}
+            pttState={ptt.state}
             compact
           />
         </div>
+      )}
+
+      {room && transferHost && (
+        <PassCrownDialog
+          open={showPassCrown}
+          busy={passingCrown}
+          participants={room.participants}
+          currentHostId={room.hostId}
+          onSelect={(id) => void handlePassCrown(id)}
+          onCancel={() => setShowPassCrown(false)}
+        />
       )}
     </div>
   );

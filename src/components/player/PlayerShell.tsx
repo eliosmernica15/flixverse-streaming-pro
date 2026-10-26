@@ -26,13 +26,37 @@ import { FlixPartySidebar } from "./FlixPartySidebar";
 import { FlixPartyInviteDialog } from "./FlixPartyInviteDialog";
 import { PartyCameraGrid, PartyCameraPiP } from "./PartyMediaPanel";
 import { PartyGuestSplash } from "./PartyGuestSplash";
-import { AmbientGlowFrame } from "./AmbientGlowFrame";
+import { SnapToHostPill } from "./SnapToHostPill";
+import { SpatialReactionsLayer } from "./SpatialReactionsLayer";
+import { CinemaBloom, getBloomIntensity } from "./CinemaBloom";
+import { CinemaStage, isCinemaStageEnabled } from "./CinemaStage";
+import dynamic from "next/dynamic";
+const CinemaScene3D = dynamic(() => import("./CinemaScene3D").then((m) => m.CinemaScene3D), {
+  ssr: false,
+  loading: () => null,
+});
+// Read the 3D-hall flag directly from localStorage so we do not pull the
+// Three.js bundle into the main chunk. CinemaScene3D itself is lazy-loaded.
+function isCinema3DEnabledLocal(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem("flixverse-cinema-3d") === "true";
+  } catch {
+    return false;
+  }
+}
+import { useCinemaHaptics } from "@/hooks/player/useCinemaHaptics";
+import { useScreenCaptureBloom, isScreenCaptureBloomEnabled } from "@/hooks/player/useScreenCaptureBloom";
+import { CINEMA_PULSE_EVENT, isHapticsEnabled } from "@/lib/player/haptics";
+import { presetFromGenres } from "@/lib/player/cinemaPresets";
 import { PlayerOverlayControls } from "./PlayerOverlayControls";
 import { AddCommentDialog } from "./AddCommentDialog";
 import { UpNextCountdown } from "./UpNextCountdown";
 import type { SyncStatus } from "./SyncStatusBadge";
 import { trackPlaybackStart } from "@/lib/analytics";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useNetworkQuality } from "@/hooks/useNetworkQuality";
+import { pickServerByQuality } from "@/lib/streamingSources";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import "@/app/video-player.css";
 
@@ -46,6 +70,8 @@ interface PlayerShellProps {
   season?: number;
   episode?: number;
   posterPath?: string;
+  /** TMDB genre ids for the title — drives the cinema mood preset. */
+  genreIds?: number[];
   resumePosition?: number;
   totalDuration?: number;
   episodeCount?: number;
@@ -97,6 +123,7 @@ export function PlayerShell({
   season,
   episode,
   posterPath,
+  genreIds,
   resumePosition = 0,
   totalDuration,
   episodeCount,
@@ -111,6 +138,8 @@ export function PlayerShell({
   const [showHint, setShowHint] = useState(true);
   const [liveDuration, setLiveDuration] = useState(0);
   const [showUpNext, setShowUpNext] = useState(false);
+  const [showSkipIntro, setShowSkipIntro] = useState(false);
+  const [showSkipRecap, setShowSkipRecap] = useState(false);
   const [commentAt, setCommentAt] = useState<number | null>(null);
   const [cursorIdle, setCursorIdle] = useState(true);
   const [captionsOn, setCaptionsOn] = useState(false);
@@ -118,9 +147,45 @@ export function PlayerShell({
 
   const { user } = useAuth();
   const locale = useLocale();
+  const networkQuality = useNetworkQuality();
   const { preferences, updatePreferences } = useUserPreferences();
   const timelineEnabled = isFeatureEnabled("timeline-comments");
   const glowEnabled = isFeatureEnabled("ambient-glow");
+  // Read once on mount: the bloom intensity is a persisted preference, not
+  // something that changes mid-session.
+  const bloomIntensity = useMemo(() => getBloomIntensity(), []);
+  const stageEnabled = useMemo(() => isCinemaStageEnabled(), []);
+  // Cinema mood preset derived from the title's genres. Multiplies the user's
+  // bloom intensity and tags the shell with a mood class for CSS theming.
+  const cinemaPreset = useMemo(() => presetFromGenres(genreIds), [genreIds]);
+
+  const [scene3dEnabled, setScene3dEnabled] = useState(() => isCinema3DEnabledLocal());
+  useEffect(() => {
+    const onToggle = (e: Event) => {
+      const detail = (e as CustomEvent<{ enabled: boolean }>).detail;
+      if (detail && typeof detail.enabled === "boolean") setScene3dEnabled(detail.enabled);
+    };
+    window.addEventListener("toggle-cinema-3d", onToggle);
+    return () => window.removeEventListener("toggle-cinema-3d", onToggle);
+  }, []);
+  const effectiveBloomIntensity = useMemo(
+    () => Math.max(0.3, Math.min(1.8, bloomIntensity * cinemaPreset.bloomMultiplier)),
+    [bloomIntensity, cinemaPreset.bloomMultiplier]
+  );
+
+  // Screen-capture ambilight (opt-in). Read the persisted flag once; the
+  // settings toggle dispatches a CustomEvent we listen for so the player
+  // reacts without a reload.
+  const [screenCaptureEnabled, setScreenCaptureEnabled] = useState(() => isScreenCaptureBloomEnabled());
+  useEffect(() => {
+    const onToggle = (e: Event) => {
+      const detail = (e as CustomEvent<{ enabled: boolean }>).detail;
+      if (detail && typeof detail.enabled === "boolean") setScreenCaptureEnabled(detail.enabled);
+    };
+    window.addEventListener("toggle-screen-capture-bloom", onToggle);
+    return () => window.removeEventListener("toggle-screen-capture-bloom", onToggle);
+  }, []);
+  const screenCapture = useScreenCaptureBloom(screenCaptureEnabled);
 
   // Audio language. The user's `preferredLanguage` preference wins; otherwise we
   // fall back to the site locale (so Albanian-locale visitors get Albanian by
@@ -156,19 +221,25 @@ export function PlayerShell({
     [movieId, mediaType, season, episode, streamLang, title]
   );
   const currentSource = streamingSources[currentServer];
-  const effectiveDuration = liveDuration || totalDuration || 120 * 60;
 
-  const { currentTime, seekTo, syncTo } = usePlaybackClock({
-    movieId,
-    mediaType,
-    title,
-    posterPath: posterPath || null,
-    season,
-    episode,
-    initialPosition: resumePosition,
-    totalDuration: effectiveDuration,
-    isPlaying: embedState === "ready",
-  });
+  // Network-aware initial quality: when the caller did not pin a server, pick
+  // one that matches the connection. Runs once per source list change.
+  const autoQualityAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialServer !== undefined) return;
+    if (autoQualityAppliedRef.current) return;
+    if (!streamingSources.length) return;
+    autoQualityAppliedRef.current = true;
+    const label =
+      networkQuality === "high" ? "4K" : networkQuality === "medium" ? "1080p" : "720p";
+    const idx = pickServerByQuality(streamingSources, label, 0);
+    if (idx !== currentServer) {
+      setCurrentServer(idx);
+      setEmbedState("loading");
+      setLiveDuration(0);
+    }
+  }, [streamingSources, networkQuality, initialServer, currentServer]);
+  const effectiveDuration = liveDuration || totalDuration || 120 * 60;
 
   const nextEpisode = useMemo(() => {
     if (mediaType !== "tv" || !season || !episode) return null;
@@ -207,6 +278,34 @@ export function PlayerShell({
     onEnded: handleEnded,
   });
 
+  /**
+   * The local clock must follow the *embed's* play state, not merely "the
+   * embed finished loading".
+   *
+   * It used to be wired to `embedState === "ready"`, which is true from the
+   * moment the iframe loads until it is unmounted. That meant the playhead
+   * kept advancing while the film was paused: the progress bar crept forward,
+   * and — far worse — in a watch party the host broadcast that invented
+   * position every heartbeat, dragging every guest forward with it.
+   *
+   * `isPlaying` is a real belief about playback, updated from provider
+   * `PLAYER_EVENT`s and from our own optimistic transport commands, so it is
+   * the correct driver. When the provider is silent (cross-origin embeds that
+   * never post events) it stays at its initial `true`, which preserves the
+   * previous behaviour for exactly those players.
+   */
+  const { currentTime, seekTo, syncTo } = usePlaybackClock({
+    movieId,
+    mediaType,
+    title,
+    posterPath: posterPath || null,
+    season,
+    episode,
+    initialPosition: resumePosition,
+    totalDuration: effectiveDuration,
+    isPlaying: isPlaying && embedState === "ready",
+  });
+
   const timeline = useTimelineComments({
     tmdbId: movieId,
     enabled: timelineEnabled && embedState === "ready",
@@ -227,17 +326,22 @@ export function PlayerShell({
     lang: streamLang,
   });
 
+  // `timeline.getMarkers` / `getCommentsNear` are recreated on every render by
+  // the hook, so listing them would defeat the memo. `timeline.comments` is
+  // the actual input that changes; the callbacks only read it.
   const overlayMarkers = useMemo(() => {
     const markers = timeline.getMarkers(effectiveDuration);
     if (!isSpoilerGuardEnabled()) return markers;
     return markers.filter((m) => m.timestamp <= currentTime + 1);
-  }, [timeline.getMarkers, timeline.comments, effectiveDuration, currentTime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeline.comments, effectiveDuration, currentTime]);
 
   const overlayNearby = useMemo(() => {
     const near = timeline.getCommentsNear(currentTime, 8);
     if (!isSpoilerGuardEnabled()) return near;
     return near.filter((c) => c.timestampSeconds <= currentTime + 1);
-  }, [timeline.getCommentsNear, timeline.comments, currentTime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeline.comments, currentTime]);
 
   const party = usePlayerPartySync({
     movieId,
@@ -331,6 +435,56 @@ export function PlayerShell({
     baseVolume: volume,
     setVolume,
   });
+
+  // 4D haptics: real low-band audio transients when a same-origin <video>
+  // exists, plus a tactile confirmation on every transport action. Opt-in —
+  // `isHapticsEnabled()` is a persisted user preference, default off.
+  //
+  // The transport event must carry only the *kind*: `at` used to be
+  // `Math.floor(currentTime)`, which changes every second of playback and
+  // made the haptics hook pulse once per second for the whole film.
+  const hapticsEnabled = useMemo(() => isHapticsEnabled(), []);
+  const transportBeat = useMemo(
+    () => ({ kind: isPlaying ? ("play" as const) : ("pause" as const), at: 0 }),
+    [isPlaying]
+  );
+  useCinemaHaptics({
+    enabled: hapticsEnabled && embedState === "ready",
+    videoRef: undefined,
+    transportEvent: transportBeat,
+  });
+
+  /**
+   * Visual half of the 4D response. `fireHaptic` broadcasts
+   * `flixverse:cinema-pulse` on every beat; here we turn that into a 220 ms
+   * frame breath (see `.cinema-pulse` in video-player.css). It is the only
+   * channel that works on a desktop with no vibration motor, so without this
+   * listener the "4D" feedback was invisible for most viewers.
+   */
+  const pulseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pulsing, setPulsing] = useState(false);
+
+  useEffect(() => {
+    if (!hapticsEnabled) return;
+    if (typeof window === "undefined") return;
+
+    const onPulse = () => {
+      // Re-trigger the animation class even when a second beat lands before
+      // the first finishes: drop the class, force a reflow, re-add it.
+      setPulsing(false);
+      if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+      pulseTimeoutRef.current = setTimeout(() => {
+        setPulsing(true);
+        pulseTimeoutRef.current = setTimeout(() => setPulsing(false), 240);
+      }, 16);
+    };
+
+    window.addEventListener(CINEMA_PULSE_EVENT, onPulse);
+    return () => {
+      window.removeEventListener(CINEMA_PULSE_EVENT, onPulse);
+      if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+    };
+  }, [hapticsEnabled]);
 
   const cameraLayout = inParty && showCameras;
 
@@ -427,6 +581,21 @@ export function PlayerShell({
       setShowUpNext(true);
     }
   }, [mediaType, onAdvanceEpisode, nextEpisode, effectiveDuration, embedState, currentTime]);
+
+  // Skip intro / recap — heuristic: intro is typically in the first 90s,
+  // recap in the first 30s of a subsequent episode. Show a button during
+  // those windows so the user can jump past them.
+  useEffect(() => {
+    if (mediaType !== "tv" || embedState !== "ready") {
+      setShowSkipIntro(false);
+      setShowSkipRecap(false);
+      return;
+    }
+    const introWindow = currentTime > 5 && currentTime < 90;
+    const recapWindow = currentTime > 0 && currentTime < 30 && (episode ?? 1) > 1;
+    setShowSkipIntro(introWindow);
+    setShowSkipRecap(recapWindow && !introWindow);
+  }, [mediaType, embedState, currentTime, episode]);
 
   const playNextEpisode = useCallback(() => {
     if (!nextEpisode || !onAdvanceEpisode) return;
@@ -536,6 +705,16 @@ export function PlayerShell({
 
   useBodyScrollLock(true);
 
+  // Mirror the playhead into a ref for the keydown handler.
+  //
+  // The handler is an 80-line closure over `party`, `media`, `layout` and
+  // dozens of callbacks — all of which are fresh identities on most renders.
+  // Depending on `currentTime` (which ticks 4×/sec) meant the whole handler
+  // was torn down and re-attached four times a second for the entire film.
+  // Reading the clock through a ref removes that dependency entirely.
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
+
   useEffect(() => {
     const hintTimer = setTimeout(() => setShowHint(false), 10000);
 
@@ -594,6 +773,13 @@ export function PlayerShell({
       if (handled.includes(e.key)) e.preventDefault();
 
       if (e.key === "Escape") {
+        // The server picker renders above everything (z-10002) with its own
+        // backdrop. Escape used to fall through to the party/close handlers,
+        // so dismissing it could close the whole player instead.
+        if (showServerSelector) {
+          setShowServerSelector(false);
+          return;
+        }
         if (commentAt !== null) {
           setCommentAt(null);
           return;
@@ -686,7 +872,7 @@ export function PlayerShell({
         e.preventDefault();
         setCaptionsOn((v) => !v);
       }
-      else if (e.key === "c" || e.key === "C") openCommentAt(currentTime);
+      else if (e.key === "c" || e.key === "C") openCommentAt(currentTimeRef.current);
        else if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
        else if (e.key === "[") prevServer();
        else if (e.key === "S" || e.key === "s") setShowServerSelector((p) => !p);
@@ -697,6 +883,7 @@ export function PlayerShell({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     embedState,
+    showServerSelector,
     handleClose,
     togglePlayPause,
     toggleMute,
@@ -717,7 +904,6 @@ export function PlayerShell({
     commentAt,
     showUpNext,
     openCommentAt,
-    currentTime,
     streamLang,
     handleSetStreamLang,
   ]);
@@ -753,6 +939,8 @@ export function PlayerShell({
     playerDrag.isDragging ? "player-shell--window-dragging" : "",
     playerResize.isResizing ? "player-shell--window-resizing" : "",
     playerResize.isCustomSize ? "player-shell--window-custom-size" : "",
+    pulsing ? "player-shell--cinema-pulse" : "",
+    glowEnabled && stageEnabled ? `player-shell--${cinemaPreset.cssClass}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -786,10 +974,44 @@ export function PlayerShell({
         visible={party.guestSplashVisible}
       />
       <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""} ${inParty ? `player-layout--cam-${effectiveCameraLayout}` : ""}`}>
-        {glowEnabled && (
-          <AmbientGlowFrame
+        {/* Generated 3D cinema hall: palette-aware geometry and a volumetric
+            mote field behind the picture. Pure CSS 3D, no WebGL context. */}
+        {scene3dEnabled ? (
+          <CinemaScene3D
+            seedKey={`${movieId}-${mediaType}-${season ?? 0}-${episode ?? 0}`}
+            accentColor="#e50914"
+            isPlaying={isPlaying}
+            compact={isMobile}
+          />
+        ) : (
+          <CinemaStage
+            seedKey={`${movieId}-${mediaType}-${season ?? 0}-${episode ?? 0}`}
             posterPath={posterPath || null}
+            genreIds={genreIds}
+            isPlaying={isPlaying}
+            enabled={glowEnabled && stageEnabled}
+            intensity={effectiveBloomIntensity}
+            compact={isMobile}
+          />
+        )}
+        {glowEnabled && (
+          <CinemaBloom
+            posterPath={posterPath || null}
+            playbackSeconds={currentTime}
+            isPlaying={isPlaying}
             isActive={embedState === "ready"}
+            intensity={effectiveBloomIntensity}
+            videoRef={screenCaptureEnabled ? screenCapture.videoRef : undefined}
+          />
+        )}
+        {/* Hidden video element that carries the screen-capture stream. */}
+        {screenCaptureEnabled && (
+          <video
+            ref={screenCapture.videoRef}
+            muted
+            playsInline
+            className="sr-only"
+            aria-hidden
           />
         )}
         <div className="player-layout-main">
@@ -911,6 +1133,20 @@ export function PlayerShell({
                 onRetry={nextServer}
               />
 
+            {/* Guest-only manual resync when drift persists beyond 2s. */}
+            <SnapToHostPill
+              active={inParty && !party.isPartyHost && embedState === "ready" && !party.staging}
+              driftMs={party.partyDriftMs}
+              getHostTime={party.projectedHostTime}
+              onSnap={party.snapToHost}
+            />
+
+            {/* Party quick-emoji reactions float over the picture. */}
+            <SpatialReactionsLayer
+              messages={party.partyMessages}
+              enabled={inParty && embedState === "ready"}
+            />
+
             {/* Self-hosted caption overlay — only when the user wants non-English */}
             {captions.cues.length > 0 && (
               <CaptionOverlay
@@ -939,6 +1175,16 @@ export function PlayerShell({
                   controlsVisible={cursorIdle}
                 />
               </div>
+            )}
+            {(showSkipIntro || showSkipRecap) && (
+              <button
+                type="button"
+                className="player-skip-btn"
+                onClick={() => seek(90)}
+                aria-label={showSkipRecap ? "Skip recap" : "Skip intro"}
+              >
+                {showSkipRecap ? "Skip Recap ⏭" : "Skip Intro ⏭"}
+              </button>
             )}
             {showUpNext && nextEpisode && onAdvanceEpisode && (
               <UpNextCountdown
@@ -1021,11 +1267,14 @@ export function PlayerShell({
             kickParticipant={party.kickParticipant}
             setParticipantMicMuted={party.setParticipantMicMuted}
             setParticipantCamDisabled={party.setParticipantCamDisabled}
+            transferHost={party.transferHost ?? undefined}
             realtimeProcessed={party.realtime?.processed}
             realtimeReady={party.realtime?.isReady}
             peerCount={party.partyRoom?.participants?.length}
             syncStage={party.syncStage}
             staging={party.staging}
+            controlsMode={party.controlsMode}
+            onSetControlsMode={party.setControlsMode}
             onSyncStart={party.startSyncedStart}
             onReleaseSyncNow={party.releaseSyncedStart}
             onCancelSync={party.cancelSyncedStart}

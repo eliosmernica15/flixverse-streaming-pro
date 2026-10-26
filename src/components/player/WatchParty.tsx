@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import {
@@ -16,6 +16,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useFriends, type Friend } from "@/hooks/useFriends";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 import { sendWatchPartyInvite } from "@/lib/notifications/sendWatchPartyInvite";
 import { firestoreErrorMessage } from "@/lib/firestore/errors";
 import {
@@ -271,7 +272,7 @@ export function WatchParty({
 
   return (
     <div className="space-y-3">
-      {/* Empty state — Netflix-style invite affordance */}
+      {/* Empty state â€” Netflix-style invite affordance */}
       {!activeRoom && !activeRoomId && (
         <div className="space-y-2">
           <button
@@ -286,18 +287,18 @@ export function WatchParty({
               ) : (
                 <PartyPopper className="w-4 h-4" />
               )}
-              {creating ? "Creating party…" : "Start Watch Party"}
+              {creating ? "Creating partyâ€¦" : "Start Watch Party"}
             </span>
             <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/20 to-red-500/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
           </button>
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-gray-500">
             <Shield className="h-3 w-3" />
-            End-to-end synced · invite-only
+            End-to-end synced Â· invite-only
           </p>
         </div>
       )}
 
-      {/* Active room — clean Netflix-style status + actions */}
+      {/* Active room â€” clean Netflix-style status + actions */}
       {(activeRoom || activeRoomId) && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between rounded-md border border-emerald-500/25 bg-emerald-500/8 px-3 py-2.5">
@@ -360,12 +361,11 @@ export function WatchParty({
                     className="flex items-center gap-2.5 rounded-md p-2 hover:bg-white/5 transition-colors"
                   >
                     {friend.avatarUrl ? (
-                      <img
+                      <Image
                         src={friend.avatarUrl}
                         alt={friend.displayName}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
+                        width={28}
+                        height={28}
                         className="w-7 h-7 rounded-full object-cover ring-1 ring-white/10"
                         onError={(e) => {
                           (e.currentTarget as HTMLElement).style.display = "none";

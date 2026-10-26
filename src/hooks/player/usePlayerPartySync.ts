@@ -62,6 +62,13 @@ const SIGNAL_FRESH_MS = 6000;
 // ?progress=, …). Soft postMessage seeks are best-effort guesses that
 // silent providers ignore — a positioned reload always works.
 const FALLBACK_SYNC_AFTER_MS = 10_000;
+// Minimum gap between iframe rebuilds for a hard resync. A rebuild is a full
+// provider reload (~2–5 s of black frame); doing it more than once every
+// 20 s is never better than waiting for the soft seek path to converge.
+const HARD_RESYNC_COOLDOWN_MS = 20_000;
+// Consecutive soft seeks (600 ms apart) that may fail to close the drift
+// before we stop trusting postMessage and rebuild the iframe instead.
+const MAX_FAILED_SOFT_SEEKS = 4;
 const MOBILE_BREAKPOINT = 768;
 
 function isMobileViewport(): boolean {
@@ -118,6 +125,11 @@ export function usePlayerPartySync({
   const [partyDriftMs, setPartyDriftMs] = useState(0);
   const [guestServerIndex, setGuestServerIndex] = useState<number | null>(null);
   const [guestInitialSynced, setGuestInitialSynced] = useState(false);
+  // Mirror for the sync interval: the tick is recreated whenever its deps
+  // change, but it must always read the *current* synced flag rather than
+  // the one captured when the interval was created.
+  const guestInitialSyncedRef = useRef(false);
+  guestInitialSyncedRef.current = guestInitialSynced;
   const [guestSplashDismissed, setGuestSplashDismissed] = useState(false);
   const [resyncSeekUrl, setResyncSeekUrl] = useState<string | null>(null);
   // Last wall-clock time a host signal (event or heartbeat, either
@@ -144,9 +156,13 @@ export function usePlayerPartySync({
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
+    setControlsMode: setControlsModeRoom,
+    transferHost,
   } = useFlixParty({ roomId: partyRoomId });
 
   const partyParticipantIds = partyRoom?.participants?.map((p) => p.userId) ?? [];
+  const controlsMode = partyRoom?.controlsMode ?? "HOST_ONLY";
+  const isCollaborative = controlsMode === "COLLABORATIVE";
 
   const onRemoteStreamRef = useRef<(peerId: string, stream: MediaStream) => void>(() => {});
   const onRemoteStreamRemovedRef = useRef<(peerId: string) => void>(() => {});
@@ -159,6 +175,14 @@ export function usePlayerPartySync({
   const currentTimeRef = useRef(currentTime);
   const isPlayingRef = useRef(isPlaying);
   const hostTimeRef = useRef(0);
+  // When `hostTimeRef` was sampled, on the shared NTP timeline. The host
+  // only reports every HOST_HEARTBEAT_MS (~1.5 s), so between reports the
+  // raw value is stale by up to a full heartbeat. Comparing a live guest
+  // clock against a frozen host value makes a correctly-synced guest look
+  // 1.5 s behind and triggers a corrective seek on every poll — the
+  // "constant micro-stutter / seek loop" symptom. Extrapolating the host
+  // position forward from the sample removes that error entirely.
+  const hostTimeSampledAtRef = useRef(0);
   const embedReadyRef = useRef(embedReady);
   const embedLiveSyncedRef = useRef(embedLiveSynced);
   const appliedRoomServerRef = useRef(-1);
@@ -170,6 +194,8 @@ export function usePlayerPartySync({
   const firstHostTimeAtRef = useRef(0);
   const fallbackHardSyncDoneRef = useRef(false);
   const lastSignalAtRef = useRef(0);
+  const lastHardResyncAtRef = useRef(0);
+  const failedSeekCountRef = useRef(0);
   // Synced Start cursors (mirrors of the states above for interval/timer use).
   const syncStageRef = useRef<{ targetTime: number; releaseAt: number } | null>(null);
   const stagingRef = useRef<{ targetTime: number; releaseAt: number } | null>(null);
@@ -177,12 +203,30 @@ export function usePlayerPartySync({
   const scheduledGoTimerRef = useRef(0);
   const prevParticipantCountRef = useRef(0);
   const driftDisplayRef = useRef(0);
+  // Latest playback state, mirrored into refs so the interval callbacks and
+  // the sync state machine read current values without re-subscribing.
+  //
+  // These MUST be declared before every callback that closes over them:
+  // `noteGuestSignal`, `handlePartyPlaybackSync`, and the heartbeat loop are
+  // all referenced from hooks that run during the same render, and a
+  // `const` referenced before its declaration throws a temporal-dead-zone
+  // ReferenceError. Keeping the whole sync-state block here makes the
+  // ordering explicit.
+  const partyTimeRef = useRef(currentTime);
+  const partyPlayingRef = useRef(isPlaying);
+  const partyServerRef = useRef(currentServer);
+  const sourceUrlRef = useRef(currentSourceProviderUrl);
+  partyTimeRef.current = currentTime;
+  partyPlayingRef.current = isPlaying;
+  partyServerRef.current = currentServer;
+  sourceUrlRef.current = currentSourceProviderUrl;
 
   // Fresh room → fresh signal cursors.
   useEffect(() => {
     firstHostTimeAtRef.current = 0;
     fallbackHardSyncDoneRef.current = false;
     lastSignalAtRef.current = 0;
+    lastHardResyncAtRef.current = 0;
     setLastSignalAt(0);
     window.clearTimeout(autoReleaseTimerRef.current);
     autoReleaseTimerRef.current = 0;
@@ -198,6 +242,25 @@ export function usePlayerPartySync({
   embedLiveSyncedRef.current = embedLiveSynced;
   syncStageRef.current = syncStage;
   stagingRef.current = staging;
+
+  /**
+   * Host position projected to *now*.
+   *
+   * `hostTimeRef` holds the position at the moment the last heartbeat was
+   * produced. If the room is playing, the host has advanced by the elapsed
+   * wall-clock time since then, so add it (bounded — a stale sample after a
+   * tab suspension must not extrapolate by minutes).
+   */
+  const projectedHostTime = useCallback((): number => {
+    const base = Math.max(partyHostTimeRef.current, hostTimeRef.current);
+    if (base <= 0) return base;
+    if (partyPlaybackRef.current !== "playing") return base;
+    const sampledAt = hostTimeSampledAtRef.current;
+    if (!sampledAt) return base;
+    const elapsedSec = (NTPClient.now() - sampledAt) / 1000;
+    if (elapsedSec <= 0 || elapsedSec > 10) return base;
+    return base + elapsedSec;
+  }, []);
 
   // Stable handles to the embed controls for callbacks defined before/after
   // them in this hook — always call the latest prop without re-subscribing.
@@ -259,6 +322,22 @@ export function usePlayerPartySync({
   // softSeekTo without needing to re-subscribe the WebRTC listener every time.
   const softSeekToRef = useRef(softSeekTo);
   softSeekToRef.current = softSeekTo;
+
+  // Records every host signal landing on this guest (both transports).
+  // Also stamps the first host position so the fallback hard-sync knows
+  // how long the provider has been silent.
+  //
+  // Declared before the WebRTC/realtime subscriptions that invoke it: those
+  // hooks call their callbacks during render setup, so a later `const`
+  // would be in the temporal dead zone and throw.
+  const noteGuestSignal = useCallback((hostTime: unknown) => {
+    const now = Date.now();
+    lastSignalAtRef.current = now;
+    setLastSignalAt(now);
+    if (typeof hostTime === "number" && hostTime > 0 && !firstHostTimeAtRef.current) {
+      firstHostTimeAtRef.current = now;
+    }
+  }, []);
 
   // Guest side of `sync-stage`: hold paused at the host timestamp. No tap
   // needed — nothing for provider ad scripts to hijack. Silent providers
@@ -347,10 +426,20 @@ export function usePlayerPartySync({
       }
       if (msg.type === "heartbeat" && typeof msg.data.currentTime === "number") {
         hostTimeRef.current = msg.data.currentTime;
+        // `timestamp` is the host's NTP-corrected send time, so it already
+        // accounts for clock skew — no extra correction needed.
+        hostTimeSampledAtRef.current = msg.timestamp || NTPClient.now();
+        // Track the host's play/pause state from the heartbeat itself. The
+        // room document also carries it, but that updates on the slow
+        // Firestore write; the heartbeat is the fastest authoritative
+        // signal and keeps the guest from running ahead between persists.
+        if (typeof msg.data.playing === "boolean") {
+          partyPlaybackRef.current = msg.data.playing ? "playing" : "paused";
+        }
         if (!embedReadyRef.current) return;
         // Respect join grace period — don't correct while the iframe is still loading
         if (partyJoinTimeRef.current && Date.now() - partyJoinTimeRef.current < JOIN_GRACE_MS) return;
-        const hostTime = msg.data.currentTime;
+        const hostTime = projectedHostTime();
         if (currentTimeRef.current === 0 && hostTime > 10) return;
         const drift = Math.abs(currentTimeRef.current - hostTime);
         if (drift > DRIFT_SOFT_THRESHOLD_SEC) {
@@ -359,7 +448,7 @@ export function usePlayerPartySync({
       }
     },
       // All mutable state is accessed via refs; only stable callbacks in deps.
-    [isPartyHost, setPlaying, playEmbed, pauseEmbed, clearGuestStaging, handleGuestStage, handleGuestGo]
+    [isPartyHost, setPlaying, playEmbed, pauseEmbed, clearGuestStaging, handleGuestStage, handleGuestGo, projectedHostTime]
   );
 
   const { isConnected: rtcConnected, sendMessage: sendRtcMessage, setLocalStream } = useWebRTCSync({
@@ -377,18 +466,6 @@ export function usePlayerPartySync({
     onRemoteStreamRemoved: (peerId) => onRemoteStreamRemovedRef.current(peerId),
   });
 
-  // Records every host signal landing on this guest (both transports).
-  // Also stamps the first host position so the fallback hard-sync knows
-  // how long the provider has been silent.
-  const noteGuestSignal = useCallback((hostTime: unknown) => {
-    const now = Date.now();
-    lastSignalAtRef.current = now;
-    setLastSignalAt(now);
-    if (typeof hostTime === "number" && hostTime > 0 && !firstHostTimeAtRef.current) {
-      firstHostTimeAtRef.current = now;
-    }
-  }, []);
-
   // Self-hosted real-time transport — same handler as WebRTC, so any
   // delivery path (Firestore events or WebRTC data channel) lands the
   // guest in the same state machine.
@@ -396,7 +473,25 @@ export function usePlayerPartySync({
     roomId: partyRoomId,
     isHost: !!isPartyHost,
     onEvent: (ev) => {
-      if (isPartyHost) return;
+      // Collaborative controls (F9): a guest requested a playback action.
+      // The host is the only writer of authoritative state, so it applies
+      // the request and re-broadcasts to everyone (including the requester).
+      if (isPartyHost) {
+        if (ev.type === "guest-control" && ev.senderId !== user?.uid) {
+          const action = ev.data?.action;
+          const t = typeof ev.data?.currentTime === "number" ? ev.data.currentTime : undefined;
+          if (action === "play") {
+            broadcastPartyState("playing", t ?? partyTimeRef.current);
+          } else if (action === "pause") {
+            broadcastPartyState("paused", t ?? partyTimeRef.current);
+          } else if (action === "seek" && typeof t === "number") {
+            broadcastPartySeek(t);
+          } else if (action === "server-change" && typeof ev.data?.serverIndex === "number") {
+            broadcastServerChange(ev.data.serverIndex, t ?? partyTimeRef.current);
+          }
+        }
+        return;
+      }
       noteGuestSignal(ev.data?.currentTime);
       if (ev.type === "sync-stage" && typeof ev.data?.currentTime === "number") {
         handleGuestStage(
@@ -449,6 +544,12 @@ export function usePlayerPartySync({
     partyRoom?.participants?.forEach((p) => map.set(p.userId, p.displayName));
     return map;
   }, [partyRoom?.participants]);
+
+  // `usePartyRealtime` returns a fresh object each render (it memoizes, but
+  // `processed` ticks up constantly). Destructure the stable `send` so the
+  // host heartbeats and broadcast callbacks do not re-subscribe — every
+  // re-subscription tears down the interval and re-writes the room doc.
+  const realtimeSend = realtime.send;
 
   const media = usePartyMedia({
     roomId: partyRoomId,
@@ -525,7 +626,7 @@ export function usePlayerPartySync({
       if (partyJoinTimeRef.current && Date.now() - partyJoinTimeRef.current < JOIN_GRACE_MS) return;
 
       const guestTime = currentTimeRef.current;
-      const hostTime = Math.max(partyHostTimeRef.current, hostTimeRef.current);
+      const hostTime = projectedHostTime();
 
       // Fallback initial sync: the provider never reported playback
       // (no PLAYER_EVENT — silent cross-origin embed) but host positions
@@ -584,17 +685,54 @@ export function usePlayerPartySync({
          pauseEmbed();
        }
 
-       // Hard resync check (>30s drift) — rebuild URL with corrected start time
+       // Hard resync check (>30s drift) — rebuild URL with corrected start time.
+       //
+       // This MUST be rate-limited. The tick runs four times a second and the
+       // host clock advances continuously, so `injectSeekParam` produced a
+       // *different* URL on every tick and the iframe reloaded four times a
+       // second forever — the "guest stuck in a reload loop" party. One hard
+       // resync per cooldown is all that is ever needed; if it did not fix
+       // the drift, reloading again immediately will not either.
        const resync = computeResync(hostTime, guestTime, sourceUrlRef.current, String(currentServer));
-       if (resync.kind === "hard") {
-         setResyncSeekUrl(resync.seekUrl);
-         setPartySyncStatus("drift");
+
+       // Count consecutive soft seeks that failed to close the gap. Many
+       // providers ignore postMessage seeks entirely; without this counter
+       // the loop issues one every 600 ms for the rest of the film, which is
+       // the "party is stuck seeking forever" symptom. After a few failures
+       // we stop trusting the soft path and rebuild the iframe at the right
+       // position — the only thing a silent provider actually honours.
+       if (driftSec >= DRIFT_SOFT_THRESHOLD_SEC) {
+         failedSeekCountRef.current += 1;
+       } else {
+         failedSeekCountRef.current = 0;
+       }
+
+       const softSeekExhausted = failedSeekCountRef.current >= MAX_FAILED_SOFT_SEEKS;
+
+       if (resync.kind === "hard" || softSeekExhausted) {
+         const seekUrl = resync.kind === "hard"
+           ? resync.seekUrl
+           : injectSeekParam(sourceUrlRef.current, hostTime);
+         const now = Date.now();
+         if (now - lastHardResyncAtRef.current >= HARD_RESYNC_COOLDOWN_MS) {
+           lastHardResyncAtRef.current = now;
+           failedSeekCountRef.current = 0;
+           initialSyncDoneRef.current = true;
+           setGuestInitialSynced(true);
+           lastSeekAtRef.current = 0;
+           setResyncSeekUrl(seekUrl);
+           setPartySyncStatus("resyncing");
+         } else {
+           setPartySyncStatus("drift");
+         }
        } else if (driftSec >= DRIFT_SOFT_THRESHOLD_SEC) {
          softSeekTo(hostTime);
          setPartySyncStatus("drift");
        } else {
          const fresh = Date.now() - lastSignalAtRef.current < SIGNAL_FRESH_MS;
-         setPartySyncStatus(rtcConnected || guestInitialSynced || fresh ? "connected" : "connecting");
+         setPartySyncStatus(
+           rtcConnected || guestInitialSyncedRef.current || fresh ? "connected" : "connecting"
+         );
        }
     };
 
@@ -610,14 +748,53 @@ export function usePlayerPartySync({
      pauseEmbed,
      softSeekTo,
      currentServer,
+     projectedHostTime,
    ]);
+
+  /**
+   * Guest: manual "Snap to Host".
+   *
+   * The automatic loop deliberately rate-limits iframe rebuilds (one per
+   * HARD_RESYNC_COOLDOWN_MS) so it can never trap a guest in a reload loop.
+   * A user tapping the pill is an explicit intent, so it bypasses that
+   * cooldown: live-synced providers get an immediate soft seek; silent
+   * providers get one positioned reload. The cooldown is re-armed afterwards
+   * so the automatic path does not immediately rebuild the iframe again.
+   */
+  const snapToHost = useCallback((): number | null => {
+    if (!partyRoomId || isPartyHost) return null;
+    const hostTime = projectedHostTime();
+    if (hostTime <= 0) return null;
+    const now = Date.now();
+    failedSeekCountRef.current = 0;
+    lastSeekAtRef.current = 0;
+    initialSyncDoneRef.current = true;
+    setGuestInitialSynced(true);
+    if (embedLiveSyncedRef.current) {
+      softSeekTo(hostTime);
+    } else {
+      lastHardResyncAtRef.current = now;
+      setResyncSeekUrl(injectSeekParam(sourceUrlRef.current, hostTime));
+    }
+    if (partyPlaybackRef.current === "playing") {
+      setPlaying(true);
+      playEmbed();
+    } else {
+      setPlaying(false);
+      pauseEmbed();
+    }
+    driftDisplayRef.current = 0;
+    setPartyDriftMs(0);
+    setPartySyncStatus("resyncing");
+    return hostTime;
+  }, [partyRoomId, isPartyHost, projectedHostTime, softSeekTo, setPlaying, playEmbed, pauseEmbed]);
 
   // Guest: one-time seek to host position when embed becomes live-synced
   useEffect(() => {
     if (!partyRoomId || isPartyHost || initialSyncDoneRef.current) return;
     if (!embedReady || !embedLiveSynced) return;
 
-    const hostTime = Math.max(partyHostTimeRef.current, hostTimeRef.current);
+    const hostTime = projectedHostTime();
     if (hostTime <= 0) return;
 
     initialSyncDoneRef.current = true;
@@ -628,7 +805,7 @@ export function usePlayerPartySync({
       setPlaying(true);
       playEmbed();
     }
-  }, [partyRoomId, isPartyHost, embedReady, embedLiveSynced, softSeekTo, setPlaying, playEmbed]);
+  }, [partyRoomId, isPartyHost, embedReady, embedLiveSynced, softSeekTo, setPlaying, playEmbed, projectedHostTime]);
 
   useEffect(() => {
     if (!partyRoomId) {
@@ -764,13 +941,13 @@ export function usePlayerPartySync({
     const startAt = NTPClient.now() + SYNC_STAGE_LEAD_MS;
     setSyncStage(null);
     void updatePlaybackState("paused", T, currentServer);
-    void realtime.send("sync-go", { currentTime: T, startAt });
+    void realtimeSend("sync-go", { currentTime: T, startAt });
     scheduledGoTimerRef.current = window.setTimeout(() => {
       scheduledGoTimerRef.current = 0;
       setPlaying(true);
       playEmbed();
     }, Math.max(0, startAt - NTPClient.now()));
-  }, [partyRoomId, isPartyHost, setPlaying, pauseEmbed, playEmbed, updatePlaybackState, currentServer, realtime.send]);
+  }, [partyRoomId, isPartyHost, setPlaying, pauseEmbed, playEmbed, updatePlaybackState, currentServer, realtimeSend]);
 
   const startSyncedStart = useCallback(() => {
     if (!partyRoomId || !isPartyHost || !user) return;
@@ -783,11 +960,11 @@ export function usePlayerPartySync({
     const releaseAt = NTPClient.now() + SYNC_AUTO_RELEASE_MS;
     setSyncStage({ targetTime: T, releaseAt });
     void updatePlaybackState("paused", T, currentServer);
-    void realtime.send("sync-stage", { currentTime: T, releaseAt });
+    void realtimeSend("sync-stage", { currentTime: T, releaseAt });
     autoReleaseTimerRef.current = window.setTimeout(() => {
       releaseSyncedStart();
     }, SYNC_AUTO_RELEASE_MS);
-  }, [partyRoomId, isPartyHost, user, setPlaying, pauseEmbed, updatePlaybackState, currentServer, realtime.send, releaseSyncedStart]);
+  }, [partyRoomId, isPartyHost, user, setPlaying, pauseEmbed, updatePlaybackState, currentServer, realtimeSend, releaseSyncedStart]);
 
   // Host: a guest just joined → pause at the current position and hold
   // everyone there until the host releases. Nobody taps anything, so no
@@ -804,9 +981,47 @@ export function usePlayerPartySync({
     if (count > prev && !syncStageRef.current) startSyncedStart();
   }, [partyRoomId, isPartyHost, partyRoom?.participants?.length, partyRoom, startSyncedStart]);
 
+  /**
+   * Collaborative controls (F9): a guest requests a playback action. The
+   * host applies it and re-broadcasts. Only meaningful in COLLABORATIVE mode.
+   */
+  const requestPlaybackState = useCallback(
+    (state: "playing" | "paused", time: number) => {
+      if (!partyRoomId || isPartyHost) return;
+      if (!isCollaborative) return;
+      void realtimeSend("guest-control", { action: state, currentTime: time });
+    },
+    [partyRoomId, isPartyHost, isCollaborative, realtimeSend]
+  );
+
+  const requestSeek = useCallback(
+    (time: number) => {
+      if (!partyRoomId || isPartyHost) return;
+      if (!isCollaborative) return;
+      void realtimeSend("guest-control", { action: "seek", currentTime: time });
+    },
+    [partyRoomId, isPartyHost, isCollaborative, realtimeSend]
+  );
+
+  const requestServerChange = useCallback(
+    (serverIndex: number, time: number) => {
+      if (!partyRoomId || isPartyHost) return;
+      if (!isCollaborative) return;
+      void realtimeSend("guest-control", { action: "server-change", currentTime: time, serverIndex });
+    },
+    [partyRoomId, isPartyHost, isCollaborative, realtimeSend]
+  );
+
   const broadcastPartyState = useCallback(
     (state: "playing" | "paused", time: number) => {
-      if (!partyRoomId || !isPartyHost) return;
+      if (!partyRoomId) return;
+      // Collaborative mode: a guest may drive playback; route through the
+      // host instead of writing Firestore directly (rules block guest writes
+      // to playbackState).
+      if (!isPartyHost) {
+        if (isCollaborative) requestPlaybackState(state, time);
+        return;
+      }
       // Staged hold: the host pressing play releases BOTH sides together
       // at the shared start moment instead of starting the host early.
       if (state === "playing" && syncStageRef.current) {
@@ -819,12 +1034,12 @@ export function usePlayerPartySync({
       // Write authoritative state to Firestore immediately on explicit play/pause
       void updatePlaybackState(state, time, currentServer);
       // Send the real-time message through the self-hosted realtime transport
-      void realtime.send(state === "playing" ? "play" : "pause", { currentTime: time });
+      void realtimeSend(state === "playing" ? "play" : "pause", { currentTime: time });
       // Also send via WebRTC data channel so connected peers get the message
       // even if the realtime listener hasn't replayed yet.
       sendRtcMessage(state === "playing" ? "play" : "pause", { currentTime: time });
     },
-    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer, releaseSyncedStart, cancelSyncedStart]
+    [partyRoomId, isPartyHost, isCollaborative, updatePlaybackState, realtimeSend, sendRtcMessage, currentServer, releaseSyncedStart, cancelSyncedStart, requestPlaybackState]
   );
 
   /**
@@ -834,16 +1049,27 @@ export function usePlayerPartySync({
    */
   const broadcastPartySeek = useCallback(
     (time: number) => {
-      if (!partyRoomId || !isPartyHost) return;
+      if (!partyRoomId) return;
+      if (!isPartyHost) {
+        if (isCollaborative) requestSeek(time);
+        return;
+      }
       if (syncStageRef.current) cancelSyncedStart();
       // Persist to Firestore so late-joining guests get the right position
       void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, currentServer);
       // Instant delivery through the realtime transport
-      void realtime.send("seek", { currentTime: time });
+      void realtimeSend("seek", { currentTime: time });
       // Belt-and-braces: also send via WebRTC
       sendRtcMessage("seek", { currentTime: time });
     },
-    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, currentServer, cancelSyncedStart]
+    [partyRoomId, isPartyHost, isCollaborative, updatePlaybackState, realtimeSend, sendRtcMessage, currentServer, cancelSyncedStart, requestSeek]
+  );
+
+  const setControlsMode = useCallback(
+    async (mode: "HOST_ONLY" | "COLLABORATIVE") => {
+      await setControlsModeRoom(mode);
+    },
+    [setControlsModeRoom]
   );
 
   /**
@@ -853,23 +1079,18 @@ export function usePlayerPartySync({
    */
   const broadcastServerChange = useCallback(
     (serverIndex: number, time: number) => {
-      if (!partyRoomId || !isPartyHost) return;
+      if (!partyRoomId) return;
+      if (!isPartyHost) {
+        if (isCollaborative) requestServerChange(serverIndex, time);
+        return;
+      }
       if (syncStageRef.current) cancelSyncedStart();
       void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, serverIndex);
-      void realtime.send("server-change", { currentTime: time, serverIndex });
+      void realtimeSend("server-change", { currentTime: time, serverIndex });
       sendRtcMessage("server-change", { currentTime: time, serverIndex });
     },
-    [partyRoomId, isPartyHost, updatePlaybackState, realtime.send, sendRtcMessage, cancelSyncedStart]
+    [partyRoomId, isPartyHost, isCollaborative, updatePlaybackState, realtimeSend, sendRtcMessage, cancelSyncedStart, requestServerChange]
   );
-
-  const partyTimeRef = useRef(currentTime);
-  const partyPlayingRef = useRef(isPlaying);
-  const partyServerRef = useRef(currentServer);
-  partyTimeRef.current = currentTime;
-  partyPlayingRef.current = isPlaying;
-  partyServerRef.current = currentServer;
-  const sourceUrlRef = useRef(currentSourceProviderUrl);
-  sourceUrlRef.current = currentSourceProviderUrl;
 
   // Host: fast realtime heartbeats (800 ms) so guests correct drift quickly.
   // Firestore writes happen at a much lower cadence (4 s) to avoid rate limits.
@@ -889,12 +1110,18 @@ export function usePlayerPartySync({
       // The staged hold rides along so guests that missed the stage event
       // (or joined mid-stage) still hold instead of drifting.
       const stage = syncStageRef.current;
-      void realtime.send("heartbeat", {
+      // `playing` rides on every heartbeat so guests track play/pause on the
+      // fast channel instead of waiting up to a second for the room poll.
+      // Without it, a host pause reached the guest late, the guest kept
+      // playing, its position ran ahead, and the next poll yanked it
+      // backwards — a visible rewind on every pause.
+      void realtimeSend("heartbeat", {
         currentTime: time,
+        playing,
         staged: stage !== null,
         stageTime: stage?.targetTime ?? 0,
       });
-      sendRtcMessage("heartbeat", { currentTime: time });
+      sendRtcMessage("heartbeat", { currentTime: time, playing });
 
       // Throttle the heavier Firestore write
       firestoreTimer += HOST_HEARTBEAT_MS;
@@ -915,7 +1142,7 @@ export function usePlayerPartySync({
 
     const id = setInterval(tick, HOST_HEARTBEAT_MS);
     return () => clearInterval(id);
-  }, [partyRoomId, isPartyHost, realtime.send, sendRtcMessage, updatePlaybackState]);
+  }, [partyRoomId, isPartyHost, realtimeSend, sendRtcMessage, updatePlaybackState]);
 
   const handleStartParty = useCallback(async (): Promise<{ roomId: string; joinUrl: string } | null> => {
     if (!user) {
@@ -1048,6 +1275,12 @@ export function usePlayerPartySync({
     broadcastPartyState,
     broadcastPartySeek,
     broadcastServerChange,
+    controlsMode,
+    isCollaborative,
+    requestPlaybackState,
+    requestSeek,
+    requestServerChange,
+    setControlsMode,
     syncStage,
     staging,
     startSyncedStart,
@@ -1060,6 +1293,7 @@ export function usePlayerPartySync({
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
+    transferHost,
     media,
     guestServerIndex,
     guestSplashPhase,
@@ -1067,6 +1301,8 @@ export function usePlayerPartySync({
     guestJoinHostName: guestJoinSession?.hostName,
     resyncSeekUrl,
     setResyncSeekUrl,
+    snapToHost,
+    projectedHostTime,
     realtime: {
       processed: realtime.processed,
       isReady: realtime.isReady,
