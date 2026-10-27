@@ -209,7 +209,16 @@
     "people": "Njerëz",
     "castAndCrew": "Aktoret & ekipi",
     "noResults": "Nuk u gjetën rezultate",
-    "tryDifferent": "Provo një term tjetër kërkimi"
+    "tryDifferent": "Provo një term tjetër kërkimi",
+    "recent": "Kërkimet e fundit",
+    "browse": "Shfleto",
+    "searching": "Duke kërkuar...",
+    "seeAll": "Shiko të gjitha rezultatet për",
+    "clear": "Pastro kërkimin",
+    "removeRecent": "Hiq {query} nga kërkimet e fundit",
+    "hintNavigate": "Navigo",
+    "hintSelect": "Zgjidh",
+    "hintClose": "Mbyll"
   },
   "notFound": {
     "title": "Faqja nuk u gjet",

@@ -265,7 +265,10 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
         </>
       )}
 
-      <div className="relative z-10 flex flex-col items-center lg:items-start lg:items-center h-full pb-24 sm:pb-32 lg:pb-0">
+      {/* pt-24 clears the fixed navbar (h-16 / lg:h-[68px]); without it the hero
+          search renders underneath the transparent nav, which still captures
+          pointer events across its full width. */}
+      <div className="relative z-10 flex flex-col items-center lg:items-start lg:items-center h-full pt-24 pb-24 sm:pb-32 lg:pb-0">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
           {/* Prominent hero search — centered on mobile, aligned on desktop */}
           <div className="flex justify-center lg:justify-start mb-6 sm:mb-8 w-full">

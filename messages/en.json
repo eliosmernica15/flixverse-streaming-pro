@@ -209,7 +209,16 @@
     "people": "People",
     "castAndCrew": "Cast & Crew",
     "noResults": "No results found",
-    "tryDifferent": "Try a different search term"
+    "tryDifferent": "Try a different search term",
+    "recent": "Recent searches",
+    "browse": "Browse",
+    "searching": "Searching...",
+    "seeAll": "See all results for",
+    "clear": "Clear search",
+    "removeRecent": "Remove {query} from recent searches",
+    "hintNavigate": "Navigate",
+    "hintSelect": "Select",
+    "hintClose": "Close"
   },
   "notFound": {
     "title": "Page not found",

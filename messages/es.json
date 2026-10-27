@@ -209,7 +209,16 @@
     "people": "Personas",
     "castAndCrew": "Reparto y equipo",
     "noResults": "Sin resultados",
-    "tryDifferent": "Prueba con otra búsqueda"
+    "tryDifferent": "Prueba con otra búsqueda",
+    "recent": "Búsquedas recientes",
+    "browse": "Explorar",
+    "searching": "Buscando...",
+    "seeAll": "Ver todos los resultados de",
+    "clear": "Borrar búsqueda",
+    "removeRecent": "Quitar {query} de las búsquedas recientes",
+    "hintNavigate": "Navegar",
+    "hintSelect": "Seleccionar",
+    "hintClose": "Cerrar"
   },
   "notFound": {
     "title": "Página no encontrada",
