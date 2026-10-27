@@ -26,11 +26,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const SearchBar = dynamic(() => import("./SearchBar"), {
-  ssr: false,
-  loading: () => <div className="hidden sm:block w-48 lg:w-64 h-9 rounded-md bg-white/5 animate-pulse" />,
-});
-
 const NotificationSettings = dynamic(() => import("./NotificationSettings"), {
   ssr: false,
   loading: () => null,
@@ -69,11 +64,6 @@ const Navigation = () => {
   const prefetchRoute = useRoutePrefetch();
   const t = useTranslations("nav");
   const tc = useTranslations("common");
-
-  const handleMovieSelect = (movie: TMDBMovie) => {
-    const type = getContentType(movie);
-    router.push(`/movie/${movie.id}?type=${type}`);
-  };
 
   const isActive = (path: string) => pathname === path;
 
@@ -173,8 +163,6 @@ const Navigation = () => {
           </div>
 
           <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
-              <SearchBar onMovieSelect={handleMovieSelect} />
-
             <LanguageSwitcher />
             <OfflineSyncBadge />
 
@@ -286,10 +274,6 @@ const Navigation = () => {
         {isMobileMenuOpen && (
           <div className="animate-fade-in-up border-t border-white/10 lg:hidden">
             <div className="glass-soft mb-4 mt-3 rounded-xl p-3">
-              <div className="px-2 py-2">
-                <SearchBar onMovieSelect={handleMovieSelect} />
-              </div>
-
               <div className="mt-1 space-y-1">
                 {isAuthenticated && (
                   <button
