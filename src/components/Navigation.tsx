@@ -6,7 +6,6 @@ import { User, LogOut, Menu, X, Sparkles, ChevronDown, CreditCard, PartyPopper }
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { TMDBMovie, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { formatPlanLabel } from "@/lib/billing/format";
@@ -25,6 +24,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import NavSearchButton from "@/components/NavSearchButton";
 
 const NotificationSettings = dynamic(() => import("./NotificationSettings"), {
   ssr: false,
@@ -163,6 +163,7 @@ const Navigation = () => {
           </div>
 
           <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+            <NavSearchButton />
             <LanguageSwitcher />
             <OfflineSyncBadge />
 
