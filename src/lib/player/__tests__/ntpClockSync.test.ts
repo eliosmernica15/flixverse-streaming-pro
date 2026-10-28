@@ -18,21 +18,26 @@ describe("NTPClient", () => {
   });
 
   it("now() mirrors Date.now() with a zero offset", () => {
-    const before = Date.now();
-    const t = NTPClient.now();
-    const after = Date.now();
-    expect(t).toBeGreaterThanOrEqual(before);
-    expect(t).toBeLessThanOrEqual(after);
+    const base = 1700000000000;
+    vi.spyOn(Date, "now").mockReturnValue(base);
+    expect(NTPClient.now()).toBe(base);
+    vi.restoreAllMocks();
   });
 
   it("applies a positive offset when the local clock runs behind", () => {
+    const base = 1700000000000;
+    vi.spyOn(Date, "now").mockReturnValue(base);
     internals.offset = 1500;
-    expect(NTPClient.now()).toBeGreaterThanOrEqual(Date.now() + 1500);
+    expect(NTPClient.now()).toBe(base + 1500);
+    vi.restoreAllMocks();
   });
 
   it("applies a negative offset when the local clock runs ahead", () => {
+    const base = 1700000000000;
+    vi.spyOn(Date, "now").mockReturnValue(base);
     internals.offset = -2000;
-    expect(NTPClient.now()).toBeLessThanOrEqual(Date.now() - 2000 + 5);
+    expect(NTPClient.now()).toBe(base - 2000);
+    vi.restoreAllMocks();
   });
 
   it("calibrate() only performs one background refinement across repeated calls", async () => {

@@ -80,10 +80,10 @@ const BROWSE_SHORTCUTS = [
 ] as const;
 
 const GROUP_HEADING_CLASS =
-  "[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.16em] [&_[cmdk-group-heading]]:text-red-400/90";
+  "[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-extrabold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.18em] [&_[cmdk-group-heading]]:text-red-500/80";
 
 const ITEM_CLASS =
-  "group flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl px-3 text-sm text-gray-300 transition-colors data-[selected=true]:bg-gradient-to-r data-[selected=true]:from-red-500/15 data-[selected=true]:to-orange-500/5 data-[selected=true]:text-white";
+  "group flex min-h-[40px] cursor-pointer items-center gap-3 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-300 transition-all data-[selected=true]:bg-white/[0.08] data-[selected=true]:text-white";
 
 const BADGE_CLASS: Record<SearchKind, string> = {
   movie: "bg-red-600",
@@ -331,7 +331,7 @@ export default function CommandPalette() {
           aria-label={t("ariaLabel")}
           // No description element: the palette's own content is the context.
           aria-describedby={undefined}
-          className="glass-strong fixed left-1/2 top-1/2 z-[80] w-[min(42rem,calc(100vw-2rem))] [translate:-50%_-50%] overflow-hidden rounded-2xl border border-white/10 text-white shadow-2xl shadow-black/60 duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
+          className="glass-strong fixed left-1/2 top-1/2 z-[80] w-[min(38rem,calc(100vw-2rem))] [translate:-50%_-50%] overflow-hidden rounded-xl border border-white/10 bg-black/80 text-white shadow-2xl shadow-black/80 backdrop-blur-2xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
         >
           <DialogTitle className="sr-only">{t("ariaLabel")}</DialogTitle>
 
@@ -342,10 +342,10 @@ export default function CommandPalette() {
             className="w-full"
           >
             <div
-              className="flex items-center gap-3 border-b border-white/10 px-4"
+              className="flex items-center gap-3 border-b border-white/5 px-4"
               cmdk-input-wrapper=""
             >
-              <Search className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+              <Search className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
               <CommandPrimitive.Input
                 ref={inputRef}
                 value={query}
@@ -355,13 +355,13 @@ export default function CommandPalette() {
                 aria-keyshortcuts="Control+K Meta+K"
                 autoComplete="off"
                 spellCheck={false}
-                className="h-14 w-full bg-transparent text-[15px] text-white outline-none placeholder:text-gray-500"
+                className="h-12 w-full bg-transparent text-sm text-white outline-none placeholder:text-gray-600"
               />
               <DialogPrimitive.Close
                 aria-label={t("hintClose")}
-                className="shrink-0 select-none rounded-md border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200 focus-ring"
+                className="shrink-0 select-none rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold tracking-wider text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
               >
-                esc
+                ESC
               </DialogPrimitive.Close>
             </div>
 

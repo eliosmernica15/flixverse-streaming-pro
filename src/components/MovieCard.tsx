@@ -245,17 +245,20 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
           <div className="absolute inset-0 skeleton-shimmer bg-gradient-to-br from-gray-800/80 to-gray-900/80" />
         )}
 
+        {/* Advanced 3D lighting plane — reacts to cursor position (via CSS vars from use3DTilt) */}
+        <div className="absolute inset-0 z-10 bg-gradient-to-tr from-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{
+          backgroundImage: 'radial-gradient(circle at var(--tilt-sheen-x, 50%) var(--tilt-sheen-y, 50%), rgba(255,255,255,0.15), transparent 70%)'
+        }} />
+
         {/* Poster sits on its own depth plane so it parallaxes against the
             badges and typography above it when the card tilts. */}
-        <div className="movie-card-poster absolute inset-0">
+        <div className="movie-card-poster absolute inset-0 transition-transform duration-500 ease-out will-change-transform group-hover:scale-105">
           <Image
             src={finalPosterUrl}
             alt={displayTitle}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
-            className={`object-cover transition-transform duration-700 ease-out ${
-              isHovered ? "scale-[1.06]" : "scale-100"
-            }`}
+            className="object-cover"
             loading={priority ? "eager" : "lazy"}
             priority={priority}
             decoding="async"
