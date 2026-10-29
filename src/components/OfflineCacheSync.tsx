@@ -38,11 +38,20 @@ export default function OfflineCacheSync() {
     const persist = () => {
       if (!cancelled) void saveOfflineCache(cache);
     };
-    if ("requestIdleCallback" in window) {
-      const idleId = window.requestIdleCallback(persist, { timeout: 1500 });
+    const requestIdleCallback = (
+      window as Window & {
+        requestIdleCallback?: (
+          callback: IdleRequestCallback,
+          options?: IdleRequestOptions
+        ) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      }
+    ).requestIdleCallback;
+    if (requestIdleCallback) {
+      const idleId = requestIdleCallback(persist, { timeout: 1500 });
       return () => {
         cancelled = true;
-        window.cancelIdleCallback(idleId);
+        window.cancelIdleCallback?.(idleId);
       };
     }
     const timeoutId = window.setTimeout(persist, 0);
