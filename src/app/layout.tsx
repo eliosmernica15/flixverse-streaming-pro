@@ -106,7 +106,7 @@ export default async function RootLayout({
     const acceptLang = headersList.get("accept-language") ?? "";
     const locale = acceptLang.startsWith("sq") ? "sq" : acceptLang.startsWith("es") ? "es" : "en";
     return (
-        <html lang={localeToHtmlLang(locale)} suppressHydrationWarning>
+        <html lang={localeToHtmlLang(locale)} data-scroll-behavior="smooth" suppressHydrationWarning>
             <head>
                 <link rel="preconnect" href="https://api.themoviedb.org" />
                 <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />

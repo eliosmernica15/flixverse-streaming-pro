@@ -14,6 +14,7 @@ import {
 // stop spinning and say so — the popup must never sit on "connecting"
 // forever.
 const STUCK_AFTER_MS = 45_000;
+const IDLE_BRIDGE_STATE = { phase: "idle" as const };
 
 const PHASE_LABEL: Record<Exclude<GuestJoinBridgePhase, "idle" | "error">, string> = {
   accepting: "Confirming your invite…",
@@ -35,7 +36,7 @@ function GuestJoinOverlayContent() {
   const bridge = useSyncExternalStore(
     subscribeGuestJoinBridge,
     getGuestJoinBridgeState,
-    () => ({ phase: "idle" as const })
+    () => IDLE_BRIDGE_STATE
   );
   const [timedOut, setTimedOut] = useState(false);
   const watchdogRef = useRef(0);

@@ -331,7 +331,7 @@ export default function CommandPalette() {
           aria-label={t("ariaLabel")}
           // No description element: the palette's own content is the context.
           aria-describedby={undefined}
-          className="glass-strong fixed left-1/2 top-1/2 z-[80] w-[min(42rem,calc(100vw-2rem))] [translate:-50%_-50%] overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(145deg,hsl(var(--surface-2)/.96),hsl(var(--surface-0)/.94))] text-white shadow-[0_30px_100px_rgba(0,0,0,.8),0_0_80px_hsl(var(--primary)/.12)] backdrop-blur-2xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
+          className="fixed left-1/2 top-1/2 z-[80] w-[min(42rem,calc(100vw-2rem))] [translate:-50%_-50%] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#050505] text-white shadow-[0_30px_100px_rgba(0,0,0,.82),0_0_70px_hsl(var(--primary)/.1)] duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
         >
           <DialogTitle className="sr-only">{t("ariaLabel")}</DialogTitle>
 
@@ -342,16 +342,10 @@ export default function CommandPalette() {
             className="relative w-full"
           >
             <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-red-400/80 to-transparent shadow-[0_0_18px_hsl(var(--primary)/.8)]"
-            />
-            <div
-              className="flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-white/[0.06] via-white/[0.025] to-transparent px-4"
+              className="flex items-center gap-2 border-b border-white/10 bg-black/20 px-3"
               cmdk-input-wrapper=""
             >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-red-400/20 bg-red-500/10 shadow-[0_0_20px_hsl(var(--primary)/.18)]">
-                <Search className="h-4 w-4 text-red-300" aria-hidden="true" />
-              </span>
+              <Search className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
               <CommandPrimitive.Input
                 ref={inputRef}
                 value={query}
@@ -361,17 +355,18 @@ export default function CommandPalette() {
                 aria-keyshortcuts="Control+K Meta+K"
                 autoComplete="off"
                 spellCheck={false}
-                className="h-14 w-full bg-transparent text-[15px] font-medium tracking-[0.01em] text-white outline-none placeholder:text-gray-500"
+                className="h-10 w-full bg-transparent text-sm font-medium tracking-normal text-white outline-none placeholder:text-gray-500 focus:border-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                style={{ outline: "none", boxShadow: "none" }}
               />
               <DialogPrimitive.Close
                 aria-label={t("hintClose")}
-                className="shrink-0 select-none rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-[10px] font-bold tracking-wider text-gray-400 transition-all hover:border-red-400/30 hover:bg-red-500/10 hover:text-white"
+                className="shrink-0 select-none rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold tracking-wider text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
               >
                 ESC
               </DialogPrimitive.Close>
             </div>
 
-            <CommandList className="max-h-[min(30rem,62vh)] py-2">
+            <CommandList className="h-[28rem] max-h-[calc(100vh-9rem)] overflow-y-auto py-2">
               {searching ? (
                 loading ? (
                   <div className="px-3 py-1">
