@@ -143,8 +143,19 @@ export async function GET(request: NextRequest) {
   const duration = parseFloat(searchParams.get("duration") || "7200");
   const format = (searchParams.get("format") || "json").toLowerCase();
 
-  if (!tmdbId) {
-    return NextResponse.json({ error: "tmdbId required" }, { status: 400 });
+  if (
+    !Number.isInteger(tmdbId) ||
+    tmdbId < 1 ||
+    !["movie", "tv"].includes(mediaType) ||
+    (season !== undefined && (!Number.isInteger(season) || season < 1 || season > 100)) ||
+    (episode !== undefined && (!Number.isInteger(episode) || episode < 1 || episode > 1000)) ||
+    !/^[a-z]{2}(?:-[A-Z]{2})?$/.test(lang) ||
+    !Number.isFinite(duration) ||
+    duration <= 0 ||
+    duration > 24 * 60 * 60 ||
+    !["json", "vtt"].includes(format)
+  ) {
+    return NextResponse.json({ error: "Invalid caption request" }, { status: 400 });
   }
 
   const rawSrt = await fetchExternalSubtitles(tmdbId, mediaType, season, episode, lang);
