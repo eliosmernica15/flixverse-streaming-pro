@@ -79,7 +79,7 @@ function useFirestoreReviews(contentId?: number, contentType?: 'movie' | 'tv') {
     });
 
     return () => unsubscribe();
-  }, [contentId, contentType, user]);
+  }, [contentId, contentType, toast, user]);
 
   useEffect(() => {
     if (!user || !isAuthenticated || reviews.length === 0) {

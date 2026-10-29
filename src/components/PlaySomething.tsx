@@ -22,8 +22,6 @@ export function PlaySomething() {
   const { toast } = useToast();
   const { history } = useWatchHistoryContext();
   const { preferences } = useUserPreferencesContext();
-  const favoriteGenres = preferences.favoriteGenres || [];
-
   const pickRandom = useCallback(async () => {
     setLoading(true);
     try {
@@ -45,7 +43,7 @@ export function PlaySomething() {
 
       // Weight by user preferences if available
       const watchedIds = new Set(history.map((h) => h.content_id));
-      const genrePrefs = favoriteGenres || [];
+      const genrePrefs = preferences.favoriteGenres || [];
 
       const scored = pool.map((m) => {
         let score = m.vote_average || 5;
@@ -72,7 +70,7 @@ export function PlaySomething() {
     } finally {
       setLoading(false);
     }
-  }, [history, favoriteGenres, router, toast]);
+  }, [history, preferences, router, toast]);
 
   return (
     <button

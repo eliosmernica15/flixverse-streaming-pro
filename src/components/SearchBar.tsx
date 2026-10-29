@@ -313,6 +313,8 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                   }`}
                 >
                   <div className="relative shrink-0">
+                    {/* Search results may come from arbitrary TMDB profile paths. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={getResultImage(result)}
                       alt={result.title || result.name}

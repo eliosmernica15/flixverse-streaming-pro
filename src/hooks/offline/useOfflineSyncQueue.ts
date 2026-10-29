@@ -33,18 +33,6 @@ export function useOfflineSyncQueue(): UseOfflineSyncQueueReturn {
     void refreshCount();
   }, [refreshCount]);
 
-  // Listen for online event to auto-sync
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const handleOnline = () => {
-      void syncNow();
-    };
-
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-  }, []);
-
   const syncNow = useCallback(async () => {
     if (isSyncing || typeof navigator === "undefined" || !navigator.onLine) return;
 
@@ -60,6 +48,18 @@ export function useOfflineSyncQueue(): UseOfflineSyncQueueReturn {
       setIsSyncing(false);
     }
   }, [isSyncing, refreshCount]);
+
+  // Listen for online event to auto-sync
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => {
+      void syncNow();
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [syncNow]);
 
   return { pendingCount, isSyncing, syncNow, lastError };
 }
