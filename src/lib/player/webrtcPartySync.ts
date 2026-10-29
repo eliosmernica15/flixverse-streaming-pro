@@ -658,6 +658,15 @@ export class WebRTCPartySync {
       this.unsubscribe = null;
     }
     for (const peerId of [...this.peers.keys()]) this.closePeer(peerId);
+    for (const channel of this.channels.values()) {
+      channel.onclose = null;
+      try {
+        channel.close();
+      } catch {
+        // already closed
+      }
+    }
+    this.channels.clear();
 
     // Deliberately does NOT stop `localStream`'s tracks: the stream belongs
     // to the caller (usePartyMedia). Stopping it here killed the user's

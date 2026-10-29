@@ -88,6 +88,9 @@ export function useWebRTCSync({
 
   useEffect(() => {
     if (!roomId || !uid) {
+      syncRef.current?.destroy();
+      syncRef.current = null;
+      syncInitRef.current = null;
       setRtcConnected(false);
       return;
     }

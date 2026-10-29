@@ -509,14 +509,20 @@ export function usePartyMedia({
   useEffect(() => {
     const remoteAnalysers = remoteAnalysersRef.current;
     return () => {
+      void setLocalStream(null);
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
+      setLocalStreamState(null);
       disposeAnalyser(analyserRef.current);
       analyserRef.current = null;
       for (const handle of remoteAnalysers.values()) disposeAnalyser(handle);
       remoteAnalysers.clear();
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
-  }, []);
+  }, [setLocalStream]);
 
   const participants: PartyMediaParticipant[] = [];
   const seen = new Set<string>();
