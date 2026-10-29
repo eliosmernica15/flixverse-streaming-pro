@@ -238,6 +238,13 @@ service cloud.firestore {
       allow list: if false;
 
       allow update: if isAuthenticated() && (
+        request.resource.data.hostId is string
+        && request.resource.data.participantIds is list
+        && request.resource.data.participantIds.size() > 0
+        && request.resource.data.participantIds.size() <= 20
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == request.resource.data.participantIds.size()
+        && (
         // The host controls playback, room policy, moderation, and host transfer.
         (
           request.auth.uid == resource.data.hostId
@@ -253,6 +260,7 @@ service cloud.firestore {
               .hasOnly(['participants', 'participantIds', 'updatedAt'])
           && (canAddPartyParticipant(roomId) || canLeaveParty(roomId))
         )
+        )
       );
       allow create: if isAuthenticated()
         && request.auth.uid == request.resource.data.hostId
@@ -260,6 +268,8 @@ service cloud.firestore {
         && request.resource.data.code.size() == 6
         && request.resource.data.participants is list
         && request.resource.data.participants.size() == 1
+        && request.resource.data.participantIds is list
+        && request.resource.data.participantIds.size() == 1
         && request.resource.data.participantIds == [request.auth.uid]
         && request.resource.data.participants[0].userId == request.auth.uid
         && request.resource.data.participants[0].role == 'host';
@@ -269,6 +279,7 @@ service cloud.firestore {
         allow read: if isPartyParticipant(roomId);
         allow create: if isPartyParticipant(roomId)
           && request.auth.uid == request.resource.data.senderId
+          && request.resource.data.senderId is string
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 500;
@@ -304,6 +315,7 @@ service cloud.firestore {
           && request.resource.data.type in ['offer', 'answer', 'candidate']
           && request.resource.data.targetId is string
           && request.resource.data.targetId.size() > 0
+          && request.resource.data.targetId.size() <= 128
           && request.resource.data.targetId != request.auth.uid
           && request.resource.data.targetId in partyRoom(roomId).participantIds;
         allow delete: if isPartyParticipant(roomId)
