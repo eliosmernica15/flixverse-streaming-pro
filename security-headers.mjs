@@ -42,6 +42,18 @@ export const securityHeaders = [
     value: "on",
   },
   {
+    key: "X-Permitted-Cross-Domain-Policies",
+    value: "none",
+  },
+  {
+    key: "Origin-Agent-Cluster",
+    value: "?1",
+  },
+  {
+    key: "Cross-Origin-Resource-Policy",
+    value: "same-site",
+  },
+  {
     key: "Referrer-Policy",
     value: "strict-origin-when-cross-origin",
   },
