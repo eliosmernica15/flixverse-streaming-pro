@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Navigation from "@/components/Navigation";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
+import { usePerformanceMode } from "@/hooks/usePerformanceMode";
 
 const Footer = dynamic(() => import("@/components/Footer"), {
   ssr: false,
@@ -17,6 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const tc = useTranslations("common");
   const pageVisible = usePageVisibility();
+  const performanceMode = usePerformanceMode();
   const hideShell = SHELL_HIDDEN_PREFIXES.some((prefix) => pathname?.startsWith(prefix));
 
   if (hideShell) {
@@ -24,7 +26,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className={`safe-area-top flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0c] text-white${pageVisible ? "" : " page-hidden"}`}>
+    <div className={`safe-area-top flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0c] text-white${pageVisible ? "" : " page-hidden"}${performanceMode ? " performance-mode" : ""}`}>
       <a href="#main-content" className="skip-link">
         {tc("skipToContent")}
       </a>

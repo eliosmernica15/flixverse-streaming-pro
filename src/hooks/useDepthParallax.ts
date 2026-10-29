@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { usePerformanceMode } from "@/hooks/usePerformanceMode";
 
 /**
  * Pointer-driven depth parallax for layered scenes.
@@ -32,13 +33,14 @@ export function useDepthParallax<T extends HTMLElement = HTMLDivElement>(
 ) {
   const ref = useRef<T | null>(null);
   const reducedMotion = useReducedMotion();
+  const performanceMode = usePerformanceMode();
   const frameRef = useRef(0);
   const targetRef = useRef({ x: 0, y: 0 });
   const currentRef = useRef({ x: 0, y: 0 });
   const visibleRef = useRef(true);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || performanceMode) return;
     const node = ref.current;
     if (!node) return;
     if (typeof window === "undefined") return;
@@ -122,7 +124,7 @@ export function useDepthParallax<T extends HTMLElement = HTMLDivElement>(
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
       frameRef.current = 0;
     };
-  }, [reducedMotion, strength]);
+  }, [performanceMode, reducedMotion, strength]);
 
   return ref;
 }

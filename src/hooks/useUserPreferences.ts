@@ -8,6 +8,7 @@ export interface UserPreferences {
   viewHistory: number[];
   lastVisited: string;
   personalizedRecommendations: boolean;
+  performanceMode: boolean;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -17,6 +18,7 @@ const defaultPreferences: UserPreferences = {
   viewHistory: [],
   lastVisited: new Date().toISOString(),
   personalizedRecommendations: true,
+  performanceMode: false,
 };
 
 export const useUserPreferences = () => {
@@ -26,7 +28,7 @@ export const useUserPreferences = () => {
     const saved = localStorage.getItem('userPreferences');
     if (saved) {
       try {
-        setPreferences(JSON.parse(saved));
+        setPreferences({ ...defaultPreferences, ...JSON.parse(saved) });
       } catch (error) {
         console.error('Error parsing user preferences:', error);
       }

@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
+import { usePerformanceMode } from "@/hooks/usePerformanceMode";
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -66,6 +67,7 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const performanceMode = usePerformanceMode();
   // Spring-smoothed 3D tilt + cursor-tracked specular sheen. Writes CSS
   // variables only — no React state — so a grid of 40 posters costs no
   // re-renders while the pointer moves across it.
@@ -73,7 +75,7 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
     max: 7,
     lift: 18,
     hoverScale: 1.02,
-    enabled: true,
+    enabled: !performanceMode,
   });
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
@@ -108,9 +110,10 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
   }, [movie, router, queryClient]);
 
   const schedulePrefetch = useCallback(() => {
+    if (performanceMode) return;
     if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
     prefetchTimerRef.current = setTimeout(prefetchMovie, 180);
-  }, [prefetchMovie]);
+  }, [performanceMode, prefetchMovie]);
 
   const clearAllTimers = useCallback(() => {
     if (prefetchTimerRef.current) {

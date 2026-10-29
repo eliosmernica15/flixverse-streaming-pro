@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { usePerformanceMode } from "@/hooks/usePerformanceMode";
 
 /**
  * Pointer-driven 3D tilt with cursor-tracked specular sheen.
@@ -62,6 +63,7 @@ export function use3DTilt<T extends HTMLElement = HTMLDivElement>(
 
   const ref = useRef<T | null>(null);
   const reducedMotion = useReducedMotion();
+  const performanceMode = usePerformanceMode();
 
   // Animation state, kept out of React.
   const targetRef = useRef<TiltTarget>({ ...IDLE });
@@ -143,7 +145,7 @@ export function use3DTilt<T extends HTMLElement = HTMLDivElement>(
 
   const onPointerMove = useCallback(
     (event: React.PointerEvent<T>) => {
-      if (!enabled || reducedMotion || !supportedRef.current) return;
+      if (!enabled || reducedMotion || performanceMode || !supportedRef.current) return;
       if (event.pointerType === "touch") return;
       const node = ref.current;
       if (!node) return;
@@ -171,7 +173,7 @@ export function use3DTilt<T extends HTMLElement = HTMLDivElement>(
       node.style.setProperty("--tilt-active", "1");
       wake();
     },
-    [enabled, hoverScale, lift, max, reducedMotion, wake]
+    [enabled, hoverScale, lift, max, performanceMode, reducedMotion, wake]
   );
 
   const onPointerLeave = useCallback(() => {
@@ -205,7 +207,7 @@ export function use3DTilt<T extends HTMLElement = HTMLDivElement>(
     onPointerMove,
     onPointerLeave,
     /** True when the effect is actually running for this user/device. */
-    enabled: enabled && !reducedMotion,
+    enabled:     enabled && !reducedMotion && !performanceMode,
   };
 }
 

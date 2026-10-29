@@ -17,7 +17,7 @@ interface LazySectionProps {
 export default function LazySection({
   children,
   minHeight = 320,
-  rootMargin = "280px",
+  rootMargin = "180px",
   className,
   staggerIndex = 0,
 }: LazySectionProps) {

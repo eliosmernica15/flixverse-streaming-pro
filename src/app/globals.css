@@ -251,6 +251,20 @@
     animation-play-state: paused !important;
   }
 
+  .performance-mode *,
+  .performance-mode *::before,
+  .performance-mode *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .performance-mode .hero-glow-red,
+  .performance-mode .hero-glow-purple,
+  .performance-mode .player-ambient-glow,
+  .performance-mode .animate-ambient-glow-pulse {
+    display: none !important;
+  }
+
   .text-balance {
     text-wrap: balance;
     text-align: balance;

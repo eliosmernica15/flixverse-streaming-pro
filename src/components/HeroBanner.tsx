@@ -15,6 +15,7 @@ import { useDominantColors } from "@/hooks/player/useDominantColors";
 import { useDepthParallax } from "@/hooks/useDepthParallax";
 import { rgbToCss } from "@/lib/player/extractDominantColors";
 import { useTranslations } from "next-intl";
+import { usePerformanceMode } from "@/hooks/usePerformanceMode";
 
 interface HeroBannerProps {
   movie: TMDBMovie;
@@ -43,6 +44,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const reducedMotion = useReducedMotion();
+  const performanceMode = usePerformanceMode();
 
   // Layered depth: the backdrop, the atmospheric glows and the copy sit on
   // three planes and drift by different amounts as the pointer moves. The
@@ -60,7 +62,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   // rAF-throttled, capped at one viewport, disabled for reduced motion.
   const backdropRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || performanceMode) return;
     if (typeof window === "undefined") return;
     let raf = 0;
     const applyParallax = () => {
@@ -80,21 +82,21 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
       if (raf) cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [reducedMotion]);
+  }, [performanceMode, reducedMotion]);
 
   const c1 = colors[0] ? rgbToCss(colors[0], 0.18) : "rgba(229, 9, 20, 0.18)";
   const c2 = colors[1] ? rgbToCss(colors[1], 0.12) : "rgba(124, 58, 237, 0.12)";
 
   useEffect(() => {
-    for (const m of allMovies) {
+    for (const m of performanceMode ? allMovies.slice(0, 1) : allMovies) {
       const ct = getContentType(m);
       prefetchContentDetails(queryClient, m.id, ct);
       router.prefetch(`/movie/${m.id}?type=${ct}`);
     }
-  }, [allMovies, queryClient, router]);
+  }, [allMovies, performanceMode, queryClient, router]);
 
   useEffect(() => {
-    if (allMovies.length <= 1 || reducedMotion) return;
+    if (allMovies.length <= 1 || reducedMotion || performanceMode) return;
 
     const startTimer = () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -120,17 +122,17 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
       stopTimer();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [allMovies.length, reducedMotion]);
+  }, [allMovies.length, performanceMode, reducedMotion]);
 
   const goToSlide = useCallback((index: number) => {
     if (timerRef.current) clearInterval(timerRef.current);
     setActiveIndex(index);
-    if (allMovies.length > 1 && !reducedMotion) {
+    if (allMovies.length > 1 && !reducedMotion && !performanceMode) {
       timerRef.current = setInterval(() => {
         setActiveIndex((prev) => (prev + 1) % allMovies.length);
       }, ROTATION_INTERVAL_MS);
     }
-  }, [allMovies.length, reducedMotion]);
+  }, [allMovies.length, performanceMode, reducedMotion]);
 
   const goPrev = useCallback(() => {
     goToSlide(activeIndex === 0 ? allMovies.length - 1 : activeIndex - 1);
