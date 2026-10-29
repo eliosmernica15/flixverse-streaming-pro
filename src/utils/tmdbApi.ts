@@ -237,6 +237,9 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
           if (response.status === 404) {
             return { results: [], success: false, status_code: 404 };
           }
+          if (response.status === 401 || response.status === 403) {
+            return { results: [], success: false, status_code: response.status };
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
