@@ -48,7 +48,7 @@ export default function LazySection({
   return (
     <div
       ref={ref}
-      className={className}
+      className={`content-visibility-auto${className ? ` ${className}` : ""}`}
       style={{
         minHeight: visible ? undefined : minHeight,
         opacity: visible ? 1 : 0,

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Navigation from "@/components/Navigation";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 
 const Footer = dynamic(() => import("@/components/Footer"), {
   ssr: false,
@@ -15,6 +16,7 @@ const SHELL_HIDDEN_PREFIXES = ["/auth", "/movie/"];
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const tc = useTranslations("common");
+  const pageVisible = usePageVisibility();
   const hideShell = SHELL_HIDDEN_PREFIXES.some((prefix) => pathname?.startsWith(prefix));
 
   if (hideShell) {
@@ -22,7 +24,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="safe-area-top flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0c] text-white">
+    <div className={`safe-area-top flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0c] text-white${pageVisible ? "" : " page-hidden"}`}>
       <a href="#main-content" className="skip-link">
         {tc("skipToContent")}
       </a>

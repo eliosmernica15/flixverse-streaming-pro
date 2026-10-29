@@ -240,6 +240,17 @@
     background: hsl(var(--surface-2));
   }
 
+  .content-visibility-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 360px;
+  }
+
+  .page-hidden *,
+  .page-hidden *::before,
+  .page-hidden *::after {
+    animation-play-state: paused !important;
+  }
+
   .text-balance {
     text-wrap: balance;
     text-align: balance;
