@@ -472,6 +472,7 @@ export function usePlayerPartySync({
   const realtime = usePartyRealtime({
     roomId: partyRoomId,
     isHost: !!isPartyHost,
+    controlsMode,
     onEvent: (ev) => {
       // Collaborative controls (F9): a guest requested a playback action.
       // The host is the only writer of authoritative state, so it applies
@@ -492,6 +493,9 @@ export function usePlayerPartySync({
         }
         return;
       }
+      // Guest-control is a request for the host, never an authoritative
+      // playback event for other guests.
+      if (ev.type === "guest-control") return;
       noteGuestSignal(ev.data?.currentTime);
       if (ev.type === "sync-stage" && typeof ev.data?.currentTime === "number") {
         handleGuestStage(

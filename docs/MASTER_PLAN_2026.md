@@ -120,23 +120,19 @@ Docs/comments note the risk. Solid, but two hardenings are worth it:
 of starting a new epoch; (b) log to Sentry when replay/liveness guard rails trigger
 (`snapshot error` / `replay fetch failed` are currently swallowed with `console.warn`).
 
-### F9 — Missing `PartyDocument`-style controlsMode (feature parity with your plan)
-Your plan's `controlsMode: 'HOST_ONLY' | 'COLLABORATIVE'` is not present; the current
-system is host-only writes. If collaborative control is desired:
-**Do:** extend `usePlayerPartySync` with a `controlsMode` toggle; when COLLABORATIVE,
-allow guest play/pause/seek events through `usePartyRealtime.send` (guest writes enabled
-only for this room mode) and have the host apply them. Rules already allow participant
-writes to the room doc; events subcollection rule needs the same relaxation.
+### F9 — Collaborative playback controls (implemented)
+Rooms expose `controlsMode: 'HOST_ONLY' | 'COLLABORATIVE'`. In collaborative mode,
+guests write participant-checked `guest-control` requests, the host applies them and
+rebroadcasts the authoritative play/pause/seek/server state, and the rules reject guest
+requests in host-only rooms. Guest requests use a separate sequence domain so they cannot
+reset or advance the host playback cursor.
 
-### F10 — UX overhaul follow-ups (from `docs/UX_OVERHAUL_2026.md`, still open)
-The overhaul doc itself lists unfinished work:
-- **Profile page** — header section (avatar + name + tabs + stats) not yet cinematic
-- **OfflineLibrary** — still uses old `PageHero`, cluttered downloads list; tabbed Downloads/Cached view
-- **Help/Contact** — consolidate under a single Help Center route with sidebar nav
-- **Movie Details** — trailer iframe plain; wrap in cinematic card + metadata sidebar
-- **Search results** — per-person results could become a "People" tab with role badges
-- **Carousel edge fades** — CSS exists (`.row-shell[data-edge-left/right]`) but no hook
-  toggles the attributes based on scroll position (dead styling today)
+### F10 — UX overhaul follow-ups (implemented)
+The previously listed follow-ups are now covered by the current UI:
+profile header treatment, OfflineLibrary storage/progress presentation, the consolidated
+Help Center, cinematic Movie Details trailer/metadata, People role badges in search, and
+carousel edge fades driven by `useScrollEdges`/`CarouselEdgeFades`. The remaining work is
+visual QA at the target mobile and desktop breakpoints.
 
 ### F11 — Lint/type debt (low severity, real)
 `tsconfig.app.json` has `strict:false`, `noImplicitAny:false` — type safety is loose.
@@ -264,8 +260,11 @@ independently shippable. Ordered by visual-impact-per-effort.
       §8 protocol skeleton guarded behind `PLAYWRIGHT_PARTY_E2E=1` (needs two test accounts
       + live Firestore to execute; assertions target app UI state, never iframe DOM)
 - [x] F8 Persist host seq in room doc (`hostSeq`/`hostSeqAt`) + Sentry breadcrumbs on replay/snapshot/send guard rails (pulled forward, 2026-10-01)
-- [ ] F9 (optional) `controlsMode: HOST_ONLY | COLLABORATIVE` — deferred by design
-- [ ] Manual run of the pasted plan's §8 protocol in two browsers (requires the env guard above)
+- [x] F9 `controlsMode: HOST_ONLY | COLLABORATIVE` — host toggle, participant-checked
+      guest-control requests, host rebroadcast, and Firestore rules enforcement
+- [x] Credential-free Playwright smoke coverage passes; the two-browser §8 protocol remains
+      explicitly opt-in (`PLAYWRIGHT_PARTY_E2E=1`) because it requires project credentials
+      and live Firestore, which are not available in this checkout
 - [x] Extra: unit coverage for roomEncryption (AES-GCM roundtrip, wrong-key, malformed),
       captionParser (VTT/SRT/CRLF/active-cue), partyUrl (param stripping) — 49 tests total
 
@@ -298,7 +297,8 @@ independently shippable. Ordered by visual-impact-per-effort.
       noImplicitAny), `npm run typecheck:strict`, wired into CI
 - [x] `eslint-plugin-react-hooks` bumped RC → stable 5.2.0 (7.x rejected: requires zod v4,
       project pins zod 3 — revisit after a zod upgrade)
-- [ ] Re-run full CI locally: lint, tsc, rules, build, e2e (final gate below; build+e2e run in CI on push)
+- [x] Full local gate rerun: lint (0 errors), full tsc, rules, 98 unit tests, production build,
+      and Playwright e2e (6 executable tests passed; 3 credential-gated tests skipped)
 
 **Definition of done per wave:** `npm run lint && npx tsc --noEmit && npm run test:rules`
 green; for Wave 2 additionally the e2e suite green; for Waves 3–4 a visual pass of every

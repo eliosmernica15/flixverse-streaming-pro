@@ -31,7 +31,9 @@ test.describe("watch party join flow (no credentials needed)", () => {
     // The join client shows its staged flow while verifying; a signed-out
     // visitor is handed to /auth instead. Either is a valid live state.
     await expect(
-      page.getByText(/Verifying invite|Joining party|Resolving content|Syncing playback|Sign in/i)
+      page
+        .getByText(/Verifying invite|Joining party|Resolving content|Syncing playback/i)
+        .first()
     ).toBeVisible({ timeout: 15_000 });
   });
 

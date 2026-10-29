@@ -57,3 +57,5 @@ filelist.txt
 *.njsproj
 *.sln
 *.sw?
+
+.vercel

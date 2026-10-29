@@ -128,6 +128,8 @@ interface UsePartyRealtimeOptions {
   roomId: string | null;
   /** Only the host emits events. */
   isHost: boolean;
+  /** Guests may emit request events only while collaborative controls are enabled. */
+  controlsMode?: "HOST_ONLY" | "COLLABORATIVE";
   /** Per-event callback for non-heartbeat sync events. */
   onEvent: (event: PartyRealtimeEvent) => void;
   /** Optional callback for heartbeat events (higher frequency, separate path). */
@@ -148,6 +150,7 @@ interface UsePartyRealtimeResult {
 export function usePartyRealtime({
   roomId,
   isHost,
+  controlsMode = "HOST_ONLY",
   onEvent,
   onHeartbeat,
 }: UsePartyRealtimeOptions): UsePartyRealtimeResult {
@@ -182,6 +185,11 @@ export function usePartyRealtime({
   // seq is not greater than the cursor. Heartbeats arrive every ~800ms, so
   // a 15s gap reliably indicates a fresh epoch, never normal jitter.
   const lastTsRef = useRef(0);
+  // Guest controls are requests, not host playback events. They use a
+  // separate sequence domain and should only be accepted if they were
+  // written after this listener started; otherwise a reconnect could replay
+  // an old play/pause request.
+  const guestControlCutoffRef = useRef(0);
   const EPOCH_GAP_MS = 15_000;
   // Live listener window. limit(1) drops intermediate events when the host
   // emits twice between snapshots (e.g. pause+seek within one heartbeat
@@ -204,6 +212,7 @@ export function usePartyRealtime({
     }
 
     const db = requireFirebaseDb();
+    guestControlCutoffRef.current = NTPClient.now();
     const eventsRef = collection(db, "flix_parties", roomId, "events");
     const replayQuery = query(eventsRef, orderBy("seq", "desc"), limit(REPLAY_BUFFER));
 
@@ -221,13 +230,25 @@ export function usePartyRealtime({
 
         for (const { data: ev } of ordered) {
           if (ev.senderId === userId) continue;
-          if (ev.seq <= lastSeenSeqRef.current && ev.ts <= lastTsRef.current + EPOCH_GAP_MS) continue;
+          const isGuestControl = ev.type === "guest-control";
+          if (isGuestControl && ev.ts < guestControlCutoffRef.current) {
+            continue;
+          }
+          if (
+            !isGuestControl &&
+            ev.seq <= lastSeenSeqRef.current &&
+            ev.ts <= lastTsRef.current + EPOCH_GAP_MS
+          ) {
+            continue;
+          }
           // Plain assignment (not max): batches are processed oldest-first,
           // and after a host reload the seq restarts low — max() would pin
           // the cursor at the pre-reload high-water mark and reject every
           // subsequent event as "old".
-          lastSeenSeqRef.current = ev.seq;
-          lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
+          if (!isGuestControl) {
+            lastSeenSeqRef.current = ev.seq;
+            lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
+          }
           bumpProcessed();
           if (ev.type === "heartbeat") {
             onHeartbeatRef.current?.(ev);
@@ -254,13 +275,17 @@ export function usePartyRealtime({
               .filter((ev) => ev.senderId !== userId)
               .filter(
                 (ev) =>
+                  (ev.type === "guest-control" &&
+                    ev.ts >= guestControlCutoffRef.current) ||
                   ev.seq > lastSeenSeqRef.current ||
                   ev.ts > lastTsRef.current + EPOCH_GAP_MS
               )
               .sort((a, b) => a.seq - b.seq);
             for (const ev of fresh) {
-              lastSeenSeqRef.current = ev.seq;
-              lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
+              if (ev.type !== "guest-control") {
+                lastSeenSeqRef.current = ev.seq;
+                lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
+              }
               bumpProcessed();
               if (ev.type === "heartbeat") {
                 onHeartbeatRef.current?.(ev);
@@ -346,7 +371,9 @@ export function usePartyRealtime({
 
   const send = useCallback(
     async (type: PartyRealtimeEventType, data: PartyRealtimeEvent["data"]) => {
-      if (!roomId || !isHost) return;
+      const isGuestControl =
+        type === "guest-control" && controlsMode === "COLLABORATIVE";
+      if (!roomId || (!isHost && !isGuestControl)) return;
       if (!userId || userId === "anon") return;
       if (isRateLimited("PARTY_REALTIME", userId)) return;
 
@@ -360,7 +387,7 @@ export function usePartyRealtime({
       // monotonic across reloads. Reads/writes for this are one per
       // session plus one per non-heartbeat event (play/pause/seek are
       // rare; heartbeats skip the write on purpose).
-      if (!seqSeededRef.current) {
+      if (isHost && !seqSeededRef.current) {
         seqSeededRef.current = true;
         try {
           const roomSnap = await getDoc(doc(db, "flix_parties", roomId));
@@ -375,8 +402,8 @@ export function usePartyRealtime({
         }
       }
 
-      const seq = seqRef.current + 1;
-      seqRef.current = seq;
+      const seq = isHost ? seqRef.current + 1 : 0;
+      if (isHost) seqRef.current = seq;
 
       const ev: PartyRealtimeEvent = {
         type,
@@ -407,14 +434,18 @@ export function usePartyRealtime({
         return;
       }
 
+      const eventId = isGuestControl
+        ? `guest_${userId}_${Date.now()}_${crypto.randomUUID()}`
+        : `${seq.toString().padStart(20, "0")}_${type}`;
       try {
-        await setDoc(doc(eventsRef, `${seq.toString().padStart(20, "0")}_${type}`), {
+        await setDoc(doc(eventsRef, eventId), {
           ...ev,
           _serverTs: serverTimestamp(),
         });
-        sentSinceTrimRef.current += 1;
+        if (!isGuestControl) sentSinceTrimRef.current += 1;
         // Persist the high-water mark on ordering-critical events only.
         try {
+          if (!isHost) return;
           await updateDoc(doc(db, "flix_parties", roomId), {
             hostSeq: seq,
             hostSeqAt: ev.ts,
@@ -431,7 +462,7 @@ export function usePartyRealtime({
         });
       }
     },
-    [roomId, isHost, userId]
+    [roomId, isHost, controlsMode, userId]
   );
 
   return useMemo(
