@@ -16,11 +16,15 @@ import { cspValue } from "./security-headers.mjs";
  * letting provider scripts run.
  */
 export function middleware(request: NextRequest) {
+  const requestId = crypto.randomUUID();
   if (request.nextUrl.pathname.startsWith("/api/embed")) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set("X-Request-ID", requestId);
+    return response;
   }
   const response = NextResponse.next();
   response.headers.set("Content-Security-Policy", cspValue);
+  response.headers.set("X-Request-ID", requestId);
   return response;
 }
 
