@@ -5,6 +5,7 @@ import { createPartySyncTransport, type PartySyncTransport } from "@/lib/player/
 import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 
 export interface SyncMessage {
   type:
@@ -59,6 +60,7 @@ export function useWebRTCSync({
   onRemoteStreamRemoved,
 }: UseWebRTCSyncOptions) {
   const { user } = useAuth();
+  const pageVisible = usePageVisibility();
   const [rtcConnected, setRtcConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
   const syncRef = useRef<WebRTCPartySync | PartySyncTransport | null>(null);
@@ -66,9 +68,11 @@ export function useWebRTCSync({
   const onPlaybackSyncRef = useRef(onPlaybackSync);
   const onRemoteStreamRef = useRef(onRemoteStream);
   const onRemoteStreamRemovedRef = useRef(onRemoteStreamRemoved);
+  const pageVisibleRef = useRef(pageVisible);
   onPlaybackSyncRef.current = onPlaybackSync;
   onRemoteStreamRef.current = onRemoteStream;
   onRemoteStreamRemovedRef.current = onRemoteStreamRemoved;
+  pageVisibleRef.current = pageVisible;
 
   useEffect(() => {
     void NTPClient.calibrate();
@@ -104,8 +108,10 @@ export function useWebRTCSync({
       syncInitRef.current?.hostId === resolvedHostId
     ) {
       const poll = setInterval(() => {
-        if (syncRef.current) setRtcConnected(syncRef.current.isConnected);
-      }, 200);
+        if (pageVisibleRef.current && syncRef.current) {
+          setRtcConnected(syncRef.current.isConnected);
+        }
+      }, 500);
       return () => clearInterval(poll);
     }
 
@@ -185,8 +191,10 @@ export function useWebRTCSync({
     })();
 
     const poll = setInterval(() => {
-      if (syncRef.current) setRtcConnected(syncRef.current.isConnected);
-    }, 200);
+      if (pageVisibleRef.current && syncRef.current) {
+        setRtcConnected(syncRef.current.isConnected);
+      }
+    }, 500);
 
     return () => {
       cancelled = true;
