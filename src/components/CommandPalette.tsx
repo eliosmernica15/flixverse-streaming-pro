@@ -83,7 +83,7 @@ const GROUP_HEADING_CLASS =
   "[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-extrabold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.18em] [&_[cmdk-group-heading]]:text-red-500/80";
 
 const ITEM_CLASS =
-  "group flex min-h-[40px] cursor-pointer items-center gap-3 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-300 transition-all data-[selected=true]:bg-white/[0.08] data-[selected=true]:text-white";
+  "group relative flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border border-transparent px-3 py-1.5 text-xs font-medium text-gray-300 transition-all duration-200 hover:border-white/[0.08] hover:bg-white/[0.035] data-[selected=true]:border-red-400/20 data-[selected=true]:bg-gradient-to-r data-[selected=true]:from-red-500/15 data-[selected=true]:via-purple-500/[0.08] data-[selected=true]:to-transparent data-[selected=true]:text-white data-[selected=true]:shadow-[inset_3px_0_0_hsl(var(--primary)),0_8px_24px_rgba(0,0,0,.12)]";
 
 const BADGE_CLASS: Record<SearchKind, string> = {
   movie: "bg-red-600",
@@ -312,7 +312,7 @@ export default function CommandPalette() {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPortal>
-        <DialogOverlay className="z-[80] bg-black/70 backdrop-blur-md" />
+        <DialogOverlay className="z-[80] bg-black/65 backdrop-blur-xl" />
         {/*
           Centred with the standalone `translate` property, not Tailwind's
           `-translate-x-1/2 -translate-y-1/2`. Both do the same thing visually, but
@@ -331,7 +331,7 @@ export default function CommandPalette() {
           aria-label={t("ariaLabel")}
           // No description element: the palette's own content is the context.
           aria-describedby={undefined}
-          className="glass-strong fixed left-1/2 top-1/2 z-[80] w-[min(38rem,calc(100vw-2rem))] [translate:-50%_-50%] overflow-hidden rounded-xl border border-white/10 bg-black/80 text-white shadow-2xl shadow-black/80 backdrop-blur-2xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
+          className="glass-strong fixed left-1/2 top-1/2 z-[80] w-[min(42rem,calc(100vw-2rem))] [translate:-50%_-50%] overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(145deg,hsl(var(--surface-2)/.96),hsl(var(--surface-0)/.94))] text-white shadow-[0_30px_100px_rgba(0,0,0,.8),0_0_80px_hsl(var(--primary)/.12)] backdrop-blur-2xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
         >
           <DialogTitle className="sr-only">{t("ariaLabel")}</DialogTitle>
 
@@ -339,13 +339,19 @@ export default function CommandPalette() {
             shouldFilter={false}
             loop
             label={t("ariaLabel")}
-            className="w-full"
+            className="relative w-full"
           >
             <div
-              className="flex items-center gap-2 border-b border-white/5 px-3"
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-red-400/80 to-transparent shadow-[0_0_18px_hsl(var(--primary)/.8)]"
+            />
+            <div
+              className="flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-white/[0.06] via-white/[0.025] to-transparent px-4"
               cmdk-input-wrapper=""
             >
-              <Search className="h-3.5 w-3.5 shrink-0 text-gray-500" aria-hidden="true" />
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-red-400/20 bg-red-500/10 shadow-[0_0_20px_hsl(var(--primary)/.18)]">
+                <Search className="h-4 w-4 text-red-300" aria-hidden="true" />
+              </span>
               <CommandPrimitive.Input
                 ref={inputRef}
                 value={query}
@@ -355,17 +361,17 @@ export default function CommandPalette() {
                 aria-keyshortcuts="Control+K Meta+K"
                 autoComplete="off"
                 spellCheck={false}
-                className="h-9 w-full bg-transparent text-sm text-white outline-none placeholder:text-gray-600"
+                className="h-14 w-full bg-transparent text-[15px] font-medium tracking-[0.01em] text-white outline-none placeholder:text-gray-500"
               />
               <DialogPrimitive.Close
                 aria-label={t("hintClose")}
-                className="shrink-0 select-none rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold tracking-wider text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                className="shrink-0 select-none rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-[10px] font-bold tracking-wider text-gray-400 transition-all hover:border-red-400/30 hover:bg-red-500/10 hover:text-white"
               >
                 ESC
               </DialogPrimitive.Close>
             </div>
 
-            <CommandList className="max-h-[min(26rem,60vh)] py-1.5">
+            <CommandList className="max-h-[min(30rem,62vh)] py-2">
               {searching ? (
                 loading ? (
                   <div className="px-3 py-1">
@@ -407,7 +413,7 @@ export default function CommandPalette() {
                     <CommandItem
                       value="see-all"
                       onSelect={handleSeeAll}
-                      className="mx-1 flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl px-3 text-xs font-black uppercase tracking-[0.15em] text-red-400 transition-colors data-[selected=true]:bg-white/[0.04] data-[selected=true]:text-red-300"
+                      className="mx-1 flex min-h-[46px] cursor-pointer items-center gap-2 rounded-xl border border-transparent px-3 text-xs font-black uppercase tracking-[0.15em] text-red-400 transition-all hover:border-red-400/20 hover:bg-red-500/10 data-[selected=true]:border-red-400/25 data-[selected=true]:bg-red-500/15 data-[selected=true]:text-red-300"
                     >
                       <Sparkles className="h-3 w-3" />
                       <span className="truncate">
@@ -475,6 +481,18 @@ export default function CommandPalette() {
                 </>
               )}
             </CommandList>
+            <div className="flex items-center justify-between border-t border-white/10 bg-black/25 px-4 py-2.5 text-[10px] font-medium tracking-wide text-gray-500">
+              <span className="flex items-center gap-2">
+                <kbd className="rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 text-gray-300">Up/Down</kbd>
+                {t("hintNavigate")}
+                <kbd className="rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 text-gray-300">Enter</kbd>
+                {t("hintSelect")}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <kbd className="rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 text-gray-300">ESC</kbd>
+                {t("hintClose")}
+              </span>
+            </div>
           </CommandPrimitive>
         </DialogPrimitive.Content>
       </DialogPortal>

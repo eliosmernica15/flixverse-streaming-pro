@@ -22,11 +22,15 @@ export default function NavSearchButton() {
       onClick={() => window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT))}
       aria-label={t("ariaLabel")}
       aria-keyshortcuts="Control+K Meta+K"
-      className="group flex min-h-[40px] items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 text-gray-300 transition-colors duration-200 hover:border-red-500/40 hover:bg-white/10 hover:text-white focus-ring"
+      title={`${t("ariaLabel")} (Ctrl K)`}
+      className="group flex min-h-[40px] min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 text-gray-300 shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-all duration-300 hover:border-red-400/40 hover:bg-white/10 hover:text-white hover:shadow-[0_8px_28px_rgba(239,68,68,0.12)] focus-ring sm:px-3"
     >
-      <Search className="h-4 w-4" aria-hidden="true" />
+      <Search className="h-4 w-4 shrink-0 text-gray-400 transition-colors group-hover:text-red-300" aria-hidden="true" />
+      <span className="hidden max-w-[13rem] truncate text-xs font-medium text-gray-400 transition-colors group-hover:text-gray-200 md:block">
+        {t("placeholder")}
+      </span>
       {/* A keyboard hint is noise on touch devices, where there is no Ctrl key. */}
-      <kbd className="hidden select-none rounded border border-white/15 bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-gray-400 transition-colors group-hover:text-gray-200 sm:inline-flex">
+      <kbd className="hidden select-none items-center gap-0.5 rounded-md border border-white/15 bg-black/20 px-1.5 py-1 text-[10px] font-semibold tracking-wide text-gray-400 transition-colors group-hover:border-red-400/30 group-hover:text-gray-200 sm:inline-flex">
         Ctrl K
       </kbd>
     </button>
