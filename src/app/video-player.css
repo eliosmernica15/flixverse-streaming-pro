@@ -287,6 +287,20 @@
   max-width: min(98vw, 90rem);
 }
 
+@media (min-width: 769px) {
+  .player-shell--party-open .player-layout-main {
+    flex: 0 1 auto;
+    width: min(
+      54rem,
+      calc(98vw - min(22rem, 92vw) - clamp(0.75rem, 2vw, 1.25rem))
+    );
+  }
+
+  .player-shell--party-open .player-window.is-framed {
+    width: 100%;
+  }
+}
+
 .player-party-panel {
   display: flex;
   flex-direction: column;
