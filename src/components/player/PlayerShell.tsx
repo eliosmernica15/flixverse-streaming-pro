@@ -28,27 +28,8 @@ import { PartyCameraGrid, PartyCameraPiP } from "./PartyMediaPanel";
 import { PartyGuestSplash } from "./PartyGuestSplash";
 import { SnapToHostPill } from "./SnapToHostPill";
 import { SpatialReactionsLayer } from "./SpatialReactionsLayer";
-import { CinemaBloom, getBloomIntensity } from "./CinemaBloom";
-import { CinemaStage, isCinemaStageEnabled } from "./CinemaStage";
-import dynamic from "next/dynamic";
-const CinemaScene3D = dynamic(() => import("./CinemaScene3D").then((m) => m.CinemaScene3D), {
-  ssr: false,
-  loading: () => null,
-});
-// Read the 3D-hall flag directly from localStorage so we do not pull the
-// Three.js bundle into the main chunk. CinemaScene3D itself is lazy-loaded.
-function isCinema3DEnabledLocal(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem("flixverse-cinema-3d") === "true";
-  } catch {
-    return false;
-  }
-}
 import { useCinemaHaptics } from "@/hooks/player/useCinemaHaptics";
-import { useScreenCaptureBloom, isScreenCaptureBloomEnabled } from "@/hooks/player/useScreenCaptureBloom";
 import { CINEMA_PULSE_EVENT, isHapticsEnabled } from "@/lib/player/haptics";
-import { presetFromGenres } from "@/lib/player/cinemaPresets";
 import { PlayerOverlayControls } from "./PlayerOverlayControls";
 import { AddCommentDialog } from "./AddCommentDialog";
 import { UpNextCountdown } from "./UpNextCountdown";
@@ -71,7 +52,6 @@ interface PlayerShellProps {
   episode?: number;
   posterPath?: string;
   /** TMDB genre ids for the title — drives the cinema mood preset. */
-  genreIds?: number[];
   resumePosition?: number;
   totalDuration?: number;
   episodeCount?: number;
@@ -123,7 +103,6 @@ export function PlayerShell({
   season,
   episode,
   posterPath,
-  genreIds,
   resumePosition = 0,
   totalDuration,
   episodeCount,
@@ -150,42 +129,6 @@ export function PlayerShell({
   const networkQuality = useNetworkQuality();
   const { preferences, updatePreferences } = useUserPreferences();
   const timelineEnabled = isFeatureEnabled("timeline-comments");
-  const glowEnabled = isFeatureEnabled("ambient-glow");
-  // Read once on mount: the bloom intensity is a persisted preference, not
-  // something that changes mid-session.
-  const bloomIntensity = useMemo(() => getBloomIntensity(), []);
-  const stageEnabled = useMemo(() => isCinemaStageEnabled(), []);
-  // Cinema mood preset derived from the title's genres. Multiplies the user's
-  // bloom intensity and tags the shell with a mood class for CSS theming.
-  const cinemaPreset = useMemo(() => presetFromGenres(genreIds), [genreIds]);
-
-  const [scene3dEnabled, setScene3dEnabled] = useState(() => isCinema3DEnabledLocal());
-  useEffect(() => {
-    const onToggle = (e: Event) => {
-      const detail = (e as CustomEvent<{ enabled: boolean }>).detail;
-      if (detail && typeof detail.enabled === "boolean") setScene3dEnabled(detail.enabled);
-    };
-    window.addEventListener("toggle-cinema-3d", onToggle);
-    return () => window.removeEventListener("toggle-cinema-3d", onToggle);
-  }, []);
-  const effectiveBloomIntensity = useMemo(
-    () => Math.max(0.3, Math.min(1.8, bloomIntensity * cinemaPreset.bloomMultiplier)),
-    [bloomIntensity, cinemaPreset.bloomMultiplier]
-  );
-
-  // Screen-capture ambilight (opt-in). Read the persisted flag once; the
-  // settings toggle dispatches a CustomEvent we listen for so the player
-  // reacts without a reload.
-  const [screenCaptureEnabled, setScreenCaptureEnabled] = useState(() => isScreenCaptureBloomEnabled());
-  useEffect(() => {
-    const onToggle = (e: Event) => {
-      const detail = (e as CustomEvent<{ enabled: boolean }>).detail;
-      if (detail && typeof detail.enabled === "boolean") setScreenCaptureEnabled(detail.enabled);
-    };
-    window.addEventListener("toggle-screen-capture-bloom", onToggle);
-    return () => window.removeEventListener("toggle-screen-capture-bloom", onToggle);
-  }, []);
-  const screenCapture = useScreenCaptureBloom(screenCaptureEnabled);
 
   // Audio language. The user's `preferredLanguage` preference wins; otherwise we
   // fall back to the site locale (so Albanian-locale visitors get Albanian by
@@ -940,7 +883,6 @@ export function PlayerShell({
     playerResize.isResizing ? "player-shell--window-resizing" : "",
     playerResize.isCustomSize ? "player-shell--window-custom-size" : "",
     pulsing ? "player-shell--cinema-pulse" : "",
-    glowEnabled && stageEnabled ? `player-shell--${cinemaPreset.cssClass}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -974,46 +916,6 @@ export function PlayerShell({
         visible={party.guestSplashVisible}
       />
       <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""} ${inParty ? `player-layout--cam-${effectiveCameraLayout}` : ""}`}>
-        {/* Generated 3D cinema hall: palette-aware geometry and a volumetric
-            mote field behind the picture. Pure CSS 3D, no WebGL context. */}
-        {scene3dEnabled ? (
-          <CinemaScene3D
-            seedKey={`${movieId}-${mediaType}-${season ?? 0}-${episode ?? 0}`}
-            accentColor="#e50914"
-            isPlaying={isPlaying}
-            compact={isMobile}
-          />
-        ) : (
-          <CinemaStage
-            seedKey={`${movieId}-${mediaType}-${season ?? 0}-${episode ?? 0}`}
-            posterPath={posterPath || null}
-            genreIds={genreIds}
-            isPlaying={isPlaying}
-            enabled={glowEnabled && stageEnabled}
-            intensity={effectiveBloomIntensity}
-            compact={isMobile}
-          />
-        )}
-        {glowEnabled && (
-          <CinemaBloom
-            posterPath={posterPath || null}
-            playbackSeconds={currentTime}
-            isPlaying={isPlaying}
-            isActive={embedState === "ready"}
-            intensity={effectiveBloomIntensity}
-            videoRef={screenCaptureEnabled ? screenCapture.videoRef : undefined}
-          />
-        )}
-        {/* Hidden video element that carries the screen-capture stream. */}
-        {screenCaptureEnabled && (
-          <video
-            ref={screenCapture.videoRef}
-            muted
-            playsInline
-            className="sr-only"
-            aria-hidden
-          />
-        )}
         <div className="player-layout-main">
           <div
             ref={windowRef}
