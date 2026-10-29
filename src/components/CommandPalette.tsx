@@ -342,10 +342,10 @@ export default function CommandPalette() {
             className="w-full"
           >
             <div
-              className="flex items-center gap-3 border-b border-white/5 px-4"
+              className="flex items-center gap-2 border-b border-white/5 px-3"
               cmdk-input-wrapper=""
             >
-              <Search className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
+              <Search className="h-3.5 w-3.5 shrink-0 text-gray-500" aria-hidden="true" />
               <CommandPrimitive.Input
                 ref={inputRef}
                 value={query}
@@ -355,7 +355,7 @@ export default function CommandPalette() {
                 aria-keyshortcuts="Control+K Meta+K"
                 autoComplete="off"
                 spellCheck={false}
-                className="h-12 w-full bg-transparent text-sm text-white outline-none placeholder:text-gray-600"
+                className="h-9 w-full bg-transparent text-sm text-white outline-none placeholder:text-gray-600"
               />
               <DialogPrimitive.Close
                 aria-label={t("hintClose")}
