@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from "next-intl";
-import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2, Download, Volume2, VolumeX } from "lucide-react";
+import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2, Download, Volume2, VolumeX, PartyPopper } from "lucide-react";
 import { getBackdropUrl, TMDBMovie, isNotReleasedYet } from "@/utils/tmdbApi";
 
 /** Minimal cast/crew entry shape returned inside TMDB `credits` payloads. */
@@ -40,6 +40,7 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { AmbientGlowFrame } from "./player/AmbientGlowFrame";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { stripPartyQueryParams } from "@/lib/player/partyUrl";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { FeatureErrorBoundary } from "./FeatureErrorBoundary";
 import { PlayerErrorFallback } from "./player/PlayerErrorFallback";
@@ -79,6 +80,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { hasPremium } = useSubscription();
+  const flixPartyEnabled = isFeatureEnabled("flixparty");
   const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieListContext();
   const pathname = usePathname();
   const { getProgress } = useWatchHistoryContext();
@@ -254,6 +256,35 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
       await navigator.clipboard.writeText(url);
       toast({ title: t("linkCopied"), description: t("linkCopiedDesc", { title: contentTitle }) });
     }
+  };
+
+  const handleWatchParty = async () => {
+    if (!content) return;
+
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      toast({
+        title: t("signInRequired"),
+        description: t("signInForWatchParty"),
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 1500);
+      return;
+    }
+
+    const contentTitle = content?.title || content?.name || 'Unknown';
+
+    // Open the player first, then start the party
+    openPlayer();
+    toast({
+      title: t("startingWatchParty"),
+      description: t("startingWatchPartyDesc", { title: contentTitle }),
+    });
+
+    // The party will be started inside the player via the WatchParty component
+    // which is rendered in PlayerShell when showPlayer becomes true
   };
 
   const handleDownload = async () => {
@@ -519,61 +550,111 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-                {!isUnreleased && (
-                  <button
-                    onClick={() => handleWatch()}
-                    className="cta-primary !rounded-md !px-6 !py-2.5 sm:!px-8 sm:!py-3.5 !text-sm sm:!text-base"
-                    aria-label="Play"
-                  >
-                    <Play className="h-5 w-5 sm:h-6 sm:w-6 fill-current" />
-                    <span>{isTV ? `${tc("play")} S${selectedSeason}E${selectedEpisode}` : tc("play")}</span>
-                  </button>
-                )}
-
-                {trailer && (
-                  <button
-                    onClick={handleWatchTrailer}
-                    className="cta-secondary !rounded-md !px-5 !py-2.5 sm:!px-6 sm:!py-3.5 !text-sm sm:!text-base"
-                  >
-                    <Play className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span>{t("trailer")}</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={handleAddToList}
-                  disabled={isOperating(movieId) || loadingList}
-                  className={`cta-icon !rounded-full ${isInList(movieId) ? '!bg-red-500/30 !border-red-500' : ''} ${(isOperating(movieId) || loadingList) ? 'cursor-not-allowed opacity-50' : ''}`}
-                  title={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
-                  aria-label={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
-                >
-                  {isOperating(movieId) ? (
-                    <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
-                  ) : (
-                    <Heart className={`h-5 w-5 sm:h-6 sm:w-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
+              {/* Enhanced Action Bar - Consolidated & Prominent */}
+              <div className="mt-6 flex flex-col sm:flex-row items-stretch gap-3 w-full max-w-3xl">
+                {/* Primary Actions Row */}
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 flex-1">
+                  {/* Play Button - Primary CTA */}
+                  {!isUnreleased && (
+                    <button
+                      onClick={() => handleWatch()}
+                      className="cta-primary !rounded-xl !px-7 !py-3.5 sm:!px-10 sm:!py-4 !text-base sm:!text-lg flex-1 sm:flex-initial min-h-[52px] sm:min-h-[56px] justify-center group transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                      aria-label={tc("play")}
+                    >
+                      <Play className="h-5 w-5 sm:h-6 sm:w-6 fill-current mr-2 group-hover:-translate-x-0.5 transition-transform" />
+                      <span>{isTV ? `${tc("play")} S${selectedSeason}E${selectedEpisode}` : tc("play")}</span>
+                    </button>
                   )}
-                </button>
 
-                <button
-                  onClick={handleDownload}
-                  className="cta-icon !rounded-full"
-                  title={hasPremium ? tc("download") : t("premiumRequired")}
-                  aria-label={tc("download")}
-                >
-                  <Download className={`h-5 w-5 sm:h-6 sm:w-6 ${!hasPremium ? "opacity-60" : ""}`} />
-                </button>
+                  {/* Watch Trailer Button */}
+                  {trailer && (
+                    <button
+                      onClick={handleWatchTrailer}
+                      className="cta-secondary !rounded-xl !px-6 !py-3.5 sm:!px-8 sm:!py-4 !text-base sm:!text-lg min-h-[52px] sm:min-h-[56px] justify-center group transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <Play className="h-5 w-5 mr-2" />
+                      <span>{t("trailer")}</span>
+                    </button>
+                  )}
 
-                <button
-                  onClick={handleShare}
-                  className="cta-icon !rounded-full"
-                  title={tc("share")}
-                  aria-label={tc("share")}
-                >
-                  <Share2 className="h-5 w-5 sm:h-6 sm:w-6" />
-                </button>
+                  {/* Watch Party CTA - Always visible before player opens */}
+                  {!isUnreleased && isAuthenticated && flixPartyEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => handleWatchParty()}
+                      className="cta-accent !rounded-xl !px-6 !py-3.5 sm:!px-8 sm:!py-4 !text-base sm:!text-lg min-h-[52px] sm:min-h-[56px] justify-center group transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
+                      aria-label={t("watchParty")}
+                    >
+                      <PartyPopper className="h-5 w-5 sm:h-6 sm:w-6 group-hover:rotate-12 transition-transform" />
+                      <span>{t("watchParty")}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Secondary Actions Row */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 justify-end sm:justify-start w-full sm:w-auto">
+                  {/* Add to List */}
+                  <button
+                    onClick={handleAddToList}
+                    disabled={isOperating(movieId) || loadingList}
+                    className={`cta-icon !rounded-xl ${isInList(movieId) ? '!bg-red-500/30 !border-red-500' : ''} ${(isOperating(movieId) || loadingList) ? 'cursor-not-allowed opacity-50' : ''} min-h-[48px] min-w-[48px] sm:min-h-[52px] sm:min-w-[52px] transition-all duration-200 hover:scale-105`}
+                    title={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
+                    aria-label={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
+                    aria-pressed={isInList(movieId)}
+                  >
+                    {isOperating(movieId) ? (
+                      <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
+                    ) : (
+                      <Heart className={`h-5 w-5 sm:h-6 sm:w-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
+                    )}
+                  </button>
+
+                  {/* Download */}
+                  <button
+                    onClick={handleDownload}
+                    className="cta-icon !rounded-xl min-h-[48px] min-w-[48px] sm:min-h-[52px] sm:min-w-[52px] transition-all duration-200 hover:scale-105"
+                    title={hasPremium ? tc("download") : t("premiumRequired")}
+                    aria-label={tc("download")}
+                    disabled={!hasPremium}
+                    aria-disabled={!hasPremium}
+                  >
+                    <Download className={`h-5 w-5 sm:h-6 sm:w-6 ${!hasPremium ? "opacity-40" : ""}`} />
+                  </button>
+
+                  {/* Share */}
+                  <button
+                    onClick={handleShare}
+                    className="cta-icon !rounded-xl min-h-[48px] min-w-[48px] sm:min-h-[52px] sm:min-w-[52px] transition-all duration-200 hover:scale-105"
+                    title={tc("share")}
+                    aria-label={tc("share")}
+                  >
+                    <Share2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </button>
+                </div>
               </div>
+
+              {/* Watch Party Promo (when not authenticated) */}
+              {!isUnreleased && !isAuthenticated && flixPartyEnabled && (
+                <div className="mt-4 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-red-500/10 via-purple-500/10 to-blue-500/10 border border-white/10">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                        <PartyPopper className="h-5 w-5 text-red-400" />
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold text-sm">{t("watchPartyCTA")}</p>
+                        <p className="text-gray-400 text-xs">{t("watchPartyCTADesc")}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => window.location.href = '/auth'}
+                      className="flex-shrink-0 cta-primary !rounded-lg !px-4 !py-2 !text-sm"
+                    >
+                      {tc("signIn")}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -788,7 +869,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                         id: c.id,
                         name: c.name || "Unknown",
                         character: c.character || "",
-                        profile_path: c.profile_path,
+                        profile_path: c.profile_path ?? null,
                         order: c.order || 0,
                       }))}
                       crew={content.credits.crew.map((c: TmdbCreditsPerson) => ({
@@ -796,7 +877,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                         name: c.name || "Unknown",
                         job: c.job || "",
                         department: c.department || "",
-                        profile_path: c.profile_path,
+                        profile_path: c.profile_path ?? null,
                       }))}
                     />
                   </div>

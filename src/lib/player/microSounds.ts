@@ -7,7 +7,7 @@
  * after which Web Audio throws and the UI sound engine dies silently.
  */
 
-import { getGlobalAudioContext, getMasterGain } from "./audioSingleton";
+import { audioContext } from "./audioSingleton";
 
 export type MicroSoundType = "timeline-tick" | "cinematic-drop" | "reaction-pop" | "hover-click";
 
@@ -83,8 +83,9 @@ export function playMicroSound(type: MicroSoundType): void {
   if (typeof window === "undefined") return;
   if (!getMicroSoundsEnabled()) return;
 
-  const ctx = getGlobalAudioContext();
-  const out = getMasterGain();
+  const ctx = audioContext.getContext();
+  // Use context.destination directly since we don't have getMasterGain
+  const out = ctx.destination;
   if (!ctx || !out) return;
 
   const spec = SPECS[type];

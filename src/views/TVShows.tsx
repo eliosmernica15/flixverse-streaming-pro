@@ -1,12 +1,15 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import MovieCarousel from "@/components/MovieCarousel";
+import CatalogQuickFilters from "@/components/CatalogQuickFilters";
 import PageContainer from "@/components/PageContainer";
 import LazySection from "@/components/LazySection";
 import { useTVShowsCatalog } from "@/hooks/queries/useTVShowsCatalog";
 import Reveal from "@/components/Reveal";
-import { Tv, Flame, Trophy, Calendar, Radio, Zap, Laugh, Drama, Search, Rocket, FileText } from "lucide-react";
+import { Tv, Flame, Trophy, Calendar, Radio, Zap, Laugh, Drama, Search, Rocket, FileText, CalendarDays } from "lucide-react";
 import { TMDBMovie } from "@/utils/tmdbApi";
+import { matchesCatalogFilters, releasedWithinDays, type CatalogFilters } from "@/lib/catalogFilters";
 
 const PRIORITY_KEYS = new Set(["trending", "airingToday", "onTheAir", "popular", "topRated"]);
 
@@ -26,10 +29,29 @@ const SECTIONS = [
 
 const TVShows = () => {
   const { data = {}, isLoading, isFetching, isError, refetch } = useTVShowsCatalog();
+  const [filters, setFilters] = useState<CatalogFilters>({ yearRange: "all", genreId: null });
+  const filteredData = useMemo(
+    () => Object.fromEntries(
+      Object.entries(data).map(([key, shows]) => [
+        key,
+        (shows as TMDBMovie[]).filter((show) => matchesCatalogFilters(show, filters)),
+      ])
+    ) as Record<string, TMDBMovie[]>,
+    [data, filters]
+  );
+  const newThisWeek = useMemo(() => {
+    const unique = new Map<number, TMDBMovie>();
+    Object.values(data).flat().forEach((show) => {
+      if (releasedWithinDays(show, 7) && matchesCatalogFilters(show, filters)) unique.set(show.id, show);
+    });
+    return [...unique.values()].sort((a, b) =>
+      (b.first_air_date || b.release_date || "").localeCompare(a.first_air_date || a.release_date || "")
+    );
+  }, [data, filters]);
   const loadedCount = Object.keys(data).length;
 
   const renderSection = (section: (typeof SECTIONS)[number], index: number) => {
-    const shows = (data as Record<string, TMDBMovie[]>)[section.key];
+    const shows = filteredData[section.key];
     return (
       <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
         <MovieCarousel
@@ -77,6 +99,29 @@ const TVShows = () => {
 
       <PageContainer className="!pt-0">
         <div className="space-y-10">
+          <CatalogQuickFilters
+            filters={filters}
+            onChange={setFilters}
+            genres={[
+              { id: 10759, label: "Action & Adventure" },
+              { id: 16, label: "Animation" },
+              { id: 35, label: "Comedy" },
+              { id: 80, label: "Crime" },
+              { id: 99, label: "Documentary" },
+              { id: 18, label: "Drama" },
+              { id: 9648, label: "Mystery" },
+              { id: 10765, label: "Sci-Fi & Fantasy" },
+            ]}
+          />
+          <Reveal>
+            <MovieCarousel
+              title="New This Week"
+              movies={newThisWeek}
+              loading={isLoading || isFetching}
+              icon={<CalendarDays className="w-5 h-5 text-emerald-400" />}
+              priority
+            />
+          </Reveal>
           {prioritySections.map((section, index) => renderSection(section, index))}
 
           <LazySection minHeight={480} className="space-y-10">

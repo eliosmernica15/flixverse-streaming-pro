@@ -94,3 +94,71 @@ export async function fetchAllSitemapContent(): Promise<SitemapContentItem[]> {
 export async function fetchTrendingForSitemap(): Promise<SitemapContentItem[]> {
   return fetchAllSitemapContent();
 }
+
+interface TmdbPerson {
+  id: number;
+  name: string;
+  popularity: number;
+  known_for_department?: string;
+}
+
+interface TmdbCollection {
+  id: number;
+  name: string;
+  part_count: number;
+  poster_path?: string;
+  backdrop_path?: string;
+}
+
+/**
+ * Fetch popular people for sitemap (actors, directors, etc.)
+ * @param limit - Maximum number of people to fetch
+ */
+export async function fetchPopularPeople(limit: number = 20): Promise<{ id: number; name: string }[]> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const { url, headers } = tmdbRequest("/person/popular?language=en-US&page=1");
+    const res = await fetch(url, {
+      headers,
+      signal: controller.signal,
+      next: { revalidate: 86400 },
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const results = (data.results ?? []) as TmdbPerson[];
+    return results
+      .slice(0, limit)
+      .map((person) => ({ id: person.id, name: person.name }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch popular collections for sitemap
+ * @param limit - Maximum number of collections to fetch
+ */
+export async function fetchPopularCollections(limit: number = 15): Promise<{ id: number; name: string }[]> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    // TMDB doesn't have a direct "popular collections" endpoint, so we use trending collections
+    // We'll search for popular collections by using a combination of endpoints
+    // For now, we'll use a known set of popular collections or fetch from a specific endpoint
+    // TMDB has collection endpoints but no popular collections list
+    // We'll use the collection details endpoint with known popular collection IDs
+    // For a more complete implementation, we could maintain a list of popular collection IDs
+
+    // Since TMDB doesn't provide a "popular collections" list endpoint,
+    // we'll return an empty array for now. In production, you might want to:
+    // 1. Maintain a curated list of popular collection IDs
+    // 2. Use the collection details endpoint with known IDs
+    // 3. Or fetch from a different source
+
+    return [];
+  } catch {
+    return [];
+  }
+}

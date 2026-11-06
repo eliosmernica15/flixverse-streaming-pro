@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import MovieCard from "@/components/MovieCard";
+import MovieCarousel from "@/components/MovieCarousel";
 import PageContainer from "@/components/PageContainer";
 import { useNewAndPopularCatalog } from "@/hooks/queries/useNewAndPopularCatalog";
 import {
@@ -9,6 +10,8 @@ import {
   Tv,
   AlertCircle,
   Sparkles,
+  Trophy,
+  Clock,
 } from "lucide-react";
 import { TMDBMovie, getContentType } from "@/utils/tmdbApi";
 
@@ -29,13 +32,31 @@ const NewAndPopular = () => {
   const moviePool = useMemo(() => {
     const items: TMDBMovie[] = [];
     if (tab === "all" || tab === "movies") {
-      items.push(...(data?.upcomingMovies || []), ...(data?.newReleases || []), ...(data?.nowPlaying || []));
+      items.push(...(data?.upcomingMovies || []), ...(data?.newReleases || []), ...(data?.nowPlaying || []), ...(data?.popularContent || []));
     }
     if (tab === "all" || tab === "tv") {
-      items.push(...(data?.airingToday || []), ...(data?.trendingShows || []), ...(data?.onTheAir || []));
+      items.push(
+        ...(data?.upcomingMovies || []).filter((movie) => getContentType(movie) === "tv"),
+        ...(data?.airingToday || []),
+        ...(data?.trendingShows || []),
+        ...(data?.onTheAir || [])
+      );
     }
-    return items;
+    const typeFiltered = tab === "all"
+      ? items
+      : items.filter((movie) => getContentType(movie) === (tab === "movies" ? "movie" : "tv"));
+    return [...new Map(typeFiltered.map((movie) => [movie.id, movie])).values()];
   }, [data, tab]);
+  const upcomingIds = useMemo(
+    () => new Set((data?.upcomingMovies || []).map((movie) => movie.id)),
+    [data?.upcomingMovies]
+  );
+  const anticipated = useMemo(() => {
+    const upcoming = data?.upcomingMovies || [];
+    return tab === "movies"
+      ? upcoming.filter((movie) => getContentType(movie) === "movie")
+      : upcoming;
+  }, [data?.upcomingMovies, tab]);
 
   if (isError && !data) {
     return (
@@ -58,7 +79,8 @@ const NewAndPopular = () => {
 
   const totalCount = (data?.upcomingMovies?.length || 0) + (data?.newReleases?.length || 0) +
     (data?.nowPlaying?.length || 0) + (data?.airingToday?.length || 0) +
-    (data?.trendingShows?.length || 0) + (data?.onTheAir?.length || 0);
+    (data?.trendingShows?.length || 0) + (data?.onTheAir?.length || 0) +
+    (data?.popularContent?.length || 0);
 
   return (
     <div className="relative">
@@ -106,6 +128,26 @@ const NewAndPopular = () => {
           ))}
         </div>
 
+        {(tab === "all" || tab === "movies") && (
+          <div className="mb-10 space-y-10">
+            <MovieCarousel
+              title="Most Anticipated"
+              movies={anticipated}
+              loading={loading && !data?.upcomingMovies}
+              icon={<Clock className="h-5 w-5 text-orange-400" />}
+              comingSoon
+              priority
+            />
+            <MovieCarousel
+              title="Critically Acclaimed"
+              movies={data?.criticallyAcclaimed || []}
+              loading={loading && !data?.criticallyAcclaimed}
+              icon={<Trophy className="h-5 w-5 text-yellow-400" />}
+              priority
+            />
+          </div>
+        )}
+
         {loading && moviePool.length === 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
             {Array.from({ length: 12 }).map((_, i) => (
@@ -120,11 +162,11 @@ const NewAndPopular = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 content-auto">
             {moviePool.map((movie, idx) => (
               <MovieCard
-                key={`${tab}-${movie.id}-${idx}`}
+                key={`${tab}-${movie.id}`}
                 movie={movie}
                 index={idx}
                 priority={idx < 6}
-                comingSoon={tab === "all" && getContentType(movie) === "movie" && idx < 3 ? false : false}
+                comingSoon={upcomingIds.has(movie.id)}
               />
             ))}
           </div>

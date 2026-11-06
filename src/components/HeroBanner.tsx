@@ -22,7 +22,7 @@ interface HeroBannerProps {
   movies?: TMDBMovie[];
 }
 
-const ROTATION_INTERVAL_MS = 9000;
+const ROTATION_INTERVAL_MS = 8000;
 const MAX_ROTATION = 5;
 
 const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
@@ -36,6 +36,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isHoveredRef = useRef(false);
 
   const t = useTranslations("hero");
   const { isAuthenticated } = useAuth();
@@ -45,6 +46,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const queryClient = useQueryClient();
   const reducedMotion = useReducedMotion();
   const performanceMode = usePerformanceMode();
+  const canAutoRotate = allMovies.length > 1 && !reducedMotion && !performanceMode;
 
   // Layered depth: the backdrop, the atmospheric glows and the copy sit on
   // three planes and drift by different amounts as the pointer moves. The
@@ -95,44 +97,45 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
     }
   }, [allMovies, performanceMode, queryClient, router]);
 
-  useEffect(() => {
-    if (allMovies.length <= 1 || reducedMotion || performanceMode) return;
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
-    const startTimer = () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = setInterval(() => {
-        setActiveIndex((prev) => (prev + 1) % allMovies.length);
-      }, ROTATION_INTERVAL_MS);
-    };
-    const stopTimer = () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
+  const startTimer = useCallback(() => {
+    stopTimer();
+    if (!canAutoRotate || document.hidden || isHoveredRef.current) return;
+    timerRef.current = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % allMovies.length);
+    }, ROTATION_INTERVAL_MS);
+  }, [allMovies.length, canAutoRotate, stopTimer]);
+
+  useEffect(() => {
+    if (!canAutoRotate) {
+      stopTimer();
+      return;
+    }
     const onVisibility = () => {
       if (document.hidden) stopTimer();
       else startTimer();
     };
 
-    if (!document.hidden) startTimer();
+    startTimer();
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       stopTimer();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [allMovies.length, performanceMode, reducedMotion]);
+  }, [canAutoRotate, startTimer, stopTimer]);
 
   const goToSlide = useCallback((index: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    stopTimer();
     setActiveIndex(index);
-    if (allMovies.length > 1 && !reducedMotion && !performanceMode) {
-      timerRef.current = setInterval(() => {
-        setActiveIndex((prev) => (prev + 1) % allMovies.length);
-      }, ROTATION_INTERVAL_MS);
-    }
-  }, [allMovies.length, performanceMode, reducedMotion]);
+    startTimer();
+  }, [startTimer, stopTimer]);
 
   const goPrev = useCallback(() => {
     goToSlide(activeIndex === 0 ? allMovies.length - 1 : activeIndex - 1);
@@ -202,17 +205,12 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
       ref={heroRef}
       className="group/hero hero-depth relative h-[78vh] sm:h-[88vh] lg:h-[92vh] min-h-[520px] overflow-hidden contain-paint bg-black"
       onMouseEnter={() => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
+        isHoveredRef.current = true;
+        stopTimer();
       }}
       onMouseLeave={() => {
-        if (allMovies.length <= 1 || reducedMotion) return;
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-          setActiveIndex((prev) => (prev + 1) % allMovies.length);
-        }, ROTATION_INTERVAL_MS);
+        isHoveredRef.current = false;
+        startTimer();
       }}
     >
       <div ref={backdropRef} className="hero-depth-backdrop absolute inset-0 will-change-transform">

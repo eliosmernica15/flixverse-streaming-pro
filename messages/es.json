@@ -133,13 +133,19 @@
     "signInRequired": "Inicio de sesión requerido",
     "signInForList": "Inicia sesión para añadir elementos a tu lista.",
     "signInToWatch": "Inicia sesión o regístrate para ver películas y series.",
+    "signInForWatchParty": "Inicia sesión para iniciar una Fiesta de Visualización.",
     "removedFromList": "Eliminado de Mi lista",
     "addedToList": "Añadido a Mi lista",
     "listError": "No se pudo actualizar tu lista.",
     "comingSoon": "Próximamente",
     "cast": "Reparto",
     "similar": "Más como esto",
-    "overview": "Sinopsis"
+    "overview": "Sinopsis",
+    "watchParty": "Fiesta de Visualización",
+    "watchPartyCTA": "Ver Juntos",
+    "watchPartyCTADesc": "Invita a amigos a ver en perfecta sincronía. Gratis para planes Standard y Premium.",
+    "startingWatchParty": "Iniciando Fiesta de Visualización...",
+    "startingWatchPartyDesc": "Lanzando {title} con tus amigos"
   },
   "plans": {
     "monthly": "Mensual",
@@ -207,6 +213,7 @@
     "moviesAndTv": "Películas y series",
     "results": "Resultados",
     "people": "Personas",
+    "collections": "Colecciones",
     "castAndCrew": "Reparto y equipo",
     "noResults": "Sin resultados",
     "tryDifferent": "Prueba con otra búsqueda",
@@ -232,6 +239,12 @@
     "topRated": "Mejor valorados",
     "newest": "Más recientes",
     "az": "A–Z",
+    "decade": "Década",
+    "allDecades": "Todas las décadas",
+    "minimumRating": "Nota mínima",
+    "anyRating": "Cualquier nota",
+    "language": "Idioma",
+    "allLanguages": "Todos los idiomas",
     "noCategory": "Categoría no encontrada",
     "titles": "{count} títulos",
     "retry": "Reintentar",
@@ -280,6 +293,7 @@
   },
 
   "carousel": {
+    "genreRail": "Explorar por género",
     "trendingNow": "Tendencias",
     "nowPlaying": "En cartelera",
     "topRated": "Mejor valoradas",
@@ -314,6 +328,7 @@
     "friends": "Amigos",
     "chat": "Chat",
     "party": "Fiesta",
+    "queue": "Cola",
     "host": "Anfitrión",
     "guest": "Invitado",
     "shareLink": "Compartir enlace",
@@ -342,7 +357,29 @@
     "syncDescription": "Invita amigos a ver juntos en sincronía",
     "friendsHint": "Pulsa Invitar para enviar una notificación — el enlace se copia automáticamente.",
     "requests": "{count} solicitud",
-    "requestsPlural": "{count} solicitudes"
+    "requestsPlural": "{count} solicitudes",
+    "queueTitle": "Cola de reproducción",
+    "queueHint": "Sugiere qué ver a continuación. Vota las sugerencias. El anfitrión confirma la selección.",
+    "hostCanConfirm": "Solo el anfitrión puede confirmar",
+    "queueEmpty": "La cola está vacía",
+    "queueEmptyHint": "Busca películas o series para añadir a la cola",
+    "searchPlaceholder": "Buscar películas o series...",
+    "addToQueue": "Añadir a la cola",
+    "suggested": "Añadido a la cola",
+    "suggestFailed": "Error al añadir a la cola",
+    "searchFailed": "Error en la búsqueda",
+    "voteFailed": "Error al votar",
+    "confirmFailed": "Error al confirmar",
+    "removeFailed": "Error al eliminar",
+    "voted": "Votado",
+    "vote": "Votar",
+    "confirm": "Confirmar",
+    "remove": "Eliminar",
+    "yours": "Tuya",
+    "confirmed": "Confirmada",
+    "queueConfirmed": "¡Confirmada!",
+    "willPlayNext": "se reproducirá a continuación",
+    "queueItemRemoved": "Eliminado de la cola"
   },
   "friends": {
     "friends": "Amigos",
@@ -362,7 +399,9 @@
     "decline": "Rechazar",
     "add": "Añadir",
     "pending": "Pendiente",
-    "alreadyFriends": "Amigos"
+    "alreadyFriends": "Amigos",
+    "onlineNow": "En línea",
+    "offline": "Sin conexión"
   },
   "player": {
     "upNext": "A continuación",
@@ -392,5 +431,16 @@
     "english": "English",
     "spanish": "Español",
     "albanian": "Shqip"
+  },
+  "collection": {
+    "back": "Volver",
+    "collection": "Colección",
+    "loading": "Cargando...",
+    "loadingDetails": "Cargando detalles de la colección...",
+    "titles": "{count} títulos",
+    "playAll": "Reproducir todo",
+    "addToList": "Añadir a la lista",
+    "moreInfo": "Más información",
+    "titlesInCollection": "Títulos en esta colección"
   }
 }

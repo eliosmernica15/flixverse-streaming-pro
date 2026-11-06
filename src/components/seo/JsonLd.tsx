@@ -255,3 +255,260 @@ export function WebPageJsonLd({
     />
   );
 }
+
+interface EpisodeJsonLdProps {
+  title: string;
+  description: string;
+  image?: string;
+  url: string;
+  episodeNumber: number;
+  seasonNumber: number;
+  seriesName: string;
+  seriesUrl: string;
+  datePublished?: string;
+  rating?: number;
+  duration?: string; // ISO 8601 duration format, e.g., "PT45M"
+}
+
+export function EpisodeJsonLd({
+  title,
+  description,
+  image,
+  url,
+  episodeNumber,
+  seasonNumber,
+  seriesName,
+  seriesUrl,
+  datePublished,
+  rating,
+  duration,
+}: EpisodeJsonLdProps) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "Episode",
+    name: title,
+    description: description.slice(0, 500),
+    image,
+    url,
+    episodeNumber,
+    seasonNumber,
+    partOfSeries: {
+      "@type": "TVSeries",
+      name: seriesName,
+      url: seriesUrl,
+    },
+    ...(datePublished ? { datePublished } : {}),
+    ...(rating && rating > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: rating.toFixed(1),
+            bestRating: "10",
+            worstRating: "0",
+            ratingCount: Math.max(10, Math.round(rating * 100)),
+          },
+        }
+      : {}),
+    ...(duration ? { duration } : {}),
+    potentialAction: {
+      "@type": "WatchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: url,
+        actionPlatform: [
+          "http://schema.org/DesktopWebPlatform",
+          "http://schema.org/MobileWebPlatform",
+        ],
+      },
+    },
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface TVSeriesJsonLdProps {
+  name: string;
+  description: string;
+  image?: string;
+  url: string;
+  datePublished?: string;
+  rating?: number;
+  numberOfSeasons?: number;
+  numberOfEpisodes?: number;
+  genres?: string[];
+  actors?: { name: string; url?: string }[];
+  creator?: { name: string; url?: string }[];
+}
+
+export function TVSeriesJsonLd({
+  name,
+  description,
+  image,
+  url,
+  datePublished,
+  rating,
+  numberOfSeasons,
+  numberOfEpisodes,
+  genres,
+  actors,
+  creator,
+}: TVSeriesJsonLdProps) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "TVSeries",
+    name,
+    description: description.slice(0, 500),
+    image,
+    url,
+    ...(datePublished ? { datePublished } : {}),
+    ...(rating && rating > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: rating.toFixed(1),
+            bestRating: "10",
+            worstRating: "0",
+            ratingCount: Math.max(10, Math.round(rating * 100)),
+          },
+        }
+      : {}),
+    ...(numberOfSeasons ? { numberOfSeasons } : {}),
+    ...(numberOfEpisodes ? { numberOfEpisodes } : {}),
+    ...(genres && genres.length > 0 ? { genre: genres } : {}),
+    ...(actors && actors.length > 0
+      ? {
+          actor: actors.map((actor) => ({
+            "@type": "Person",
+            name: actor.name,
+            ...(actor.url ? { url: actor.url } : {}),
+          })),
+        }
+      : {}),
+    ...(creator && creator.length > 0
+      ? {
+          creator: creator.map((c) => ({
+            "@type": "Person",
+            name: c.name,
+            ...(c.url ? { url: c.url } : {}),
+          })),
+        }
+      : {}),
+    potentialAction: {
+      "@type": "WatchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: url,
+        actionPlatform: [
+          "http://schema.org/DesktopWebPlatform",
+          "http://schema.org/MobileWebPlatform",
+        ],
+      },
+    },
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface PersonJsonLdProps {
+  name: string;
+  description: string;
+  image?: string;
+  url: string;
+  birthDate?: string;
+  deathDate?: string | null;
+  jobTitle?: string;
+  knownFor?: { name: string; url: string }[];
+}
+
+export function PersonJsonLd({
+  name,
+  description,
+  image,
+  url,
+  birthDate,
+  deathDate,
+  jobTitle,
+  knownFor,
+}: PersonJsonLdProps) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name,
+    description: description.slice(0, 500),
+    image,
+    url,
+    ...(birthDate ? { birthDate } : {}),
+    ...(deathDate ? { deathDate } : {}),
+    ...(jobTitle ? { jobTitle } : {}),
+    ...(knownFor && knownFor.length > 0
+      ? {
+          knownFor: knownFor.map((item) => ({
+            "@type": "CreativeWork",
+            name: item.name,
+            url: item.url,
+          })),
+        }
+      : {}),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface CollectionJsonLdProps {
+  name: string;
+  description: string;
+  image?: string;
+  url: string;
+  numberOfItems?: number;
+  hasPart?: { name: string; url: string; type: "Movie" | "TVSeries" }[];
+}
+
+export function CollectionJsonLd({
+  name,
+  description,
+  image,
+  url,
+  numberOfItems,
+  hasPart,
+}: CollectionJsonLdProps) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name,
+    description: description.slice(0, 500),
+    image,
+    url,
+    numberOfItems: numberOfItems || (hasPart?.length || 0),
+    itemListElement: hasPart?.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": item.type,
+        name: item.name,
+        url: item.url,
+      },
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}

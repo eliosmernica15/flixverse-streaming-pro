@@ -373,6 +373,7 @@ export class WebRTCPartySync {
   private attachChannel(peerId: string, channel: RTCDataChannel) {
     const existing = this.channels.get(peerId);
     if (existing && existing !== channel) {
+      this.removeChannelListeners(existing);
       try {
         existing.close();
       } catch {
@@ -389,8 +390,20 @@ export class WebRTCPartySync {
       }
     };
     channel.onclose = () => {
-      if (this.channels.get(peerId) === channel) this.channels.delete(peerId);
+      if (this.channels.get(peerId) === channel) {
+        this.removeChannelListeners(channel);
+        this.channels.delete(peerId);
+      }
     };
+    channel.onerror = () => {
+      // Error handling is implicit via onclose
+    };
+  }
+
+  private removeChannelListeners(channel: RTCDataChannel) {
+    channel.onmessage = null;
+    channel.onclose = null;
+    channel.onerror = null;
   }
 
   private async connectAsHost(guestId: string) {
@@ -607,7 +620,7 @@ export class WebRTCPartySync {
 
     const channel = this.channels.get(peerId);
     if (channel) {
-      channel.onclose = null;
+      this.removeChannelListeners(channel);
       try {
         channel.close();
       } catch {
@@ -620,6 +633,18 @@ export class WebRTCPartySync {
     if (!opts.keepStream) this.mediaCallbacks.onRemoteStreamRemoved?.(peerId);
 
     if (peer) {
+      // Explicitly stop all sender tracks associated with this peer connection.
+      // This ensures encoders are torn down and resources are released immediately.
+      for (const sender of peer.pc.getSenders()) {
+        const track = sender.track;
+        if (track) {
+          try {
+            track.stop();
+          } catch {
+            // ignore
+          }
+        }
+      }
       // Stop clones this peer received — they are our allocations, not the
       // sender's tracks, so stopping them is safe and stops the encoder.
       for (const sender of peer.pc.getSenders()) {
@@ -659,7 +684,7 @@ export class WebRTCPartySync {
     }
     for (const peerId of [...this.peers.keys()]) this.closePeer(peerId);
     for (const channel of this.channels.values()) {
-      channel.onclose = null;
+      this.removeChannelListeners(channel);
       try {
         channel.close();
       } catch {

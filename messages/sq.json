@@ -133,13 +133,19 @@
     "signInRequired": "Kërkohet hyrja",
     "signInForList": "Hyr për të shtuar në listën tënde.",
     "signInToWatch": "Hyr ose regjistrohu për të parë filma dhe seriale.",
+    "signInForWatchParty": "Hyr për të filluar një Festë Shikimi.",
     "removedFromList": "U hoq nga Lista ime",
     "addedToList": "U shtua në Listën time",
     "listError": "Nuk u përditësua lista.",
     "comingSoon": "Së shpejti",
     "cast": "Aktoret",
     "similar": "Më shumë si kjo",
-    "overview": "Përmbledhja"
+    "overview": "Përmbledhja",
+    "watchParty": "Festë Shikimi",
+    "watchPartyCTA": "Shiko Së Bashku",
+    "watchPartyCTADesc": "Fto miqtë të shikojnë në sinkron perfekt. Falas për planet Standard dhe Premium.",
+    "startingWatchParty": "Duke filluar Festën e Shikimit...",
+    "startingWatchPartyDesc": "Duke lëshuar {title} me miqtë të tu"
   },
   "plans": {
     "monthly": "Mujore",
@@ -207,6 +213,7 @@
     "moviesAndTv": "Filma & seriale",
     "results": "Rezultatet",
     "people": "Njerëz",
+    "collections": "Koleksione",
     "castAndCrew": "Aktoret & ekipi",
     "noResults": "Nuk u gjetën rezultate",
     "tryDifferent": "Provo një term tjetër kërkimi",
@@ -232,6 +239,12 @@
     "topRated": "Më të vlerësuarit",
     "newest": "Më të rejat",
     "az": "A–Z",
+    "decade": "Dekada",
+    "allDecades": "Të gjitha dekadat",
+    "minimumRating": "Vlerësimi min.",
+    "anyRating": "Çdo vlerësim",
+    "language": "Gjuha",
+    "allLanguages": "Të gjitha gjuhët",
     "noCategory": "Kategoria nuk u gjet",
     "titles": "{count} tituj",
     "retry": "Provo përsëri",
@@ -280,6 +293,7 @@
   },
 
   "carousel": {
+    "genreRail": "Eksploro sipas zhanrit",
     "trendingNow": "Në trend",
     "nowPlaying": "Në kinema",
     "topRated": "Më të vlerësuarit",
@@ -314,6 +328,7 @@
     "friends": "Miq",
     "chat": "Bisedë",
     "party": "Festa",
+    "queue": "Radha",
     "host": "Pritës",
     "guest": "Mysafir",
     "shareLink": "Ndaj lidhjen",
@@ -342,7 +357,29 @@
     "syncDescription": "Fto miqtë të shikojnë së bashku në sinkron",
     "friendsHint": "Shtyp Fto për të dërguar njoftim — lidhja kopjohet automatikisht.",
     "requests": "{count} kërkesë",
-    "requestsPlural": "{count} kërkesa"
+    "requestsPlural": "{count} kërkesa",
+    "queueTitle": "Rradha e ardhshme",
+    "queueHint": "Përshkruaj çfarë të shikohet më pas. Voto përparësitë. Pritësi konfirmon zgjedhjen.",
+    "hostCanConfirm": "Vetëm pritësi mund të konfirmojë",
+    "queueEmpty": "Radha është bosh",
+    "queueEmptyHint": "Kërko filma ose shfaqje për të shtuar në radhë",
+    "searchPlaceholder": "Kërko filma ose shfaqje...",
+    "addToQueue": "Shto në radhë",
+    "suggested": "U shtua në radhë",
+    "suggestFailed": "Dështoi shtimi në radhë",
+    "searchFailed": "Kërkimi dështoi",
+    "voteFailed": "Votimi dështoi",
+    "confirmFailed": "Konfirmimi dështoi",
+    "removeFailed": "Heqja dështoi",
+    "voted": "U votua",
+    "vote": "Voto",
+    "confirm": "Konfirmo",
+    "remove": "Hiq",
+    "yours": "Jote",
+    "confirmed": "E konfirmuar",
+    "queueConfirmed": "U konfirmua!",
+    "willPlayNext": "do të luajë më pas",
+    "queueItemRemoved": "U hoq nga radha"
   },
   "friends": {
     "friends": "Miq",
@@ -362,7 +399,9 @@
     "decline": "Refuzo",
     "add": "Shto",
     "pending": "Në pritje",
-    "alreadyFriends": "Miq"
+    "alreadyFriends": "Miq",
+    "onlineNow": "Ne linjë tani",
+    "offline": "Jashtë linje"
   },
   "player": {
     "upNext": "Tjetri",
@@ -392,5 +431,16 @@
     "english": "English",
     "spanish": "Español",
     "albanian": "Shqip"
+  },
+  "collection": {
+    "back": "Kthehu",
+    "collection": "Koleksion",
+    "loading": "Duke u ngarkuar...",
+    "loadingDetails": "Duke u ngarkuar detajet e koleksionit...",
+    "titles": "{count} tituj",
+    "playAll": "Luaj të gjitha",
+    "addToList": "Shto në listë",
+    "moreInfo": "Më shumë info",
+    "titlesInCollection": "Titujt në këtë koleksion"
   }
 }

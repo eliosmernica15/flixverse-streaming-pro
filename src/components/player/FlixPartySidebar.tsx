@@ -1,8 +1,8 @@
 ﻿"use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { memo, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
-  X, Users, Send, Crown, LogOut, PartyPopper, Smile, UserPlus, ChevronDown, Copy, Check, Link2
+  X, Users, Send, Crown, LogOut, PartyPopper, Smile, UserPlus, ChevronDown, Copy, Check, Link2, List, ThumbsUp, XCircle, PlayCircle, MicOff, Bell
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { FlixPartyParticipant, FlixPartyChatMessage, FlixPartyRoom } from "@/hooks/player/useFlixParty";
@@ -81,6 +81,295 @@ function PartyPresenceArt({
   );
 }
 
+function QueueItemCard({
+  item,
+  isHost,
+  currentUserId,
+  onVote,
+  onConfirm,
+  onRemove,
+  onRemoveOwn,
+  t,
+  toast,
+}: {
+  item: QueueItem;
+  isHost: boolean;
+  currentUserId: string | undefined;
+  onVote?: (itemId: string) => Promise<void>;
+  onConfirm?: (itemId: string) => Promise<void>;
+  onRemove?: (itemId: string) => Promise<void>;
+  onRemoveOwn?: (itemId: string) => Promise<void>;
+  t: (key: string) => string;
+  toast: (options: { title: string; description?: string; variant?: "default" | "destructive" }) => void;
+}) {
+  const hasVoted = currentUserId ? item.votes.includes(currentUserId) : false;
+  const isSuggester = currentUserId === item.suggestedBy;
+
+  const handleVote = async () => {
+    if (!onVote) return;
+    try {
+      await onVote(item.id);
+    } catch (err) {
+      console.error("Vote failed:", err);
+      toast({ title: t("voteFailed"), description: String(err), variant: "destructive" });
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!onConfirm) return;
+    try {
+      await onConfirm(item.id);
+      toast({ title: t("queueConfirmed"), description: `${item.title} ${t("willPlayNext")}` });
+    } catch (err) {
+      console.error("Confirm failed:", err);
+      toast({ title: t("confirmFailed"), description: String(err), variant: "destructive" });
+    }
+  };
+
+  const handleRemove = async () => {
+    const removeFn = isHost ? onRemove : isSuggester ? onRemoveOwn : undefined;
+    if (!removeFn) return;
+    try {
+      await removeFn(item.id);
+      toast({ title: t("queueItemRemoved") });
+    } catch (err) {
+      console.error("Remove failed:", err);
+      toast({ title: t("removeFailed"), description: String(err), variant: "destructive" });
+    }
+  };
+
+  const mediaTypeLabel = item.mediaType === "tv"
+    ? `${item.title} ${item.season ? `S${item.season}` : ""}${item.episode ? `E${item.episode}` : ""}`
+    : item.title;
+
+  return (
+    <div className="flex gap-2 p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+      {item.posterPath && (
+        <img
+          src={`https://image.tmdb.org/t/p/w92${item.posterPath}`}
+          alt={item.title}
+          className="w-16 h-24 object-cover rounded-lg shrink-0"
+          loading="lazy"
+        />
+      )}
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="font-medium text-white truncate">{mediaTypeLabel}</span>
+          {item.confirmed && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-500/20 border border-green-500/30 px-1.5 py-0.5 text-[9px] font-bold text-green-300">
+              <PlayCircle className="w-2.5 h-2.5" />
+              {t("confirmed")}
+            </span>
+          )}
+          {isSuggester && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 border border-blue-500/30 px-1.5 py-0.5 text-[9px] font-bold text-blue-300">
+              {t("yours")}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-gray-400">
+          <span className="flex items-center gap-0.5">
+            {item.suggestedByAvatar ? (
+              <img src={item.suggestedByAvatar} alt="" className="w-3 h-3 rounded-full" />
+            ) : (
+              <div className="w-3 h-3 rounded-full bg-white/10 flex items-center justify-center">
+                <span className="text-[8px] font-bold text-white/60">{item.suggestedByName.charAt(0)}</span>
+              </div>
+            )}
+            <span className="truncate max-w-[100px]">{item.suggestedByName}</span>
+          </span>
+          <span>·</span>
+          <span>{new Date(item.suggestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <button
+          onClick={handleVote}
+          disabled={hasVoted}
+          className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-colors ${
+            hasVoted
+              ? "bg-green-500/20 text-green-300 border border-green-500/30 cursor-default"
+              : "bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-white/10"
+          }`}
+          aria-pressed={hasVoted}
+          aria-label={hasVoted ? t("voted") : t("vote")}
+        >
+          <ThumbsUp className={hasVoted ? "w-3.5 h-3.5 fill-current" : "w-3.5 h-3.5"} />
+          <span>{item.voteCount}</span>
+        </button>
+        {isHost && !item.confirmed && (
+          <button
+            onClick={handleConfirm}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30 text-[10px] font-medium transition-colors"
+            aria-label={t("confirm")}
+          >
+            <PlayCircle className="w-3.5 h-3.5" />
+            <span>{t("confirm")}</span>
+          </button>
+        )}
+        {(isHost || isSuggester) && (
+          <button
+            onClick={handleRemove}
+            className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            aria-label={t("remove")}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddToQueueForm({
+  onSuggest,
+  isHost,
+  t,
+  toast,
+}: {
+  onSuggest?: (item: Omit<QueueItem, "id" | "votes" | "voteCount" | "suggestedAt" | "suggestedBy" | "suggestedByName" | "suggestedByAvatar">) => Promise<void>;
+  isHost: boolean;
+  t: (key: string) => string;
+  toast: (options: { title: string; description?: string; variant?: "default" | "destructive" }) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{
+    id: number;
+    mediaType: "movie" | "tv";
+    title: string;
+    posterPath: string | null;
+    season?: number;
+    episode?: number;
+  }>>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<typeof searchResults[0] | null>(null);
+
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery.trim() || !onSuggest) return;
+    setSearching(true);
+    try {
+      // Use the existing search API
+      const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&limit=10`);
+      if (!res.ok) throw new Error("Search failed");
+      const data = await res.json();
+      const results = (data.results || []).map((r: any) => ({
+        id: r.id,
+        mediaType: r.media_type || (r.first_air_date ? "tv" : "movie"),
+        title: r.title || r.name,
+        posterPath: r.poster_path,
+        season: r.season_number,
+        episode: r.episode_number,
+      }));
+      setSearchResults(results);
+      if (results.length > 0) setSelectedResult(results[0]);
+    } catch (err) {
+      console.error("Search error:", err);
+      toast({ title: t("searchFailed"), variant: "destructive" });
+    } finally {
+      setSearching(false);
+    }
+  }, [searchQuery, onSuggest, t, toast]);
+
+  const handleSuggest = async () => {
+    if (!selectedResult || !onSuggest) return;
+    try {
+      await onSuggest({
+        tmdbId: selectedResult.id,
+        mediaType: selectedResult.mediaType,
+        title: selectedResult.title,
+        posterPath: selectedResult.posterPath,
+        season: selectedResult.season,
+        episode: selectedResult.episode,
+        serverIndex: 0,
+      });
+      setSearchQuery("");
+      setSearchResults([]);
+      setSelectedResult(null);
+      toast({ title: t("suggested") });
+    } catch (err) {
+      console.error("Suggest failed:", err);
+      toast({ title: t("suggestFailed"), description: String(err), variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        handleSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, handleSearch]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t("searchPlaceholder")}
+          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20 transition-colors"
+        />
+        <button
+          onClick={handleSuggest}
+          disabled={!selectedResult || searching}
+          className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-30 disabled:hover:bg-red-600 text-white text-sm font-medium transition-colors shrink-0"
+        >
+          {t("addToQueue")}
+        </button>
+      </div>
+
+      {searchResults.length > 0 && (
+        <div className="max-h-32 overflow-y-auto space-y-1">
+          {searchResults.map((result) => (
+            <button
+              key={`${result.mediaType}-${result.id}-${result.season || 0}-${result.episode || 0}`}
+              onClick={() => setSelectedResult(result)}
+              className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition-colors ${
+                selectedResult?.id === result.id &&
+                selectedResult?.mediaType === result.mediaType &&
+                selectedResult?.season === result.season &&
+                selectedResult?.episode === result.episode
+                  ? "bg-red-500/20 border border-red-500/30"
+                  : "bg-white/5 hover:bg-white/10 border border-white/10"
+              }`}
+            >
+              {result.posterPath && (
+                <img
+                  src={`https://image.tmdb.org/t/p/w45${result.posterPath}`}
+                  alt={result.title}
+                  className="w-10 h-15 object-cover rounded shrink-0"
+                  loading="lazy"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  {result.title}
+                  {result.mediaType === "tv" && result.season && (
+                    <> S{result.season} {result.episode && `E${result.episode}`}</>
+                  )}
+                </p>
+                <p className="text-[10px] text-gray-500 capitalize">{result.mediaType}</p>
+              </div>
+              {selectedResult?.id === result.id &&
+                selectedResult?.mediaType === result.mediaType &&
+                selectedResult?.season === result.season &&
+                selectedResult?.episode === result.episode && (
+                <div className="w-4 h-4 rounded-full border-2 border-red-500 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface FlixPartySidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -99,8 +388,6 @@ interface FlixPartySidebarProps {
   episode?: number;
   title?: string;
   posterPath?: string | null;
-  currentTime?: number;
-  isPlaying?: boolean;
   onSyncToPosition?: (position: number) => void;
   partyJoinUrl?: string | null;
   media?: PartyMediaState;
@@ -129,11 +416,43 @@ interface FlixPartySidebarProps {
   /** Collaborative controls toggle (host only). */
   controlsMode?: "HOST_ONLY" | "COLLABORATIVE";
   onSetControlsMode?: (mode: "HOST_ONLY" | "COLLABORATIVE") => void;
+  /** Queue items from the party room */
+  pendingQueue?: QueueItem[];
+  /** Function to suggest content to queue */
+  suggestToQueue?: (item: Omit<QueueItem, "id" | "votes" | "voteCount" | "suggestedAt" | "suggestedBy" | "suggestedByName" | "suggestedByAvatar">) => Promise<void>;
+  /** Function to vote on a queue item */
+  voteQueueItem?: (itemId: string) => Promise<void>;
+  /** Function for host to confirm a queue item */
+  confirmQueueItem?: (itemId: string) => Promise<void>;
+  /** Function for host to remove a queue item */
+  removeQueueItem?: (itemId: string) => Promise<void>;
+  /** Function for user to remove their own queue item */
+  removeOwnQueueItem?: (itemId: string) => Promise<void>;
+  /** Broadcast mute-all command to all guests via WebRTC data channel (host only) */
+  sendMuteAll?: () => void;
 }
 
-type SidebarTab = "chat" | "friends" | "party";
+type SidebarTab = "chat" | "friends" | "party" | "queue";
 
-export function FlixPartySidebar({
+interface QueueItem {
+  id: string;
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+  season?: number;
+  episode?: number;
+  title: string;
+  posterPath?: string | null;
+  serverIndex?: number;
+  suggestedBy: string;
+  suggestedByName: string;
+  suggestedByAvatar?: string | null;
+  suggestedAt: number;
+  votes: string[];
+  voteCount: number;
+  confirmed?: boolean;
+}
+
+export const FlixPartySidebar = memo(function FlixPartySidebar({
   isOpen,
   onClose,
   roomId,
@@ -148,8 +467,6 @@ export function FlixPartySidebar({
   episode,
   title,
   posterPath,
-  currentTime,
-  isPlaying,
   onSyncToPosition,
   partyJoinUrl,
   embedded = false,
@@ -161,6 +478,7 @@ export function FlixPartySidebar({
   setParticipantMicMuted,
   setParticipantCamDisabled,
   transferHost,
+  sendMuteAll,
   isMobile = false,
   mobileExpanded = true,
   onMinimize,
@@ -173,6 +491,12 @@ export function FlixPartySidebar({
   onCancelSync,
   controlsMode = "HOST_ONLY",
   onSetControlsMode,
+  pendingQueue = [],
+  suggestToQueue,
+  voteQueueItem,
+  confirmQueueItem,
+  removeQueueItem,
+  removeOwnQueueItem,
 }: FlixPartySidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>(roomId ? "chat" : "friends");
   const [input, setInput] = useState("");
@@ -214,8 +538,10 @@ export function FlixPartySidebar({
     if (roomId) setActiveTab("chat");
   }, [roomId]);
 
-  // D5 â€” toast once when playback drift resolves back into sync.
+  // D5 — toast once when playback drift resolves back into sync.
   const sawDriftRef = useRef(false);
+  const [syncAnnouncement, setSyncAnnouncement] = useState("");
+
   useEffect(() => {
     if (syncStatus === "drift" || syncStatus === "resyncing") {
       sawDriftRef.current = true;
@@ -224,6 +550,9 @@ export function FlixPartySidebar({
     if (syncStatus === "connected" && sawDriftRef.current) {
       sawDriftRef.current = false;
       toast({ title: "Back in sync", description: "Playback caught up with the host." });
+      // Also announce to screen readers
+      setSyncAnnouncement("Playback back in sync with host");
+      setTimeout(() => setSyncAnnouncement(""), 1000);
     }
   }, [syncStatus, toast]);
 
@@ -236,6 +565,19 @@ export function FlixPartySidebar({
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen, activeTab]);
+
+  // Handle Escape key to close sidebar
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   const handleSend = useCallback(() => {
     const text = input.trim();
@@ -450,13 +792,38 @@ export function FlixPartySidebar({
               </p>
             )}
             {roomId && (
-              <SyncStatusBadge
-                status={syncStatus}
-                driftMs={driftMs}
-                processed={realtimeProcessed}
-                peers={peerCount}
-                className="mt-1"
-              />
+              <>
+                {/* Live region for sync status changes */}
+                <div
+                  className="sr-only"
+                  aria-live="assertive"
+                  aria-atomic="true"
+                  aria-label="Playback sync status"
+                >
+                  {syncStatus === "connected" && "Playback in sync"}
+                  {syncStatus === "drift" && "Playback drifting"}
+                  {syncStatus === "resyncing" && "Resyncing playback"}
+                  {syncStatus === "connecting" && "Connecting to party"}
+                  {syncStatus === "disconnected" && "Disconnected from party"}
+                </div>
+                {/* Live region for "Back in sync" announcement */}
+                {syncAnnouncement && (
+                  <div
+                    className="sr-only"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    {syncAnnouncement}
+                  </div>
+                )}
+                <SyncStatusBadge
+                  status={syncStatus}
+                  driftMs={driftMs}
+                  processed={realtimeProcessed}
+                  peers={peerCount}
+                  className="mt-1"
+                />
+              </>
             )}
             {roomId && isHostProp && onSetControlsMode && (
               <button
@@ -568,6 +935,7 @@ export function FlixPartySidebar({
           { id: "friends" as const, label: t("friends"), icon: UserPlus },
           { id: "chat" as const, label: t("chat"), icon: Send },
           { id: "party" as const, label: t("party"), icon: Users },
+          { id: "queue" as const, label: t("queue"), icon: List },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -653,6 +1021,14 @@ export function FlixPartySidebar({
                     />
                   </div>
                 )}
+                {/* Live region for chat messages and reactions */}
+                <div
+                  ref={messagesEndRef}
+                  className="sr-only"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  aria-label="Chat messages"
+                />
                 <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
                   {messages.map((msg) => (
                     <div key={msg.id} className="flex gap-2.5">
@@ -677,14 +1053,13 @@ export function FlixPartySidebar({
                           <span className="text-[11px] font-semibold text-gray-300">{msg.senderName}</span>
                         </div>
                         {msg.emoji ? (
-                          <span className="text-2xl">{msg.emoji}</span>
+                          <span className="text-2xl" role="img" aria-label={`${msg.senderName} reacted with ${msg.emoji}`}>{msg.emoji}</span>
                         ) : (
                           <p className="text-xs text-gray-200 break-words">{msg.text}</p>
                         )}
                       </div>
                     </div>
                   ))}
-                  <div ref={messagesEndRef} />
                 </div>
 
                 {showEmoji && (
@@ -771,6 +1146,24 @@ export function FlixPartySidebar({
                   pttState={ptt.state}
                   compact={isMobile}
                 />
+                {/* Mute all except host button - host only */}
+                {isHostProp && sendMuteAll && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sendMuteAll();
+                      toast({
+                        title: "Muted all guests",
+                        description: "All guests' microphones have been muted. You remain unmuted.",
+                      });
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-amber-600/20 border border-amber-500/30 text-amber-200 hover:bg-amber-600/30 text-sm font-medium transition-colors"
+                    title="Mute all guests except yourself"
+                  >
+                    <MicOff className="w-4 h-4" />
+                    <span>Mute all except host</span>
+                  </button>
+                )}
                 {room && user && (
                   <PartyMembersPanel
                     participants={room.participants}
@@ -802,8 +1195,6 @@ export function FlixPartySidebar({
                   episode={episode}
                   title={title}
                   posterPath={posterPath || null}
-                  currentTime={currentTime || 0}
-                  isPlaying={isPlaying || false}
                   onSyncToPosition={onSyncToPosition || (() => {})}
                   onStartParty={onStartParty}
                   externalRoomId={roomId}
@@ -811,6 +1202,70 @@ export function FlixPartySidebar({
                 />
               )}
             </div>
+          </div>
+        )}
+
+        {/* Queue tab */}
+        {activeTab === "queue" && (
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {!roomId ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                <List className="w-8 h-8 text-gray-700 mb-2" />
+                <p className="text-xs text-gray-500">No active party</p>
+                <p className="text-[10px] text-gray-600 mt-1">Start a party to use the queue</p>
+              </div>
+            ) : (
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="shrink-0 border-b border-white/10 px-3 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-white text-sm">{t("queueTitle")}</h3>
+                    {isHostProp && (
+                      <span className="text-[10px] text-amber-400">
+                        {t("hostCanConfirm")}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500 leading-relaxed">
+                    {t("queueHint")}
+                  </p>
+                </div>
+
+                {pendingQueue && pendingQueue.length > 0 ? (
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+                    {pendingQueue.map((item) => (
+                      <QueueItemCard
+                        key={item.id}
+                        item={item}
+                        isHost={isHostProp}
+                        currentUserId={user?.uid}
+                        onVote={voteQueueItem}
+                        onConfirm={confirmQueueItem}
+                        onRemove={removeQueueItem}
+                        onRemoveOwn={removeOwnQueueItem}
+                        t={t}
+                        toast={toast}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                    <List className="w-12 h-12 text-gray-700 mb-3" />
+                    <p className="text-sm text-gray-400">{t("queueEmpty")}</p>
+                    <p className="text-[10px] text-gray-600 mt-1">{t("queueEmptyHint")}</p>
+                  </div>
+                )}
+
+                {/* Add to queue form */}
+                <div className="shrink-0 p-3 border-t border-white/10 bg-zinc-950/95">
+                  <AddToQueueForm
+                    onSuggest={suggestToQueue}
+                    isHost={isHostProp}
+                    t={t}
+                    toast={toast}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -849,4 +1304,4 @@ export function FlixPartySidebar({
       )}
     </div>
   );
-}
+});

@@ -250,6 +250,18 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     [roomId]
   );
 
+  const updateEncryptedPayload = useCallback(
+    async (encryptedPayload: string) => {
+      if (!roomId || !user || room?.hostId !== user.uid) return;
+      await pythonFetch(`/parties/${roomId}/encryption`, {
+        method: "PATCH",
+        body: JSON.stringify({ encryptedPayload }),
+      });
+      setRoom((prev) => (prev ? { ...prev, encryptedPayload } : prev));
+    },
+    [roomId, user, room?.hostId]
+  );
+
   const kickParticipant = useCallback(
     async (targetUserId: string) => {
       if (!roomId || !user || room?.hostId !== user.uid || targetUserId === user.uid) return;
@@ -351,6 +363,7 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
     leaveRoom,
     sendMessage,
     updatePlaybackState,
+    updateEncryptedPayload,
     setControlsMode,
     kickParticipant,
     setParticipantMicMuted,
@@ -363,6 +376,23 @@ export function useFlixPartyPython({ roomId }: UseFlixPartyOptions) {
      */
     transferHost: null as ((targetUserId: string) => Promise<boolean>) | null,
     refreshRoom: fetchRoom,
+    // Queue functions - not implemented in Python backend yet
+    pendingQueue: [] as import("./useFlixParty").FlixPartyQueueItem[],
+    suggestToQueue: async () => {
+      throw new Error("Queue not available on this transport");
+    },
+    voteQueueItem: async () => {
+      throw new Error("Queue not available on this transport");
+    },
+    confirmQueueItem: async () => {
+      throw new Error("Queue not available on this transport");
+    },
+    removeQueueItem: async () => {
+      throw new Error("Queue not available on this transport");
+    },
+    removeOwnQueueItem: async () => {
+      throw new Error("Queue not available on this transport");
+    },
   };
 }
 

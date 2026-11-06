@@ -39,6 +39,8 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useNetworkQuality } from "@/hooks/useNetworkQuality";
 import { pickServerByQuality } from "@/lib/streamingSources";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { NTPClient } from "@/lib/player/ntpClockSync";
+import { parseChaptersFromEvent, type Chapter } from "@/lib/player/chapterParser";
 import "@/app/video-player.css";
 
 interface PlayerShellProps {
@@ -119,10 +121,14 @@ export function PlayerShell({
   const [showUpNext, setShowUpNext] = useState(false);
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [showSkipRecap, setShowSkipRecap] = useState(false);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [introChapter, setIntroChapter] = useState<Chapter | null>(null);
+  const [recapChapter, setRecapChapter] = useState<Chapter | null>(null);
   const [commentAt, setCommentAt] = useState<number | null>(null);
   const [cursorIdle, setCursorIdle] = useState(true);
   const [captionsOn, setCaptionsOn] = useState(false);
   const cursorIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleEndedRef = useRef<() => void>(() => {});
 
   const { user } = useAuth();
   const locale = useLocale();
@@ -192,12 +198,7 @@ export function PlayerShell({
     return { season: season + 1, episode: 1 };
   }, [mediaType, season, episode, episodeCount]);
 
-  const handleEnded = useCallback(() => {
-    if (mediaType === "tv" && onAdvanceEpisode && nextEpisode) {
-      setShowUpNext(true);
-    }
-  }, [mediaType, onAdvanceEpisode, nextEpisode]);
-
+  
   const {
     isPlaying,
     volume,
@@ -218,7 +219,7 @@ export function PlayerShell({
     totalDuration: effectiveDuration,
     onTimeUpdate: (time) => syncTo(time),
     onDurationChange: (duration) => setLiveDuration(duration),
-    onEnded: handleEnded,
+    onEnded: () => handleEndedRef.current?.(),
   });
 
   /**
@@ -308,12 +309,32 @@ export function PlayerShell({
     guestJoinMode,
   });
 
-   const { media, guestServerIndex, resyncSeekUrl, setResyncSeekUrl } = party;
+   const { media, guestServerIndex, resyncSeekUrl, setResyncSeekUrl, broadcastNextEpisode } = party;
   const layout = usePartyLayout();
   const mobilePartyPreparedRef = useRef(false);
 
   const inParty = !!party.partyRoomId;
   const isMobile = layout.isMobile;
+
+  // Binge sync: auto-advance to next episode when episode ends
+  const handleEnded = useCallback(() => {
+    if (mediaType === "tv" && onAdvanceEpisode && nextEpisode) {
+      // Binge sync: auto-advance to next episode for party host without showing UpNext overlay
+      if (inParty && party.isPartyHost && party.partyRoomId) {
+        // Use NTP-corrected transition time for precise sync
+        const transitionTime = NTPClient.now() + 500; // Small buffer for network latency
+        broadcastNextEpisode(nextEpisode.season, nextEpisode.episode, currentServer, transitionTime);
+        // Also call onAdvanceEpisode locally for the host to navigate
+        onAdvanceEpisode(nextEpisode.season, nextEpisode.episode);
+      } else {
+        // Non-party or guest: show UpNext countdown for manual advance
+        setShowUpNext(true);
+      }
+    }
+  }, [mediaType, onAdvanceEpisode, nextEpisode, inParty, party, currentServer, broadcastNextEpisode]);
+
+  // Update the ref so useEmbedBridge can call it
+  handleEndedRef.current = handleEnded;
 
   const playerResize = usePlayerWindowResize(shellRef, windowRef, {
     enabled: !isMobile,
@@ -461,8 +482,13 @@ export function PlayerShell({
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => undefined);
     }
+    // Leave party before closing to ensure WebRTC tracks and media are cleaned up
+    if (inParty) {
+      void party.handleLeaveParty();
+      party.resetPartySession();
+    }
     onClose();
-  }, [onClose]);
+  }, [inParty, onClose, party]);
 
   const toggleExpanded = cycleLayoutFocus;
 
@@ -647,6 +673,23 @@ export function PlayerShell({
   }, []);
 
   useBodyScrollLock(true);
+
+  // Cleanup on unmount: leave party, stop WebRTC tracks, clean up local stream
+  useEffect(() => {
+    return () => {
+      if (inParty) {
+        // Leave party gracefully to stop WebRTC tracks and clean up media
+        void party.handleLeaveParty();
+        party.resetPartySession();
+      }
+      // Clear any pending timeouts
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+      if (cursorIdleTimerRef.current) clearTimeout(cursorIdleTimerRef.current);
+      if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+      // Ensure body scroll lock is released
+      // (useBodyScrollLock handles this, but explicit safety)
+    };
+  }, [inParty, party]);
 
   // Mirror the playhead into a ref for the keydown handler.
   //
@@ -851,6 +894,31 @@ export function PlayerShell({
     handleSetStreamLang,
   ]);
 
+  // Listen for skip-intro/recap events from EmbedFrame
+  useEffect(() => {
+    const handleSkipIntro = (event: CustomEvent) => {
+      const startTime = event.detail.startTime;
+      const introEndTime = introChapter?.endTime || 90;
+      seek(introEndTime);
+      syncTo(introEndTime);
+    };
+
+    const handleSkipRecap = (event: CustomEvent) => {
+      const startTime = event.detail.startTime;
+      const recapEndTime = recapChapter?.endTime || 30;
+      seek(recapEndTime);
+      syncTo(recapEndTime);
+    };
+
+    window.addEventListener("flixverse:skip-intro", handleSkipIntro as EventListener);
+    window.addEventListener("flixverse:skip-recap", handleSkipRecap as EventListener);
+
+    return () => {
+      window.removeEventListener("flixverse:skip-intro", handleSkipIntro as EventListener);
+      window.removeEventListener("flixverse:skip-recap", handleSkipRecap as EventListener);
+    };
+  }, [introChapter, recapChapter, seek, syncTo]);
+
    const onIframeLoad = () => {
      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
      autoFailoverRef.current = 0;
@@ -1032,7 +1100,10 @@ export function PlayerShell({
                iframeRef={iframeRef}
                onIframeLoad={onIframeLoad}
                onIframeError={onIframeError}
-                onRetry={nextServer}
+               onRetry={nextServer}
+               chapters={chapters}
+               introChapter={introChapter}
+               recapChapter={recapChapter}
               />
 
             {/* Guest-only manual resync when drift persists beyond 2s. */}
@@ -1070,22 +1141,39 @@ export function PlayerShell({
                   nearbyComments={overlayNearby}
                   onSeek={seekOverlay}
                   onAddComment={openCommentAt}
-                  onLikeComment={(id) => {
-                    void timeline.likeComment(id);
-                  }}
-                  isPlaying={isPlaying}
-                  controlsVisible={cursorIdle}
+                  onLikeComment={timeline.likeComment}
                 />
               </div>
             )}
-            {(showSkipIntro || showSkipRecap) && (
+            {/* Skip intro button - shows when intro chapter exists and we're in the intro window */}
+            {showSkipIntro && introChapter && (
               <button
                 type="button"
                 className="player-skip-btn"
-                onClick={() => seek(90)}
-                aria-label={showSkipRecap ? "Skip recap" : "Skip intro"}
+                onClick={() => {
+                  const introEndTime = introChapter.endTime || 90;
+                  seek(introEndTime);
+                  syncTo(introEndTime);
+                }}
+                aria-label="Skip intro"
               >
-                {showSkipRecap ? "Skip Recap ⏭" : "Skip Intro ⏭"}
+                Skip Intro ⏭
+              </button>
+            )}
+
+            {/* Skip recap button - shows when recap chapter exists and we're in the recap window */}
+            {showSkipRecap && recapChapter && (
+              <button
+                type="button"
+                className="player-skip-btn"
+                onClick={() => {
+                  const recapEndTime = recapChapter.endTime || 30;
+                  seek(recapEndTime);
+                  syncTo(recapEndTime);
+                }}
+                aria-label="Skip recap"
+              >
+                Skip Recap ⏭
               </button>
             )}
             {showUpNext && nextEpisode && onAdvanceEpisode && (
@@ -1158,8 +1246,6 @@ export function PlayerShell({
             episode={episode}
             title={title}
             posterPath={posterPath || null}
-            currentTime={currentTime}
-            isPlaying={isPlaying}
             onSyncToPosition={seekTo}
             partyJoinUrl={party.partyJoinUrl}
             media={media}
@@ -1170,6 +1256,7 @@ export function PlayerShell({
             setParticipantMicMuted={party.setParticipantMicMuted}
             setParticipantCamDisabled={party.setParticipantCamDisabled}
             transferHost={party.transferHost ?? undefined}
+            sendMuteAll={party.sendMuteAll}
             realtimeProcessed={party.realtime?.processed}
             realtimeReady={party.realtime?.isReady}
             peerCount={party.partyRoom?.participants?.length}
@@ -1180,6 +1267,12 @@ export function PlayerShell({
             onSyncStart={party.startSyncedStart}
             onReleaseSyncNow={party.releaseSyncedStart}
             onCancelSync={party.cancelSyncedStart}
+            pendingQueue={party.pendingQueue}
+            suggestToQueue={party.suggestToQueue}
+            voteQueueItem={party.voteQueueItem}
+            confirmQueueItem={party.confirmQueueItem}
+            removeQueueItem={party.removeQueueItem}
+            removeOwnQueueItem={party.removeOwnQueueItem}
           />
         )}
       </div>

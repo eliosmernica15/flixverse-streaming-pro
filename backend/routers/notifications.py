@@ -268,3 +268,125 @@ async def decline_party_invite(body: InviteActionBody, auth: dict = Depends(veri
             await notification_hub.push(host_id, decline_doc)
 
     return {"ok": True}
+
+
+# ── Notification Channel Preferences ────────────────────────────────
+
+class NotificationChannelPrefs(BaseModel):
+    email_enabled: bool = True
+    push_enabled: bool = True
+    in_app_enabled: bool = True
+    # Per-type preferences: {type: {email: bool, push: bool, in_app: bool}}
+    channel_prefs: dict[str, dict[str, bool]] = Field(default_factory=dict)
+
+
+class UpdateChannelPrefsBody(BaseModel):
+    email_enabled: bool | None = None
+    push_enabled: bool | None = None
+    in_app_enabled: bool | None = None
+    channel_prefs: dict[str, dict[str, bool]] | None = None
+
+
+def _default_channel_prefs() -> dict[str, dict[str, bool]]:
+    """Default channel preferences for all notification types."""
+    types = [
+        "like",
+        "comment",
+        "follow",
+        "review",
+        "new_episode",
+        "recommendation",
+        "friend_request",
+        "friend_accepted",
+        "watch_party_invite",
+        "watch_party_invite_declined",
+    ]
+    return {t: {"email": True, "push": True, "in_app": True} for t in types}
+
+
+@router.get("/preferences")
+def get_notification_preferences(auth: dict = Depends(verify_bearer)) -> NotificationChannelPrefs:
+    """Get notification channel preferences for the current user."""
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        row = db_fetchone(
+            conn,
+            "SELECT email_enabled, push_enabled, in_app_enabled, channel_prefs_json FROM notification_preferences WHERE user_id = ?",
+            (uid,),
+        )
+        if row:
+            channel_prefs = json.loads(row_get(row, "channel_prefs_json") or "{}")
+            # Merge with defaults for any missing types
+            defaults = _default_channel_prefs()
+            for t, prefs in defaults.items():
+                if t not in channel_prefs:
+                    channel_prefs[t] = prefs
+            return NotificationChannelPrefs(
+                email_enabled=bool(row_get(row, "email_enabled")),
+                push_enabled=bool(row_get(row, "push_enabled")),
+                in_app_enabled=bool(row_get(row, "in_app_enabled")),
+                channel_prefs=channel_prefs,
+            )
+        # Return defaults if no preferences stored
+        return NotificationChannelPrefs(channel_prefs=_default_channel_prefs())
+
+
+@router.patch("/preferences")
+def update_notification_preferences(body: UpdateChannelPrefsBody, auth: dict = Depends(verify_bearer)) -> NotificationChannelPrefs:
+    """Update notification channel preferences for the current user."""
+    uid = uid_from_auth(auth)
+    created = iso_now()
+
+    with get_conn() as conn:
+        # Get existing preferences
+        row = db_fetchone(
+            conn,
+            "SELECT email_enabled, push_enabled, in_app_enabled, channel_prefs_json FROM notification_preferences WHERE user_id = ?",
+            (uid,),
+        )
+
+        if row:
+            email_enabled = body.email_enabled if body.email_enabled is not None else bool(row_get(row, "email_enabled"))
+            push_enabled = body.push_enabled if body.push_enabled is not None else bool(row_get(row, "push_enabled"))
+            in_app_enabled = body.in_app_enabled if body.in_app_enabled is not None else bool(row_get(row, "in_app_enabled"))
+            channel_prefs = json.loads(row_get(row, "channel_prefs_json") or "{}")
+
+            if body.channel_prefs:
+                # Merge with existing, keeping existing for types not specified
+                channel_prefs = {**channel_prefs, **body.channel_prefs}
+        else:
+            # First time setup - use defaults
+            email_enabled = body.email_enabled if body.email_enabled is not None else True
+            push_enabled = body.push_enabled if body.push_enabled is not None else True
+            in_app_enabled = body.in_app_enabled if body.in_app_enabled is not None else True
+            channel_prefs = _default_channel_prefs()
+            if body.channel_prefs:
+                channel_prefs = {**channel_prefs, **body.channel_prefs}
+
+        # Upsert preferences
+        if row:
+            db_execute(
+                conn,
+                """
+                UPDATE notification_preferences
+                SET email_enabled = ?, push_enabled = ?, in_app_enabled = ?, channel_prefs_json = ?, updated_at = ?
+                WHERE user_id = ?
+                """,
+                (int(email_enabled), int(push_enabled), int(in_app_enabled), json.dumps(channel_prefs), created, uid),
+            )
+        else:
+            db_execute(
+                conn,
+                """
+                INSERT INTO notification_preferences (user_id, email_enabled, push_enabled, in_app_enabled, channel_prefs_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (uid, int(email_enabled), int(push_enabled), int(in_app_enabled), json.dumps(channel_prefs), created),
+            )
+
+    return NotificationChannelPrefs(
+        email_enabled=email_enabled,
+        push_enabled=push_enabled,
+        in_app_enabled=in_app_enabled,
+        channel_prefs=channel_prefs,
+    )

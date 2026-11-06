@@ -43,6 +43,7 @@ export interface TMDBMovie {
   poster_path: string;
   backdrop_path: string;
   vote_average: number;
+  original_language?: string;
   release_date?: string;
   first_air_date?: string;
   genre_ids: number[];
@@ -629,6 +630,57 @@ export const discoverTVShowsByGenre = async (genreId: number, page: number = 1):
 export const searchMovies = async (query: string, page: number = 1): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}&page=${page}`);
   return data.results || [];
+};
+
+// Collection search
+export interface TMDBCollection {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string;
+  backdrop_path: string;
+  parts: TMDBMovie[];
+  part_count: number;
+}
+
+export interface SearchCollectionResponse {
+  results: TMDBCollection[];
+  page: number;
+  total_pages: number;
+  total_results: number;
+}
+
+export const searchCollections = async (query: string, page: number = 1): Promise<TMDBCollection[]> => {
+  const data = await apiCall(`${TMDB_BASE_URL}/search/collection?query=${encodeURIComponent(query)}&page=${page}`);
+  return data.results || [];
+};
+
+export const searchCollectionsWithPagination = async (
+  query: string,
+  page: number = 1
+): Promise<SearchCollectionResponse> => {
+  const data = await apiCall(
+    `${TMDB_BASE_URL}/search/collection?query=${encodeURIComponent(query)}&page=${page}`
+  );
+  return {
+    results: data.results || [],
+    page: data.page ?? 1,
+    total_pages: Math.min(data.total_pages ?? 1, 500),
+    total_results: data.total_results ?? 0,
+  };
+};
+
+// Collection details
+export const fetchCollectionDetails = async (collectionId: number): Promise<TMDBCollection | null> => {
+  const data = await apiCall(`${TMDB_BASE_URL}/collection/${collectionId}`);
+  if (data.success && data.id) {
+    return {
+      ...data,
+      parts: data.parts || [],
+      part_count: data.part_count || data.parts?.length || 0,
+    };
+  }
+  return null;
 };
 
 export const searchTVShows = async (query: string, page: number = 1): Promise<TMDBMovie[]> => {

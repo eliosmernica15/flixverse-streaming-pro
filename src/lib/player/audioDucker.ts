@@ -7,7 +7,7 @@
  * cross-origin provider iframe and cannot be routed through Web Audio —
  * that case is handled in volume space by `useVolumeDucking`.
  */
-import { getGlobalAudioContext, getMasterGain } from "./audioSingleton";
+import { audioContext } from "./audioSingleton";
 
 const DUCK_TARGET = 0.35; // 65 % attenuation of app sounds
 const RAMP_MS = 150;
@@ -17,10 +17,11 @@ export interface AudioDuckerState {
   isDucking: boolean;
   gainNode?: GainNode | null;
   duckTimer?: ReturnType<typeof setTimeout> | null;
+  gainNodeId?: symbol | null;
 }
 
 export function createAudioDucker(): AudioDuckerState {
-  return { isDucking: false, gainNode: null, duckTimer: null };
+  return { isDucking: false, gainNode: null, duckTimer: null, gainNodeId: null };
 }
 
 /**
@@ -29,20 +30,18 @@ export function createAudioDucker(): AudioDuckerState {
  */
 export function setupMovieAudioDucking(state: AudioDuckerState): void {
   if (state.gainNode) return;
-  const master = getMasterGain();
-  if (!master) return;
+  const ctx = audioContext.getContext();
+  if (!ctx) return;
   try {
-    const gain = master.context.createGain();
+    const gain = ctx.createGain();
     gain.gain.value = 1;
-    master.connect(gain);
-    gain.connect(master.context.destination);
+    // Connect master to gain, then gain to destination
+    const masterGainId = audioContext.attachGainNode(gain);
     state.gainNode = gain;
-    // Route app sounds through the ducking stage instead of straight to
-    // the destination, so ducking actually affects them.
-    master.disconnect();
-    master.connect(gain);
+    state.gainNodeId = masterGainId;
   } catch {
     state.gainNode = null;
+    state.gainNodeId = null;
   }
 }
 
@@ -51,7 +50,7 @@ export function applyDucking(isSpeaking: boolean, state: AudioDuckerState): void
   const gain = state.gainNode;
   if (!gain) return;
 
-  const ctx = getGlobalAudioContext();
+  const ctx = audioContext.getContext();
   if (!ctx) return;
   const now = ctx.currentTime;
   const ramp = RAMP_MS / 1000;
@@ -71,7 +70,7 @@ export function applyDucking(isSpeaking: boolean, state: AudioDuckerState): void
       state.duckTimer = setTimeout(() => {
         state.isDucking = false;
         state.duckTimer = null;
-        const current = getGlobalAudioContext();
+        const current = audioContext.getContext();
         if (!current || !state.gainNode) return;
         state.gainNode.gain.cancelScheduledValues(current.currentTime);
         state.gainNode.gain.setTargetAtTime(1, current.currentTime, ramp);
@@ -90,10 +89,15 @@ export function teardownAudioDucking(state: AudioDuckerState): void {
   state.gainNode = null;
   if (!gain) return;
   try {
-    const ctx = getGlobalAudioContext();
+    const ctx = audioContext.getContext();
     if (ctx) gain.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
     gain.disconnect();
   } catch {
     // ignore
+  }
+  // Detach the gain node from the audio context
+  if (state.gainNodeId) {
+    audioContext.detachGainNode(state.gainNodeId);
+    state.gainNodeId = null;
   }
 }

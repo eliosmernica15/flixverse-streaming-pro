@@ -1,3 +1,10 @@
+import EMBED_HOSTS from "./src/lib/embedHosts.json" with { type: "json" };
+
+const embedFrameSources = EMBED_HOSTS.flatMap((host) => [
+  `https://${host}`,
+  `https://*.${host}`,
+]).join(" ");
+
 /** Shared CSP + security header values (used by next.config and src/lib). */
 export const cspDirectives = [
   "default-src 'self'",
@@ -5,22 +12,12 @@ export const cspDirectives = [
   "form-action 'self'",
   "frame-ancestors 'self'",
   "object-src 'none'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google.com https://www.recaptcha.net https://browser.sentry-cdn.com",
+  "script-src 'self' 'unsafe-inline' https://apis.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google.com https://www.recaptcha.net https://browser.sentry-cdn.com",
   "font-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com",
   "connect-src 'self' https://image.tmdb.org https://images.unsplash.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://lovable.dev https://lh3.googleusercontent.com https://api.themoviedb.org https://www.cloudflare.com https://worldtimeapi.org https://*.googleapis.com https://*.firebaseio.com https://*.cloudinary.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://*.ingest.sentry.io https://*.sentry.io https://www.google.com https://www.recaptcha.net wss://*.firebaseio.com",
-  // frame-src must list every host the player iframes. Keep in sync with
-  // src/lib/streamingSources.ts -> ALLOWED_EMBED_HOSTS. The canonical VidSrc
-  // domain is vidsrcme.ru (vidsrc.to is the per-domain mirror). The
-  // canonical Videasy domain is player.videasy.to. The legacy mirrors
-  // (vidsrc.me/.net/.pm/.in/.su, player.videasy.net, embed.su, 2embed.cc,
-  // multiembed.mov) are all blocked or 404 and have been removed.
-  // VidFast serves/redirects across all of its documented domains
-  // (pro/in/io/me/net/pm/xyz/vc/bz) — the player navigates to vidfast.vc
-  // even when loaded from vidfast.pro, so every mirror must be listed or
-  // the browser blocks the frame.
-  "frame-src 'self' blob: https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net https://vidsrcme.ru https://*.vidsrcme.ru https://vidsrc.to https://*.vidsrc.to https://vidlink.pro https://*.vidlink.pro https://player.videasy.to https://*.player.videasy.to https://videasy.to https://*.videasy.to https://vidfast.pro https://*.vidfast.pro https://vidfast.vc https://*.vidfast.vc https://vidfast.in https://*.vidfast.in https://vidfast.io https://*.vidfast.io https://vidfast.me https://*.vidfast.me https://vidfast.net https://*.vidfast.net https://vidfast.pm https://*.vidfast.pm https://vidfast.xyz https://*.vidfast.xyz https://vidfast.bz https://*.vidfast.bz https://yapgrid.com https://*.yapgrid.com https://www.yapgrid.com https://www.youtube.com https://www.youtube-nocookie.com https://*.youtube.com https://*.youtube-nocookie.com",
+  `frame-src 'self' blob: https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net ${embedFrameSources} https://www.youtube.com https://www.youtube-nocookie.com https://*.youtube.com https://*.youtube-nocookie.com`,
   "upgrade-insecure-requests",
 ];
 
@@ -59,7 +56,8 @@ export const securityHeaders = [
   },
   {
     key: "Permissions-Policy",
-    value: "camera=(self), microphone=(self), geolocation=(), interest-cohort=()",
+    value:
+      "camera=(self), microphone=(self), geolocation=(), interest-cohort=(), autoplay=(self), fullscreen=(self), picture-in-picture=(self), clipboard-write=(self), encrypted-media=(self), display-capture=(), payment=()",
   },
   {
     key: "Content-Security-Policy",
@@ -69,11 +67,7 @@ export const securityHeaders = [
 
 export const cspValue = cspDirectives.join("; ");
 
-/** Global headers WITHOUT CSP — CSP is applied by middleware.ts instead so
- * `/api/embed` (third-party provider HTML served same-origin) can be
- * excluded. A global CSP from next.config `headers()` would apply to the
- * proxied embed HTML too and block the provider's own scripts (`script-src
- * 'self'`) leaving a white player. */
+/** Global headers without CSP, which is applied by middleware.ts. */
 export const securityHeadersWithoutCsp = securityHeaders.filter(
   (h) => h.key !== "Content-Security-Policy"
 );

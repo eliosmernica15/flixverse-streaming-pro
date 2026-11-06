@@ -731,6 +731,159 @@ def set_user_settings(conn: Any, user_id: str, settings: dict[str, Any]) -> None
     )
 
 
+# ── Reports ────────────────────────────────────────────────────────
+
+def create_report(
+    conn: Any,
+    reporter_id: str,
+    target_type: str,
+    target_id: str,
+    target_owner_id: str | None,
+    reason: str,
+    details: str | None = None,
+) -> str:
+    report_id = new_id()
+    db_execute(
+        conn,
+        """
+        INSERT INTO reports
+          (id, reporter_id, target_type, target_id, target_owner_id, reason, details, status, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s)
+        """,
+        (
+            report_id,
+            reporter_id,
+            target_type,
+            target_id,
+            target_owner_id,
+            reason,
+            details,
+            now_ms(),
+        ),
+    )
+    return report_id
+
+
+def get_report(conn: Any, report_id: str) -> dict[str, Any] | None:
+    row = db_fetchone(
+        conn, "SELECT * FROM reports WHERE id = %s", (report_id,)
+    )
+    if not row:
+        return None
+    return {
+        "id": row_get(row, "id"),
+        "reporter_id": row_get(row, "reporter_id"),
+        "target_type": row_get(row, "target_type"),
+        "target_id": row_get(row, "target_id"),
+        "target_owner_id": row_get(row, "target_owner_id"),
+        "reason": row_get(row, "reason"),
+        "details": row_get(row, "details"),
+        "status": row_get(row, "status"),
+        "created_at": row_get(row, "created_at"),
+    }
+
+
+def list_reports_by_reporter(conn: Any, reporter_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    rows = db_fetchall(
+        conn,
+        """
+        SELECT * FROM reports
+        WHERE reporter_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (reporter_id, limit),
+    )
+    return [
+        {
+            "id": row_get(r, "id"),
+            "reporter_id": row_get(r, "reporter_id"),
+            "target_type": row_get(r, "target_type"),
+            "target_id": row_get(r, "target_id"),
+            "target_owner_id": row_get(r, "target_owner_id"),
+            "reason": row_get(r, "reason"),
+            "details": row_get(r, "details"),
+            "status": row_get(r, "status"),
+            "created_at": row_get(r, "created_at"),
+        }
+        for r in rows
+    ]
+
+
+# ── Blocks ────────────────────────────────────────────────────────
+
+def block_user(conn: Any, blocker_id: str, blocked_id: str) -> bool:
+    if blocker_id == blocked_id:
+        return False
+    block_id = f"{blocker_id}_{blocked_id}"
+    db_execute(
+        conn,
+        """
+        INSERT INTO blocks (id, blocker_id, blocked_id, created_at)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT(blocker_id, blocked_id) DO NOTHING
+        """,
+        (block_id, blocker_id, blocked_id, now_ms()),
+    )
+    return True
+
+
+def unblock_user(conn: Any, blocker_id: str, blocked_id: str) -> bool:
+    cur = db_execute(
+        conn,
+        "DELETE FROM blocks WHERE blocker_id = %s AND blocked_id = %s",
+        (blocker_id, blocked_id),
+    )
+    return getattr(cur, "rowcount", 0) > 0
+
+
+def is_blocked(conn: Any, blocker_id: str, blocked_id: str) -> bool:
+    row = db_fetchone(
+        conn,
+        "SELECT 1 FROM blocks WHERE blocker_id = %s AND blocked_id = %s",
+        (blocker_id, blocked_id),
+    )
+    return row is not None
+
+
+def list_blocked_users(conn: Any, blocker_id: str) -> list[str]:
+    rows = db_fetchall(
+        conn, "SELECT blocked_id FROM blocks WHERE blocker_id = %s", (blocker_id,)
+    )
+    return [row_get(r, "blocked_id") for r in rows]
+
+
+# ── Mutual Titles ──────────────────────────────────────────────────
+
+def get_mutual_titles(conn: Any, user_id: str, other_user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    """Get movies/shows that both users have in their watchlists."""
+    rows = db_fetchall(
+        conn,
+        """
+        SELECT ml1.movie_id, ml1.movie_title, ml1.movie_poster_path, ml1.media_type, ml1.added_at
+        FROM user_movie_lists ml1
+        INNER JOIN user_movie_lists ml2
+          ON ml1.movie_id = ml2.movie_id
+         AND ml1.media_type = ml2.media_type
+        WHERE ml1.user_id = %s
+          AND ml2.user_id = %s
+        ORDER BY ml1.added_at DESC
+        LIMIT %s
+        """,
+        (user_id, other_user_id, limit),
+    )
+    return [
+        {
+            "movie_id": row_get(r, "movie_id"),
+            "movie_title": row_get(r, "movie_title"),
+            "movie_poster_path": row_get(r, "movie_poster_path"),
+            "media_type": row_get(r, "media_type"),
+            "added_at": row_get(r, "added_at"),
+        }
+        for r in rows
+    ]
+
+
 # ── Friendships / friend requests ────────────────────────────────
 
 def send_friend_request(conn: Any, from_uid: str, to_uid: str) -> str:
@@ -833,7 +986,7 @@ def upsert_subscription(
         INSERT INTO subscriptions
           (user_id, stripe_customer_id, stripe_subscription_id, status, plan,
            current_period_end, cancel_at_period_end, metadata_json, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
           stripe_customer_id = excluded.stripe_customer_id,
           stripe_subscription_id = excluded.stripe_subscription_id,
@@ -879,12 +1032,58 @@ def get_subscription(conn: Any, user_id: str) -> dict[str, Any] | None:
 
 def record_stripe_event(conn: Any, event_id: str, event_type: str) -> bool:
     """Returns True if new, False if duplicate (idempotency)."""
-    try:
-        db_execute(
-            conn,
-            "INSERT INTO stripe_webhook_events (event_id, type, received_at) VALUES (%s, %s, %s)",
-            (event_id, event_type, now_ms()),
-        )
-        return True
-    except Exception:
-        return False
+    result = db_execute(
+        conn,
+        """
+        INSERT INTO stripe_webhook_events (event_id, type, received_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(event_id) DO NOTHING
+        """,
+        (event_id, event_type, now_ms()),
+    )
+    return result.rowcount > 0
+
+
+# ── Cancellation Reasons ───────────────────────────────────────────
+
+def record_cancellation_reason(
+    conn: Any,
+    user_id: str,
+    reason: str,
+    stripe_subscription_id: str | None = None,
+    details: str | None = None,
+) -> str:
+    """Record a cancellation reason from the user."""
+    cancellation_id = new_id()
+    db_execute(
+        conn,
+        """
+        INSERT INTO cancellation_reasons (id, user_id, stripe_subscription_id, reason, details, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (cancellation_id, user_id, stripe_subscription_id, reason, details, now_ms()),
+    )
+    return cancellation_id
+
+
+def get_cancellation_reasons(conn: Any, user_id: str) -> list[dict[str, Any]]:
+    """Get all cancellation reasons for a user."""
+    rows = db_fetchall(
+        conn,
+        """
+        SELECT * FROM cancellation_reasons WHERE user_id = ?
+        ORDER BY created_at DESC
+        """,
+        (user_id,),
+    )
+    return [
+        {
+            "id": row_get(r, "id"),
+            "user_id": row_get(r, "user_id"),
+            "stripe_subscription_id": row_get(r, "stripe_subscription_id"),
+            "reason": row_get(r, "reason"),
+            "details": row_get(r, "details"),
+            "created_at": row_get(r, "created_at"),
+        }
+        for r in rows
+    ]

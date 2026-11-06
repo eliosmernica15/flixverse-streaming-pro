@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import Image from "next/image";
 import { Mic, MicOff, Video, VideoOff, Crown, LayoutGrid, PanelRight, Rows3, EyeOff } from "lucide-react";
 import type { PartyMediaParticipant } from "@/hooks/player/usePartyMedia";
@@ -17,6 +17,8 @@ import {
   updateSpatialVoicePan,
   type SpatialVoiceNode,
 } from "@/lib/player/spatialAudio";
+
+const EMPTY_ROOM_PARTICIPANTS: FlixPartyParticipant[] = [];
 
 /**
  * Remote party voice.
@@ -220,10 +222,10 @@ const LAYOUT_OPTIONS: { id: CameraLayoutMode; label: string; icon: typeof Layout
   { id: "hidden", label: "Hide", icon: EyeOff },
 ];
 
-export function PartyCameraGrid({
+export const PartyCameraGrid = memo(function PartyCameraGrid({
   participants,
   voiceVolume = 1,
-  roomParticipants = [],
+  roomParticipants = EMPTY_ROOM_PARTICIPANTS,
   hostId = null,
   layoutMode = "side",
   onLayoutChange,
@@ -270,7 +272,7 @@ export function PartyCameraGrid({
       <p className="party-camera-hint">Turn on cam/mic in the party panel â†’</p>
     </aside>
   );
-}
+});
 
 interface PartyMediaControlsProps {
   micOn: boolean;

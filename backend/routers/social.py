@@ -14,14 +14,19 @@ from pydantic import BaseModel, Field
 from auth import uid_from_auth, verify_bearer
 from crud import (
     accept_friend_request,
+    block_user,
     create_comment,
+    create_report,
     create_review,
     decline_friend_request,
     delete_review,
     follow,
+    get_mutual_titles,
     get_profile,
+    is_blocked,
     is_following,
     list_activity,
+    list_blocked_users,
     list_comments,
     list_friend_requests,
     list_friends,
@@ -31,6 +36,7 @@ from crud import (
     list_reviews,
     post_activity,
     send_friend_request,
+    unblock_user,
     unfollow,
     update_review,
 )
@@ -242,6 +248,81 @@ def get_friends(user_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, 
     with get_conn() as conn:
         ids = list_friends(conn, user_id)
     return {"userIds": ids}
+
+
+# ── Reports ──────────────────────────────────────────────────────
+
+class ReportBody(BaseModel):
+    targetType: str
+    targetId: str
+    targetOwnerId: str | None = None
+    reason: str
+    details: str | None = None
+
+
+@router.post("/report")
+def do_report(body: ReportBody, auth: dict = Depends(verify_bearer)) -> dict[str, str]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        report_id = create_report(
+            conn,
+            reporter_id=uid,
+            target_type=body.targetType,
+            target_id=body.targetId,
+            target_owner_id=body.targetOwnerId,
+            reason=body.reason,
+            details=body.details,
+        )
+    return {"id": report_id}
+
+
+# ── Blocks ──────────────────────────────────────────────────────
+
+class BlockBody(BaseModel):
+    targetUserId: str
+
+
+@router.post("/block/{target_id}")
+def do_block(target_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        if not is_blocked(conn, uid, target_id):
+            block_user(conn, uid, target_id)
+    return {"ok": True}
+
+
+@router.delete("/block/{target_id}")
+def do_unblock(target_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        unblock_user(conn, uid, target_id)
+    return {"ok": True}
+
+
+@router.get("/block/{target_id}")
+def check_block(target_id: str, auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        blocked = is_blocked(conn, uid, target_id)
+    return {"isBlocked": blocked}
+
+
+@router.get("/blocks")
+def get_blocks(auth: dict = Depends(verify_bearer)) -> dict[str, list[str]]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        ids = list_blocked_users(conn, uid)
+    return {"userIds": ids}
+
+
+# ── Mutual Titles ────────────────────────────────────────────────
+
+@router.get("/mutual-titles/{other_user_id}")
+def get_mutual_titles_endpoint(other_user_id: str, limit: int = 20, auth: dict = Depends(verify_bearer)) -> dict[str, list]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        titles = get_mutual_titles(conn, uid, other_user_id, limit=limit)
+    return {"titles": titles}
 
 
 # ── Activity feed ────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import {
   syncSubscriptionToFirestore,
   cancelSubscriptionInFirestore,
+  isWebhookEventProcessed,
   markWebhookEventProcessed,
   type BillingPlan,
 } from "@/lib/billing/subscriptionSync";
@@ -29,7 +30,8 @@ function getPlanFromMetadata(metadata: Stripe.Metadata | null | undefined): Bill
 
 async function handleSubscription(
   sub: Stripe.Subscription,
-  fallbackPlan?: BillingPlan
+  fallbackPlan?: BillingPlan,
+  requestOrigin?: string
 ) {
   const userId = sub.metadata?.userId;
   if (!userId) return;
@@ -42,7 +44,7 @@ async function handleSubscription(
     customerId: String(sub.customer),
     subscriptionId: sub.id,
     periodEndMs: getPeriodEndMs(sub),
-  });
+  }, requestOrigin);
 }
 
 export async function POST(request: NextRequest) {
@@ -65,12 +67,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const isNew = await markWebhookEventProcessed(event.id);
-  if (!isNew) {
-    return NextResponse.json({ received: true, duplicate: true });
-  }
-
+  const requestOrigin = request.nextUrl.origin;
   try {
+    if (await isWebhookEventProcessed(event.id, requestOrigin)) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -85,14 +87,14 @@ export async function POST(request: NextRequest) {
             customerId: String(session.customer),
             subscriptionId: sub.id,
             periodEndMs: getPeriodEndMs(sub),
-          });
+          }, requestOrigin);
         }
         break;
       }
 
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
-        await handleSubscription(sub);
+        await handleSubscription(sub, undefined, requestOrigin);
         break;
       }
 
@@ -103,7 +105,8 @@ export async function POST(request: NextRequest) {
           await cancelSubscriptionInFirestore(
             userId,
             String(sub.customer),
-            sub.id
+            sub.id,
+            requestOrigin
           );
         }
         break;
@@ -114,7 +117,29 @@ export async function POST(request: NextRequest) {
         const subId = (invoice as unknown as { subscription?: string | null }).subscription;
         if (subId) {
           const sub = await stripe.subscriptions.retrieve(subId);
-          await handleSubscription(sub);
+          await handleSubscription(sub, undefined, requestOrigin);
+        }
+        break;
+      }
+
+      case "invoice.paid": {
+        // Payment recovered - update subscription status
+        const invoice = event.data.object as Stripe.Invoice;
+        const subId = (invoice as unknown as { subscription?: string | null }).subscription;
+        if (subId) {
+          const sub = await stripe.subscriptions.retrieve(subId);
+          await handleSubscription(sub, undefined, requestOrigin);
+        }
+        break;
+      }
+
+      case "customer.subscription.trial_will_end": {
+        // Notify user that trial is ending soon
+        const sub = event.data.object as Stripe.Subscription;
+        const userId = sub.metadata?.userId;
+        if (userId) {
+          // Could trigger a notification here
+          console.log(`Trial ending soon for user ${userId}, subscription ${sub.id}`);
         }
         break;
       }
@@ -122,6 +147,8 @@ export async function POST(request: NextRequest) {
       default:
         break;
     }
+
+    await markWebhookEventProcessed(event.id, event.type, requestOrigin);
   } catch (err) {
     console.error("Webhook handler error:", err);
     return NextResponse.json({ error: "Handler failed" }, { status: 500 });

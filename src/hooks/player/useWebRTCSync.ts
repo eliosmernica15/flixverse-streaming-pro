@@ -17,12 +17,19 @@ export interface SyncMessage {
     | "speaking"
     | "server-change"
     | "sync-stage"
-    | "sync-go";
+    | "sync-go"
+    | "next-episode"
+    | "mute-all";
   timestamp: number;
   data: {
     currentTime?: number;
     text?: string;
     speaking?: boolean;
+    season?: number;
+    episode?: number;
+    serverIndex?: number;
+    movieId?: number;
+    mediaType?: string;
     [key: string]: unknown;
   };
 }
@@ -40,6 +47,7 @@ interface UseWebRTCSyncOptions {
   onPlaybackSync?: (msg: SyncMessage) => void;
   onRemoteStream?: (peerId: string, stream: MediaStream) => void;
   onRemoteStreamRemoved?: (peerId: string) => void;
+  onMuteAll?: () => void;
 }
 
 /**
@@ -58,6 +66,7 @@ export function useWebRTCSync({
   onPlaybackSync,
   onRemoteStream,
   onRemoteStreamRemoved,
+  onMuteAll,
 }: UseWebRTCSyncOptions) {
   const { user } = useAuth();
   const pageVisible = usePageVisibility();
@@ -68,10 +77,12 @@ export function useWebRTCSync({
   const onPlaybackSyncRef = useRef(onPlaybackSync);
   const onRemoteStreamRef = useRef(onRemoteStream);
   const onRemoteStreamRemovedRef = useRef(onRemoteStreamRemoved);
+  const onMuteAllRef = useRef(onMuteAll);
   const pageVisibleRef = useRef(pageVisible);
   onPlaybackSyncRef.current = onPlaybackSync;
   onRemoteStreamRef.current = onRemoteStream;
   onRemoteStreamRemovedRef.current = onRemoteStreamRemoved;
+  onMuteAllRef.current = onMuteAll;
   pageVisibleRef.current = pageVisible;
 
   useEffect(() => {
@@ -143,6 +154,10 @@ export function useWebRTCSync({
           ].includes(msg.type)
         ) {
           onPlaybackSyncRef.current?.(msg);
+        }
+        // Handle mute-all command from host
+        if (msg.type === "mute-all") {
+          onMuteAllRef.current?.();
         }
       };
 
@@ -239,6 +254,10 @@ export function useWebRTCSync({
     syncRef.current.sendMessage(msg);
   }, []);
 
+  const sendMuteAll = useCallback(() => {
+    sendMessageRtc("mute-all", {});
+  }, [sendMessageRtc]);
+
   const setLocalStreamRtc = useCallback(async (stream: MediaStream | null) => {
     await syncRef.current?.setLocalStream(stream);
   }, []);
@@ -246,6 +265,7 @@ export function useWebRTCSync({
   return {
     isConnected: rtcConnected,
     sendMessage: sendMessageRtc,
+    sendMuteAll,
     messages,
     setLocalStream: setLocalStreamRtc,
     syncRef,

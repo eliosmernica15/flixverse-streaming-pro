@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import threading
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -16,6 +17,15 @@ USE_POSTGRES = bool(
     or os.environ.get("DATABASE_URL")
     or os.environ.get("POSTGRES_URL_NON_POOLING")
 )
+SCHEMA_VERSION = 1
+SCHEMA_VERSION_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS app_schema_version (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  version INTEGER NOT NULL
+)
+"""
+_POSTGRES_POOL: Any | None = None
+_POSTGRES_POOL_LOCK = threading.Lock()
 
 DB_PATH = Path(os.environ.get("FLIXVERSE_DB_PATH", Path(__file__).parent / "data" / "flixverse.db"))
 
@@ -283,6 +293,68 @@ CREATE TABLE IF NOT EXISTS stripe_webhook_events (
   type TEXT NOT NULL,
   received_at BIGINT NOT NULL
 );
+
+-- ── Notification channel preferences ──────────────────────────────
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  user_id TEXT PRIMARY KEY,
+  email_enabled INTEGER NOT NULL DEFAULT 1,
+  push_enabled INTEGER NOT NULL DEFAULT 1,
+  in_app_enabled INTEGER NOT NULL DEFAULT 1,
+  -- Per-type channel preferences (JSON: {type: {email: bool, push: bool, in_app: bool}})
+  channel_prefs_json TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL
+);
+
+-- ── Dunning emails (for failed payment tracking) ────────────────
+CREATE TABLE IF NOT EXISTS dunning_emails (
+  user_id TEXT NOT NULL,
+  attempt INTEGER NOT NULL,
+  email_type TEXT NOT NULL,
+  sent_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, attempt)
+);
+
+-- ── Cancellation reasons (for subscription cancellation flow) ────────────────
+CREATE TABLE IF NOT EXISTS cancellation_reasons (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  stripe_subscription_id TEXT,
+  reason TEXT NOT NULL,
+  details TEXT,
+  created_at BIGINT NOT NULL
+);
+
+-- ── Reports ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS reports (
+  id TEXT PRIMARY KEY,
+  reporter_id TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  target_owner_id TEXT,
+  reason TEXT NOT NULL,
+  details TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at BIGINT NOT NULL
+);
+
+-- ── Blocks ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS blocks (
+  id TEXT PRIMARY KEY,
+  blocker_id TEXT NOT NULL,
+  blocked_id TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  UNIQUE(blocker_id, blocked_id)
+);
+
+-- ── GDPR Exports ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS gdpr_exports (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  data_json TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 """
 
 INDEX_SQL = """
@@ -308,6 +380,15 @@ CREATE INDEX IF NOT EXISTS idx_friendships_b ON friendships(user_b);
 CREATE INDEX IF NOT EXISTS idx_friend_requests_to ON friend_requests(to_user_id, status);
 CREATE INDEX IF NOT EXISTS idx_friend_requests_from ON friend_requests(from_user_id, status);
 CREATE INDEX IF NOT EXISTS idx_member_profiles_owner ON member_profiles(owner_id);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_target ON reports(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocker ON blocks(blocker_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks(blocked_id);
+CREATE INDEX IF NOT EXISTS idx_notification_prefs_user ON notification_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_dunning_emails_user ON dunning_emails(user_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cancellation_reasons_user ON cancellation_reasons(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_gdpr_exports_user ON gdpr_exports(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_gdpr_exports_token ON gdpr_exports(token_hash);
 """
 
 
@@ -328,11 +409,46 @@ def _postgres_url() -> str:
     )
 
 
+def _postgres_pool() -> Any:
+    global _POSTGRES_POOL
+    if _POSTGRES_POOL is None:
+        with _POSTGRES_POOL_LOCK:
+            if _POSTGRES_POOL is None:
+                from psycopg.rows import dict_row
+                from psycopg_pool import ConnectionPool
+
+                _POSTGRES_POOL = ConnectionPool(
+                    conninfo=_postgres_url(),
+                    kwargs={
+                        "row_factory": dict_row,
+                        "connect_timeout": 10,
+                        "options": "-c statement_timeout=10000",
+                    },
+                    min_size=1,
+                    max_size=8,
+                    timeout=10,
+                    open=True,
+                )
+    return _POSTGRES_POOL
+
+
+def close_db_pool() -> None:
+    global _POSTGRES_POOL
+    if _POSTGRES_POOL is not None:
+        _POSTGRES_POOL.close()
+        _POSTGRES_POOL = None
+
+
 @contextmanager
 def get_conn() -> Iterator[Any]:
     if USE_POSTGRES:
         import psycopg
         from psycopg.rows import dict_row
+
+        if os.environ.get("VERCEL") != "1":
+            with _postgres_pool().connection(timeout=10) as conn:
+                yield conn
+            return
 
         # Bound connection setup: without connect_timeout a saturated pool
         # (or a stalled network path) hangs for TCP-default minutes, which
@@ -340,20 +456,12 @@ def get_conn() -> Iterator[Any]:
         # further requests until ERR_INSUFFICIENT_RESOURCES. Fail fast so
         # callers hit their backoff instead.
         with psycopg.connect(
-            _postgres_url(), row_factory=dict_row, connect_timeout=10
+            _postgres_url(),
+            row_factory=dict_row,
+            connect_timeout=10,
+            options="-c statement_timeout=10000",
         ) as conn:
-            # Bound query time too: a single pathological query (e.g. a
-            # sequential scan under load) must not hold the serverless
-            # request past its execution budget. Session-level: persists for
-            # this connection only.
-            with conn.cursor() as cur:
-                cur.execute("SET statement_timeout = '10s'")
-            try:
-                yield conn
-                conn.commit()
-            except Exception:
-                conn.rollback()
-                raise
+            yield conn
     elif os.environ.get("VERCEL") == "1":
         raise RuntimeError("POSTGRES_URL is required on Vercel (SQLite is not supported)")
     else:
@@ -380,25 +488,62 @@ def _exec_script(conn: Any, sql: str) -> None:
 
 def _migrate_party_content_meta(conn: Any) -> None:
     """Add content_meta_json column for guest redirects without URL hash key."""
-    try:
-        if USE_POSTGRES:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "ALTER TABLE party_rooms ADD COLUMN IF NOT EXISTS content_meta_json TEXT"
-                )
-        else:
-            rows = conn.execute("PRAGMA table_info(party_rooms)").fetchall()
-            names = {row[1] for row in rows}
-            if "content_meta_json" not in names:
-                conn.execute("ALTER TABLE party_rooms ADD COLUMN content_meta_json TEXT")
-    except Exception:
-        pass
+    if USE_POSTGRES:
+        with conn.cursor() as cur:
+            cur.execute(
+                "ALTER TABLE party_rooms ADD COLUMN IF NOT EXISTS content_meta_json TEXT"
+            )
+    else:
+        rows = conn.execute("PRAGMA table_info(party_rooms)").fetchall()
+        names = {row[1] for row in rows}
+        if "content_meta_json" not in names:
+            conn.execute("ALTER TABLE party_rooms ADD COLUMN content_meta_json TEXT")
 
 
-def init_db() -> None:
+def _record_schema_version(conn: Any) -> None:
+    _exec_script(conn, SCHEMA_VERSION_TABLE_SQL)
+    if USE_POSTGRES:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO app_schema_version (id, version) VALUES (1, %s)
+                ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version
+                """,
+                (SCHEMA_VERSION,),
+            )
+    else:
+        conn.execute(
+            """
+            INSERT INTO app_schema_version (id, version) VALUES (1, ?)
+            ON CONFLICT (id) DO UPDATE SET version = excluded.version
+            """,
+            (SCHEMA_VERSION,),
+        )
+
+
+def _assert_schema_version(conn: Any) -> None:
+    version_row = db_fetchone(conn, "SELECT version FROM app_schema_version WHERE id = 1")
+    if version_row is None or int(row_get(version_row, "version")) != SCHEMA_VERSION:
+        found = int(row_get(version_row, "version")) if version_row else "uninitialized"
+        raise RuntimeError(
+            f"Database schema version is {found}; expected {SCHEMA_VERSION}. "
+            "Run `python backend/migrate.py` before starting the API."
+        )
+
+
+def init_db(*, schema_sync: bool | None = None) -> None:
     if os.environ.get("VERCEL") == "1" and not USE_POSTGRES:
         return
+    if schema_sync is None:
+        schema_sync = not USE_POSTGRES or os.environ.get("SCHEMA_SYNC") == "1"
+
     with get_conn() as conn:
+        if USE_POSTGRES and not schema_sync:
+            _exec_script(conn, "SELECT 1;")
+            _migrate_party_content_meta(conn)
+            _assert_schema_version(conn)
+            return
+
         for stmt in SCHEMA_SQL.split(";"):
             s = stmt.strip()
             if s:
@@ -406,11 +551,9 @@ def init_db() -> None:
         for stmt in INDEX_SQL.split(";"):
             s = stmt.strip()
             if s:
-                try:
-                    _exec_script(conn, s + ";")
-                except Exception:
-                    pass
+                _exec_script(conn, s + ";")
         _migrate_party_content_meta(conn)
+        _record_schema_version(conn)
 
 
 def row_get(row: Any, key: str) -> Any:
@@ -469,4 +612,3 @@ def db_fetchone(conn: Any, sql: str, params: tuple = ()) -> Any:
             cur.execute(_sql(sql), params)
             return cur.fetchone()
     return conn.execute(sql, params).fetchone()
-

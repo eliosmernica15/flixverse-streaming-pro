@@ -2,18 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Film, Tv, Star, Activity, UserPlus, UserCheck, Users } from "lucide-react";
+import { Film, Tv, Star, Activity, UserPlus, UserCheck, Users, Flag, Shield, AlertTriangle, UserMinus } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { getFirestore, collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { MemberProfile, ActivityFeedItem } from "@/integrations/firebase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useFollow } from "@/hooks/useFollow";
+import { useBlock } from "@/hooks/useBlock";
+import { useReport } from "@/hooks/useReport";
 import { useToast } from "@/hooks/use-toast";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
 import Reveal from "@/components/Reveal";
 import { TMDBMovie } from "@/utils/tmdbApi";
+import { ReportDialog } from "@/components/ReportDialog";
 
 interface PublicProfileProps {
   username: string;
@@ -26,9 +29,13 @@ export default function PublicProfile({ username }: PublicProfileProps) {
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [watchlist, setWatchlist] = useState<TMDBMovie[]>([]);
   const [activity, setActivity] = useState<ActivityFeedItem[]>([]);
+  const [mutualTitles, setMutualTitles] = useState<TMDBMovie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   const { isFollowing, followerCount, toggleFollow } = useFollow(profile?.ownerId ?? null);
+  const { isBlocked, loading: blockLoading, toggleBlock } = useBlock(profile?.ownerId ?? null);
+  const { submitReport, submitting: reportSubmitting } = useReport();
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -69,6 +76,43 @@ export default function PublicProfile({ username }: PublicProfileProps) {
         });
         setWatchlist(items);
 
+        // Load mutual titles if user is logged in and not viewing own profile
+        if (user && user.uid !== data.ownerId) {
+          try {
+            const mutualQ = query(
+              collection(db, "user_movie_lists"),
+              where("user_id", "==", user.uid),
+              limit(500)
+            );
+            const mutualSnap = await getDocs(mutualQ);
+            const userMovieIds = new Set(mutualSnap.docs.map(d => `${d.data().movie_id}_${d.data().media_type || "movie"}`));
+
+            // Now check which of the profile's movies are in the user's list
+            const mutualItems: TMDBMovie[] = [];
+            listSnap.forEach((d) => {
+              const item = d.data();
+              const key = `${item.movie_id}_${item.media_type || "movie"}`;
+              if (userMovieIds.has(key)) {
+                mutualItems.push({
+                  id: item.movie_id,
+                  title: item.movie_title,
+                  name: item.movie_title,
+                  poster_path: item.movie_poster_path,
+                  backdrop_path: null,
+                  media_type: item.media_type || "movie",
+                  vote_average: 0,
+                  overview: "",
+                  genre_ids: [],
+                  release_date: "",
+                } as TMDBMovie);
+              }
+            });
+            setMutualTitles(mutualItems);
+          } catch {
+            // Ignore mutual titles errors
+          }
+        }
+
         // Load activity feed
         const activityQ = query(
           collection(db, "activity_feed"),
@@ -90,7 +134,7 @@ export default function PublicProfile({ username }: PublicProfileProps) {
     };
 
     loadProfile();
-  }, [username]);
+  }, [username, user]);
 
   if (loading) {
     return (
@@ -150,6 +194,47 @@ export default function PublicProfile({ username }: PublicProfileProps) {
         variant: "destructive",
       });
     }
+  };
+
+  const handleReport = () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Sign in to report a profile.",
+      });
+      router.push("/auth");
+      return;
+    }
+    setReportDialogOpen(true);
+  };
+
+  const handleBlock = async () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Sign in to block a user.",
+      });
+      router.push("/auth");
+      return;
+    }
+    try {
+      await toggleBlock();
+    } catch {
+      toast({
+        title: "Action failed",
+        description: "Could not update block status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReportSubmit = async (reason: string, details?: string): Promise<boolean> => {
+    if (!profile) return false;
+    const success = await submitReport("profile", profile.id, profile.ownerId, reason, details);
+    if (success) {
+      setReportDialogOpen(false);
+    }
+    return success;
   };
 
   return (
@@ -215,6 +300,35 @@ export default function PublicProfile({ username }: PublicProfileProps) {
                     </>
                   )}
                 </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleBlock}
+                    disabled={blockLoading}
+                    className={`inline-flex items-center justify-center min-h-[40px] w-[40px] rounded-md transition-colors focus-ring ${
+                      isBlocked
+                        ? "bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30"
+                        : "bg-white/5 border border-white/10 text-white hover:bg-white/10"
+                    }`}
+                    title={isBlocked ? "Unblock user" : "Block user"}
+                    aria-label={isBlocked ? "Unblock user" : "Block user"}
+                  >
+                    {isBlocked ? (
+                      <UserMinus className="w-5 h-5" />
+                    ) : (
+                      <Shield className="w-5 h-5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReport}
+                    className="inline-flex items-center justify-center min-h-[40px] w-[40px] rounded-md bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors focus-ring"
+                    title="Report user"
+                    aria-label="Report user"
+                  >
+                    <Flag className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             )}
           </Reveal>
@@ -239,6 +353,18 @@ export default function PublicProfile({ username }: PublicProfileProps) {
             <Film className="w-10 h-10 text-gray-600 mx-auto mb-3" />
             <p className="text-gray-400 text-sm">This profile&apos;s list is private or empty.</p>
           </div>
+        )}
+
+        {/* Mutual Titles */}
+        {mutualTitles.length > 0 && (
+          <Reveal className="mb-12">
+            <SectionHeader title="Mutual Titles" eyebrow={`${mutualTitles.length} in common`} />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3 content-auto">
+              {mutualTitles.map((movie) => (
+                <MovieCard key={movie.id} movie={movie} />
+              ))}
+            </div>
+          </Reveal>
         )}
 
         {/* Activity Feed */}
@@ -273,6 +399,15 @@ export default function PublicProfile({ username }: PublicProfileProps) {
           </Reveal>
         )}
       </div>
+
+      <ReportDialog
+        isOpen={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        targetType="profile"
+        targetId={profile.id}
+        targetOwnerId={profile.ownerId}
+        onSubmit={handleReportSubmit}
+      />
     </div>
   );
 }

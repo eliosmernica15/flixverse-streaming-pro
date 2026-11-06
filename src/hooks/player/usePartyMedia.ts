@@ -1,11 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { FlixPartyParticipant } from "@/hooks/player/useFlixParty";
-import {
-  createStreamAnalyser,
-  getGlobalAudioContext,
-  releaseAudioContext,
-  retainAudioContext,
-} from "@/lib/player/audioSingleton";
+import { audioContext } from "@/lib/player/audioSingleton";
 
 export interface PartyMediaParticipant {
   peerId: string;
@@ -40,6 +35,7 @@ function dedupeMediaParticipants(list: PartyMediaParticipant[]): PartyMediaParti
 }
 
 const SPEAK_THRESHOLD = 0.04;
+const EMPTY_ROOM_PARTICIPANTS: FlixPartyParticipant[] = [];
 const SPEAK_HYSTERESIS = 0.025;
 const VOICE_VOLUME_KEY = "flixverse-party-voice-volume";
 const MOBILE_BREAKPOINT = 768;
@@ -62,19 +58,33 @@ interface StreamAnalyserHandle {
   source: MediaStreamAudioSourceNode;
   /** Reusable gain buffer sized to the analyser. */
   levelBuffer: Uint8Array;
+  /** Gain node ID for detachment from audioSingleton. */
+  gainNodeId: symbol | null;
   dispose: () => void;
 }
 
 function createAnalyser(stream: MediaStream): StreamAnalyserHandle | null {
-  const created = createStreamAnalyser(stream, 512, 0.65);
-  if (!created) return null;
-  retainAudioContext();
-  const { analyser, source } = created;
+  const ctx = audioContext.getContext();
+  if (!ctx) return null;
+
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.65;
+
+  const source = ctx.createMediaStreamSource(stream);
+  source.connect(analyser);
+
+  // Attach a gain node to keep the context alive while this analyser exists
+  const gainNode = ctx.createGain();
+  gainNode.gain.value = 0; // Silent passthrough, just for ref counting
+  const gainNodeId = audioContext.attachGainNode(gainNode);
+
   let disposed = false;
   return {
     analyser,
     source,
     levelBuffer: new Uint8Array(analyser.frequencyBinCount),
+    gainNodeId,
     dispose: () => {
       if (disposed) return;
       disposed = true;
@@ -84,7 +94,10 @@ function createAnalyser(stream: MediaStream): StreamAnalyserHandle | null {
       } catch {
         // already detached
       }
-      releaseAudioContext();
+      if (gainNodeId) {
+        audioContext.detachGainNode(gainNodeId);
+      }
+      audioContext.closeContext();
     },
   };
 }
@@ -121,6 +134,8 @@ interface UsePartyMediaOptions {
   localDisplayName?: string;
   hostMicForcedOff?: boolean;
   hostCamForcedOff?: boolean;
+  /** WebRTC broadcast mute-all: guests mute their mic, host stays unmuted */
+  webRTCMuteAll?: boolean;
 }
 
 export function usePartyMedia({
@@ -128,11 +143,12 @@ export function usePartyMedia({
   setLocalStream,
   sendSpeakingState,
   participantNames,
-  roomParticipants = [],
+  roomParticipants = EMPTY_ROOM_PARTICIPANTS,
   localUserId,
   localDisplayName = "You",
   hostMicForcedOff = false,
   hostCamForcedOff = false,
+  webRTCMuteAll = false,
 }: UsePartyMediaOptions) {
   const [micOn, setMicOn] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
@@ -164,7 +180,7 @@ export function usePartyMedia({
   }, []);
 
   const resumeAnalyser = useCallback(async () => {
-    const ctx = getGlobalAudioContext();
+    const ctx = audioContext.getContext();
     if (ctx && ctx.state === "suspended") {
       try {
         await ctx.resume();
@@ -175,7 +191,7 @@ export function usePartyMedia({
   }, []);
 
   const buildLocalStream = useCallback(async (wantMic: boolean, wantCam: boolean) => {
-    const effectiveMic = wantMic && !hostMicForcedOff;
+    const effectiveMic = wantMic && !hostMicForcedOff && !webRTCMuteAll;
     const effectiveCam = wantCam && !hostCamForcedOff;
     const mobile = isMobileDevice();
 
@@ -193,14 +209,86 @@ export function usePartyMedia({
     const hasAudio = existing?.getAudioTracks().some((t) => t.readyState === "live");
     const hasVideo = existing?.getVideoTracks().some((t) => t.readyState === "live");
 
-    if (existing && hasAudio === effectiveMic && hasVideo === effectiveCam) {
-      existing.getAudioTracks().forEach((t) => {
-        t.enabled = effectiveMic;
-      });
-      existing.getVideoTracks().forEach((t) => {
-        t.enabled = effectiveCam;
-      });
-      if (effectiveMic) {
+    // Reuse existing MediaStream with replaceTrack/addTrack instead of creating new one
+    if (existing) {
+      // Handle audio track
+      if (effectiveMic && !hasAudio) {
+        // Need to add audio track
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: { ideal: true },
+              noiseSuppression: { ideal: true },
+              autoGainControl: { ideal: true },
+              channelCount: { ideal: 1 },
+            },
+            video: false,
+          });
+          const audioTrack = audioStream.getAudioTracks()[0];
+          if (audioTrack) {
+            existing.addTrack(audioTrack);
+            audioTrack.enabled = true;
+          }
+        } catch (err) {
+          console.warn("Failed to add audio track:", err);
+        }
+      } else if (!effectiveMic && hasAudio) {
+        // Remove audio tracks
+        existing.getAudioTracks().forEach((t) => {
+          existing.removeTrack(t);
+          t.stop();
+        });
+      } else if (effectiveMic && hasAudio) {
+        // Keep existing, just enable/disable
+        existing.getAudioTracks().forEach((t) => {
+          t.enabled = true;
+        });
+      }
+
+      // Handle video track
+      if (effectiveCam && !hasVideo) {
+        // Need to add video track
+        const videoConstraints = mobile
+          ? {
+              width: { ideal: 640, max: 1280 },
+              height: { ideal: 480, max: 720 },
+              frameRate: { ideal: 24, max: 30 },
+              facingMode: { ideal: "user" },
+            }
+          : {
+              width: { ideal: 1280, max: 1920 },
+              height: { ideal: 720, max: 1080 },
+              frameRate: { ideal: 30, max: 30 },
+              facingMode: { ideal: "user" },
+            };
+        try {
+          const videoStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: videoConstraints,
+          });
+          const videoTrack = videoStream.getVideoTracks()[0];
+          if (videoTrack) {
+            existing.addTrack(videoTrack);
+            videoTrack.enabled = true;
+          }
+        } catch (err) {
+          console.warn("Failed to add video track:", err);
+        }
+      } else if (!effectiveCam && hasVideo) {
+        // Remove video tracks
+        existing.getVideoTracks().forEach((t) => {
+          existing.removeTrack(t);
+          t.stop();
+        });
+      } else if (effectiveCam && hasVideo) {
+        // Keep existing, just enable/disable
+        existing.getVideoTracks().forEach((t) => {
+          t.enabled = true;
+        });
+      }
+
+      // Update analyser if audio track state changed
+      if (effectiveMic && existing.getAudioTracks().length) {
         if (!analyserRef.current) {
           analyserRef.current = createAnalyser(existing);
         }
@@ -209,10 +297,14 @@ export function usePartyMedia({
         disposeAnalyser(analyserRef.current);
         analyserRef.current = null;
       }
+
       await setLocalStream(existing);
+      setLocalStreamState(existing);
+      setMediaError(null);
       return;
     }
 
+    // No existing stream - create new one (first time)
     const audioConstraints = effectiveMic
       ? {
           echoCancellation: { ideal: true },
@@ -256,9 +348,6 @@ export function usePartyMedia({
         });
       }
 
-      localStreamRef.current?.getTracks().forEach((t) => {
-        if (!stream.getTracks().some((nt) => nt.kind === t.kind)) t.stop();
-      });
       localStreamRef.current = stream;
       setLocalStreamState(stream);
       setMediaError(null);
@@ -319,7 +408,7 @@ export function usePartyMedia({
   );
 
   const toggleMic = useCallback(async () => {
-    if (hostMicForcedOff) return;
+    if (hostMicForcedOff || webRTCMuteAll) return;
     const next = !micOn;
     setMicOn(next);
 
@@ -350,7 +439,7 @@ export function usePartyMedia({
     }
 
     await buildLocalStream(next, cameraOn);
-  }, [micOn, cameraOn, buildLocalStream, hostMicForcedOff, resumeAnalyser, sendSpeakingState, setLocalStream]);
+  }, [micOn, cameraOn, buildLocalStream, hostMicForcedOff, webRTCMuteAll, resumeAnalyser, sendSpeakingState, setLocalStream]);
 
   const toggleCamera = useCallback(async () => {
     if (hostCamForcedOff) return;
@@ -373,12 +462,13 @@ export function usePartyMedia({
   }, [micOn, cameraOn, buildLocalStream, hostCamForcedOff, setLocalStream]);
 
   // Host forced mute/cam — apply immediately
+  // WebRTC mute-all (broadcast from host) — apply immediately for guests
   useEffect(() => {
-    if (hostMicForcedOff && micOnRef.current) {
+    if ((hostMicForcedOff || webRTCMuteAll) && micOnRef.current) {
       setMicOn(false);
       void buildLocalStream(false, cameraOnRef.current);
     }
-  }, [hostMicForcedOff, buildLocalStream]);
+  }, [hostMicForcedOff, webRTCMuteAll, buildLocalStream]);
 
   useEffect(() => {
     if (hostCamForcedOff && cameraOnRef.current) {
@@ -500,6 +590,8 @@ export function usePartyMedia({
       // is one of the ways a long session accumulated memory.
       for (const handle of remoteAnalysersRef.current.values()) disposeAnalyser(handle);
       remoteAnalysersRef.current.clear();
+      // Null out refs to prevent stale references
+      remoteAnalysersRef.current = new Map();
     }
   }, [roomId, buildLocalStream]);
 
@@ -509,88 +601,137 @@ export function usePartyMedia({
   useEffect(() => {
     const remoteAnalysers = remoteAnalysersRef.current;
     return () => {
-      void setLocalStream(null);
-      localStreamRef.current?.getTracks().forEach((t) => t.stop());
-      localStreamRef.current = null;
-      setLocalStreamState(null);
-      disposeAnalyser(analyserRef.current);
-      analyserRef.current = null;
-      for (const handle of remoteAnalysers.values()) disposeAnalyser(handle);
-      remoteAnalysers.clear();
+      // Stop the animation frame loop first
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
+
+      // Clean up local stream tracks
+      localStreamRef.current?.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {
+          // Ignore errors on already stopped tracks
+        }
+      });
+      localStreamRef.current = null;
+      setLocalStreamState(null);
+
+      // Clean up local analyser (releases AudioContext reference)
+      disposeAnalyser(analyserRef.current);
+      analyserRef.current = null;
+
+      // Clean up remote analysers
+      for (const handle of remoteAnalysers.values()) {
+        disposeAnalyser(handle);
+      }
+      remoteAnalysers.clear();
+      remoteAnalysersRef.current = new Map();
+
+      // Clear remote streams state
+      setRemoteStreams(new Map());
+      setSpeakingPeers(new Set());
+
+      // Notify parent of stream removal
+      void setLocalStream(null);
+
+      // Reset speaking state
+      wasSpeakingRef.current = false;
+      setLocalSpeaking(false);
+      sendSpeakingState?.(false);
     };
-  }, [setLocalStream]);
+  }, [setLocalStream, sendSpeakingState]);
 
-  const participants: PartyMediaParticipant[] = [];
-  const seen = new Set<string>();
+  const mergedParticipants = useMemo(() => {
+    const participants: PartyMediaParticipant[] = [];
+    const seen = new Set<string>();
 
-  if (localStream && localUserId && (micOn || cameraOn)) {
-    seen.add(localUserId);
-    participants.push({
-      peerId: localUserId,
-      displayName: localDisplayName,
-      stream: localStream,
-      hasVideo: cameraOn && !hostCamForcedOff && localStream.getVideoTracks().some((t) => t.enabled),
-      hasAudio: micOn && !hostMicForcedOff,
-      isSpeaking: localSpeaking,
-      isLocal: true,
-      micMutedByHost: hostMicForcedOff,
-    });
-  }
+    // Effective mute state for local participant (host forced OR webRTC mute-all)
+    const effectiveMicMuted = hostMicForcedOff || webRTCMuteAll;
 
-  for (const [peerId, stream] of remoteStreams) {
-    if (peerId === localUserId) continue;
-    seen.add(peerId);
-    const hasVideo = stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
-    participants.push({
-      peerId,
-      displayName: participantNames?.get(peerId) || "Friend",
-      stream,
-      hasVideo,
-      hasAudio: stream.getAudioTracks().length > 0,
-      isSpeaking: speakingPeers.has(peerId),
-      isLocal: false,
-    });
-  }
+    if (localStream && localUserId && (micOn || cameraOn)) {
+      seen.add(localUserId);
+      participants.push({
+        peerId: localUserId,
+        displayName: localDisplayName,
+        stream: localStream,
+        hasVideo:
+          cameraOn &&
+          !hostCamForcedOff &&
+          localStream.getVideoTracks().some((t) => t.enabled),
+        hasAudio: micOn && !effectiveMicMuted,
+        isSpeaking: localSpeaking,
+        isLocal: true,
+        micMutedByHost: effectiveMicMuted,
+      });
+    }
 
-  for (const rp of roomParticipants) {
-    if (seen.has(rp.userId) || rp.userId === localUserId) continue;
-    participants.push({
-      peerId: rp.userId,
-      displayName: rp.displayName,
-      avatarUrl: rp.avatarUrl,
-      stream: new MediaStream(),
-      hasVideo: false,
-      hasAudio: false,
-      isSpeaking: false,
-      isLocal: false,
-      micMutedByHost: rp.micMutedByHost,
-    });
-  }
+    for (const [peerId, stream] of remoteStreams) {
+      if (peerId === localUserId) continue;
+      seen.add(peerId);
+      const hasVideo = stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
+      participants.push({
+        peerId,
+        displayName: participantNames?.get(peerId) || "Friend",
+        stream,
+        hasVideo,
+        hasAudio: stream.getAudioTracks().length > 0,
+        isSpeaking: speakingPeers.has(peerId),
+        isLocal: false,
+      });
+    }
 
-  if (localUserId && !seen.has(localUserId)) {
-    participants.unshift({
-      peerId: localUserId,
-      displayName: localDisplayName,
-      stream: localStream || new MediaStream(),
-      hasVideo: false,
-      hasAudio: false,
-      isSpeaking: localSpeaking,
-      isLocal: true,
-      micMutedByHost: hostMicForcedOff,
-    });
-  }
+    for (const participant of roomParticipants) {
+      if (seen.has(participant.userId) || participant.userId === localUserId) continue;
+      participants.push({
+        peerId: participant.userId,
+        displayName: participant.displayName,
+        avatarUrl: participant.avatarUrl,
+        stream: new MediaStream(),
+        hasVideo: false,
+        hasAudio: false,
+        isSpeaking: false,
+        isLocal: false,
+        micMutedByHost: participant.micMutedByHost,
+      });
+    }
 
-  const mergedParticipants = dedupeMediaParticipants(participants);
+    if (localUserId && !seen.has(localUserId)) {
+      participants.unshift({
+        peerId: localUserId,
+        displayName: localDisplayName,
+        stream: localStream || new MediaStream(),
+        hasVideo: false,
+        hasAudio: false,
+        isSpeaking: localSpeaking,
+        isLocal: true,
+        micMutedByHost: hostMicForcedOff || webRTCMuteAll,
+      });
+    }
+
+    return dedupeMediaParticipants(participants);
+  }, [
+    cameraOn,
+    hostCamForcedOff,
+    hostMicForcedOff,
+    webRTCMuteAll,
+    localDisplayName,
+    localStream,
+    localUserId,
+    localSpeaking,
+    micOn,
+    participantNames,
+    remoteStreams,
+    roomParticipants,
+    speakingPeers,
+  ]);
 
   const cameraMode = !!roomId;
   const anyoneSpeaking = speakingPeers.size > 0;
 
-  return {
-    micOn: micOn && !hostMicForcedOff,
+  return useMemo(() => ({
+    micOn: micOn && !hostMicForcedOff && !webRTCMuteAll,
     cameraOn: cameraOn && !hostCamForcedOff,
     cameraMode,
     voiceVolume,
@@ -604,7 +745,26 @@ export function usePartyMedia({
     mediaError,
     hostMicForcedOff,
     hostCamForcedOff,
+    webRTCMuteAll,
     onRemoteStream,
     onRemoteStreamRemoved,
-  };
+  }), [
+    micOn,
+    hostMicForcedOff,
+    webRTCMuteAll,
+    cameraOn,
+    hostCamForcedOff,
+    cameraMode,
+    voiceVolume,
+    setVoiceVolume,
+    toggleMic,
+    setMicLive,
+    toggleCamera,
+    mergedParticipants,
+    anyoneSpeaking,
+    localSpeaking,
+    mediaError,
+    onRemoteStream,
+    onRemoteStreamRemoved,
+  ]);
 }

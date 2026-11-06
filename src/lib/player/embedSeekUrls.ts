@@ -19,8 +19,8 @@ const HARD_DRIFT_THRESHOLD = 30;
  * hard-resync (URL rewrite), or do nothing.
  *
  * The returned `seekUrl` is the raw provider URL (direct cross-origin
- * iframe). We unwrap any legacy `/api/embed?src=...` URL first, append the
- * seek param to the underlying provider URL, and return it directly.
+ * iframe). We unwrap legacy `/api/embed?src=...` URLs first, append the seek
+ * param to the underlying provider URL, and return it directly.
  */
 export function computeResync(
   hostTimeSeconds: number,

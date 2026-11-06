@@ -1,4 +1,5 @@
 import { buildYapGridEmbedUrl, YAPGRID_LANES } from "./player/yapgrid";
+import ALLOWED_EMBED_HOSTS from "./embedHosts.json";
 
 export interface StreamingSource {
   id: string;
@@ -15,16 +16,8 @@ export interface StreamingSource {
   providerUrl: string;
 }
 
-/** Allowed embed hostnames — must match security-headers.mjs frame-src. */
-export const ALLOWED_EMBED_HOSTS = [
-  "vidsrcme.ru",
-  "vidsrc.to",
-  "vidlink.pro",
-  "videasy.to",
-  "player.videasy.to",
-  "vidfast.pro",
-  "yapgrid.com",
-] as const;
+/** Allowed embed hostnames; security-headers.mjs builds frame-src from this list. */
+export { ALLOWED_EMBED_HOSTS };
 
 export function isAllowedEmbedUrl(url: string): boolean {
   try {
@@ -35,18 +28,7 @@ export function isAllowedEmbedUrl(url: string): boolean {
   }
 }
 
-/**
- * Wrap a provider URL in our same-origin /api/embed proxy so the iframe loads
- * from our origin. The proxy re-fetches the provider URL server-side, strips
- * any sandbox-detection scripts, and returns the HTML. The provider's real
- * origin is still encoded in the response's `X-Embed-Provider` header so
- * postMessage origin detection (`resolveEmbedSrc`) still works.
- */
-export function proxyEmbedUrl(providerUrl: string): string {
-  return `/api/embed?src=${encodeURIComponent(providerUrl)}`;
-}
-
-/** Extract the real provider URL when loaded through /api/embed proxy. */
+/** Unwrap legacy proxy URLs so old links can still be resolved directly. */
 export function unproxyEmbedUrl(iframeSrc: string): string {
   try {
     const url = new URL(iframeSrc, typeof window !== "undefined" ? window.location.origin : "http://localhost");
@@ -208,18 +190,8 @@ export function buildStreamingSources(
 
   return ordered.map((s) => ({
     ...s,
-    // Load providers DIRECT (cross-origin iframe), not via /api/embed.
-    // The same-origin proxy is fundamentally unfixable for JS-heavy
-    // providers: their scripts fetch relative endpoints (e.g. vidsrc's
-    // `/vs_src.php`, `/manifest.json`, Cloudflare challenge URLs) that
-    // static href/src rewriting cannot catch, so the requests hit OUR
-    // origin instead of the provider and time out (white player), and our
-    // site CSP (`base-uri 'self'`, `script-src 'self'`) blocks their
-    // scripts and <base> tag. Direct iframes are served from the provider
-    // origin with the provider's own CSP, so all of that works. The
-    // /api/embed route is kept for backward compat but no longer used.
-    // (`providerUrl` stays as the raw URL for postMessage origin
-    // detection in `resolveEmbedSrc` / `detectProvider`.)
+    // Keep provider content cross-origin. The server-side HTML proxy is
+    // intentionally not used: provider scripts depend on their own origin.
     url: s.providerUrl,
   }));
 }

@@ -5,6 +5,8 @@ import HeroBanner from "@/components/HeroBanner";
 import MovieCarousel from "@/components/MovieCarousel";
 import PersonalizedWelcome from "@/components/PersonalizedWelcome";
 import LazySection from "@/components/LazySection";
+import HomeGenreRail from "@/components/HomeGenreRail";
+import { Top10RowSkeleton } from "@/components/skeletons/ContentSkeletons";
 import { PlaySomething } from "@/components/PlaySomething";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeContent } from "@/hooks/queries/useHomeContent";
@@ -19,7 +21,7 @@ import { isFeatureEnabled } from "@/lib/featureFlags";
 
 const Top10Row = dynamic(() => import("@/components/Top10Row"), {
   ssr: false,
-  loading: () => <div className="h-64 skeleton-shimmer rounded-2xl" />,
+  loading: () => <Top10RowSkeleton />,
 });
 
 const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), {
@@ -70,6 +72,8 @@ const Index = () => {
 
       <div className="relative z-10">
         <div className="space-y-12 lg:space-y-16 pb-16 lg:pb-24 px-4 sm:px-6 lg:px-10 max-w-[1800px] mx-auto">
+          <HomeGenreRail />
+
           {isAuthenticated && (
             <Reveal>
               <ContinueWatching />
@@ -94,9 +98,14 @@ const Index = () => {
             />
           </Reveal>
 
-          {isFeatureEnabled("top10-row") && (data?.trendingMovies?.length ?? 0) >= 10 && (
+          {isFeatureEnabled("top10-row") &&
+            (isLoading || (data?.trendingMovies?.length ?? 0) >= 10) && (
             <Reveal delay={40}>
-              <Top10Row movies={data!.trendingMovies!} />
+              {data?.trendingMovies?.length ? (
+                <Top10Row movies={data.trendingMovies} />
+              ) : (
+                <Top10RowSkeleton />
+              )}
             </Reveal>
           )}
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getGlobalAudioContext, getMasterGain } from "@/lib/player/audioSingleton";
+import { audioContext } from "@/lib/player/audioSingleton";
 import {
   fireHaptic,
   isHapticsEnabled,
@@ -57,9 +57,11 @@ export function useCinemaHaptics({
     }
 
     let cancelled = false;
-    const ctx = getGlobalAudioContext();
-    const master = getMasterGain();
-    if (!ctx || !master) return;
+    const ctx = audioContext.getContext();
+    // Get master gain by creating it if needed, or use context.destination
+    // For now, connect directly to destination since we don't have getMasterGain
+    const master = ctx.destination;
+    if (!ctx) return;
 
     let tap: AudioTap | null = null;
     try {
@@ -149,6 +151,8 @@ export function useCinemaHaptics({
           // already detached
         }
       }
+      // Release the audio context reference when done
+      audioContext.closeContext();
     };
   }, [enabled, videoRef]);
 

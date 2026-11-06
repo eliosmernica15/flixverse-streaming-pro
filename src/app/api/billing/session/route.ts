@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
           customerId: String(session.customer),
           subscriptionId: sub.id,
           periodEndMs: periodEndMs ?? Date.now() + 30 * 24 * 60 * 60 * 1000,
-        });
+        }, request.nextUrl.origin);
       }
     }
 

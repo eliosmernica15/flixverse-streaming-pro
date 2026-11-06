@@ -7,6 +7,7 @@ import { usePartyRealtime } from "@/hooks/player/usePartyRealtime";
 import {
   encryptPayload,
   generateRoomKey,
+  isRoomEncryptionRotationDue,
   buildPartyJoinUrl,
   buildPartyPlayerUrl,
   partyContentMatches,
@@ -16,7 +17,18 @@ import {
 } from "@/lib/player/roomEncryption";
 import type { SyncStatus } from "@/components/player/SyncStatusBadge";
 import type { GuestSplashPhase } from "@/components/player/PartyGuestSplash";
-import { trackGuestJoinSynced } from "@/lib/analytics";
+import {
+  trackGuestJoinSynced,
+  trackPartyJoin,
+  trackDriftSnap,
+  trackPartyReconnect,
+  breadcrumbDriftSnap,
+  breadcrumbReconnect,
+  breadcrumbStageHold,
+  breadcrumbQualityChange,
+  breadcrumbServerSwitch,
+  breadcrumbSyncFail,
+} from "@/lib/analytics";
 import {
   readGuestJoinSession,
   clearGuestJoinSession,
@@ -33,6 +45,8 @@ import {
 } from "@/lib/player/partyUrl";
 import { computeResync, injectSeekParam } from "@/lib/player/embedSeekUrls";
 import { NTPClient } from "@/lib/player/ntpClockSync";
+import { useNetworkQuality, type NetworkQuality } from "@/hooks/useNetworkQuality";
+import { pickServerByQuality, type StreamingSource } from "@/lib/streamingSources";
 
 const JOIN_GRACE_MS = 5000;
 const SYNC_INTERVAL_MS = 250;
@@ -40,10 +54,12 @@ const SYNC_INTERVAL_MS = 250;
 const DRIFT_SOFT_THRESHOLD_SEC = 0.5;
 const SEEK_COOLDOWN_MS = 600;
 const MAX_GUEST_SPLASH_MS = 14_000;
-// Host heartbeat cadence. Was 800ms (1.25 Firestore writes/sec per host
-// plus fan-out reads) — 1500ms still corrects drift promptly (threshold
-// 0.5s, room poll ~1s) at roughly half the write/read load.
-const HOST_HEARTBEAT_MS = 1500;
+// Host heartbeat cadence. 4500ms (4.5s) reduces Firestore writes to
+// ~0.22 writes/sec per host while still keeping drift correction within
+// the 0.5s soft threshold (room poll ~1s, heartbeat extrapolation covers
+// the gap). Combined with the realtime channel's sub-second delivery,
+// guests stay synced without the write load.
+const HOST_HEARTBEAT_MS = 4500;
 const FIRESTORE_PERSIST_INTERVAL_MS = 4000;
 // Lead time for a joint start: both sides seek first, then play at the
 // shared wall-clock moment so network jitter doesn't stagger the start.
@@ -95,6 +111,12 @@ interface UsePlayerPartySyncOptions {
   seekTo: (time: number) => void;
   seekRelative: (delta: number) => void;
   guestJoinMode?: boolean;
+  /** Streaming sources for quality-based server selection */
+  streamingSources?: StreamingSource[];
+  /** Enable automatic quality downgrade on network degradation (default: true) */
+  autoQualityDowngrade?: boolean;
+  /** Callback when quality changes (for UI indicator) */
+  onQualityChange?: (quality: NetworkQuality, previousQuality: NetworkQuality) => void;
 }
 
 export function usePlayerPartySync({
@@ -114,6 +136,9 @@ export function usePlayerPartySync({
   seekEmbed,
   seekTo,
   guestJoinMode = false,
+  streamingSources = [],
+  autoQualityDowngrade = true,
+  onQualityChange,
 }: UsePlayerPartySyncOptions) {
   const { user } = useAuth();
   const router = useRouter();
@@ -131,6 +156,12 @@ export function usePlayerPartySync({
   const guestInitialSyncedRef = useRef(false);
   guestInitialSyncedRef.current = guestInitialSynced;
   const [guestSplashDismissed, setGuestSplashDismissed] = useState(false);
+  // Network quality state for ABR downgrade
+  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>("high");
+  const [previousNetworkQuality, setPreviousNetworkQuality] = useState<NetworkQuality>("high");
+  const [showQualityIndicator, setShowQualityIndicator] = useState(false);
+  const [qualityIndicatorMessage, setQualityIndicatorMessage] = useState("");
+  const qualityChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resyncSeekUrl, setResyncSeekUrl] = useState<string | null>(null);
   // Last wall-clock time a host signal (event or heartbeat, either
   // transport) was applied. Drives the freshness-based "connected" status
@@ -143,6 +174,88 @@ export function usePlayerPartySync({
   const guestJoinSession = useMemo(() => readGuestJoinSession(), []);
   const guestSplashStartedAt = useRef(guestJoinSession?.startedAt ?? Date.now());
 
+  // Refs for values used in quality change effect before they're declared
+  const isPartyHostRef = useRef(false);
+  const broadcastServerChangeRef = useRef<typeof broadcastServerChange | null>(null);
+
+  // Network quality monitoring for ABR downgrade
+  const detectedQuality = useNetworkQuality();
+
+  // Track quality changes and trigger server downgrade
+  useEffect(() => {
+    if (!autoQualityDowngrade) return;
+    if (detectedQuality === previousNetworkQuality) return;
+
+    const previous = previousNetworkQuality;
+    const current = detectedQuality;
+
+    // Only act on degradation (not improvement) to avoid flapping
+    const qualityRank = { high: 3, medium: 2, low: 1 };
+    if (qualityRank[current] >= qualityRank[previous]) {
+      // Quality improved or stayed same - just update state
+      setNetworkQuality(current);
+      setPreviousNetworkQuality(current);
+      onQualityChange?.(current, previous);
+      return;
+    }
+
+    // Quality degraded - trigger downgrade
+    setNetworkQuality(current);
+    setPreviousNetworkQuality(current);
+
+    // Track quality change for analytics
+    if (partyRoomId) {
+      breadcrumbQualityChange(partyRoomId, previous, current);
+    }
+
+    // Show quality change indicator
+    const qualityLabels: Record<NetworkQuality, string> = {
+      high: "4K",
+      medium: "1080p",
+      low: "720p",
+    };
+    const message = `Network quality dropped — switching to ${qualityLabels[current]} quality`;
+    setQualityIndicatorMessage(message);
+    setShowQualityIndicator(true);
+
+    // Clear indicator after 5 seconds
+    if (qualityChangeTimeoutRef.current) {
+      clearTimeout(qualityChangeTimeoutRef.current);
+    }
+    qualityChangeTimeoutRef.current = setTimeout(() => {
+      setShowQualityIndicator(false);
+    }, 5000);
+
+    // Determine target quality label for server selection
+    // "4K" allows 4K sources (falls back to FHD if unavailable)
+    // "1080p" picks FHD
+    // "HD" picks HD (720p)
+    const targetQualityLabel = current === "low" ? "HD" : current === "medium" ? "1080p" : "4K";
+
+    // Use pickServerByQuality to find the best server for the new quality
+    if (streamingSources.length > 0) {
+      const newServerIndex = pickServerByQuality(streamingSources, targetQualityLabel, currentServer);
+      if (newServerIndex !== currentServer) {
+        // Trigger server change
+        if (isPartyHostRef.current) {
+          broadcastServerChangeRef.current?.(newServerIndex, currentTime);
+        } else {
+          setGuestServerIndex(newServerIndex);
+        }
+      }
+    }
+
+    onQualityChange?.(current, previous);
+  }, [
+    detectedQuality,
+    previousNetworkQuality,
+    autoQualityDowngrade,
+    streamingSources,
+    currentServer,
+    currentTime,
+    onQualityChange,
+  ]);
+
   const {
     room: partyRoom,
     messages: partyMessages,
@@ -152,13 +265,23 @@ export function usePlayerPartySync({
     joinRoomById,
     leaveRoom: leavePartyRoom,
     updatePlaybackState,
+    updateEncryptedPayload,
     sendMessage: sendPartyMessage,
     kickParticipant,
     setParticipantMicMuted,
     setParticipantCamDisabled,
     setControlsMode: setControlsModeRoom,
     transferHost,
+    pendingQueue: partyPendingQueue,
+    suggestToQueue: partySuggestToQueue,
+    voteQueueItem: partyVoteQueueItem,
+    confirmQueueItem: partyConfirmQueueItem,
+    removeQueueItem: partyRemoveQueueItem,
+    removeOwnQueueItem: partyRemoveOwnQueueItem,
   } = useFlixParty({ roomId: partyRoomId });
+
+  // Update refs for quality change effect
+  isPartyHostRef.current = isPartyHost;
 
   const partyParticipantIds = partyRoom?.participants?.map((p) => p.userId) ?? [];
   const controlsMode = partyRoom?.controlsMode ?? "HOST_ONLY";
@@ -167,11 +290,19 @@ export function usePlayerPartySync({
   const onRemoteStreamRef = useRef<(peerId: string, stream: MediaStream) => void>(() => {});
   const onRemoteStreamRemovedRef = useRef<(peerId: string) => void>(() => {});
   const partyJoinAttempted = useRef(false);
+  const rotatingEncryptionRef = useRef(false);
   const guestRedirectAttempted = useRef(false);
   const wasInPartyRef = useRef(false);
   const absentPollCountRef = useRef(0);
   const partyJoinTimeRef = useRef<number | null>(null);
+  // Track if seek was user-initiated (vs remote sync) to avoid broadcasting remote seeks back
+  const isUserSeekRef = useRef(false);
   const lastSeekAtRef = useRef(0);
+  // Debounce for user-initiated seeks (400ms) to avoid flooding broadcasts
+  const seekDebounceRef = useRef<{ timer: number | null; pendingTime: number | null }>({
+    timer: null,
+    pendingTime: null,
+  });
   const currentTimeRef = useRef(currentTime);
   const isPlayingRef = useRef(isPlaying);
   const hostTimeRef = useRef(0);
@@ -196,6 +327,8 @@ export function usePlayerPartySync({
   const lastSignalAtRef = useRef(0);
   const lastHardResyncAtRef = useRef(0);
   const failedSeekCountRef = useRef(0);
+  // Track previous signal freshness for reconnect detection
+  const wasSignalFreshRef = useRef(false);
   // Synced Start cursors (mirrors of the states above for interval/timer use).
   const syncStageRef = useRef<{ targetTime: number; releaseAt: number } | null>(null);
   const stagingRef = useRef<{ targetTime: number; releaseAt: number } | null>(null);
@@ -235,6 +368,28 @@ export function usePlayerPartySync({
     setSyncStage(null);
     setStaging(null);
   }, [partyRoomId]);
+
+  // Cleanup seek debounce timer on unmount
+  useEffect(() => {
+    const ref = seekDebounceRef.current;
+    return () => {
+      if (ref.timer) {
+        window.clearTimeout(ref.timer);
+        ref.timer = null;
+        ref.pendingTime = null;
+      }
+    };
+  }, []);
+
+  // Cleanup quality change indicator timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (qualityChangeTimeoutRef.current) {
+        window.clearTimeout(qualityChangeTimeoutRef.current);
+        qualityChangeTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   currentTimeRef.current = currentTime;
   isPlayingRef.current = isPlaying;
@@ -451,7 +606,9 @@ export function usePlayerPartySync({
     [isPartyHost, setPlaying, playEmbed, pauseEmbed, clearGuestStaging, handleGuestStage, handleGuestGo, projectedHostTime]
   );
 
-  const { isConnected: rtcConnected, sendMessage: sendRtcMessage, setLocalStream } = useWebRTCSync({
+  const [webRTCMuteAll, setWebRTCMuteAll] = useState(false);
+
+  const { isConnected: rtcConnected, sendMessage: sendRtcMessage, sendMuteAll, setLocalStream } = useWebRTCSync({
     roomId: partyRoomId,
     isHost: !!isPartyHost,
     hostId: partyRoom?.hostId ?? null,
@@ -464,6 +621,12 @@ export function usePlayerPartySync({
     },
     onRemoteStream: (peerId, stream) => onRemoteStreamRef.current(peerId, stream),
     onRemoteStreamRemoved: (peerId) => onRemoteStreamRemovedRef.current(peerId),
+    onMuteAll: () => {
+      // Only guests (non-host) should mute when receiving the command
+      if (!isPartyHost) {
+        setWebRTCMuteAll(true);
+      }
+    },
   });
 
   // Self-hosted real-time transport — same handler as WebRTC, so any
@@ -496,6 +659,31 @@ export function usePlayerPartySync({
       // Guest-control is a request for the host, never an authoritative
       // playback event for other guests.
       if (ev.type === "guest-control") return;
+      // Binge sync: host advances to the next episode; guests navigate.
+      if (ev.type === "next-episode" && ev.data) {
+        const nextSeason = typeof ev.data.season === "number" ? ev.data.season : season;
+        const nextEpisode = typeof ev.data.episode === "number" ? ev.data.episode : episode;
+        if (mediaType === "tv" && nextSeason !== undefined && nextEpisode !== undefined) {
+          // NTP-corrected transition: wait until the shared transition time if provided
+          const transitionAt = typeof ev.data.transitionAt === "number" ? ev.data.transitionAt : 0;
+          if (transitionAt > 0) {
+            const delay = transitionAt - NTPClient.now();
+            if (delay > 0 && delay < 5000) {
+              // Small delay - wait for precise synchronized transition
+              setTimeout(() => {
+                window.location.href = `/movie/${movieId}?type=tv&season=${nextSeason}&episode=${nextEpisode}&autoplay=true&party=${partyRoomId}`;
+              }, delay);
+            } else {
+              // Transition time has passed or is too far in future - navigate immediately
+              window.location.href = `/movie/${movieId}?type=tv&season=${nextSeason}&episode=${nextEpisode}&autoplay=true&party=${partyRoomId}`;
+            }
+          } else {
+            // No NTP time provided - navigate immediately (backward compatibility)
+            window.location.href = `/movie/${movieId}?type=tv&season=${nextSeason}&episode=${nextEpisode}&autoplay=true&party=${partyRoomId}`;
+          }
+        }
+        return;
+      }
       noteGuestSignal(ev.data?.currentTime);
       if (ev.type === "sync-stage" && typeof ev.data?.currentTime === "number") {
         handleGuestStage(
@@ -565,6 +753,7 @@ export function usePlayerPartySync({
     localDisplayName: user?.displayName || "You",
     hostMicForcedOff: partyRoom?.participants?.find((p) => p.userId === user?.uid)?.micMutedByHost ?? false,
     hostCamForcedOff: partyRoom?.participants?.find((p) => p.userId === user?.uid)?.camDisabledByHost ?? false,
+    webRTCMuteAll: webRTCMuteAll && !isPartyHost, // Only apply to guests, not host
   });
 
   useEffect(() => {
@@ -726,12 +915,18 @@ export function usePlayerPartySync({
            lastSeekAtRef.current = 0;
            setResyncSeekUrl(seekUrl);
            setPartySyncStatus("resyncing");
+           // Track hard drift correction
+           trackDriftSnap(partyRoomId!, driftSec * 1000, "hard");
+           breadcrumbDriftSnap(partyRoomId!, driftSec * 1000, "hard");
          } else {
            setPartySyncStatus("drift");
          }
        } else if (driftSec >= DRIFT_SOFT_THRESHOLD_SEC) {
          softSeekTo(hostTime);
          setPartySyncStatus("drift");
+         // Track soft drift correction
+         trackDriftSnap(partyRoomId!, driftSec * 1000, "soft");
+         breadcrumbDriftSnap(partyRoomId!, driftSec * 1000, "soft");
        } else {
          const fresh = Date.now() - lastSignalAtRef.current < SIGNAL_FRESH_MS;
          setPartySyncStatus(
@@ -774,11 +969,19 @@ export function usePlayerPartySync({
     lastSeekAtRef.current = 0;
     initialSyncDoneRef.current = true;
     setGuestInitialSynced(true);
+    const guestTime = currentTimeRef.current;
+    const driftMs = Math.abs(guestTime - hostTime) * 1000;
     if (embedLiveSyncedRef.current) {
       softSeekTo(hostTime);
+      // Track manual drift correction
+      trackDriftSnap(partyRoomId, driftMs, "manual");
+      breadcrumbDriftSnap(partyRoomId, driftMs, "manual");
     } else {
       lastHardResyncAtRef.current = now;
       setResyncSeekUrl(injectSeekParam(sourceUrlRef.current, hostTime));
+      // Track manual hard resync
+      trackDriftSnap(partyRoomId, driftMs, "manual");
+      breadcrumbDriftSnap(partyRoomId, driftMs, "manual");
     }
     if (partyPlaybackRef.current === "playing") {
       setPlaying(true);
@@ -826,8 +1029,17 @@ export function usePlayerPartySync({
       // Host signals are arriving over the event channel — the party is
       // live even though the WebRTC data channel never opened (no TURN /
       // strict NAT) and the provider iframe stays silent.
+      const isSignalFresh = true;
+      // Track reconnect if signal was stale before
+      if (!isPartyHost && !wasSignalFreshRef.current && lastSignalAtRef.current > 0) {
+        const wasDisconnectedMs = Date.now() - lastSignalAtRef.current;
+        trackPartyReconnect(partyRoomId, wasDisconnectedMs, rtcConnected ? "webrtc" : "firestore");
+        breadcrumbReconnect(partyRoomId, wasDisconnectedMs, rtcConnected ? "webrtc" : "firestore");
+      }
+      wasSignalFreshRef.current = isSignalFresh;
       setPartySyncStatus("connected");
     } else if (partyRoom) {
+      wasSignalFreshRef.current = false;
       setPartySyncStatus("connecting");
     }
   }, [partyRoomId, rtcConnected, partyRoom, isPartyHost, guestInitialSynced, staging, lastSignalAt]);
@@ -857,6 +1069,7 @@ export function usePlayerPartySync({
       if (ok) {
         clearPartyLeftMark(joinId);
         setPartyRoomId(joinId);
+        trackPartyJoin(joinId);
       }
     });
   }, [partyRoomId, user, joinRoomById, guestJoinMode]);
@@ -965,6 +1178,8 @@ export function usePlayerPartySync({
     setSyncStage({ targetTime: T, releaseAt });
     void updatePlaybackState("paused", T, currentServer);
     void realtimeSend("sync-stage", { currentTime: T, releaseAt });
+    // Track stage hold
+    breadcrumbStageHold(partyRoomId, T, releaseAt);
     autoReleaseTimerRef.current = window.setTimeout(() => {
       releaseSyncedStart();
     }, SYNC_AUTO_RELEASE_MS);
@@ -1050,6 +1265,7 @@ export function usePlayerPartySync({
    * Broadcast an explicit seek to all guests.
    * Called by the host whenever the playhead jumps (keyboard shortcuts,
    * progress-bar click, 0-9 number keys, etc.).
+   * Only broadcasts if the seek was user-initiated (not from remote sync).
    */
   const broadcastPartySeek = useCallback(
     (time: number) => {
@@ -1058,6 +1274,8 @@ export function usePlayerPartySync({
         if (isCollaborative) requestSeek(time);
         return;
       }
+      // Only broadcast user-initiated seeks, not remote sync seeks
+      if (!isUserSeekRef.current) return;
       if (syncStageRef.current) cancelSyncedStart();
       // Persist to Firestore so late-joining guests get the right position
       void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, currentServer);
@@ -1088,13 +1306,19 @@ export function usePlayerPartySync({
         if (isCollaborative) requestServerChange(serverIndex, time);
         return;
       }
+      const fromServer = partyServerRef.current;
       if (syncStageRef.current) cancelSyncedStart();
       void updatePlaybackState(partyPlayingRef.current ? "playing" : "paused", time, serverIndex);
       void realtimeSend("server-change", { currentTime: time, serverIndex });
       sendRtcMessage("server-change", { currentTime: time, serverIndex });
+      // Track server switch
+      breadcrumbServerSwitch(partyRoomId, fromServer, serverIndex);
     },
     [partyRoomId, isPartyHost, isCollaborative, updatePlaybackState, realtimeSend, sendRtcMessage, cancelSyncedStart, requestServerChange]
   );
+
+  // Update ref for quality change effect
+  broadcastServerChangeRef.current = broadcastServerChange;
 
   // Host: fast realtime heartbeats (800 ms) so guests correct drift quickly.
   // Firestore writes happen at a much lower cadence (4 s) to avoid rate limits.
@@ -1147,6 +1371,76 @@ export function usePlayerPartySync({
     const id = setInterval(tick, HOST_HEARTBEAT_MS);
     return () => clearInterval(id);
   }, [partyRoomId, isPartyHost, realtimeSend, sendRtcMessage, updatePlaybackState]);
+
+  const hasPartyRoom = partyRoom !== null;
+  const encryptedPartyPayload = partyRoom?.encryptedPayload;
+  const contentMetaTmdbId = partyRoom?.contentMeta?.tmdbId;
+  const contentMetaMediaType = partyRoom?.contentMeta?.mediaType;
+  const contentMetaSeason = partyRoom?.contentMeta?.season;
+  const contentMetaEpisode = partyRoom?.contentMeta?.episode;
+  const contentMetaServerIndex = partyRoom?.contentMeta?.serverIndex;
+
+  useEffect(() => {
+    if (
+      !partyRoomId ||
+      !partyRoomKey ||
+      !hasPartyRoom ||
+      !encryptedPartyPayload ||
+      !isPartyHost
+    ) return;
+
+    let active = true;
+    const rotateRoomKey = async () => {
+      if (
+        rotatingEncryptionRef.current ||
+        !isRoomEncryptionRotationDue(encryptedPartyPayload)
+      ) {
+        return;
+      }
+
+      rotatingEncryptionRef.current = true;
+      try {
+        const contentMeta: PartyContentMeta = {
+          tmdbId: contentMetaTmdbId ?? movieId,
+          mediaType: contentMetaMediaType ?? mediaType,
+          season: contentMetaSeason ?? season,
+          episode: contentMetaEpisode ?? episode,
+          serverIndex: contentMetaServerIndex ?? currentServer,
+        };
+        const encryptedPayload = await encryptPayload(contentMeta, partyRoomKey);
+        if (active) await updateEncryptedPayload(encryptedPayload);
+      } catch (error) {
+        console.error("Failed to rotate party encryption key:", error);
+      } finally {
+        rotatingEncryptionRef.current = false;
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      void rotateRoomKey();
+    }, 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [
+    partyRoomId,
+    partyRoomKey,
+    hasPartyRoom,
+    encryptedPartyPayload,
+    contentMetaTmdbId,
+    contentMetaMediaType,
+    contentMetaSeason,
+    contentMetaEpisode,
+    contentMetaServerIndex,
+    isPartyHost,
+    movieId,
+    mediaType,
+    season,
+    episode,
+    currentServer,
+    updateEncryptedPayload,
+  ]);
 
   const handleStartParty = useCallback(async (): Promise<{ roomId: string; joinUrl: string } | null> => {
     if (!user) {
@@ -1278,7 +1572,53 @@ export function usePlayerPartySync({
     resetPartySession,
     broadcastPartyState,
     broadcastPartySeek,
+    // Debounced version for user-initiated seeks (400ms debounce)
+    debouncedBroadcastPartySeek: useCallback(
+      (time: number) => {
+        const ref = seekDebounceRef.current;
+        // Clear any pending debounce timer
+        if (ref.timer) {
+          window.clearTimeout(ref.timer);
+        }
+        // Mark this as a user-initiated seek
+        isUserSeekRef.current = true;
+        ref.pendingTime = time;
+        ref.timer = window.setTimeout(() => {
+          ref.timer = null;
+          if (ref.pendingTime !== null) {
+            broadcastPartySeek(ref.pendingTime);
+            ref.pendingTime = null;
+          }
+          // Reset the user-initiated flag after the debounced call
+          isUserSeekRef.current = false;
+        }, 400);
+      },
+      [broadcastPartySeek]
+    ),
     broadcastServerChange,
+    broadcastNextEpisode: useCallback(
+      (nextSeason: number, nextEpisode: number, serverIndex?: number, transitionTime?: number) => {
+        if (!partyRoomId) return;
+        if (!isPartyHost) return;
+        // NTP-corrected transition time for precise sync across all clients
+        const ntpTransitionTime = transitionTime ?? NTPClient.now();
+        void realtimeSend("next-episode", {
+          season: nextSeason,
+          episode: nextEpisode,
+          serverIndex: serverIndex ?? currentServer,
+          movieId,
+          mediaType,
+          transitionAt: ntpTransitionTime,
+        });
+        sendRtcMessage("next-episode", {
+          season: nextSeason,
+          episode: nextEpisode,
+          serverIndex: serverIndex ?? currentServer,
+          transitionAt: ntpTransitionTime,
+        });
+      },
+      [partyRoomId, isPartyHost, realtimeSend, sendRtcMessage, currentServer, movieId, mediaType]
+    ),
     controlsMode,
     isCollaborative,
     requestPlaybackState,
@@ -1299,6 +1639,7 @@ export function usePlayerPartySync({
     setParticipantCamDisabled,
     transferHost,
     media,
+    sendMuteAll,
     guestServerIndex,
     guestSplashPhase,
     guestSplashVisible,
@@ -1307,6 +1648,16 @@ export function usePlayerPartySync({
     setResyncSeekUrl,
     snapToHost,
     projectedHostTime,
+    // Network quality for ABR downgrade indicator
+    networkQuality,
+    showQualityIndicator,
+    qualityIndicatorMessage,
+    pendingQueue: partyPendingQueue,
+    suggestToQueue: partySuggestToQueue,
+    voteQueueItem: partyVoteQueueItem,
+    confirmQueueItem: partyConfirmQueueItem,
+    removeQueueItem: partyRemoveQueueItem,
+    removeOwnQueueItem: partyRemoveOwnQueueItem,
     realtime: {
       processed: realtime.processed,
       isReady: realtime.isReady,

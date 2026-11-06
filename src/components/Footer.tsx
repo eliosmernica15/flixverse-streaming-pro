@@ -159,7 +159,7 @@ const Footer = () => {
                 <li key={link.path}>
                   <Link
                     href={link.path}
-                    prefetch
+                    prefetch={false}
                     className="group flex min-h-[44px] items-center space-x-3 rounded-lg text-gray-400 transition-colors hover:text-white focus-ring"
                   >
                     <link.icon className="h-4 w-4 text-gray-500 transition-colors group-hover:text-red-500" />

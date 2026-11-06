@@ -234,7 +234,7 @@ export function detectProvider(src: string): ProviderConfig {
   }
 }
 
-/** Extract the real provider URL when loaded through /api/embed proxy. */
+/** Unwrap legacy proxy URLs so old links can still be resolved directly. */
 export function resolveEmbedSrc(iframeSrc: string): string {
   try {
     const url = new URL(iframeSrc, typeof window !== "undefined" ? window.location.origin : "http://localhost");

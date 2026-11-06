@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildPartyPlayerUrl,
   decryptPayload,
   encryptPayload,
   generateRoomKey,
+  isRoomEncryptionRotationDue,
   partyContentMatches,
   type PartyPayload,
 } from "../roomEncryption";
@@ -14,10 +15,42 @@ const PAYLOAD: PartyPayload = {
   serverIndex: 0,
 };
 
+async function encryptLegacyPayload(payload: PartyPayload, roomKey: string): Promise<string> {
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(roomKey),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: new TextEncoder().encode("flixverse-party"),
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(JSON.stringify(payload))
+  );
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+  return btoa(String.fromCharCode(...combined));
+}
+
 describe("generateRoomKey", () => {
-  it("produces a 6-character key from the URL-safe alphabet", () => {
+  it("produces a 24-character key from the URL-safe alphabet", () => {
     const key = generateRoomKey();
-    expect(key).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+    expect(key).toMatch(/^[A-HJ-NP-Z2-9]{24}$/);
   });
 
   it("is randomized (two calls differ with overwhelming probability)", () => {
@@ -51,6 +84,35 @@ describe("encryptPayload / decryptPayload", () => {
   it("returns null for malformed ciphertext", async () => {
     expect(await decryptPayload("not-base64!!", generateRoomKey())).toBeNull();
     expect(await decryptPayload(btoa("garbage"), generateRoomKey())).toBeNull();
+    expect(await decryptPayload("fv2:not-an-epoch:bad:payload", generateRoomKey())).toBeNull();
+  });
+
+  it("decrypts ciphertext from the legacy room-key format", async () => {
+    const key = generateRoomKey();
+    const encrypted = await encryptLegacyPayload(PAYLOAD, key);
+    await expect(decryptPayload(encrypted, key)).resolves.toEqual(PAYLOAD);
+  });
+
+  it("rotates the derived encryption key every hour", async () => {
+    const issuedAt = Math.ceil(1_700_000_000_000 / 3_600_000) * 3_600_000;
+    const ciphertext = await encryptPayload(PAYLOAD, generateRoomKey(), issuedAt);
+
+    expect(isRoomEncryptionRotationDue(ciphertext, issuedAt + 59 * 60 * 1000)).toBe(false);
+    expect(isRoomEncryptionRotationDue(ciphertext, issuedAt + 60 * 60 * 1000)).toBe(true);
+  });
+
+  it("expires rotated ciphertext after its renewal window", async () => {
+    vi.useFakeTimers();
+    const issuedAt = 1_700_000_000_000;
+    const key = generateRoomKey();
+    vi.setSystemTime(issuedAt);
+    try {
+      const ciphertext = await encryptPayload(PAYLOAD, key, issuedAt);
+      vi.setSystemTime(issuedAt + 66 * 60 * 1000);
+      await expect(decryptPayload(ciphertext, key)).resolves.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

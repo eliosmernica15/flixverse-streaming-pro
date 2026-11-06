@@ -66,6 +66,8 @@ export type PartyRealtimeEventType =
   | "heartbeat"
   | "speaking"
   | "server-change"
+  // Binge sync: host advances to the next episode; guests navigate.
+  | "next-episode"
   // Staged simultaneous start (see usePlayerPartySync Synced Start):
   // host holds everyone paused at a timestamp, then releases both sides
   // at the same wall-clock moment so the guest never taps anything.

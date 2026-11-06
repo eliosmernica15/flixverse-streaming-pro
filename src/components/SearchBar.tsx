@@ -345,7 +345,7 @@ const SearchBar = ({ onMovieSelect }: SearchBarProps) => {
                         <>
                           <span>
                             {result.release_date || result.first_air_date
-                              ? new Date(result.release_date || result.first_air_date).getFullYear()
+                              ? new Date(result.release_date || result.first_air_date!).getFullYear()
                               : "â€”"}
                           </span>
                           {result.vote_average && result.vote_average > 0 && (

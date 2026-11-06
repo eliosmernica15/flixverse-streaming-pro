@@ -23,6 +23,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 import { usePerformanceMode } from "@/hooks/usePerformanceMode";
+import { daysUntilRelease } from "@/lib/catalogFilters";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -63,11 +65,13 @@ const genreNames: Record<number, string> = {
   10768: "War & Politics",
 };
 
-const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
+const MovieCard = ({ movie, priority = false, matchScore, comingSoon = false }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const performanceMode = usePerformanceMode();
+  const reducedMotion = useReducedMotion();
   // Spring-smoothed 3D tilt + cursor-tracked specular sheen. Writes CSS
   // variables only — no React state — so a grid of 40 posters costs no
   // re-renders while the pointer moves across it.
@@ -75,7 +79,7 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
     max: 7,
     lift: 18,
     hoverScale: 1.02,
-    enabled: !performanceMode,
+    enabled: !performanceMode && !reducedMotion,
   });
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
@@ -181,6 +185,12 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
   const posterUrl = movie.poster_path ? getImageUrl(movie.poster_path, "medium") : null;
   const rating = typeof movie.vote_average === "number" ? movie.vote_average : 0;
   const hasValidRating = rating > 0;
+  const releaseDays = comingSoon ? daysUntilRelease(movie) : null;
+  const countdownLabel = releaseDays === null || releaseDays < 0
+    ? null
+    : releaseDays === 0
+      ? "Releases today"
+      : `In ${releaseDays} day${releaseDays === 1 ? "" : "s"}`;
   const finalPosterUrl = !posterUrl || imageError ? getPlaceholderImage() : posterUrl;
 
   const getRatingBadge = (value: number): string => {
@@ -218,7 +228,7 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
       className="netflix-card-wrap movie-card-3d content-auto cursor-pointer outline-none focus-ring group"
       role="button"
       tabIndex={0}
-      aria-label={`${displayTitle}${year ? ` (${year})` : ""}`}
+      aria-label={`${displayTitle}${year ? ` (${year})` : ""}${hasValidRating ? `, rated ${rating.toFixed(1)} out of 10` : ""}`}
       onMouseEnter={() => {
         setIsHovered(true);
         schedulePrefetch();
@@ -229,10 +239,12 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
       }}
       onFocus={() => {
         setIsHovered(true);
+        setIsFocused(true);
         schedulePrefetch();
       }}
       onBlur={() => {
         setIsHovered(false);
+        setIsFocused(false);
         cancelPrefetch();
       }}
       onClick={handleCardClick}
@@ -260,6 +272,7 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
             src={finalPosterUrl}
             alt={displayTitle}
             fill
+            quality={60}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
             className="object-cover"
             loading={priority ? "eager" : "lazy"}
@@ -291,8 +304,13 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
 
         {/* Top-left badge column: match score and the Series tag stack
             instead of rendering on top of each other. */}
-        {((matchScore !== undefined && matchScore > 0) || contentType === "tv") && (
+        {((matchScore !== undefined && matchScore > 0) || contentType === "tv" || countdownLabel) && (
           <div className="movie-card-layer movie-card-layer--badge absolute left-2 top-2 z-20 flex flex-col items-start gap-1">
+            {countdownLabel && (
+              <span className="badge-pill bg-red-600/90 text-white shadow-[0_2px_12px_rgba(239,68,68,0.35)]">
+                {countdownLabel}
+              </span>
+            )}
             {matchScore !== undefined && matchScore > 0 && (
               <span className="badge-pill badge-match bg-gradient-to-r from-amber-500/90 to-rose-400/90 text-white shadow-[0_2px_12px_rgba(245,158,11,0.35)]">
                 <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
@@ -315,27 +333,27 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
         {/* Center Play button — single primary action. Fades in on hover/focus. */}
         <div
           className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
-            isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+            (isHovered || isFocused) ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
-          aria-hidden={!isHovered}
+          aria-hidden={!(isHovered || isFocused)}
         >
           <button
             type="button"
             onClick={handlePlay}
             className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black shadow-2xl shadow-black/50 ring-1 ring-black/10 transition-transform duration-200 hover:scale-110 focus-visible:scale-110 focus:outline-none"
             aria-label={`Play ${displayTitle}`}
-            tabIndex={isHovered ? 0 : -1}
+            tabIndex={(isHovered || isFocused) ? 0 : -1}
           >
             <Play className="h-5 w-5 fill-current ml-0.5" />
           </button>
         </div>
 
-        {/* Right-side vertical action stack — only visible on hover, overlays on the card */}
+        {/* Right-side vertical action stack — visible on hover or focus, overlays on the card */}
         <div
           className={`absolute right-2 bottom-2 flex flex-col gap-1.5 transition-all duration-300 ${
-            isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+            (isHovered || isFocused) ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
           }`}
-          aria-hidden={!isHovered}
+          aria-hidden={!(isHovered || isFocused)}
         >
           <button
             type="button"
@@ -347,7 +365,7 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
                 : "border-white/40 bg-black/40 text-white hover:bg-white hover:text-black hover:border-white"
             } ${listBusy ? "opacity-60" : ""}`}
             aria-label={isInMyList ? tc("removeFromList") : tc("addToList")}
-            tabIndex={isHovered ? 0 : -1}
+            tabIndex={(isHovered || isFocused) ? 0 : -1}
           >
             {listBusy ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -366,7 +384,7 @@ const MovieCard = ({ movie, priority = false, matchScore }: MovieCardProps) => {
             }}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-black/40 text-white backdrop-blur-md transition-all duration-200 hover:bg-white hover:text-black hover:border-white focus:outline-none"
             aria-label={`More about ${displayTitle}`}
-            tabIndex={isHovered ? 0 : -1}
+            tabIndex={(isHovered || isFocused) ? 0 : -1}
           >
             <ChevronDown className="h-3.5 w-3.5" />
           </button>

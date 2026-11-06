@@ -68,6 +68,8 @@ export const RATE_LIMITS = {
   SEARCH: { max: 30, windowMs: 60 * 1000 },
   /** Max report submissions per hour */
   REPORT: { max: 10, windowMs: 60 * 60 * 1000 },
+  /** Max queue suggestions per minute per user */
+  PARTY_QUEUE_SUGGEST: { max: 10, windowMs: 60 * 1000 },
 } as const;
 
 export function isRateLimited(action: keyof typeof RATE_LIMITS, userId: string): boolean {

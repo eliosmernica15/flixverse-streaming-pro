@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildStreamingSources, isAllowedEmbedUrl, pickServerByQuality, proxyEmbedUrl, unproxyEmbedUrl } from "../streamingSources";
+import { buildStreamingSources, isAllowedEmbedUrl, pickServerByQuality, ALLOWED_EMBED_HOSTS, unproxyEmbedUrl } from "../streamingSources";
 
 describe("buildStreamingSources", () => {
   const en = buildStreamingSources(550, "movie");
@@ -36,6 +36,17 @@ describe("buildStreamingSources", () => {
     }
   });
 
+  it("allows documented VidFast mirrors and rejects lookalike domains", () => {
+    expect(isAllowedEmbedUrl("https://player.vidfast.vc/embed")).toBe(true);
+    expect(isAllowedEmbedUrl("https://vidsrcme.ru.attacker.example/embed")).toBe(false);
+    expect(isAllowedEmbedUrl("http://vidsrcme.ru/embed")).toBe(true);
+  });
+
+  it("uses a canonical host list shared with the CSP configuration", () => {
+    expect(ALLOWED_EMBED_HOSTS).toContain("vidfast.vc");
+    expect(ALLOWED_EMBED_HOSTS).toContain("player.videasy.to");
+  });
+
   it("adds Albanian subtitle params only to providers that document them", () => {
     const sq = buildStreamingSources(550, "movie", undefined, undefined, { lang: "sq" });
     expect(sq[0].url).toContain("ds_lang=sq");
@@ -69,16 +80,14 @@ describe("pickServerByQuality", () => {
   });
 });
 
-describe("proxy/unproxy embed url", () => {
-  it("round-trips a provider url through the proxy", () => {
-    const url = "https://vidsrcme.ru/embed/movie/550";
-    const proxied = proxyEmbedUrl(url);
-    expect(proxied).toContain("/api/embed?src=");
-    expect(unproxyEmbedUrl(proxied)).toBe(url);
-  });
-
+describe("legacy embed proxy URL compatibility", () => {
   it("returns the input unchanged when not proxied", () => {
     const url = "https://vidsrcme.ru/embed/movie/550";
     expect(unproxyEmbedUrl(url)).toBe(url);
+  });
+
+  it("unwraps links issued by the removed embed proxy", () => {
+    const url = "https://vidsrcme.ru/embed/movie/550";
+    expect(unproxyEmbedUrl(`/api/embed?src=${encodeURIComponent(url)}`)).toBe(url);
   });
 });

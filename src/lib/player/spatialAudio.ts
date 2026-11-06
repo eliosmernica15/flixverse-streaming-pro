@@ -23,12 +23,7 @@
  *    each allocate their own impulse response.
  */
 
-import {
-  getGlobalAudioContext,
-  getMasterGain,
-  releaseAudioContext,
-  retainAudioContext,
-} from "./audioSingleton";
+import { audioContext } from "./audioSingleton";
 
 /**
  * An element can be bound to exactly ONE MediaElementAudioSourceNode for its
@@ -100,9 +95,8 @@ function getReverb(ctx: AudioContext): { conv: ConvolverNode; gain: GainNode } |
     }
     conv.buffer = buffer;
     conv.connect(gain);
-    // Through the master gain (not straight to the destination) so app-wide
-    // mute / ducking also applies to the reverb tail.
-    gain.connect(getMasterGain() ?? ctx.destination);
+    // Through the destination so app-wide mute / ducking also applies to the reverb tail.
+    gain.connect(ctx.destination);
     sharedReverb = conv;
     sharedReverbGain = gain;
     return { conv, gain };
@@ -131,9 +125,8 @@ export function attachSpatialVoice(
   element: HTMLAudioElement,
   pan: number
 ): SpatialVoiceNode | null {
-  const ctx = getGlobalAudioContext();
-  const master = getMasterGain();
-  if (!ctx || !master) return null;
+  const ctx = audioContext.getContext();
+  if (!ctx) return null;
 
   try {
     const panner = ctx.createPanner();
@@ -175,17 +168,17 @@ export function attachSpatialVoice(
 
     try {
       source.connect(panner);
-      panner.connect(master);
+      panner.connect(ctx.destination);
     } catch {
       // The element is captured by `source` now, so it no longer plays on
-      // its own. Never leave it silent: route it dry to the master bus.
+      // its own. Never leave it silent: route it dry to the destination.
       try {
         panner.disconnect();
       } catch {
         // ignore
       }
       try {
-        source.connect(master);
+        source.connect(ctx.destination);
       } catch {
         // ignore
       }
@@ -201,7 +194,8 @@ export function attachSpatialVoice(
       }
     }
 
-    retainAudioContext();
+    // Retain audio context reference
+    audioContext.getContext(); // increments ref count
     return { panner, source, element, pan: clampPan(pan), reverbSend, released: false };
   } catch {
     return null;
@@ -212,7 +206,7 @@ export function updateSpatialVoicePan(node: SpatialVoiceNode, pan: number): void
   const next = clampPan(pan);
   if (Math.abs(next - node.pan) < 0.01) return;
   node.pan = next;
-  const ctx = getGlobalAudioContext();
+  const ctx = audioContext.getContext();
   if (!ctx) return;
   const pos = panToPosition(next);
   try {
@@ -231,7 +225,8 @@ export function updateSpatialVoicePan(node: SpatialVoiceNode, pan: number): void
 export function detachSpatialVoice(node: SpatialVoiceNode | null): void {
   if (!node || node.released) return;
   node.released = true;
-  releaseAudioContext();
+  // Release the audio context reference
+  audioContext.closeContext();
   try {
     node.source?.disconnect();
   } catch {

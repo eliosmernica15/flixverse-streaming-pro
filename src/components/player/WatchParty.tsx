@@ -52,8 +52,6 @@ interface WatchPartyProps {
   episode?: number;
   title: string;
   posterPath: string | null;
-  currentTime: number;
-  isPlaying: boolean;
   onSyncToPosition: (position: number) => void;
   onStartParty?: () => Promise<{ roomId: string; joinUrl: string } | null> | void;
   externalRoomId?: string | null;

@@ -1,11 +1,13 @@
 ﻿"use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Search, UserPlus, Check, X, Users, Send, Loader2, Clock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useFriends, type Friend, type UserProfile } from "@/hooks/useFriends";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
+import { usePresence } from "@/hooks/usePresence";
+import { usePartyInvites, type CreateInviteParams } from "@/hooks/usePartyInvites";
 
 interface FriendsListProps {
   inviteMode?: boolean;
@@ -13,6 +15,7 @@ interface FriendsListProps {
   invitingUserId?: string | null;
   variant?: "sidebar" | "page";
   initialTab?: "friends" | "requests" | "find";
+  partyRoomId?: string | null;
 }
 
 export function FriendsList({
@@ -21,6 +24,7 @@ export function FriendsList({
   invitingUserId = null,
   variant = "sidebar",
   initialTab = "friends",
+  partyRoomId = null,
 }: FriendsListProps) {
   const { toast } = useToast();
   const t = useTranslations("friends");
@@ -34,6 +38,13 @@ export function FriendsList({
     declineFriendRequest,
     getRelationship,
   } = useFriends();
+
+  // Presence: track online status of friends
+  const friendIds = useMemo(() => friends.map((f) => f.userId), [friends]);
+  const { presenceMap, loading: presenceLoading } = usePresence(friendIds);
+
+  // Party invites hook
+  const { createInvite, creating } = usePartyInvites();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
@@ -195,45 +206,82 @@ export function FriendsList({
                 <p className="mt-1 text-[10px] text-gray-600">{t("searchFindTab")}</p>
               </div>
             )}
-            {friends.map((friend) => (
-              <div
-                key={friend.id}
-                className="group flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-white/5"
-              >
-                {friend.avatarUrl ? (
-                  <Image
-                    src={friend.avatarUrl}
-                    alt={friend.displayName}
-                    width={36}
-                    height={36}
-                    className="h-9 w-9 rounded-full object-cover ring-2 ring-white/15"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-600 text-sm font-bold text-white">
-                    {friend.displayName.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{friend.displayName}</p>
-                  <p className="text-[10px] text-emerald-400/80">{inviteMode ? t("available") : ""}</p>
-                </div>
-                {inviteMode && onInvite && (
-                  <button
-                    type="button"
-                    onClick={() => void onInvite(friend)}
-                    disabled={invitingUserId === friend.userId}
-                    className="flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-red-500 focus-ring disabled:opacity-50"
+            {friends.map((friend) => {
+                const isOnline = presenceMap[friend.userId] === true;
+                const isCreating = creating[friend.userId] === true;
+
+                return (
+                  <div
+                    key={friend.id}
+                    className="group flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-white/5"
                   >
-                    {invitingUserId === friend.userId ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Send className="h-3 w-3" />
+                    <div className="relative">
+                      {friend.avatarUrl ? (
+                        <Image
+                          src={friend.avatarUrl}
+                          alt={friend.displayName}
+                          width={36}
+                          height={36}
+                          className="h-9 w-9 rounded-full object-cover ring-2 ring-white/15"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-600 text-sm font-bold text-white">
+                          {friend.displayName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      {/* Online indicator */}
+                      <span
+                        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-gray-900 ${
+                          isOnline ? "bg-emerald-400" : "bg-gray-600"
+                        }`}
+                        aria-label={isOnline ? "Online" : "Offline"}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-white">{friend.displayName}</p>
+                      <p className="text-[10px] text-emerald-400/80">
+                        {inviteMode ? t("available") : isOnline ? t("onlineNow") : t("offline")}
+                      </p>
+                    </div>
+                    {inviteMode && partyRoomId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const params: CreateInviteParams = {
+                            roomId: partyRoomId,
+                            toUserId: friend.userId,
+                          };
+                          void createInvite(params);
+                        }}
+                        disabled={isCreating || invitingUserId === friend.userId}
+                        className="flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-red-500 focus-ring disabled:opacity-50"
+                      >
+                        {isCreating || invitingUserId === friend.userId ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Send className="h-3 w-3" />
+                        )}
+                        {isCreating || invitingUserId === friend.userId ? t("sending") : t("invite")}
+                      </button>
                     )}
-                    {invitingUserId === friend.userId ? t("sending") : t("invite")}
-                  </button>
-                )}
-              </div>
-            ))}
+                    {inviteMode && onInvite && !partyRoomId && (
+                      <button
+                        type="button"
+                        onClick={() => void onInvite(friend)}
+                        disabled={invitingUserId === friend.userId}
+                        className="flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-red-500 focus-ring disabled:opacity-50"
+                      >
+                        {invitingUserId === friend.userId ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Send className="h-3 w-3" />
+                        )}
+                        {invitingUserId === friend.userId ? t("sending") : t("invite")}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
 

@@ -145,7 +145,11 @@ def _verify_via_identity_toolkit(token: str) -> dict[str, Any]:
     }
 
 
-def verify_bearer(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+def _verify_bearer(
+    authorization: str | None,
+    *,
+    check_revoked: bool,
+) -> dict[str, Any]:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing authorization")
 
@@ -155,17 +159,37 @@ def verify_bearer(authorization: str | None = Header(default=None)) -> dict[str,
 
     try:
         _init_firebase()
-        return firebase_auth.verify_id_token(token, check_revoked=False)
+        return firebase_auth.verify_id_token(token, check_revoked=check_revoked)
     except HTTPException:
         # Already classified by an inner handler (401 bad token, 503 unreachable).
         # Don't re-wrap it in a generic 401.
         raise
+    except (
+        firebase_auth.RevokedIdTokenError,
+        firebase_auth.UserDisabledError,
+        firebase_auth.InvalidIdTokenError,
+        firebase_auth.ExpiredIdTokenError,
+    ) as exc:
+        raise HTTPException(status_code=401, detail="Invalid or revoked token") from exc
     except Exception:
-        # Anything else from firebase_admin (jwt decode error, expired, revoked,
-        # project mismatch, …) falls through to the REST fallback. If that
-        # also fails the same way, _verify_via_identity_toolkit now distinguishes
-        # "bad token" (401) from "unreachable" (503).
+        if check_revoked:
+            # The REST fallback cannot check revocation. Fail closed instead
+            # of accepting a token whose revocation status is unavailable.
+            raise HTTPException(status_code=503, detail="Auth backend unavailable")
+        # The REST fallback preserves the existing non-sensitive endpoint
+        # behavior while distinguishing invalid tokens from Firebase outages.
         return _verify_via_identity_toolkit(token)
+
+
+def verify_bearer(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    return _verify_bearer(authorization, check_revoked=False)
+
+
+def verify_bearer_revoked(
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    """Verify a bearer token and reject disabled or revoked accounts."""
+    return _verify_bearer(authorization, check_revoked=True)
 
 
 def uid_from_auth(auth: dict[str, Any]) -> str:
