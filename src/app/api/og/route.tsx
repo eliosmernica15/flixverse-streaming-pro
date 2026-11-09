@@ -1,28 +1,55 @@
 import type { JSX } from "react";
+import { NextResponse } from "next/server";
 import { ImageResponse } from "next/og";
 import { SITE_NAME } from "@/lib/seo/metadata";
 
 export const runtime = "edge";
 
+/** Only allow images from hosts we control/trust — the edge function fetches this URL server-side. */
+const ALLOWED_IMAGE_HOSTS = new Set([
+  "image.tmdb.org",
+  "lh3.googleusercontent.com",
+  "res.cloudinary.com",
+  "firebasestorage.googleapis.com",
+  "i.ytimg.com",
+]);
+
+function sanitizeImageUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return null;
+    if (!ALLOWED_IMAGE_HOSTS.has(url.hostname.toLowerCase())) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function clip(raw: string | null, max: number): string | null {
+  if (!raw) return null;
+  return raw.length > max ? raw.slice(0, max) : raw;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  // Get parameters
-  const title = searchParams.get("title") || "Watch Free Movies & TV Shows";
-  const description = searchParams.get("description") || "Stream trending films, top-rated series, new releases on FlixVerse.";
-  const type = searchParams.get("type") || "website"; // movie, tv, person, collection
-  const image = searchParams.get("image"); // backdrop/poster URL
-  const rating = searchParams.get("rating");
-  const year = searchParams.get("year");
-  const genres = searchParams.get("genres");
-  const season = searchParams.get("season");
-  const episode = searchParams.get("episode");
-  const episodeTitle = searchParams.get("episodeTitle");
-  const episodeOverview = searchParams.get("episodeOverview");
-  const personName = searchParams.get("personName");
-  const knownFor = searchParams.get("knownFor");
-  const collectionName = searchParams.get("collectionName");
-  const partCount = searchParams.get("partCount");
+  // Get parameters (clipped — these come straight from the URL)
+  const title = clip(searchParams.get("title"), 150) || "Watch Free Movies & TV Shows";
+  const description = clip(searchParams.get("description"), 300) || "Stream trending films, top-rated series, new releases on FlixVerse.";
+  const type = clip(searchParams.get("type"), 20) || "website"; // movie, tv, person, collection
+  const image = sanitizeImageUrl(searchParams.get("image")); // backdrop/poster URL
+  const rating = clip(searchParams.get("rating"), 10);
+  const year = clip(searchParams.get("year"), 10);
+  const genres = clip(searchParams.get("genres"), 120);
+  const season = clip(searchParams.get("season"), 4);
+  const episode = clip(searchParams.get("episode"), 6);
+  const episodeTitle = clip(searchParams.get("episodeTitle"), 150);
+  const episodeOverview = clip(searchParams.get("episodeOverview"), 300);
+  const personName = clip(searchParams.get("personName"), 100);
+  const knownFor = clip(searchParams.get("knownFor"), 120);
+  const collectionName = clip(searchParams.get("collectionName"), 100);
+  const partCount = clip(searchParams.get("partCount"), 4);
 
   // Base styles
   const baseStyles: React.CSSProperties = {
@@ -552,10 +579,11 @@ export async function GET(request: Request) {
     );
   }
 
-  return new ImageResponse(
-    <div style={baseStyles}>
-      {backgroundDecoration}
-      {content}
+  try {
+    return new ImageResponse(
+      <div style={baseStyles}>
+        {backgroundDecoration}
+        {content}
       {/* Brand footer */}
       <div style={{
         position: "absolute",
@@ -603,10 +631,20 @@ export async function GET(request: Request) {
           }
         `}
       </style>
-    </div>,
-    {
-      width: 1200,
-      height: 630,
-    }
-  );
+      </div>,
+      {
+        width: 1200,
+        height: 630,
+        headers: {
+          "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+        },
+      }
+    );
+  } catch (err) {
+    console.error("[og] Image generation failed:", err);
+    return NextResponse.json(
+      { error: "Failed to generate preview image" },
+      { status: 500 }
+    );
+  }
 }

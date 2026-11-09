@@ -217,7 +217,7 @@ const NotificationSettings = () => {
             {hasPermission === true && preferences.allNotifications && (
               <div className="flex items-center gap-2 rounded-xl bg-green-500/10 border border-green-500/20 p-2.5">
                 <ShieldCheck className="w-4 h-4 text-green-400" />
-                <p className="text-xs text-green-200/90">Browser alerts enabled — you'll get desktop notifications for new content.</p>
+                <p className="text-xs text-green-200/90">Browser alerts enabled - you&apos;ll get desktop notifications for new content.</p>
               </div>
             )}
           </div>

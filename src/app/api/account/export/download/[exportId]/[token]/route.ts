@@ -4,6 +4,10 @@ import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
 export const runtime = "nodejs";
 
+const EXPORT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+// URL tokens are base64url-ish; may contain dots (JWT-style) but never slashes or traversal
+const TOKEN_RE = /^(?!\.{1,2}$)[A-Za-z0-9._~-]{1,512}$/;
+
 /**
  * GET /api/account/export/download/[exportId]/[token] — Download GDPR export.
  *
@@ -19,30 +23,21 @@ export async function GET(
   if (!limit.success) return rateLimitResponse(limit);
 
   const { exportId, token } = await params;
+  if (!EXPORT_ID_RE.test(exportId) || !TOKEN_RE.test(token)) {
+    return NextResponse.json({ error: "Invalid export link" }, { status: 400 });
+  }
 
   // Proxy to Python API's download endpoint
   const res = await proxyToPython(
     request,
-    `/account/export/download/${exportId}/${token}`,
+    `/account/export/download/${encodeURIComponent(exportId)}/${encodeURIComponent(token)}`,
     {
       method: "GET",
       passQuery: false,
     }
   );
 
-  // Set Content-Disposition header for download
-  const ident = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000"}/api/account/identity`, {
-    headers: {
-      Authorization: request.headers.get("Authorization") || "",
-    },
-  });
-  let filename = `flixverse-export.json`;
-  if (ident.ok) {
-    const identData = await ident.json();
-    const uid = identData.data?.uid ?? "user";
-    filename = `flixverse-export-${uid}.json`;
-  }
-
-  res.headers.set("content-disposition", `attachment; filename="${filename}"`);
+  // Suggest a filename for the archive download
+  res.headers.set("content-disposition", 'attachment; filename="flixverse-export.json"');
   return res;
 }

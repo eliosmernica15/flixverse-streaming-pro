@@ -29,8 +29,6 @@ export function useMyPresence() {
     const presenceRef = doc(db, "presence", user.uid);
 
     const setupPresence = () => {
-      let cancelled = false;
-
       // Set online status with server timestamp
       setDoc(presenceRef, {
         userId: user.uid,

@@ -6,9 +6,38 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+/** Hosts allowed to be used for server-to-server Python calls. */
+function allowedPythonHosts(): string[] {
+  const hosts = new Set<string>(["localhost:3000", "localhost:8000", "127.0.0.1:3000", "127.0.0.1:8000"]);
+  for (const raw of [
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    process.env.VERCEL_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.PYTHON_API_URL,
+  ]) {
+    if (!raw) continue;
+    try {
+      const url = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+      hosts.add(url.host.toLowerCase());
+    } catch {
+      // ignore malformed env values
+    }
+  }
+  return [...hosts];
+}
+
+function sanitizeProto(proto: string | null): "http" | "https" {
+  const p = (proto || "https").toLowerCase();
+  return p === "http" ? "http" : "https";
+}
+
 /** Build the absolute origin under which the Python serverless function lives. */
 export function pythonApiOrigin(request: NextRequest): string {
-  // Prefer the host the user actually requested (x-forwarded-host / host).
+  // Prefer the host the user actually requested (x-forwarded-host / host) — but
+  // only if it matches a host we explicitly trust (env-configured Vercel hosts,
+  // the public site URL, or localhost). Otherwise an attacker could point the
+  // internal fetch at an arbitrary host and we'd forward the caller's auth
+  // header there (SSRF / token exfiltration).
   // `VERCEL_URL` is the deployment-specific URL
   // (e.g. flixverse-abc123-losis-projects.vercel.app) which is behind Vercel
   // Deployment Protection even when the production domain
@@ -19,10 +48,12 @@ export function pythonApiOrigin(request: NextRequest): string {
   // `POST /api/profile/username 401 (Unauthorized)`.
   // Using the request host keeps the internal fetch on the same public
   // domain the browser already reached, so no protection bypass is needed.
-  const host =
-    request.headers.get("x-forwarded-host") || request.headers.get("host");
-  const proto = request.headers.get("x-forwarded-proto") || "https";
-  if (host) return `${proto}://${host}`;
+  const headerHost = (
+    request.headers.get("x-forwarded-host") || request.headers.get("host") || ""
+  ).toLowerCase();
+  if (headerHost && allowedPythonHosts().includes(headerHost)) {
+    return `${sanitizeProto(request.headers.get("x-forwarded-proto"))}://${headerHost}`;
+  }
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   }

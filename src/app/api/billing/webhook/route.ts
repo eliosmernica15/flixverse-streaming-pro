@@ -7,6 +7,10 @@ import {
   markWebhookEventProcessed,
   type BillingPlan,
 } from "@/lib/billing/subscriptionSync";
+import {
+  getSubscriptionPeriodEndMs,
+  getInvoiceSubscriptionId,
+} from "@/lib/billing/stripeDahlia";
 
 export const runtime = "nodejs";
 
@@ -19,8 +23,8 @@ function getStripe() {
 }
 
 function getPeriodEndMs(sub: Stripe.Subscription): number {
-  const end = (sub as unknown as { current_period_end?: number }).current_period_end;
-  return end ? end * 1000 : Date.now() + 30 * 24 * 60 * 60 * 1000;
+  // dahlia: current_period_end lives on subscription items (see stripeDahlia.ts)
+  return getSubscriptionPeriodEndMs(sub) ?? Date.now() + 30 * 24 * 60 * 60 * 1000;
 }
 
 function getPlanFromMetadata(metadata: Stripe.Metadata | null | undefined): BillingPlan {
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        const subId = (invoice as unknown as { subscription?: string | null }).subscription;
+        const subId = getInvoiceSubscriptionId(invoice);
         if (subId) {
           const sub = await stripe.subscriptions.retrieve(subId);
           await handleSubscription(sub, undefined, requestOrigin);
@@ -125,7 +129,7 @@ export async function POST(request: NextRequest) {
       case "invoice.paid": {
         // Payment recovered - update subscription status
         const invoice = event.data.object as Stripe.Invoice;
-        const subId = (invoice as unknown as { subscription?: string | null }).subscription;
+        const subId = getInvoiceSubscriptionId(invoice);
         if (subId) {
           const sub = await stripe.subscriptions.retrieve(subId);
           await handleSubscription(sub, undefined, requestOrigin);

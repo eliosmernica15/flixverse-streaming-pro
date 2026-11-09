@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { syncSubscriptionToFirestore, type BillingPlan } from "@/lib/billing/subscriptionSync";
+import { getSubscriptionPeriodEndMs } from "@/lib/billing/stripeDahlia";
 import { callPythonJson } from "@/app/api/_lib/pythonOrigin";
 import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
@@ -57,8 +58,8 @@ export async function GET(request: NextRequest) {
     if (session.subscription) {
       const sub = await stripe.subscriptions.retrieve(session.subscription as string);
       status = sub.status;
-      const end = (sub as unknown as { current_period_end?: number }).current_period_end;
-      if (end) periodEndMs = end * 1000;
+      // dahlia: current_period_end lives on subscription items
+      periodEndMs = getSubscriptionPeriodEndMs(sub);
 
       if (userId) {
         await syncSubscriptionToFirestore({

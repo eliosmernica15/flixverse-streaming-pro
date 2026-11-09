@@ -53,6 +53,16 @@ const nextConfig = {
                 hostname: "image.tmdb.org",
             },
             {
+                // YouTube thumbnails (trailers on detail pages)
+                protocol: "https",
+                hostname: "i.ytimg.com",
+            },
+            {
+                // Google account avatars (photoURL from Firebase Auth)
+                protocol: "https",
+                hostname: "lh3.googleusercontent.com",
+            },
+            {
                 protocol: "https",
                 hostname: "images.unsplash.com",
             },

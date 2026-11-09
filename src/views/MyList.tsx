@@ -66,18 +66,6 @@ const MyList = () => {
     [myMovies]
   );
 
-  if (!isAuthenticated) {
-    return (
-      <EmptyState
-        icon={<LogIn className="w-10 h-10 text-red-500" />}
-        title="Sign in required"
-        description="Create an account or sign in to save your favorite movies and TV shows to your personal list."
-        actionLabel="Sign In / Sign Up"
-        actionHref="/auth"
-      />
-    );
-  }
-
   const greeting = profile?.display_name?.split(" ")[0] ?? "your";
   const tabs: { id: ListTab; label: string; count: number; icon: typeof Film }[] = [
     { id: "all", label: "All", count: myMovies.length, icon: Sparkles },
@@ -187,6 +175,18 @@ const MyList = () => {
     setIsMultiSelect(false);
     setSelectedIds(new Set());
   }, []);
+
+  if (!isAuthenticated) {
+    return (
+      <EmptyState
+        icon={<LogIn className="w-10 h-10 text-red-500" />}
+        title="Sign in required"
+        description="Create an account or sign in to save your favorite movies and TV shows to your personal list."
+        actionLabel="Sign In / Sign Up"
+        actionHref="/auth"
+      />
+    );
+  }
 
   return (
     <div className="relative">

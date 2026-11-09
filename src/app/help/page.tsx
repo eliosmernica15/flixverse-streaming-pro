@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import { Search, Mail, User, CreditCard, Settings, LifeBuoy, CheckCircle, Send, MessageSquare, Clock, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -386,9 +387,9 @@ export default function HelpCenterPage({ searchParams }: { searchParams: { tab?:
     <div className="min-h-screen bg-black pt-24 pb-16 px-4 sm:px-6 lg:px-8 page-enter">
       <div className="max-w-7xl mx-auto">
         <nav className="mb-8 text-sm text-gray-500">
-          <a href="/" className="hover:text-white transition-colors focus-ring rounded">
+          <Link href="/" className="hover:text-white transition-colors focus-ring rounded">
             Home
-          </a>
+          </Link>
           <span className="mx-2">/</span>
           <span className="text-gray-300">Help Center</span>
         </nav>
