@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { ImageResponse } from "next/og";
 import { SITE_NAME } from "@/lib/seo/metadata";
 
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
 
   // Generate content based on type
   let content: JSX.Element;
+  // (JSX namespace imported from react — React 19 types no longer provide a global JSX namespace)
 
   if (type === "movie" || type === "tv") {
     // Movie/TV Show OG Image
