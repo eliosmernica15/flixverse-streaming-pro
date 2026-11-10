@@ -7,12 +7,14 @@ export const contentType = "image/png";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string }>;
+  // Next does not always pass searchParams to opengraph-image routes — treat it as optional
+  searchParams?: Promise<{ type?: string }>;
 };
 
 export default async function MovieOpenGraphImage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { type } = await searchParams;
+  const resolved = searchParams ? await searchParams : undefined;
+  const type = resolved?.type;
   const mediaType = type === "tv" ? "tv" : "movie";
   let content = await getCachedTmdbSeoContent(Number(id), mediaType);
   if (!content && !type) {

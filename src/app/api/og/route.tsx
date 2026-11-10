@@ -129,7 +129,7 @@ export async function GET(request: Request) {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           {/* Type badge */}
           <div style={{
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
             gap: "8px",
             background: "rgba(239, 68, 68, 0.2)",
@@ -140,8 +140,7 @@ export async function GET(request: Request) {
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.1em",
-            color: "#fca5a5",
-            width: "fit-content",
+            color: "#fca5a5",
             marginBottom: "16px"
           }}>
             <span style={{
@@ -161,7 +160,7 @@ export async function GET(request: Request) {
             lineHeight: 1.1,
             margin: "0 0 12px 0",
             textShadow: "0 4px 24px rgba(0,0,0,0.5)",
-            maxWidth: image ? "600px" : "none",
+            ...(image ? { maxWidth: "600px" as const } : {}),
           }}>
             {title}
           </h1>
@@ -246,7 +245,7 @@ export async function GET(request: Request) {
               flexWrap: "wrap",
               gap: "8px",
               marginBottom: "20px",
-              maxWidth: image ? "600px" : "none",
+              ...(image ? { maxWidth: "600px" as const } : {}),
             }}>
               {genres.split(",").slice(0, 5).map((genre, i) => (
                 <span key={i} style={{
@@ -270,7 +269,7 @@ export async function GET(request: Request) {
               border: "1px solid rgba(255,255,255,0.1)",
               borderRadius: "12px",
               padding: "16px",
-              maxWidth: image ? "600px" : "none",
+              ...(image ? { maxWidth: "600px" as const } : {}),
             }}>
               <p style={{
                 fontSize: "16px",
@@ -325,7 +324,7 @@ export async function GET(request: Request) {
 
         {/* Person badge */}
         <div style={{
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
           gap: "8px",
           background: "rgba(239, 68, 68, 0.2)",
@@ -417,7 +416,7 @@ export async function GET(request: Request) {
 
         {/* Collection badge */}
         <div style={{
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
           gap: "8px",
           background: "rgba(167, 139, 250, 0.2)",
@@ -454,7 +453,7 @@ export async function GET(request: Request) {
         {/* Part count */}
         {partCount && (
           <div style={{
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
             gap: "8px",
             fontSize: "18px",
