@@ -1,13 +1,15 @@
-const CACHE_VERSION = "flixverse-v10";
+const CACHE_VERSION = "flixverse-v11";
 const OFFLINE_URL = "/offline";
+const IMAGES_CACHE = "flixverse-images-v1";
+const MAX_CACHED_IMAGES = 200;
 
 const NAV_TIMEOUT_MS = 4500; // per attempt
 const NAV_RETRY_DELAY_MS = 800;
 const STATIC_TIMEOUT_MS = 5000;
 const STATIC_RETRY_DELAY_MS = 400;
 
-/** Static assets only - never precache HTML (avoids stale pages blocking fonts/clicks). */
-const PRECACHE = [OFFLINE_URL, "/manifest.json", "/favicon.svg"];
+/** Static shell + offline-library page so the "Offline library" link works without a network. */
+const PRECACHE = [OFFLINE_URL, "/offline-library", "/manifest.json", "/favicon.svg", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -19,7 +21,11 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key)))
+      Promise.all(
+        keys
+          .filter((key) => key !== CACHE_VERSION && key !== IMAGES_CACHE)
+          .map((key) => caches.delete(key))
+      )
     ).then(() => self.clients.claim())
   );
 });
@@ -78,8 +84,61 @@ self.addEventListener("fetch", (event) => {
     url.pathname === "/manifest.json"
   ) {
     event.respondWith(staleWhileRevalidate(event.request, CACHE_VERSION));
+    return;
+  }
+
+  // Cross-origin catalog art (TMDB posters, ytimg thumbnails, Google avatars,
+  // Cloudinary uploads): cache aggressively so the offline library and slow
+  // networks still render posters instead of broken frames. Bounded via LRU.
+  if (isCacheableImageHost(url)) {
+    event.respondWith(staleWhileRevalidateImages(event.request));
   }
 });
+
+const IMAGE_HOSTS = new Set([
+  "image.tmdb.org",
+  "i.ytimg.com",
+  "lh3.googleusercontent.com",
+  "res.cloudinary.com",
+  "cus.cloudinary.com",
+]);
+
+function isCacheableImageHost(url) {
+  return IMAGE_HOSTS.has(url.hostname.toLowerCase());
+}
+
+/** Keep the image cache bounded: delete oldest entries when we're over the cap. */
+async function trimImageCache(cache, max = MAX_CACHED_IMAGES) {
+  const keys = await cache.keys();
+  if (keys.length <= max) return;
+  const excess = keys.length - max;
+  for (let i = 0; i < excess; i++) {
+    await cache.delete(keys[i]);
+  }
+}
+
+/** stale-while-revalidate for cross-origin images; opaque responses are cacheable. */
+async function staleWhileRevalidateImages(request) {
+  const cache = await caches.open(IMAGES_CACHE);
+  const cached = await cache.match(request);
+
+  const fetchPromise = fetch(request, { mode: "cors", credentials: "omit", referrerPolicy: "no-referrer" })
+    .then(async (response) => {
+      // Opaque (type === "opaque") responses can't be inspected; put() them anyway.
+      // Basic CORS responses with status 200 are ideal. Anything else: skip caching.
+      const cacheable =
+        (response && response.type === "opaque") ||
+        (response && response.ok && response.status === 200);
+      if (cacheable) {
+        void cache.put(request, response.clone());
+        void trimImageCache(cache);
+      }
+      return response;
+    })
+    .catch(() => cached || Response.error());
+
+  return cached || fetchPromise;
+}
 
 /**
  * Always fetch fresh HTML - no stale shell that breaks hydration/clicks.

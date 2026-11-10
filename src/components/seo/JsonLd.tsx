@@ -1,6 +1,8 @@
+import { getNonce } from "@/lib/seo/nonce";
 import { SITE_URL, SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/seo/metadata";
 
-export function WebsiteJsonLd() {
+export async function WebsiteJsonLd() {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -20,13 +22,15 @@ export function WebsiteJsonLd() {
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
   );
 }
 
-export function OrganizationJsonLd() {
+export async function OrganizationJsonLd() {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": ["Organization", "EntertainmentBusiness"],
@@ -40,13 +44,15 @@ export function OrganizationJsonLd() {
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
   );
 }
 
-export function FAQJsonLd() {
+export async function FAQJsonLd() {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -80,6 +86,7 @@ export function FAQJsonLd() {
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -92,7 +99,8 @@ interface CollectionPageJsonLdProps {
   url: string;
 }
 
-export function CollectionPageJsonLd({ name, description, url }: CollectionPageJsonLdProps) {
+export async function CollectionPageJsonLd({ name, description, url }: CollectionPageJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -104,6 +112,7 @@ export function CollectionPageJsonLd({ name, description, url }: CollectionPageJ
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -114,7 +123,8 @@ interface BreadcrumbJsonLdProps {
   items: { name: string; url: string }[];
 }
 
-export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
+export async function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -128,6 +138,7 @@ export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -144,7 +155,7 @@ interface ContentJsonLdProps {
   rating?: number;
 }
 
-export function ContentJsonLd({
+export async function ContentJsonLd({
   title,
   description,
   image,
@@ -153,6 +164,7 @@ export function ContentJsonLd({
   datePublished,
   rating,
 }: ContentJsonLdProps) {
+  const nonce = await getNonce();
   const schemaType = type === "tv" ? "TVSeries" : "Movie";
   const data = {
     "@context": "https://schema.org",
@@ -188,6 +200,7 @@ export function ContentJsonLd({
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -201,7 +214,8 @@ interface ItemListJsonLdProps {
   items: { name: string; url: string; image?: string }[];
 }
 
-export function ItemListJsonLd({ name, description, url, items }: ItemListJsonLdProps) {
+export async function ItemListJsonLd({ name, description, url, items }: ItemListJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -223,13 +237,14 @@ export function ItemListJsonLd({ name, description, url, items }: ItemListJsonLd
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
   );
 }
 
-export function WebPageJsonLd({
+export async function WebPageJsonLd({
   name,
   description,
   url,
@@ -238,6 +253,7 @@ export function WebPageJsonLd({
   description: string;
   url: string;
 }) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -250,6 +266,7 @@ export function WebPageJsonLd({
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -270,7 +287,7 @@ interface EpisodeJsonLdProps {
   duration?: string; // ISO 8601 duration format, e.g., "PT45M"
 }
 
-export function EpisodeJsonLd({
+export async function EpisodeJsonLd({
   title,
   description,
   image,
@@ -283,6 +300,7 @@ export function EpisodeJsonLd({
   rating,
   duration,
 }: EpisodeJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "Episode",
@@ -325,6 +343,7 @@ export function EpisodeJsonLd({
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -345,7 +364,7 @@ interface TVSeriesJsonLdProps {
   creator?: { name: string; url?: string }[];
 }
 
-export function TVSeriesJsonLd({
+export async function TVSeriesJsonLd({
   name,
   description,
   image,
@@ -358,6 +377,7 @@ export function TVSeriesJsonLd({
   actors,
   creator,
 }: TVSeriesJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "TVSeries",
@@ -413,6 +433,7 @@ export function TVSeriesJsonLd({
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -430,7 +451,7 @@ interface PersonJsonLdProps {
   knownFor?: { name: string; url: string }[];
 }
 
-export function PersonJsonLd({
+export async function PersonJsonLd({
   name,
   description,
   image,
@@ -440,6 +461,7 @@ export function PersonJsonLd({
   jobTitle,
   knownFor,
 }: PersonJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "Person",
@@ -463,6 +485,7 @@ export function PersonJsonLd({
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -478,7 +501,7 @@ interface CollectionJsonLdProps {
   hasPart?: { name: string; url: string; type: "Movie" | "TVSeries" }[];
 }
 
-export function CollectionJsonLd({
+export async function CollectionJsonLd({
   name,
   description,
   image,
@@ -486,6 +509,7 @@ export function CollectionJsonLd({
   numberOfItems,
   hasPart,
 }: CollectionJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -507,6 +531,7 @@ export function CollectionJsonLd({
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />

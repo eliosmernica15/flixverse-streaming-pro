@@ -1,4 +1,4 @@
-import { getFirebaseAuth } from "@/integrations/firebase/client";
+import { getFirebaseAuth, getAppCheckToken } from "@/integrations/firebase/client";
 import { getPythonHttpBase } from "@/lib/pythonApi/config";
 
 async function getToken(forceRefresh = false): Promise<string | null> {
@@ -31,6 +31,9 @@ export async function pythonFetch<T>(
     const token = await getToken(forceRefresh);
     if (!token) throw new PythonApiError("Not signed in", 401);
 
+    // Best-effort App Check header for monitor-mode verification server-side.
+    const appCheckToken = await getAppCheckToken();
+
     const res = await fetch(url, {
       ...options,
       // Bound hanging Python invocations (cold start / Postgres stall) so
@@ -40,6 +43,7 @@ export async function pythonFetch<T>(
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
+        ...(appCheckToken ? { "X-Firebase-AppCheck": appCheckToken } : {}),
         ...(options.headers || {}),
       },
     });

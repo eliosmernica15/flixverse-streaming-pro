@@ -355,9 +355,19 @@ CREATE TABLE IF NOT EXISTS gdpr_exports (
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+
+-- FCM device tokens (web + mobile) for push notifications
+CREATE TABLE IF NOT EXISTS device_tokens (
+  user_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  platform TEXT NOT NULL DEFAULT 'web',
+  created_at TEXT NOT NULL,
+  UNIQUE(user_id, token)
+);
 """
 
 INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_party_messages_room ON party_messages(room_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_invites_to ON watch_party_invites(to_user_id, status);

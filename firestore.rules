@@ -84,58 +84,39 @@ service cloud.firestore {
     function canModifyQueue(roomId) {
       let newQueue = request.resource.data.pendingQueue;
       let previousQueue = resource.data.pendingQueue;
-
-      // Queue must be a list
-      if (!(newQueue is list) || !(previousQueue is list)) return false;
-
-      // Must be a participant
-      if (!(request.auth.uid in resource.data.participantIds)) return false;
-
-      // Allow if queue size increased by 1 (new suggestion) and user is the suggester
-      if (newQueue.size() == previousQueue.size() + 1) {
-        let newItem = newQueue[newQueue.size() - 1];
-        return newItem.suggestedBy == request.auth.uid
-          && newItem.votes is list
-          && newItem.votes.size() == 1
-          && newItem.votes[0] == request.auth.uid
-          && newItem.voteCount == 1;
-      }
-
-      // Allow if queue size same (vote toggle or host confirm)
-      if (newQueue.size() == previousQueue.size()) {
-        // Simplified: check if only voteCount or confirmed changed for one item
-        // and the user is the voter (for vote) or host (for confirm)
-        let diffCount = 0;
-        let voterOrHost = false;
-
-        // Iterate through new queue and compare with previous
-        // We can't easily loop, so we check if the overall structure is valid
-        // This is a simplified check - in practice, we rely on the client to send valid updates
-
-        // For vote: user's vote status changed (added or removed)
-        // For confirm: host set confirmed=true
-        return true; // Simplified: trust the client for vote/confirm, host can always modify
-      }
-
-      // Allow if queue size decreased by 1 (item removed)
-      // Only host or the suggester can remove
-      if (newQueue.size() == previousQueue.size() - 1) {
-        // Simplified: allow host or any participant to remove (we validate server-side in hook)
-        return request.auth.uid == resource.data.hostId; // Only host can remove for now
-      }
-
-      return false;
+      let isQueueList = (newQueue is list) && (previousQueue is list);
+      let isParticipant = isAuthenticated()
+        && request.auth.uid in resource.data.participantIds;
+      // New suggestion: one item appended, suggester's own with self-vote.
+      let addedSuggestion = newQueue.size() == previousQueue.size() + 1
+        && newQueue[newQueue.size() - 1].suggestedBy == request.auth.uid
+        && newQueue[newQueue.size() - 1].votes is list
+        && newQueue[newQueue.size() - 1].votes.size() == 1
+        && newQueue[newQueue.size() - 1].votes[0] == request.auth.uid
+        && newQueue[newQueue.size() - 1].voteCount == 1;
+      // Vote toggle / host confirm: same size. The client is trusted here —
+      // the app bounds this path to votes and host confirmation.
+      let voteToggleOrConfirm = newQueue.size() == previousQueue.size();
+      // Removal: only the host may shrink the queue.
+      let hostRemoval = newQueue.size() == previousQueue.size() - 1
+        && request.auth.uid == resource.data.hostId;
+      return isQueueList && isParticipant
+        && (addedSuggestion || voteToggleOrConfirm || hostRemoval);
     }
 
     // Default deny — no match rule = no access
     // (Firestore deny-by-default when no rule matches)
 
-    // User profiles - users can read any profile, write only their own
+    // User profiles - users can read any profile, write only their own.
+    // Owner writes are restricted to display fields so clients can never forge
+    // entitlement counters (followers_count etc.) — those are server-maintained.
     match /profiles/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId)
         && hasString(request.resource.data.display_name);
-      allow update: if isOwner(userId);
+      allow update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['display_name', 'avatar_url', 'banner_url', 'bio', 'favorite_genres', 'username', 'user_id', 'updated_at']);
       allow delete: if false;
     }
 

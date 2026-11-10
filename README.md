@@ -33,13 +33,25 @@ npm run dev
 
 Copy `.env.example` to `.env.local` and fill in:
 
-- `NEXT_PUBLIC_FIREBASE_*` — Firebase web app config
-- `TMDB_ACCESS_TOKEN` (or `TMDB_API_KEY`) — server-only TMDB API credentials
-- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — billing (optional locally)
-- `FIREBASE_SERVICE_ACCOUNT_JSON`, `FIREBASE_PROJECT_ID` — Python backend
-- `POSTGRES_URL` — production database (local dev uses SQLite automatically)
-- `NEXT_PUBLIC_USE_PYTHON_API`, `PYTHON_API_URL` — Python-first data routing
-- `NEXT_PUBLIC_SENTRY_DSN` — error monitoring (optional)
+- `NEXT_PUBLIC_FIREBASE_*` - Firebase web app config
+- `TMDB_ACCESS_TOKEN` (or `TMDB_API_KEY`) - server-only TMDB API credentials
+- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` - billing (optional locally)
+- `FIREBASE_SERVICE_ACCOUNT_JSON`, `FIREBASE_PROJECT_ID` - Python backend
+- `POSTGRES_URL` - production database (local dev uses SQLite automatically)
+- `NEXT_PUBLIC_USE_PYTHON_API`, `PYTHON_API_URL` - Python-first data routing
+- `NEXT_PUBLIC_SENTRY_DSN` - error monitoring (optional)
+- `NEXT_PUBLIC_FIREBASE_VAPID_KEY` - Web push (FCM) browser notifications (optional)
+- `GOOGLE_RECAPTCHA_SECRET_KEY` - server-side contact form verification (optional)
+- `APPCHECK_MONITOR=1` / `APPCHECK_ENFORCE=1` - App Check monitoring / enforcement on the Python API (optional)
+
+To enable passwordless sign-in, turn on **Email link (passwordless sign-in)**
+in the Firebase Console (Authentication → Sign-in method). The
+`/auth/email-link` route completes the flow; users receive a link that signs
+them in without a password.
+
+To push browser notifications to a user, the client permission flow registers
+an FCM token (`/notifications/register-token`), and dispatched notifications
+are fanned out over FCM alongside the in-app feed.
 
 Before deploying a Python API version that changes the database schema, run
 `python backend/migrate.py` once against the target database. Normal PostgreSQL

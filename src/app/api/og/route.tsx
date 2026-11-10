@@ -1,7 +1,8 @@
 import type { JSX } from "react";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ImageResponse } from "next/og";
 import { SITE_NAME } from "@/lib/seo/metadata";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
 // Defaults to the Node.js runtime — the Edge runtime is deprecated in Next 16.
 
@@ -31,7 +32,10 @@ function clip(raw: string | null, max: number): string | null {
   return raw.length > max ? raw.slice(0, max) : raw;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const limit = await rateLimitByIp(request, "og", 60, "1 m");
+  if (!limit.success) return rateLimitResponse(limit);
+
   const { searchParams } = new URL(request.url);
 
   // Get parameters (clipped — these come straight from the URL)

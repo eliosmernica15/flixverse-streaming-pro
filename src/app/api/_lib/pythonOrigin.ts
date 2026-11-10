@@ -74,6 +74,8 @@ function buildProxyHeaders(request: NextRequest, initBody?: string): Headers {
   const headers = new Headers();
   const auth = request.headers.get("authorization");
   if (auth) headers.set("authorization", auth);
+  const appCheck = request.headers.get("x-firebase-appcheck");
+  if (appCheck) headers.set("x-firebase-appcheck", appCheck);
 
   // If production ever enables Deployment Protection, the browser's request
   // to the Next route carries the bypass cookie / header, but a bare

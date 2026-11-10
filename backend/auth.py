@@ -181,14 +181,47 @@ def _verify_bearer(
         return _verify_via_identity_toolkit(token)
 
 
-def verify_bearer(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+def _app_check_monitor(token: str | None) -> None:
+    """Monitor-mode App Check: verify and log; never blocks.
+
+    Enable with APPCHECK_MONITOR=1. Enforcement stays env-gated behind
+    APPCHECK_ENFORCE=1 so production behavior only changes deliberately.
+    """
+    enforce = os.environ.get("APPCHECK_ENFORCE", "").lower() in ("1", "true", "yes")
+    monitor = os.environ.get("APPCHECK_MONITOR", "").lower() in ("1", "true", "yes")
+    if not (enforce or monitor):
+        return
+    if not token:
+        print("[appcheck] monitor: request without X-Firebase-AppCheck token" if not enforce else "[appcheck] enforce: missing token")
+        if enforce:
+            raise HTTPException(status_code=401, detail="App Check token required")
+        return
+    try:
+        _init_firebase()
+        from firebase_admin import app_check
+        app_check.verify_token(token)
+        if monitor:
+            print("[appcheck] monitor: token verified ok")
+    except Exception as exc:
+        print(f"[appcheck] monitor: token verification failed: {exc}" if not enforce else f"[appcheck] enforce: token invalid: {exc}")
+        if enforce:
+            raise HTTPException(status_code=401, detail="Invalid App Check token")
+
+
+def verify_bearer(
+    authorization: str | None = Header(default=None),
+    x_firebase_appcheck: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _app_check_monitor(x_firebase_appcheck)
     return _verify_bearer(authorization, check_revoked=False)
 
 
 def verify_bearer_revoked(
     authorization: str | None = Header(default=None),
+    x_firebase_appcheck: str | None = Header(default=None),
 ) -> dict[str, Any]:
     """Verify a bearer token and reject disabled or revoked accounts."""
+    _app_check_monitor(x_firebase_appcheck)
     return _verify_bearer(authorization, check_revoked=True)
 
 

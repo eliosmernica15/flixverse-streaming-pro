@@ -67,6 +67,21 @@ export const securityHeaders = [
 
 export const cspValue = cspDirectives.join("; ");
 
+/**
+ * Middleware-only: rebuild the CSP with a per-request 'nonce' in script-src and
+ * 'strict-dynamic' so injected inline framework scripts carry the nonce and
+ * 'unsafe-inline' can be dropped for scripts.
+ */
+export function cspWithNonce(nonce) {
+  return cspDirectives
+    .map((directive) =>
+      directive.startsWith("script-src ")
+        ? "script-src 'self' 'nonce-" + nonce + "' 'strict-dynamic' https://apis.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google.com https://www.recaptcha.net https://browser.sentry-cdn.com"
+        : directive
+    )
+    .join("; ");
+}
+
 /** Global headers without CSP, which is applied by middleware.ts. */
 export const securityHeadersWithoutCsp = securityHeaders.filter(
   (h) => h.key !== "Content-Security-Policy"
