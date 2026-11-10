@@ -24,6 +24,22 @@ const initialState: BufferingDiagnostics = {
   health: "good",
 };
 
+/** Minimal shapes for the Network Information / Battery APIs. */
+interface NetworkConnectionInfo {
+  effectiveType?: string;
+  downlink?: number;
+  addEventListener(type: "change", listener: () => void): void;
+  removeEventListener(type: "change", listener: () => void): void;
+}
+interface BatteryManager {
+  savingPower?: boolean;
+  addEventListener(type: "chargingchange", listener: () => void): void;
+}
+interface NavigatorWithDiagnostics extends Navigator {
+  connection?: NetworkConnectionInfo;
+  getBattery?: () => Promise<BatteryManager>;
+}
+
 /**
  * Heuristic buffering diagnostics using Network Information API,
  * Page Visibility API, Battery API, and rAF frame drop detection.
@@ -35,8 +51,8 @@ export function useBufferingDiagnostics(): BufferingDiagnostics {
 
   useEffect(() => {
     // Network Information API
-    const nav = navigator as any;
-    const connection = nav.connection as any;
+    const nav = navigator as NavigatorWithDiagnostics;
+    const connection = nav.connection;
 
     const updateNetwork = () => {
       if (connection) {
@@ -62,8 +78,7 @@ export function useBufferingDiagnostics(): BufferingDiagnostics {
     // Battery API
     const checkBattery = async () => {
       try {
-        const navAny = navigator as any;
-        const battery = await navAny.getBattery?.() as any;
+        const battery = await nav.getBattery?.();
         if (battery) {
           setState((prev) => ({ ...prev, isBatterySaving: battery.savingPower }));
           battery.addEventListener("chargingchange", () => {

@@ -287,6 +287,20 @@
   max-width: min(98vw, 90rem);
 }
 
+@media (min-width: 769px) {
+  .player-shell--party-open .player-layout-main {
+    flex: 0 1 auto;
+    width: min(
+      54rem,
+      calc(98vw - min(22rem, 92vw) - clamp(0.75rem, 2vw, 1.25rem))
+    );
+  }
+
+  .player-shell--party-open .player-window.is-framed {
+    width: 100%;
+  }
+}
+
 .player-party-panel {
   display: flex;
   flex-direction: column;
@@ -758,6 +772,88 @@
   color: #fff;
 }
 
+/* Audio language picker (EN | SQ) — two segmented pill buttons */
+.player-window-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.125rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.player-window-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.6);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.player-window-lang:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.player-window-lang.is-active {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fecaca;
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.35);
+}
+
+.player-window-lang-flag {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.player-window-lang-code {
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 480px) {
+  .player-window-lang-code {
+    display: none;
+  }
+}
+
+/* CC button — toggles self-hosted caption overlay */
+.player-window-cc-btn {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0 0.5rem;
+  width: auto;
+  min-width: 2rem;
+}
+
+.player-window-cc-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.player-window-cc-btn.is-active {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fecaca;
+}
+
+.player-window-cc-text {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
 .player-shell--party-open .player-window.is-framed {
   width: min(54rem, 76vw);
 }
@@ -927,6 +1023,7 @@
 .party-camera-avatar {
   width: 100%;
   height: 100%;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1777,9 +1874,27 @@
   right: 0;
   bottom: 0;
   z-index: 4;
-  padding: 0.65rem 0.85rem 0.75rem;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+  padding: 0.5rem 0.75rem 0.55rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  /* never block the embed's own controls when we are not interactive */
+}
+
+.player-overlay-bar.is-cursor-idle {
+  opacity: 1;
   pointer-events: auto;
+}
+
+.player-overlay-bar.is-cursor-active {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* while hidden, inner scrubber must also not capture pointer events */
+.player-overlay-bar.is-cursor-active .video-scrubber {
+  pointer-events: none;
 }
 
 .video-scrubber-row {
@@ -1801,42 +1916,43 @@
   left: 0;
   right: 0;
   top: 50%;
-  height: 4px;
+  height: 3px;
   transform: translateY(-50%);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
   overflow: hidden;
 }
 
 .video-scrubber-buffered {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .video-scrubber-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: #e50914;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .video-scrubber-hover {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .video-scrubber-playhead {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
   border-radius: 50%;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.9);
   transform: translateY(-50%);
-  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.35);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
   pointer-events: none;
+  opacity: 0.9;
 }
 
 .video-scrubber-tooltip {
@@ -1855,13 +1971,14 @@
 .video-marker {
   position: absolute;
   top: 50%;
-  width: 7px;
-  height: 7px;
-  margin-left: -3.5px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
   border-radius: 50%;
-  background: #fbbf24;
+  background: rgba(251, 191, 36, 0.85);
   transform: translateY(-50%);
   z-index: 2;
+  opacity: 0.85;
 }
 
 .video-marker-count-mid {
@@ -1903,4 +2020,389 @@
   justify-content: center;
   background: rgba(0, 0, 0, 0.82);
   backdrop-filter: blur(8px);
+}
+
+/* C4 — party presence art: avatars drifting on a gentle sine wave */
+.party-presence {
+  display: flex;
+  align-items: center;
+}
+.party-float {
+  display: inline-flex;
+  animation: party-float 3.4s ease-in-out infinite;
+}
+@keyframes party-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .party-float {
+    animation: none;
+  }
+}
+
+/* =====================================================================
+ * 4D SCREEN BLOOM
+ *
+ * Three stacked layers behind the player: a wide blurred colour field, two
+ * directional emitters that counter-drift for parallax, and a fine grain
+ * overlay that prevents banding across the large gradients.
+ *
+ * The colour values are injected as a `background` shorthand from
+ * CinemaBloom.tsx at 8 Hz. Nothing here animates on its own except the
+ * emitters, which use a very slow transform drift — transform-only, so it
+ * stays on the compositor and never triggers layout or paint.
+ * ===================================================================== */
+
+.cinema-bloom {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* Promote once, here — not on every child. */
+  contain: strict;
+  isolation: isolate;
+}
+
+.cinema-bloom-field {
+  position: absolute;
+  inset: -22%;
+  /* A single wide blur is far cheaper than blurring each radial gradient
+     individually, and produces a smoother wall wash. */
+  filter: blur(90px) saturate(135%);
+  transition: background 900ms ease-out, opacity 600ms ease-out;
+  will-change: background;
+}
+
+.cinema-bloom-emitter {
+  position: absolute;
+  width: 46%;
+  height: 120%;
+  top: -10%;
+  filter: blur(110px) saturate(150%);
+  opacity: 0.75;
+  transition: background 900ms ease-out;
+  will-change: transform, background;
+}
+
+.cinema-bloom-emitter--left {
+  left: -14%;
+  animation: cinema-emitter-drift 18s ease-in-out infinite alternate;
+}
+
+.cinema-bloom-emitter--right {
+  right: -14%;
+  animation: cinema-emitter-drift 23s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes cinema-emitter-drift {
+  from {
+    transform: translate3d(-2%, -1.5%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2%, 1.5%, 0) scale(1.08);
+  }
+}
+
+/* Fine grain kills gradient banding on 8-bit displays without an image
+   asset — an inline SVG turbulence filter rendered once. */
+.cinema-bloom-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinema-bloom-emitter {
+    animation: none;
+  }
+  .cinema-bloom-field,
+  .cinema-bloom-emitter {
+    transition: none;
+  }
+}
+
+/* On small screens the extra blurs cost more than they add; keep the field
+   (it is one layer) and drop the two emitters and the grain. */
+@media (max-width: 640px) {
+  .cinema-bloom-emitter,
+  .cinema-bloom-grain {
+    display: none;
+  }
+  .cinema-bloom-field {
+    filter: blur(64px) saturate(130%);
+  }
+}
+
+/* =====================================================================
+ * 4D FRAME PULSE
+ *
+ * A 220 ms, 0.6 % scale breath on the player frame at a cinematic beat.
+ * Deliberately tiny: it should register as the room reacting, not as a
+ * glitch. Transform-only, so it never triggers layout.
+ * ===================================================================== */
+
+.player-window.cinema-pulse {
+  animation: cinema-frame-pulse 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cinema-frame-pulse {
+  0% {
+    transform: scale(1);
+  }
+  22% {
+    transform: scale(1.006);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The window already carries drag/resize transforms inline; animating
+   `transform` here would fight them. When the window is floating or being
+   resized we pulse a dedicated overlay instead. */
+.cinema-pulse-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  animation: cinema-overlay-pulse 260ms ease-out;
+  z-index: 5;
+}
+
+@keyframes cinema-overlay-pulse {
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+  25% {
+    box-shadow: inset 0 0 42px 0 rgba(255, 255, 255, 0.14);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-window.cinema-pulse,
+  .cinema-pulse-overlay {
+    animation: none;
+  }
+}
+
+/* ── Snap to Host pill ─────────────────────────────────────────────────
+   Floating guest HUD shown when drift stays above 2s. Sits top-centre over
+   the picture, clear of the overlay controls bar at the bottom. */
+.snap-to-host {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.75rem;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(10, 10, 12, 0.82);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8), 0 0 24px -8px rgba(251, 191, 36, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: snap-to-host-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  max-width: calc(100% - 1.5rem);
+}
+
+.snap-to-host__label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: rgba(253, 230, 138, 0.9);
+  white-space: nowrap;
+}
+
+.snap-to-host__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform 150ms ease, filter 150ms ease;
+}
+
+.snap-to-host__btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.snap-to-host__btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.snap-to-host__btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.snap-to-host__time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  font-weight: 600;
+}
+
+@keyframes snap-to-host-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@media (max-width: 480px) {
+  .snap-to-host__label {
+    display: none;
+  }
+  .snap-to-host {
+    padding-left: 0.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snap-to-host {
+    animation: none;
+  }
+  .snap-to-host__btn,
+  .snap-to-host__btn:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ── Spatial reactions ─────────────────────────────────────────────────
+   Party quick-emoji reactions float up over the picture. Transform/opacity
+   only (compositor-friendly); each particle removes itself on animationend. */
+.spatial-reactions {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+.spatial-reaction {
+  position: absolute;
+  bottom: 12%;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  transform: translate(-50%, 0) scale(var(--reaction-scale, 1));
+  opacity: 0;
+  animation-name: spatial-reaction-float;
+  animation-timing-function: cubic-bezier(0.22, 0.8, 0.36, 1);
+  animation-fill-mode: forwards;
+  will-change: transform, opacity;
+}
+
+.spatial-reaction__emoji {
+  font-size: clamp(1.75rem, 3.2vw, 2.6rem);
+  line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55));
+}
+
+.spatial-reaction__name {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.05rem 0.4rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@keyframes spatial-reaction-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(calc(var(--reaction-scale, 1) * 0.6));
+  }
+  12% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--reaction-sway, 0px) * 0.25), -8vh)
+      scale(var(--reaction-scale, 1));
+  }
+  55% {
+    opacity: 1;
+    transform: translate(calc(-50% - var(--reaction-sway, 0px) * 0.5), -30vh)
+      scale(var(--reaction-scale, 1));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--reaction-sway, 0px)), -52vh)
+      scale(calc(var(--reaction-scale, 1) * 0.9));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spatial-reaction {
+    animation-name: spatial-reaction-fade;
+  }
+  @keyframes spatial-reaction-fade {
+    0%,
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -10vh);
+    }
+    15%,
+    70% {
+      opacity: 1;
+      transform: translate(-50%, -10vh);
+    }
+  }
+}
+
+/* Skip intro / recap button */
+.player-skip-btn {
+  position: absolute;
+  right: 1.5rem;
+  bottom: 5rem;
+  z-index: 30;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: #000;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.player-skip-btn:hover {
+  background: #fff;
+  transform: translateY(-2px);
+}
+.player-skip-btn:active {
+  transform: translateY(0);
 }

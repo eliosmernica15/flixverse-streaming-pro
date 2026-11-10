@@ -28,8 +28,7 @@ const MASTER_GAIN = 0.22;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
-let enabled: boolean | null = null;
-let lastPlayed: Record<string, number> = {};
+let enabled: boolean | null = null;  const lastPlayed: Record<string, number> = {};
 
 function isBrowser() {
   return typeof window !== "undefined";

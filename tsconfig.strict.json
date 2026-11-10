@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src/lib/player/**/*.ts"],
+  "exclude": ["src/lib/player/__tests__/**"]
+}

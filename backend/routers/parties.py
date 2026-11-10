@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import random
 import time
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -59,6 +60,11 @@ class SendMessageBody(BaseModel):
 class PlaybackBody(BaseModel):
     state: str
     currentTime: float = 0
+    serverIndex: int | None = None
+
+
+class EncryptionPayloadBody(BaseModel):
+    encryptedPayload: str = Field(min_length=1, max_length=8192)
 
 
 class InviteBody(BaseModel):
@@ -167,6 +173,16 @@ def _parse_content_meta(raw: Any) -> dict[str, Any] | None:
         return None
 
 
+def _timestamp_ms(raw: Any) -> int:
+    if not raw:
+        return 0
+    if isinstance(raw, datetime):
+        value = raw
+    else:
+        value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    return int(value.timestamp() * 1000)
+
+
 def _room_doc(conn, room_id: str) -> dict[str, Any] | None:
     row = db_fetchone(conn, "SELECT * FROM party_rooms WHERE id = ?", (room_id,))
     if not row:
@@ -180,8 +196,8 @@ def _room_doc(conn, room_id: str) -> dict[str, Any] | None:
         "playbackState": row_get(row, "playback_state"),
         "lastKnownTime": row_get(row, "last_known_time"),
         "serverIndex": row_get(row, "server_index"),
-        "updatedAt": int(time.time() * 1000),
-        "createdAt": int(time.time() * 1000),
+        "updatedAt": _timestamp_ms(row_get(row, "updated_at")),
+        "createdAt": _timestamp_ms(row_get(row, "created_at")),
         "participants": _room_participants(conn, room_id),
     }
 
@@ -436,14 +452,46 @@ def update_playback(room_id: str, body: PlaybackBody, auth: dict = Depends(verif
         row = db_fetchone(conn, "SELECT host_id FROM party_rooms WHERE id = ?", (room_id,))
         if not row or row_get(row, "host_id") != uid:
             raise HTTPException(status_code=403, detail="Host only")
+        if body.serverIndex is None:
+            db_execute(
+                conn,
+                """
+                UPDATE party_rooms
+                SET playback_state = ?, last_known_time = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (body.state, body.currentTime, iso_now(), room_id),
+            )
+        else:
+            db_execute(
+                conn,
+                """
+                UPDATE party_rooms
+                SET playback_state = ?, last_known_time = ?, server_index = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (body.state, body.currentTime, body.serverIndex, iso_now(), room_id),
+            )
+    return {"ok": True}
+
+
+@router.patch("/parties/{room_id}/encryption")
+def rotate_room_encryption(
+    room_id: str,
+    body: EncryptionPayloadBody,
+    auth: dict = Depends(verify_bearer),
+) -> dict[str, bool]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        row = db_fetchone(conn, "SELECT host_id FROM party_rooms WHERE id = ?", (room_id,))
+        if not row:
+            raise HTTPException(status_code=404, detail="Room not found")
+        if row_get(row, "host_id") != uid:
+            raise HTTPException(status_code=403, detail="Host only")
         db_execute(
             conn,
-            """
-            UPDATE party_rooms
-            SET playback_state = ?, last_known_time = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (body.state, body.currentTime, iso_now(), room_id),
+            "UPDATE party_rooms SET encrypted_payload = ?, updated_at = ? WHERE id = ?",
+            (body.encryptedPayload, iso_now(), room_id),
         )
     return {"ok": True}
 

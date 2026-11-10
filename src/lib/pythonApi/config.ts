@@ -11,7 +11,7 @@ export function isPythonBackendEnabled(): boolean {
 }
 
 /** True when WebSockets are unavailable (Vercel serverless). Use HTTP polling instead. */
-export function useHttpTransport(): boolean {
+export function usesHttpTransport(): boolean {
   if (process.env.NEXT_PUBLIC_PYTHON_HTTP_TRANSPORT === "true") return true;
   if (typeof window !== "undefined") {
     if (process.env.NEXT_PUBLIC_VERCEL === "1") return true;
@@ -40,7 +40,7 @@ export function getPythonHttpBase(): string {
 }
 
 export function getPythonWsBase(): string {
-  if (useHttpTransport()) return "";
+  if (usesHttpTransport()) return "";
 
   const explicit = process.env.NEXT_PUBLIC_PYTHON_WS_URL;
   if (explicit) return explicit.replace(/\/$/, "");

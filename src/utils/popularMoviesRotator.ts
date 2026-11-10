@@ -1,4 +1,4 @@
-import { fetchTrendingMovies, fetchPopularMovies, fetchTrendingTVShows, TMDBMovie, isNotReleasedYet } from './tmdbApi';
+import { fetchTrendingMovies, TMDBMovie, isNotReleasedYet } from './tmdbApi';
 
 // Function to get the current week number
 const getWeekNumber = (date: Date): number => {
@@ -8,24 +8,14 @@ const getWeekNumber = (date: Date): number => {
 };
 
 // Function to get popular content for hero banner that rotates weekly
-export const getHeroMovieOfTheWeek = async (): Promise<TMDBMovie | null> => {
+export const getHeroMovieOfTheWeek = async (trendingMovies?: TMDBMovie[]): Promise<TMDBMovie | null> => {
   try {
     // Get current week to determine which content to show
     const currentWeek = getWeekNumber(new Date());
-    
-    // Fetch all popular content
-    const [trendingMovies, popularMovies, trendingShows] = await Promise.all([
-      fetchTrendingMovies(),
-      fetchPopularMovies(),
-      fetchTrendingTVShows()
-    ]);
 
     // Combine all content and filter for high-quality entries
-    const allContent = [
-      ...trendingMovies.filter(movie => movie.vote_average >= 7.0 && movie.backdrop_path),
-      ...popularMovies.filter(movie => movie.vote_average >= 7.0 && movie.backdrop_path),
-      ...trendingShows.filter(show => show.vote_average >= 7.0 && show.backdrop_path)
-    ];
+    const movies = trendingMovies ?? await fetchTrendingMovies();
+    const allContent = movies.filter(movie => movie.vote_average >= 7.0 && movie.backdrop_path);
 
     if (allContent.length === 0) return null;
 

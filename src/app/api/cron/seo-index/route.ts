@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 import {
   collectPublicUrls,
   pingSitemapToSearchEngines,
@@ -18,10 +19,13 @@ function isAuthorized(request: Request): boolean {
   return request.headers.get("x-cron-secret") === secret;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const limit = await rateLimitByIp(request, "cron-seo-index", 10, "1 h");
+  if (!limit.success) return rateLimitResponse(limit);
 
   try {
     const urls = await collectPublicUrls();

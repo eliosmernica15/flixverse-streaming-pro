@@ -11,7 +11,7 @@ import {
   writeBatch,
   limit
 } from 'firebase/firestore';
-import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
+import { requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { Notification } from '@/integrations/firebase/types';
 
@@ -19,7 +19,7 @@ export const useFirebaseNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   // Fetch notifications for the current user
   useEffect(() => {

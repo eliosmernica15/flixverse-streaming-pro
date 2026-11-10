@@ -26,6 +26,10 @@ export const DEFAULT_KEYWORDS = [
   "film streaming",
 ];
 
+// Supported locales for hreflang
+export const SUPPORTED_LOCALES = ["en", "es", "sq"] as const;
+export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
+
 const INDEX_ROBOTS: Metadata["robots"] = {
   index: true,
   follow: true,
@@ -53,6 +57,67 @@ function defaultOgImage(title: string) {
   };
 }
 
+/**
+ * Build dynamic OG image URL using the /api/og endpoint
+ */
+export function buildOgImageUrl(params: {
+  title: string;
+  description?: string;
+  type?: "movie" | "tv" | "person" | "collection" | "website";
+  image?: string;
+  rating?: string;
+  year?: string;
+  genres?: string;
+  season?: string;
+  episode?: string;
+  episodeTitle?: string;
+  episodeOverview?: string;
+  personName?: string;
+  knownFor?: string;
+  collectionName?: string;
+  partCount?: string;
+}): string {
+  const searchParams = new URLSearchParams();
+  searchParams.set("title", params.title);
+  if (params.description) searchParams.set("description", params.description);
+  if (params.type) searchParams.set("type", params.type);
+  if (params.image) searchParams.set("image", params.image);
+  if (params.rating) searchParams.set("rating", params.rating);
+  if (params.year) searchParams.set("year", params.year);
+  if (params.genres) searchParams.set("genres", params.genres);
+  if (params.season) searchParams.set("season", params.season);
+  if (params.episode) searchParams.set("episode", params.episode);
+  if (params.episodeTitle) searchParams.set("episodeTitle", params.episodeTitle);
+  if (params.episodeOverview) searchParams.set("episodeOverview", params.episodeOverview);
+  if (params.personName) searchParams.set("personName", params.personName);
+  if (params.knownFor) searchParams.set("knownFor", params.knownFor);
+  if (params.collectionName) searchParams.set("collectionName", params.collectionName);
+  if (params.partCount) searchParams.set("partCount", params.partCount);
+
+  return `${SITE_URL}/api/og?${searchParams.toString()}`;
+}
+
+/**
+ * Build hreflang alternates for a given path
+ */
+export function buildHreflangAlternates(path: string): Metadata["alternates"] {
+  const alternates: Record<string, string> = {};
+
+  // Add each supported locale
+  for (const locale of SUPPORTED_LOCALES) {
+    const localePath = locale === "en" ? path : `/${locale}${path}`;
+    alternates[locale] = `${SITE_URL}${localePath}`;
+  }
+
+  // x-default points to English version
+  alternates["x-default"] = `${SITE_URL}${path}`;
+
+  // Also include canonical
+  alternates.canonical = `${SITE_URL}${path}`;
+
+  return alternates;
+}
+
 export function buildPageMetadata({
   title,
   description = DEFAULT_DESCRIPTION,
@@ -60,6 +125,10 @@ export function buildPageMetadata({
   keywords = DEFAULT_KEYWORDS,
   image,
   index = true,
+  type = "website",
+  locale = "en_US",
+  useDynamicOg = true,
+  ogParams,
 }: {
   title: string;
   description?: string;
@@ -67,24 +136,57 @@ export function buildPageMetadata({
   keywords?: string[];
   image?: string;
   index?: boolean;
+  type?: "website" | "article" | "profile" | "movie" | "tv_show";
+  locale?: string;
+  useDynamicOg?: boolean;
+  ogParams?: {
+    type?: "movie" | "tv" | "person" | "collection" | "website";
+    rating?: string;
+    year?: string;
+    genres?: string;
+    season?: string;
+    episode?: string;
+    episodeTitle?: string;
+    episodeOverview?: string;
+    personName?: string;
+    knownFor?: string;
+    collectionName?: string;
+    partCount?: string;
+  };
 }): Metadata {
+  // Map internal types to valid Next.js Open Graph types
+  const ogType: "website" | "article" | "profile" =
+    type === "movie" || type === "tv_show" ? "website" : type;
   const url = `${SITE_URL}${path}`;
-  const ogImages = image
-    ? [{ url: image, width: 1200, height: 630, alt: title }]
-    : [defaultOgImage(title)];
+
+  // Determine OG image - use dynamic OG if enabled and params provided
+  let ogImages: Metadata["openGraph"]["images"];
+  if (useDynamicOg && ogParams) {
+    const dynamicOgUrl = buildOgImageUrl({
+      title,
+      description,
+      ...ogParams,
+      image: image,
+    });
+    ogImages = [{ url: dynamicOgUrl, width: 1200, height: 630, alt: title }];
+  } else if (image) {
+    ogImages = [{ url: image, width: 1200, height: 630, alt: title }];
+  } else {
+    ogImages = [defaultOgImage(title)];
+  }
 
   return {
     title,
     description,
     keywords,
-    alternates: { canonical: url },
+    alternates: buildHreflangAlternates(path),
     openGraph: {
       title,
       description,
       url,
       siteName: SITE_NAME,
-      type: "website",
-      locale: "en_US",
+      type: ogType,
+      locale,
       images: ogImages,
     },
     twitter: {
