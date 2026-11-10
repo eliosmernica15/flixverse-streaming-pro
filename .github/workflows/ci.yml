@@ -49,7 +49,9 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: E2E (basic)
-        run: npm run test:e2e
+        # Functional specs only; screenshot specs target win32 snapshots and the
+        # dedicated visual-regression job covers them (continue-on-error).
+        run: npx playwright test --project=chromium
 
       - name: NPM Audit
         run: npm audit --audit-level=high
