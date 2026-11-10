@@ -1,7 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import MovieCarousel from "@/components/MovieCarousel";
-import PageHero from "@/components/PageHero";
+import CatalogQuickFilters from "@/components/CatalogQuickFilters";
 import PageContainer from "@/components/PageContainer";
 import LazySection from "@/components/LazySection";
 import Reveal from "@/components/Reveal";
@@ -20,8 +21,10 @@ import {
   Sparkles,
   Compass,
   Wand2,
+  CalendarDays,
 } from "lucide-react";
 import { TMDBMovie } from "@/utils/tmdbApi";
+import { matchesCatalogFilters, releasedWithinDays, type CatalogFilters } from "@/lib/catalogFilters";
 
 const PRIORITY_KEYS = new Set(["trending", "nowPlaying", "topRated", "popular"]);
 
@@ -45,10 +48,29 @@ const SECTIONS = [
 
 const Movies = () => {
   const { data = {}, isLoading, isFetching, isError, refetch } = useMoviesCatalog();
+  const [filters, setFilters] = useState<CatalogFilters>({ yearRange: "all", genreId: null });
+  const filteredData = useMemo(
+    () => Object.fromEntries(
+      Object.entries(data).map(([key, movies]) => [
+        key,
+        (movies as TMDBMovie[]).filter((movie) => matchesCatalogFilters(movie, filters)),
+      ])
+    ) as Record<string, TMDBMovie[]>,
+    [data, filters]
+  );
+  const newThisWeek = useMemo(() => {
+    const unique = new Map<number, TMDBMovie>();
+    Object.values(data).flat().forEach((movie) => {
+      if (releasedWithinDays(movie, 7) && matchesCatalogFilters(movie, filters)) unique.set(movie.id, movie);
+    });
+    return [...unique.values()].sort((a, b) =>
+      (b.release_date || b.first_air_date || "").localeCompare(a.release_date || a.first_air_date || "")
+    );
+  }, [data, filters]);
   const loadedCount = Object.keys(data).length;
 
   const renderSection = (section: (typeof SECTIONS)[number], index: number) => {
-    const movies = (data as Record<string, TMDBMovie[]>)[section.key];
+    const movies = filteredData[section.key];
     return (
       <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
         <MovieCarousel
@@ -59,7 +81,6 @@ const Movies = () => {
           exploreAllPath={section.exploreAllPath}
           comingSoon={section.comingSoon}
         />
-        {index < SECTIONS.length - 1 && <div className="divider-glow mt-10" />}
       </Reveal>
     );
   };
@@ -68,22 +89,63 @@ const Movies = () => {
   const deferredSections = SECTIONS.filter((s) => !PRIORITY_KEYS.has(s.key));
 
   return (
-    <>
-      <PageHero
-        title="Movies"
-        subtitle="Discover blockbusters and hidden gems"
-        meta={loadedCount > 0 ? `${loadedCount} curated collections` : undefined}
-        accent="red"
-        icon={<Film className="w-6 h-6 text-white" />}
-      />
+    <div className="relative">
+      <header className="relative pt-24 pb-10 px-4 sm:px-6 lg:px-10 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(239, 68, 68, 0.18) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 100% 100%, rgba(168, 85, 247, 0.10) 0%, transparent 60%)",
+          }}
+        />
+        <div className="max-w-[1800px] mx-auto flex items-end gap-4">
+          <div className="p-3 rounded-lg bg-white/5 ring-1 ring-white/10">
+            <Film className="h-7 w-7 text-red-400" />
+          </div>
+          <div className="min-w-0">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-red-500 mb-1.5">
+              {loadedCount > 0 ? `${loadedCount} curated collections` : "Loading…"}
+            </span>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl 2xl:text-6xl 3xl:text-7xl 4xl:text-[8.5rem] font-black tracking-tight text-white leading-[1.05]">
+              Movies
+            </h1>
+            <p className="text-gray-400 text-sm sm:text-base mt-2">
+              Discover blockbusters and hidden gems
+            </p>
+          </div>
+        </div>
+      </header>
 
-      <PageContainer>
+      <PageContainer className="!pt-0">
         <div className="space-y-10">
+          <CatalogQuickFilters
+            filters={filters}
+            onChange={setFilters}
+            genres={[
+              { id: 28, label: "Action" },
+              { id: 12, label: "Adventure" },
+              { id: 16, label: "Animation" },
+              { id: 35, label: "Comedy" },
+              { id: 18, label: "Drama" },
+              { id: 27, label: "Horror" },
+              { id: 878, label: "Sci-Fi" },
+              { id: 53, label: "Thriller" },
+            ]}
+          />
+          <Reveal>
+            <MovieCarousel
+              title="New This Week"
+              movies={newThisWeek}
+              loading={isLoading || isFetching}
+              icon={<CalendarDays className="w-5 h-5 text-emerald-400" />}
+              priority
+            />
+          </Reveal>
           {prioritySections.map((section, index) => renderSection(section, index))}
 
           <LazySection minHeight={480} className="space-y-10">
             <>
-              <div className="divider-glow" />
               {deferredSections.map((section, index) =>
                 renderSection(section, prioritySections.length + index)
               )}
@@ -91,18 +153,22 @@ const Movies = () => {
           </LazySection>
 
           {isError && !isLoading && (
-            <div className="text-center py-16 glass-card rounded-3xl border border-white/8">
+            <div className="text-center py-16 glass-soft rounded-2xl max-w-md mx-auto">
               <Film className="w-12 h-12 text-gray-600 mx-auto mb-4" />
               <h3 className="text-xl font-bold text-white mb-2">Could not load movies</h3>
               <p className="text-gray-400 mb-6">There was a connection issue. Please try again.</p>
-              <button type="button" onClick={() => refetch()} className="btn-primary px-8 py-3">
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 px-6 py-2.5 text-sm font-semibold text-white transition-colors focus-ring"
+              >
                 Retry
               </button>
             </div>
           )}
         </div>
       </PageContainer>
-    </>
+    </div>
   );
 };
 

@@ -46,7 +46,7 @@ export function SubscriptionBilling() {
     async function loadInvoices() {
       setInvoicesLoading(true);
       try {
-        const headers = await getAuthHeaders(user);
+        const headers = await getAuthHeaders(user!);
         const res = await fetch("/api/billing/invoices", { headers });
         const data = await res.json();
         if (res.ok) setInvoices(data.invoices || []);
@@ -64,7 +64,7 @@ export function SubscriptionBilling() {
     if (!user) return;
     setPortalLoading(true);
     try {
-      const headers = await getAuthHeaders(user);
+      const headers = await getAuthHeaders(user!);
       const res = await fetch("/api/billing/portal", {
         method: "POST",
         headers,

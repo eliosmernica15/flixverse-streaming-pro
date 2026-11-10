@@ -26,7 +26,7 @@ export function PlansCheckoutSuccess() {
 
     async function confirm() {
       try {
-        const headers = await getAuthHeaders(user);
+        const headers = await getAuthHeaders(user!);
         const res = await fetch(`/api/billing/session?session_id=${sessionId}`, { headers });
         const data = await res.json();
 

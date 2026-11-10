@@ -1,6 +1,8 @@
+import { getNonce } from "@/lib/seo/nonce";
 import { SITE_URL, SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/seo/metadata";
 
-export function WebsiteJsonLd() {
+export async function WebsiteJsonLd() {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -20,13 +22,15 @@ export function WebsiteJsonLd() {
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
   );
 }
 
-export function OrganizationJsonLd() {
+export async function OrganizationJsonLd() {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": ["Organization", "EntertainmentBusiness"],
@@ -40,13 +44,15 @@ export function OrganizationJsonLd() {
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
   );
 }
 
-export function FAQJsonLd() {
+export async function FAQJsonLd() {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -80,6 +86,7 @@ export function FAQJsonLd() {
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -92,7 +99,8 @@ interface CollectionPageJsonLdProps {
   url: string;
 }
 
-export function CollectionPageJsonLd({ name, description, url }: CollectionPageJsonLdProps) {
+export async function CollectionPageJsonLd({ name, description, url }: CollectionPageJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -104,6 +112,7 @@ export function CollectionPageJsonLd({ name, description, url }: CollectionPageJ
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -114,7 +123,8 @@ interface BreadcrumbJsonLdProps {
   items: { name: string; url: string }[];
 }
 
-export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
+export async function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -128,6 +138,7 @@ export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -144,7 +155,7 @@ interface ContentJsonLdProps {
   rating?: number;
 }
 
-export function ContentJsonLd({
+export async function ContentJsonLd({
   title,
   description,
   image,
@@ -153,6 +164,7 @@ export function ContentJsonLd({
   datePublished,
   rating,
 }: ContentJsonLdProps) {
+  const nonce = await getNonce();
   const schemaType = type === "tv" ? "TVSeries" : "Movie";
   const data = {
     "@context": "https://schema.org",
@@ -188,6 +200,7 @@ export function ContentJsonLd({
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -201,7 +214,8 @@ interface ItemListJsonLdProps {
   items: { name: string; url: string; image?: string }[];
 }
 
-export function ItemListJsonLd({ name, description, url, items }: ItemListJsonLdProps) {
+export async function ItemListJsonLd({ name, description, url, items }: ItemListJsonLdProps) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -223,13 +237,14 @@ export function ItemListJsonLd({ name, description, url, items }: ItemListJsonLd
 
   return (
     <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
   );
 }
 
-export function WebPageJsonLd({
+export async function WebPageJsonLd({
   name,
   description,
   url,
@@ -238,6 +253,7 @@ export function WebPageJsonLd({
   description: string;
   url: string;
 }) {
+  const nonce = await getNonce();
   const data = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -250,6 +266,272 @@ export function WebPageJsonLd({
 
   return (
     <script
+    nonce={nonce}
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface EpisodeJsonLdProps {
+  title: string;
+  description: string;
+  image?: string;
+  url: string;
+  episodeNumber: number;
+  seasonNumber: number;
+  seriesName: string;
+  seriesUrl: string;
+  datePublished?: string;
+  rating?: number;
+  duration?: string; // ISO 8601 duration format, e.g., "PT45M"
+}
+
+export async function EpisodeJsonLd({
+  title,
+  description,
+  image,
+  url,
+  episodeNumber,
+  seasonNumber,
+  seriesName,
+  seriesUrl,
+  datePublished,
+  rating,
+  duration,
+}: EpisodeJsonLdProps) {
+  const nonce = await getNonce();
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "Episode",
+    name: title,
+    description: description.slice(0, 500),
+    image,
+    url,
+    episodeNumber,
+    seasonNumber,
+    partOfSeries: {
+      "@type": "TVSeries",
+      name: seriesName,
+      url: seriesUrl,
+    },
+    ...(datePublished ? { datePublished } : {}),
+    ...(rating && rating > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: rating.toFixed(1),
+            bestRating: "10",
+            worstRating: "0",
+            ratingCount: Math.max(10, Math.round(rating * 100)),
+          },
+        }
+      : {}),
+    ...(duration ? { duration } : {}),
+    potentialAction: {
+      "@type": "WatchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: url,
+        actionPlatform: [
+          "http://schema.org/DesktopWebPlatform",
+          "http://schema.org/MobileWebPlatform",
+        ],
+      },
+    },
+  };
+
+  return (
+    <script
+    nonce={nonce}
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface TVSeriesJsonLdProps {
+  name: string;
+  description: string;
+  image?: string;
+  url: string;
+  datePublished?: string;
+  rating?: number;
+  numberOfSeasons?: number;
+  numberOfEpisodes?: number;
+  genres?: string[];
+  actors?: { name: string; url?: string }[];
+  creator?: { name: string; url?: string }[];
+}
+
+export async function TVSeriesJsonLd({
+  name,
+  description,
+  image,
+  url,
+  datePublished,
+  rating,
+  numberOfSeasons,
+  numberOfEpisodes,
+  genres,
+  actors,
+  creator,
+}: TVSeriesJsonLdProps) {
+  const nonce = await getNonce();
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "TVSeries",
+    name,
+    description: description.slice(0, 500),
+    image,
+    url,
+    ...(datePublished ? { datePublished } : {}),
+    ...(rating && rating > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: rating.toFixed(1),
+            bestRating: "10",
+            worstRating: "0",
+            ratingCount: Math.max(10, Math.round(rating * 100)),
+          },
+        }
+      : {}),
+    ...(numberOfSeasons ? { numberOfSeasons } : {}),
+    ...(numberOfEpisodes ? { numberOfEpisodes } : {}),
+    ...(genres && genres.length > 0 ? { genre: genres } : {}),
+    ...(actors && actors.length > 0
+      ? {
+          actor: actors.map((actor) => ({
+            "@type": "Person",
+            name: actor.name,
+            ...(actor.url ? { url: actor.url } : {}),
+          })),
+        }
+      : {}),
+    ...(creator && creator.length > 0
+      ? {
+          creator: creator.map((c) => ({
+            "@type": "Person",
+            name: c.name,
+            ...(c.url ? { url: c.url } : {}),
+          })),
+        }
+      : {}),
+    potentialAction: {
+      "@type": "WatchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: url,
+        actionPlatform: [
+          "http://schema.org/DesktopWebPlatform",
+          "http://schema.org/MobileWebPlatform",
+        ],
+      },
+    },
+  };
+
+  return (
+    <script
+    nonce={nonce}
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface PersonJsonLdProps {
+  name: string;
+  description: string;
+  image?: string;
+  url: string;
+  birthDate?: string;
+  deathDate?: string | null;
+  jobTitle?: string;
+  knownFor?: { name: string; url: string }[];
+}
+
+export async function PersonJsonLd({
+  name,
+  description,
+  image,
+  url,
+  birthDate,
+  deathDate,
+  jobTitle,
+  knownFor,
+}: PersonJsonLdProps) {
+  const nonce = await getNonce();
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name,
+    description: description.slice(0, 500),
+    image,
+    url,
+    ...(birthDate ? { birthDate } : {}),
+    ...(deathDate ? { deathDate } : {}),
+    ...(jobTitle ? { jobTitle } : {}),
+    ...(knownFor && knownFor.length > 0
+      ? {
+          knownFor: knownFor.map((item) => ({
+            "@type": "CreativeWork",
+            name: item.name,
+            url: item.url,
+          })),
+        }
+      : {}),
+  };
+
+  return (
+    <script
+    nonce={nonce}
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
+interface CollectionJsonLdProps {
+  name: string;
+  description: string;
+  image?: string;
+  url: string;
+  numberOfItems?: number;
+  hasPart?: { name: string; url: string; type: "Movie" | "TVSeries" }[];
+}
+
+export async function CollectionJsonLd({
+  name,
+  description,
+  image,
+  url,
+  numberOfItems,
+  hasPart,
+}: CollectionJsonLdProps) {
+  const nonce = await getNonce();
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name,
+    description: description.slice(0, 500),
+    image,
+    url,
+    numberOfItems: numberOfItems || (hasPart?.length || 0),
+    itemListElement: hasPart?.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": item.type,
+        name: item.name,
+        url: item.url,
+      },
+    })),
+  };
+
+  return (
+    <script
+    nonce={nonce}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />

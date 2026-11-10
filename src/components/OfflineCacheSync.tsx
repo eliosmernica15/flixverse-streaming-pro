@@ -29,11 +29,36 @@ export default function OfflineCacheSync() {
         cached_at: h.watched_at,
       }));
 
-    void saveOfflineCache({
+    const cache = {
       watchlist,
       continueWatching,
       updated_at: new Date().toISOString(),
-    });
+    };
+    let cancelled = false;
+    const persist = () => {
+      if (!cancelled) void saveOfflineCache(cache);
+    };
+    const requestIdleCallback = (
+      window as Window & {
+        requestIdleCallback?: (
+          callback: IdleRequestCallback,
+          options?: IdleRequestOptions
+        ) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      }
+    ).requestIdleCallback;
+    if (requestIdleCallback) {
+      const idleId = requestIdleCallback(persist, { timeout: 1500 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback?.(idleId);
+      };
+    }
+    const timeoutId = window.setTimeout(persist, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [movieList, history]);
 
   return null;

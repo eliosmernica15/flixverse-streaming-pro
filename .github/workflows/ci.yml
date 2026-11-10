@@ -6,30 +6,38 @@ on:
   pull_request:
     branches: [main, master]
 
+env:
+  NEXT_PUBLIC_FIREBASE_API_KEY: test
+  TMDB_ACCESS_TOKEN: test
+  TMDB_API_KEY: test
+
 jobs:
   lint-typecheck-test:
     runs-on: ubuntu-latest
-    env:
-      NEXT_PUBLIC_FIREBASE_API_KEY: test
-      NEXT_PUBLIC_TMDB_API_KEY: test
-      NEXT_PUBLIC_TMDB_ACCESS_TOKEN: test
-      TMDB_ACCESS_TOKEN: test
-      TMDB_API_KEY: test
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
+
+      - name: Check public environment variables
+        run: npm run check:public-env
 
       - name: Lint
         run: npm run lint
 
       - name: Type check
         run: npx tsc --noEmit
+
+      - name: Strict type check (player sync libs)
+        run: npm run typecheck:strict
+
+      - name: Unit tests
+        run: npm test
 
       - name: Firestore rules checks
         run: npm run test:rules
@@ -40,8 +48,151 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: E2E
+      - name: E2E (basic)
         run: npm run test:e2e
+
+      - name: NPM Audit
+        run: npm audit --audit-level=high
+
+  webhook-idempotency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run webhook idempotency tests
+        run: npm run test:webhook
+
+  party-e2e-emulator:
+    runs-on: ubuntu-latest
+    env:
+      FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+      AUTH_EMULATOR_HOST: 127.0.0.1:9099
+      PLAYWRIGHT_PARTY_E2E: 1
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_FIREBASE_API_KEY: test
+      TMDB_ACCESS_TOKEN: test
+      TMDB_API_KEY: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: npm ci
+        env:
+          CI: true
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Firebase Emulators
+        uses: firebase/emulator-setup@v1
+        with:
+          firestore: "8080"
+          auth: "9099"
+
+      - name: Verify Emulators Running
+        run: |
+          curl -f http://127.0.0.1:8080 || exit 1
+          curl -f http://127.0.0.1:9099 || exit 1
+          echo "Emulators are running"
+
+      - name: Create test users and party in emulators
+        run: |
+          node scripts/setup-emulator-test-data.mjs
+
+      - name: Build
+        run: npm run build
+
+      - name: Start Dev Server
+        run: |
+          npm run dev &
+          sleep 15
+          curl -f http://127.0.0.1:3000 || exit 1
+
+      - name: Party Sync E2E Tests (Emulator)
+        run: npm run test:e2e:emulator
+        env:
+          PLAYWRIGHT_PARTY_E2E: 1
+
+      - name: Visual Regression Tests (with emulator running)
+        run: npm run test:e2e -- --project=chromium --grep="visual regression"
+        continue-on-error: true
+
+  visual-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Start Dev Server
+        run: |
+          npm run dev &
+          sleep 15
+          curl -f http://127.0.0.1:3000 || exit 1
+
+      - name: Visual Regression Tests
+        run: npm run test:e2e -- --project=chromium --grep="visual regression"
+        continue-on-error: true
+
+  python-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Python Audit
+        run: pip-audit
+
+  strict-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Strict Type Check
+        run: npx tsc --noEmit --strict
 
   firestore-rules:
     runs-on: ubuntu-latest
@@ -49,7 +200,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - name: Validate Firestore rules

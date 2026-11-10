@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Globe, Sparkles, Trash2, Palette, Shield, CreditCard, ChevronRight } from "lucide-react";
+import { Bell, Globe, Sparkles, Trash2, Palette, Shield, CreditCard, ChevronRight, Gauge } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useSyncedCaptionPreferences } from "@/hooks/player/useSyncedCaptionPreferences";
+import { CinemaSenseSettings } from "@/components/player/CinemaSenseSettings";
+import { setPerformanceMode } from "@/hooks/usePerformanceMode";
 
 interface ProfileSettingsProps {
   onOpenTab?: (tab: string) => void;
@@ -57,8 +59,10 @@ export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
       viewHistory: [],
       preferredLanguage: "en",
       personalizedRecommendations: true,
+      performanceMode: false,
       lastVisited: new Date().toISOString(),
     });
+    setPerformanceMode(false);
     toast({ title: "Local data cleared", description: "Preferences and cached list data were reset." });
   };
 
@@ -106,6 +110,24 @@ export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
               <p className="text-sm font-medium text-white">Personalized recommendations</p>
               <p className="text-xs text-gray-500 mt-0.5">Use your watch history and genres you explore</p>
             </div>
+
+            <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+              <div className="flex items-center gap-3">
+                <Gauge className="w-4 h-4 text-cyan-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-white">Performance mode</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Reduce effects, hover work, and background rendering</p>
+                </div>
+              </div>
+              <Switch
+                checked={preferences.performanceMode}
+                onCheckedChange={(checked) => {
+                  updatePreferences({ performanceMode: checked });
+                  setPerformanceMode(checked);
+                  toast({ title: checked ? "Performance mode on" : "Performance mode off" });
+                }}
+              />
+            </div>
             <Switch
               checked={preferences.personalizedRecommendations}
               onCheckedChange={(checked) => {
@@ -115,15 +137,22 @@ export default function ProfileSettings({ onOpenTab }: ProfileSettingsProps) {
             />
           </div>
 
-          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
-            <div className="flex items-center gap-3">
-              <Palette className="w-4 h-4 text-purple-400 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-white">Ambient glow</p>
-                <p className="text-xs text-gray-500 mt-0.5">Dynamic backlight effect during playback</p>
+          <div className="rounded-xl bg-white/5 border border-white/5 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Palette className="w-4 h-4 text-purple-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-white">Ambient glow</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Dynamic backlight effect during playback</p>
+                </div>
               </div>
+              <Switch checked={ambientGlow} onCheckedChange={toggleAmbientGlow} />
             </div>
-            <Switch checked={ambientGlow} onCheckedChange={toggleAmbientGlow} />
+            {ambientGlow && (
+              <div className="mt-4 border-t border-white/5 pt-4">
+                <CinemaSenseSettings />
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/5">

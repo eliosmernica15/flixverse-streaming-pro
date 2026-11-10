@@ -21,7 +21,7 @@ export interface OfflineCachePayload {
 export interface MutationAction {
   id: string; // uuid
   type: "ADD_WATCHLIST" | "REMOVE_WATCHLIST" | "RATE_CONTENT" | "UPDATE_PROGRESS";
-  payload: any;
+  payload: Record<string, unknown>;
   timestamp: string;
 }
 

@@ -2,11 +2,22 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Reveal } from "@/components/Reveal";
+import { buildPageMetadata, SITE_URL } from "@/lib/seo/metadata";
+import { WebPageJsonLd } from "@/components/seo/JsonLd";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Privacy Policy — FlixVerse",
   description: "FlixVerse privacy policy. Learn how we collect, use, and protect your personal information.",
-};
+  path: "/privacy",
+  keywords: [
+    "privacy policy",
+    "data protection",
+    "personal information",
+    "FlixVerse privacy",
+    "GDPR",
+    "user rights",
+  ],
+});
 
 const SECTIONS = [
   {
@@ -43,15 +54,21 @@ const SECTIONS = [
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-black pt-24 pb-16 px-4 sm:px-6 lg:px-8 page-enter">
-      <div className="max-w-6xl mx-auto">
-        <nav className="mb-8 text-sm text-gray-500">
-          <Link href="/" className="hover:text-white transition-colors focus-ring rounded">
-            Home
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-gray-300">Privacy Policy</span>
-        </nav>
+    <>
+      <WebPageJsonLd
+        name="Privacy Policy — FlixVerse"
+        description="FlixVerse privacy policy. Learn how we collect, use, and protect your personal information."
+        url={`${SITE_URL}/privacy`}
+      />
+      <div className="min-h-screen bg-black pt-24 pb-16 px-4 sm:px-6 lg:px-8 page-enter">
+        <div className="max-w-6xl mx-auto">
+          <nav className="mb-8 text-sm text-gray-500">
+            <Link href="/" className="hover:text-white transition-colors focus-ring rounded">
+              Home
+            </Link>
+            <span className="mx-2">/</span>
+            <span className="text-gray-300">Privacy Policy</span>
+          </nav>
 
         <div className="grid lg:grid-cols-[200px_minmax(0,1fr)] gap-10">
           <aside className="lg:sticky lg:top-28 h-max">
@@ -88,5 +105,6 @@ export default function PrivacyPage() {
         </div>
       </div>
     </div>
-  );
+  </>
+);
 }

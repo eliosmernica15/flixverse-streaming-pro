@@ -1,9 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  getOutboxMutations,
-  clearOutboxMutation,
-  type MutationAction,
-} from "@/lib/offlineStorage";
+import { getOutboxMutations } from "@/lib/offlineStorage";
 import { MutationDispatcher } from "@/lib/offline/mutationDispatcher";
 
 interface UseOfflineSyncQueueReturn {
@@ -37,18 +33,6 @@ export function useOfflineSyncQueue(): UseOfflineSyncQueueReturn {
     void refreshCount();
   }, [refreshCount]);
 
-  // Listen for online event to auto-sync
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const handleOnline = () => {
-      void syncNow();
-    };
-
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-  }, []);
-
   const syncNow = useCallback(async () => {
     if (isSyncing || typeof navigator === "undefined" || !navigator.onLine) return;
 
@@ -64,6 +48,18 @@ export function useOfflineSyncQueue(): UseOfflineSyncQueueReturn {
       setIsSyncing(false);
     }
   }, [isSyncing, refreshCount]);
+
+  // Listen for online event to auto-sync
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => {
+      void syncNow();
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [syncNow]);
 
   return { pendingCount, isSyncing, syncNow, lastError };
 }

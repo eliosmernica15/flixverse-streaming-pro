@@ -1,4 +1,4 @@
-import { securityHeaders } from "./security-headers.mjs";
+import { securityHeadersWithoutCsp } from "./security-headers.mjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -53,6 +53,16 @@ const nextConfig = {
                 hostname: "image.tmdb.org",
             },
             {
+                // YouTube thumbnails (trailers on detail pages)
+                protocol: "https",
+                hostname: "i.ytimg.com",
+            },
+            {
+                // Google account avatars (photoURL from Firebase Auth)
+                protocol: "https",
+                hostname: "lh3.googleusercontent.com",
+            },
+            {
                 protocol: "https",
                 hostname: "images.unsplash.com",
             },
@@ -70,6 +80,7 @@ const nextConfig = {
             },
         ],
         formats: ["image/avif", "image/webp"],
+        qualities: [60, 75],
         minimumCacheTTL: 60 * 60 * 24 * 7,
         deviceSizes: [640, 750, 828, 1080, 1200, 1920],
         imageSizes: [64, 96, 128, 256, 384],
@@ -78,7 +89,7 @@ const nextConfig = {
         return [
             {
                 source: "/(.*)",
-                headers: securityHeaders,
+                headers: securityHeadersWithoutCsp,
             },
             {
                 source: "/_next/static/(.*)",

@@ -2,6 +2,7 @@
 
 import { Heart, MessageCircle } from "lucide-react";
 import type { TimelineComment } from "@/hooks/player/useTimelineComments";
+import Image from "next/image";
 
 interface TimelineCommentPopupProps {
   comments: TimelineComment[];
@@ -52,9 +53,11 @@ export function TimelineCommentPopup({
             >
               <div className="flex items-start gap-2">
                 {comment.userAvatarUrl ? (
-                  <img
+                  <Image
                     src={comment.userAvatarUrl}
                     alt={comment.userDisplayName}
+                    width={20}
+                    height={20}
                     className="w-5 h-5 rounded-full object-cover shrink-0 mt-0.5"
                   />
                 ) : (
