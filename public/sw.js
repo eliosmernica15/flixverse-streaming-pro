@@ -1,7 +1,12 @@
-const CACHE_VERSION = "flixverse-v8";
+const CACHE_VERSION = "flixverse-v9";
 const OFFLINE_URL = "/offline";
 
-/** Static assets only — never precache HTML (avoids stale pages blocking fonts/clicks). */
+const NAV_TIMEOUT_MS = 4500; // per attempt
+const NAV_RETRY_DELAY_MS = 800;
+const STATIC_TIMEOUT_MS = 5000;
+const STATIC_RETRY_DELAY_MS = 400;
+
+/** Static assets only - never precache HTML (avoids stale pages blocking fonts/clicks). */
 const PRECACHE = [OFFLINE_URL, "/manifest.json", "/favicon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -22,6 +27,30 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function fetchWithTimeout(request, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(request, { cache: "no-store", signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+}
+
+/** One network attempt, then a short pause and one retry. Null on total failure. */
+async function fetchWithRetry(request, timeoutMs, retryDelayMs) {
+  try {
+    return await fetchWithTimeout(request, timeoutMs);
+  } catch {
+    await delay(retryDelayMs);
+    try {
+      return await fetchWithTimeout(request, timeoutMs);
+    } catch {
+      return null;
+    }
+  }
+}
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
@@ -45,48 +74,60 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-/** Always fetch fresh HTML — no stale shell that breaks hydration/clicks. */
+/**
+ * Always fetch fresh HTML - no stale shell that breaks hydration/clicks.
+ * But give the network *two* chances (with a timeout) before falling back to
+ * the offline page: a single dropped packet should never flash the offline UI.
+ */
 async function networkOnlyNavigate(request) {
-  try {
-    return await fetch(request, { cache: "no-store" });
-  } catch {
-    const cache = await caches.open(CACHE_VERSION);
-    const offline = await cache.match(OFFLINE_URL);
-    if (offline) return offline;
-    // `Response.error()` is a network-error response: responding with it for
-    // a navigation surfaces the browser's own error page but is at least a
-    // valid Response. Prefer a real document so the user sees our UI.
-    return new Response(
-      "<!doctype html><meta charset=utf-8><title>Offline</title><body style=\"background:#0a0a0c;color:#fff;font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0\"><div style=\"text-align:center\"><h1 style=\"font-size:1.25rem\">You are offline</h1><p style=\"color:#9ca3af;font-size:.875rem\">FlixVerse will resume when your connection returns.</p></div></body>",
-      { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
-    );
-  }
+  const response = await fetchWithRetry(request, NAV_TIMEOUT_MS, NAV_RETRY_DELAY_MS);
+  if (response) return response;
+
+  const cache = await caches.open(CACHE_VERSION);
+  const offline = await cache.match(OFFLINE_URL);
+  if (offline) return offline;
+  // `Response.error()` is a network-error response: responding with it for
+  // a navigation surfaces the browser's own error page but is at least a
+  // valid Response. Prefer a real document so the user sees our UI.
+  return new Response(
+    "<!doctype html><meta charset=utf-8><title>Offline</title><body style=\"background:#0a0a0c;color:#fff;font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0\"><div style=\"text-align:center\"><h1 style=\"font-size:1.25rem\">You are offline</h1><p style=\"color:#9ca3af;font-size:.875rem\">FlixVerse will resume when your connection returns.</p></div></body>",
+    { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
+  );
 }
 
 async function staleWhileRevalidate(request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
-  const fetchPromise = fetch(request)
+  const fetchPromise = fetchWithRetry(request, STATIC_TIMEOUT_MS, STATIC_RETRY_DELAY_MS)
     .then((response) => {
       // Only cache complete, successful, same-origin responses. Caching a
       // partial (206) or an opaque response poisons the cache and produces
       // the "ChunkLoadError" the app then has to reload away from.
-      if (response.ok && response.status === 200 && response.type === "basic") {
+      if (response && response.ok && response.status === 200 && response.type === "basic") {
         void cache.put(request, response.clone());
       }
-      return response;
-    })
-    .catch(() => {
       // Nothing cached and the network is gone: a bare 503 with no body is
       // what a chunk request wants (Next retries / the boundary reloads).
-      return cached
-        ? cached
-        : new Response("", {
-            status: 503,
-            statusText: "Service Unavailable",
-            headers: { "Cache-Control": "no-store" },
-          });
+      return (
+        response ||
+        cached ||
+        new Response("", {
+          status: 503,
+          statusText: "Service Unavailable",
+          headers: { "Cache-Control": "no-store" },
+        })
+      );
+    })
+    .catch(() => {
+      return (
+        cached ||
+        new Response("", {
+          status: 503,
+          statusText: "Service Unavailable",
+          headers: { "Cache-Control": "no-store" },
+        })
+      );
     });
 
   // Serve the cached copy instantly when present; the revalidation above
