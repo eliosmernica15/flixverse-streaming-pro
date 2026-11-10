@@ -160,7 +160,7 @@ export function buildPageMetadata({
   const url = `${SITE_URL}${path}`;
 
   // Determine OG image - use dynamic OG if enabled and params provided
-  let ogImages: Metadata["openGraph"]["images"];
+  let ogImages: NonNullable<Metadata["openGraph"]>["images"];
   if (useDynamicOg && ogParams) {
     const dynamicOgUrl = buildOgImageUrl({
       title,
