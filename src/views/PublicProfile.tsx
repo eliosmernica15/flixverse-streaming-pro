@@ -2,15 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Film, Tv, Star, Activity } from "lucide-react";
+import { Film, Tv, Star, Activity, UserPlus, UserCheck, Users, Flag, Shield, AlertTriangle, UserMinus } from "lucide-react";
 import Image from "next/image";
-import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { getFirestore, collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { MemberProfile, ActivityFeedItem } from "@/integrations/firebase/types";
+import { useAuth } from "@/hooks/useAuth";
+import { useFollow } from "@/hooks/useFollow";
+import { useBlock } from "@/hooks/useBlock";
+import { useReport } from "@/hooks/useReport";
+import { useToast } from "@/hooks/use-toast";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
 import Reveal from "@/components/Reveal";
 import { TMDBMovie } from "@/utils/tmdbApi";
+import { ReportDialog } from "@/components/ReportDialog";
 
 interface PublicProfileProps {
   username: string;
@@ -18,10 +24,18 @@ interface PublicProfileProps {
 
 export default function PublicProfile({ username }: PublicProfileProps) {
   const router = useRouter();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [watchlist, setWatchlist] = useState<TMDBMovie[]>([]);
   const [activity, setActivity] = useState<ActivityFeedItem[]>([]);
+  const [mutualTitles, setMutualTitles] = useState<TMDBMovie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+
+  const { isFollowing, followerCount, toggleFollow } = useFollow(profile?.ownerId ?? null);
+  const { isBlocked, loading: blockLoading, toggleBlock } = useBlock(profile?.ownerId ?? null);
+  const { submitReport, submitting: reportSubmitting } = useReport();
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -62,6 +76,43 @@ export default function PublicProfile({ username }: PublicProfileProps) {
         });
         setWatchlist(items);
 
+        // Load mutual titles if user is logged in and not viewing own profile
+        if (user && user.uid !== data.ownerId) {
+          try {
+            const mutualQ = query(
+              collection(db, "user_movie_lists"),
+              where("user_id", "==", user.uid),
+              limit(500)
+            );
+            const mutualSnap = await getDocs(mutualQ);
+            const userMovieIds = new Set(mutualSnap.docs.map(d => `${d.data().movie_id}_${d.data().media_type || "movie"}`));
+
+            // Now check which of the profile's movies are in the user's list
+            const mutualItems: TMDBMovie[] = [];
+            listSnap.forEach((d) => {
+              const item = d.data();
+              const key = `${item.movie_id}_${item.media_type || "movie"}`;
+              if (userMovieIds.has(key)) {
+                mutualItems.push({
+                  id: item.movie_id,
+                  title: item.movie_title,
+                  name: item.movie_title,
+                  poster_path: item.movie_poster_path,
+                  backdrop_path: null,
+                  media_type: item.media_type || "movie",
+                  vote_average: 0,
+                  overview: "",
+                  genre_ids: [],
+                  release_date: "",
+                } as TMDBMovie);
+              }
+            });
+            setMutualTitles(mutualItems);
+          } catch {
+            // Ignore mutual titles errors
+          }
+        }
+
         // Load activity feed
         const activityQ = query(
           collection(db, "activity_feed"),
@@ -83,7 +134,7 @@ export default function PublicProfile({ username }: PublicProfileProps) {
     };
 
     loadProfile();
-  }, [username]);
+  }, [username, user]);
 
   if (loading) {
     return (
@@ -95,15 +146,15 @@ export default function PublicProfile({ username }: PublicProfileProps) {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
-        <div className="glass-panel rounded-3xl p-10 max-w-md w-full text-center">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 px-4">
+        <div className="glass-soft rounded-2xl p-10 max-w-md w-full text-center">
           <p className="text-white text-lg font-semibold mb-4">Profile not found</p>
-          <button
-            onClick={() => router.back()}
-            className="btn-primary min-h-[44px] px-6 py-3 focus-ring"
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors focus-ring"
           >
-            Go back
-          </button>
+            Go home
+          </Link>
         </div>
       </div>
     );
@@ -117,86 +168,228 @@ export default function PublicProfile({ username }: PublicProfileProps) {
   ];
   const colorIndex = profile.displayName.charCodeAt(0) % AVATAR_COLORS.length;
 
+  const isOwnProfile = user?.uid === profile.ownerId;
+
+  const handleToggleFollow = async () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Sign in to follow other movie fans.",
+      });
+      router.push("/auth");
+      return;
+    }
+    try {
+      await toggleFollow();
+      toast({
+        title: isFollowing ? "Unfollowed" : "Following",
+        description: isFollowing
+          ? `You unfollowed ${profile.displayName}`
+          : `You are now following ${profile.displayName}`,
+      });
+    } catch {
+      toast({
+        title: "Action failed",
+        description: "Could not update follow status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReport = () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Sign in to report a profile.",
+      });
+      router.push("/auth");
+      return;
+    }
+    setReportDialogOpen(true);
+  };
+
+  const handleBlock = async () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Sign in to block a user.",
+      });
+      router.push("/auth");
+      return;
+    }
+    try {
+      await toggleBlock();
+    } catch {
+      toast({
+        title: "Action failed",
+        description: "Could not update block status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReportSubmit = async (reason: string, details?: string): Promise<boolean> => {
+    if (!profile) return false;
+    const success = await submitReport("profile", profile.id, profile.ownerId, reason, details);
+    if (success) {
+      setReportDialogOpen(false);
+    }
+    return success;
+  };
+
   return (
     <div className="min-h-screen bg-black">
-      <div className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 rounded-lg hover:bg-white/10 focus-ring min-w-[44px] min-h-[44px]" aria-label="Go back">
-            <ArrowLeft className="w-5 h-5 text-white" />
-          </button>
-          <h1 className="text-white font-bold truncate">{profile.displayName}</h1>
+      <div className="relative pt-24 pb-10 px-4 sm:px-6 lg:px-10 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(99, 102, 241, 0.18) 0%, transparent 60%)",
+          }}
+        />
+        <div className="max-w-[1800px] mx-auto">
+          <Reveal className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+            <div className="flex items-center gap-5">
+              {profile.avatarUrl ? (
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden ring-2 ring-white/15 shadow-2xl shadow-black/50 shrink-0">
+                  <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="object-cover w-full h-full" />
+                </div>
+              ) : (
+                <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-gradient-to-br ${AVATAR_COLORS[colorIndex]} flex items-center justify-center shadow-2xl shadow-black/50 ring-2 ring-white/10 shrink-0`}>
+                  <span className="text-3xl sm:text-4xl font-black text-white">{profile.displayName.charAt(0).toUpperCase()}</span>
+                </div>
+              )}
+              <div className="min-w-0">
+                <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 mb-1">
+                  {profile.type === "kids" ? "Kids Profile" : "Member"}
+                  {profile.isPrimary ? " · Primary" : ""}
+                </span>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-[1.05]">
+                  {profile.displayName}
+                </h1>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-gray-300">
+                    <Users className="h-3 w-3" />
+                    {followerCount} {followerCount === 1 ? "follower" : "followers"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {!isOwnProfile && (
+              <div className="flex items-center gap-3 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={handleToggleFollow}
+                  className={`inline-flex items-center gap-1.5 min-h-[40px] rounded-md px-5 py-2 text-sm font-bold transition-colors focus-ring ${
+                    isFollowing
+                      ? "border border-white/15 bg-white/5 text-white hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                      : "bg-white text-black hover:bg-white/90"
+                  }`}
+                >
+                  {isFollowing ? (
+                    <>
+                      <UserCheck className="w-4 h-4" />
+                      Following
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      Follow
+                    </>
+                  )}
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleBlock}
+                    disabled={blockLoading}
+                    className={`inline-flex items-center justify-center min-h-[40px] w-[40px] rounded-md transition-colors focus-ring ${
+                      isBlocked
+                        ? "bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30"
+                        : "bg-white/5 border border-white/10 text-white hover:bg-white/10"
+                    }`}
+                    title={isBlocked ? "Unblock user" : "Block user"}
+                    aria-label={isBlocked ? "Unblock user" : "Block user"}
+                  >
+                    {isBlocked ? (
+                      <UserMinus className="w-5 h-5" />
+                    ) : (
+                      <Shield className="w-5 h-5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReport}
+                    className="inline-flex items-center justify-center min-h-[40px] w-[40px] rounded-md bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors focus-ring"
+                    title="Report user"
+                    aria-label="Report user"
+                  >
+                    <Flag className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </Reveal>
         </div>
       </div>
 
-      <div className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
-        {/* Profile header */}
-        <Reveal className="flex items-center gap-6 mb-10">
-          {profile.avatarUrl ? (
-            <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-white/10 glow-ring shrink-0">
-              <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="object-cover w-full h-full" />
-            </div>
-          ) : (
-            <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${AVATAR_COLORS[colorIndex]} flex items-center justify-center glow-ring shrink-0`}>
-              <span className="text-3xl font-black text-white">{profile.displayName.charAt(0).toUpperCase()}</span>
-            </div>
-          )}
-          <div>
-            <h1 className="display-title text-2xl font-bold text-white">{profile.displayName}</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className="chip">
-                {profile.type === "kids" ? "Kids Profile" : "Member"}
-                {profile.isPrimary && " · Primary"}
-              </span>
-            </div>
-          </div>
-        </Reveal>
-
+      <div className="pb-16 px-4 sm:px-6 lg:px-10 max-w-[1800px] mx-auto">
         <div className="divider-glow mb-10" />
 
         {/* Watchlist */}
         {watchlist.length > 0 ? (
           <Reveal className="mb-12">
-            <SectionHeader title="My List" eyebrow="Watchlist" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mt-2 content-auto">
+            <SectionHeader title="Public List" eyebrow={`${watchlist.length} titles`} />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3 content-auto">
               {watchlist.map((movie) => (
-                <div key={movie.id} className="hover-lift-sm rounded-2xl">
-                  <MovieCard movie={movie} />
-                </div>
+                <MovieCard key={movie.id} movie={movie} />
               ))}
             </div>
           </Reveal>
         ) : (
-          <div className="text-center py-16">
-            <div className="glass-panel rounded-3xl p-10 max-w-md mx-auto">
-              <Film className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-300 text-sm">This profile&apos;s list is private or empty.</p>
-            </div>
+          <div className="glass-soft rounded-2xl py-12 text-center">
+            <Film className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">This profile&apos;s list is private or empty.</p>
           </div>
+        )}
+
+        {/* Mutual Titles */}
+        {mutualTitles.length > 0 && (
+          <Reveal className="mb-12">
+            <SectionHeader title="Mutual Titles" eyebrow={`${mutualTitles.length} in common`} />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3 content-auto">
+              {mutualTitles.map((movie) => (
+                <MovieCard key={movie.id} movie={movie} />
+              ))}
+            </div>
+          </Reveal>
         )}
 
         {/* Activity Feed */}
         {activity.length > 0 && (
-          <Reveal className="mb-12">
-            <SectionHeader title="Recent Activity" eyebrow="Feed" />
-            <div className="space-y-3 mt-2">
+          <Reveal className="mt-4 mb-12">
+            <SectionHeader title="Recent Activity" eyebrow={`${activity.length} events`} />
+            <div className="space-y-2 mt-3">
               {activity.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 rounded-2xl surface hover:surface-elevated border border-white/10 hover-lift-sm transition-all">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                    {item.type === "review" && <Star className="w-4 h-4 text-yellow-400" />}
-                    {item.type === "rating" && <Star className="w-4 h-4 text-yellow-400" />}
-                    {item.type === "watchlist_add" && <Film className="w-4 h-4 text-red-400" />}
-                    {item.type === "watched" && <Tv className="w-4 h-4 text-blue-400" />}
-                    {item.type === "follow" && <Activity className="w-4 h-4 text-green-400" />}
+                <div key={item.id} className="flex items-center gap-3 p-3 rounded-md border border-white/8 bg-white/3 hover:bg-white/5 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-white/5 ring-1 ring-white/10 flex items-center justify-center shrink-0">
+                    {item.type === "review" && <Star className="w-3.5 h-3.5 text-yellow-400" />}
+                    {item.type === "rating" && <Star className="w-3.5 h-3.5 text-yellow-400" />}
+                    {item.type === "watchlist_add" && <Film className="w-3.5 h-3.5 text-red-400" />}
+                    {item.type === "watched" && <Tv className="w-3.5 h-3.5 text-blue-400" />}
+                    {item.type === "follow" && <Activity className="w-3.5 h-3.5 text-green-400" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-gray-300">
-                      {item.type === "review" && `Reviewed ${item.content_title}`}
-                      {item.type === "rating" && `Rated ${item.content_title} ${item.rating}/10`}
-                      {item.type === "watchlist_add" && `Added ${item.content_title} to list`}
-                      {item.type === "watched" && `Watched ${item.content_title}`}
-                      {item.type === "follow" && `Started following ${item.target_user_name}`}
+                    <p className="text-sm text-gray-200">
+                      {item.type === "review" && <>Reviewed <span className="font-semibold text-white">{item.content_title}</span></>}
+                      {item.type === "rating" && <>Rated <span className="font-semibold text-white">{item.content_title}</span> <span className="text-yellow-400">{item.rating}/10</span></>}
+                      {item.type === "watchlist_add" && <>Added <span className="font-semibold text-white">{item.content_title}</span> to list</>}
+                      {item.type === "watched" && <>Watched <span className="font-semibold text-white">{item.content_title}</span></>}
+                      {item.type === "follow" && <>Started following <span className="font-semibold text-white">{item.target_user_name}</span></>}
                     </p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">
+                    <p className="text-[10px] text-gray-500 mt-0.5">
                       {new Date(item.created_at).toLocaleDateString()}
                     </p>
                   </div>
@@ -206,6 +399,15 @@ export default function PublicProfile({ username }: PublicProfileProps) {
           </Reveal>
         )}
       </div>
+
+      <ReportDialog
+        isOpen={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        targetType="profile"
+        targetId={profile.id}
+        targetOwnerId={profile.ownerId}
+        onSubmit={handleReportSubmit}
+      />
     </div>
   );
 }

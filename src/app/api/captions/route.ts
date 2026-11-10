@@ -3,6 +3,19 @@ import { parseSubtitles } from "@/lib/player/captionParser";
 import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 import { getServerTmdbAuth, hasServerTmdbCredentials } from "@/lib/tmdb/serverCredentials";
 
+/**
+ * Subtitle API
+ *
+ * Two modes:
+ *  - `?format=json` (default) — returns parsed cues for the in-app overlay
+ *  - `?format=vtt`           — returns a WebVTT document suitable for
+ *                              `?sub_url=...` on YapGrid / VidLink / etc embeds
+ *
+ * When a real subtitle file is fetched, the raw cues are returned. When
+ * nothing is found, we still emit a tiny VTT containing a single station-Id
+ * cue so the player has *something* to display rather than a broken track.
+ */
+
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
 async function fetchTmdbTitle(
@@ -32,7 +45,34 @@ async function fetchTmdbTitle(
   }
 }
 
-/** Try free subtitle aggregator (wyzie). */
+/** Resolve the IMDb id for a TMDB title (needed by yifysubtitles, which keys off IMDb ids). */
+async function fetchImdbId(
+  tmdbId: number,
+  mediaType: "movie" | "tv"
+): Promise<string | null> {
+  if (!hasServerTmdbCredentials()) return null;
+
+  const auth = getServerTmdbAuth();
+  let url = `${TMDB_BASE}/${mediaType}/${tmdbId}/external_ids`;
+  if (auth.queryApiKey) url += `?api_key=${encodeURIComponent(auth.queryApiKey)}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: auth.headers,
+      next: { revalidate: 86400 },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const imdbId = typeof data?.imdb_id === "string" ? data.imdb_id : null;
+    // IMDb ids look like "tt1234567"
+    return imdbId && /^tt\d+$/.test(imdbId) ? imdbId : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Try free subtitle aggregators in priority order. */
 async function fetchExternalSubtitles(
   tmdbId: number,
   mediaType: "movie" | "tv",
@@ -50,10 +90,16 @@ async function fetchExternalSubtitles(
     params.set("episode", String(episode));
   }
 
-  const endpoints = [
-    `https://sub.wyzie.ru/search?${params}`,
-    `https://subs.yifysubtitles.ch/api/v1/subtitles?imdb=${tmdbId}&lang=${lang}`,
-  ];
+  const endpoints = [`https://sub.wyzie.ru/search?${params}`];
+  // yifysubtitles only supports movies keyed by IMDb id — resolve via TMDB first
+  if (mediaType === "movie") {
+    const imdbId = await fetchImdbId(tmdbId, mediaType);
+    if (imdbId) {
+      endpoints.push(
+        `https://subs.yifysubtitles.ch/api/v1/subtitles?imdb=${imdbId}&lang=${lang}`
+      );
+    }
+  }
 
   for (const endpoint of endpoints) {
     try {
@@ -81,8 +127,13 @@ async function fetchExternalSubtitles(
   return null;
 }
 
-/** Generate readable fallback cues from title when no subtitle file is found. */
-function buildFallbackCues(title: string, duration: number): ReturnType<typeof parseSubtitles> {
+interface Cue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+function buildFallbackCues(title: string, duration: number): Cue[] {
   const phrases = [
     `[ ${title} ]`,
     "Subtitles will appear here when available.",
@@ -96,6 +147,22 @@ function buildFallbackCues(title: string, duration: number): ReturnType<typeof p
   }));
 }
 
+function formatVttTimestamp(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds - Math.floor(seconds)) * 1000);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
+}
+
+function cuesToVtt(cues: Cue[]): string {
+  const header = "WEBVTT\n\n";
+  const body = cues
+    .map((c, i) => `${i + 1}\n${formatVttTimestamp(c.start)} --> ${formatVttTimestamp(c.end)}\n${c.text}\n`)
+    .join("\n");
+  return header + body;
+}
+
 export async function GET(request: NextRequest) {
   const limit = await rateLimitByIp(request, "captions", 40, "1 m");
   if (!limit.success) return rateLimitResponse(limit);
@@ -107,30 +174,82 @@ export async function GET(request: NextRequest) {
   const episode = searchParams.get("episode") ? parseInt(searchParams.get("episode")!, 10) : undefined;
   const lang = searchParams.get("lang") || "en";
   const duration = parseFloat(searchParams.get("duration") || "7200");
+  const format = (searchParams.get("format") || "json").toLowerCase();
 
-  if (!tmdbId) {
-    return NextResponse.json({ error: "tmdbId required" }, { status: 400 });
+  if (
+    !Number.isInteger(tmdbId) ||
+    tmdbId < 1 ||
+    !["movie", "tv"].includes(mediaType) ||
+    (season !== undefined && (!Number.isInteger(season) || season < 1 || season > 100)) ||
+    (episode !== undefined && (!Number.isInteger(episode) || episode < 1 || episode > 1000)) ||
+    !/^[a-z]{2}(?:-[A-Z]{2})?$/.test(lang) ||
+    !Number.isFinite(duration) ||
+    duration <= 0 ||
+    duration > 24 * 60 * 60 ||
+    !["json", "vtt"].includes(format)
+  ) {
+    return NextResponse.json({ error: "Invalid caption request" }, { status: 400 });
   }
 
-  let rawSrt = await fetchExternalSubtitles(tmdbId, mediaType, season, episode, lang);
+  const rawSrt = await fetchExternalSubtitles(tmdbId, mediaType, season, episode, lang);
   let source: "external" | "fallback" = "external";
 
   if (!rawSrt) {
     source = "fallback";
     const title = await fetchTmdbTitle(tmdbId, mediaType, season, episode);
     const cues = buildFallbackCues(title, duration);
+
+    if (format === "vtt") {
+      // Always emit at least a placeholder VTT so the player has a usable
+      // sub_url to load. We add CORS headers so the embed can fetch it.
+      return new NextResponse(cuesToVtt(cues), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/vtt; charset=utf-8",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
+      });
+    }
+
     return NextResponse.json({ cues, source, lang });
   }
 
   const cues = parseSubtitles(rawSrt);
-  if (cues.length === 0) {
-    source = "fallback";
-    const title = await fetchTmdbTitle(tmdbId, mediaType, season, episode);
-    return NextResponse.json({ cues: buildFallbackCues(title, duration), source, lang });
+  const finalCues: Cue[] =
+    cues.length > 0
+      ? cues.map((c) => ({ start: c.start, end: c.end, text: c.text }))
+      : (() => {
+          source = "fallback";
+          return buildFallbackCues("Now playing", duration);
+        })();
+
+  if (format === "vtt") {
+    return new NextResponse(cuesToVtt(finalCues), {
+      status: 200,
+      headers: {
+        "Content-Type": "text/vtt; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      },
+    });
   }
 
   return NextResponse.json(
-    { cues, source, lang },
+    { cues: finalCues, source, lang },
     { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } }
   );
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
 }

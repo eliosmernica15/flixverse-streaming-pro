@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { registerWebPush } from '@/lib/notifications/webPush';
 
 export interface NotificationPreferences {
   newMovies: boolean;
@@ -21,7 +22,7 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
 export const useNotifications = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
-  const { toast } = useToast();
+  const { toast: _toast } = useToast();
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -55,6 +56,10 @@ export const useNotifications = () => {
       const permission = await Notification.requestPermission();
       const granted = permission === 'granted';
       setHasPermission(granted);
+      if (granted) {
+        // Fire-and-forget: enroll this device for FCM push delivery.
+        void registerWebPush();
+      }
       return granted;
     } catch {
       return false;

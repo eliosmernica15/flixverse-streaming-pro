@@ -5,6 +5,7 @@ export interface UserProfile {
   /** Unique public handle for friend search (@username) */
   username?: string | null;
   avatar_url: string | null;
+  banner_url?: string | null; // customizable cinematic cover
   bio?: string | null;
   favorite_genres?: string[];
   followers_count?: number;
@@ -190,6 +191,27 @@ export interface TimelineComment {
   status: 'visible' | 'hidden';
   createdAt: string;
   updatedAt: string;
+}
+
+// User Report
+export interface UserReport {
+  id: string;
+  reporterId: string;
+  targetType: 'profile' | 'review' | 'comment' | 'timeline_comment';
+  targetId: string;
+  targetOwnerId?: string;
+  reason: string;
+  details?: string | null;
+  status: 'pending' | 'reviewed' | 'dismissed';
+  createdAt: number;
+}
+
+// User Block
+export interface UserBlock {
+  id: string;
+  blockerId: string;
+  blockedId: string;
+  createdAt: number;
 }
 
 // Member Profile (Netflix-style multi-profile)

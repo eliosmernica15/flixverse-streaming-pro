@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from auth import uid_from_auth, verify_bearer
 from database import get_conn, iso_now, new_id, row_to_notification, db_fetchall, db_fetchone, db_execute, row_get
 from notify_hub import notification_hub
+from push import push_to_user
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -96,6 +97,19 @@ async def dispatch_notification(body: DispatchBody, auth: dict = Depends(verify_
                 created,
             ),
         )
+        # Respect the master push toggle for the recipient before sending FCM.
+        row = db_fetchone(
+            conn,
+            "SELECT push_enabled FROM notification_preferences WHERE user_id = ?",
+            (body.recipientId,),
+        )
+        push_enabled = True if row is None else bool(row_get(row, "push_enabled"))
+
+    if push_enabled:
+        try:
+            push_to_user(body.recipientId, doc["title"], doc["message"], data)
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            print(f"[push] dispatch failed for {body.recipientId}: {exc}")
 
     await notification_hub.push(body.recipientId, doc)
     return {"ok": True}
@@ -147,6 +161,38 @@ def clear_all(auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
 
 class InviteActionBody(BaseModel):
     notificationId: str
+
+
+class DeviceTokenBody(BaseModel):
+    token: str = Field(min_length=10, max_length=512)
+    platform: str = "web"
+
+
+@router.post("/register-token")
+def register_device_token(body: DeviceTokenBody, auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
+    uid = uid_from_auth(auth)
+    if body.platform not in ("web", "android", "ios"):
+        raise HTTPException(status_code=400, detail="Invalid platform")
+    with get_conn() as conn:
+        # Idempotent upsert: ON CONFLICT DO NOTHING works on both SQLite and Postgres.
+        db_execute(
+            conn,
+            """
+            INSERT INTO device_tokens (user_id, token, platform, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, token) DO NOTHING
+            """,
+            (uid, body.token, body.platform, iso_now()),
+        )
+    return {"ok": True}
+
+
+@router.delete("/unregister-token")
+def unregister_device_token(body: DeviceTokenBody, auth: dict = Depends(verify_bearer)) -> dict[str, bool]:
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        db_execute(conn, "DELETE FROM device_tokens WHERE user_id = ? AND token = ?", (uid, body.token))
+    return {"ok": True}
 
 
 def _guest_player_url(data: dict[str, Any]) -> str | None:
@@ -268,3 +314,125 @@ async def decline_party_invite(body: InviteActionBody, auth: dict = Depends(veri
             await notification_hub.push(host_id, decline_doc)
 
     return {"ok": True}
+
+
+# ── Notification Channel Preferences ────────────────────────────────
+
+class NotificationChannelPrefs(BaseModel):
+    email_enabled: bool = True
+    push_enabled: bool = True
+    in_app_enabled: bool = True
+    # Per-type preferences: {type: {email: bool, push: bool, in_app: bool}}
+    channel_prefs: dict[str, dict[str, bool]] = Field(default_factory=dict)
+
+
+class UpdateChannelPrefsBody(BaseModel):
+    email_enabled: bool | None = None
+    push_enabled: bool | None = None
+    in_app_enabled: bool | None = None
+    channel_prefs: dict[str, dict[str, bool]] | None = None
+
+
+def _default_channel_prefs() -> dict[str, dict[str, bool]]:
+    """Default channel preferences for all notification types."""
+    types = [
+        "like",
+        "comment",
+        "follow",
+        "review",
+        "new_episode",
+        "recommendation",
+        "friend_request",
+        "friend_accepted",
+        "watch_party_invite",
+        "watch_party_invite_declined",
+    ]
+    return {t: {"email": True, "push": True, "in_app": True} for t in types}
+
+
+@router.get("/preferences")
+def get_notification_preferences(auth: dict = Depends(verify_bearer)) -> NotificationChannelPrefs:
+    """Get notification channel preferences for the current user."""
+    uid = uid_from_auth(auth)
+    with get_conn() as conn:
+        row = db_fetchone(
+            conn,
+            "SELECT email_enabled, push_enabled, in_app_enabled, channel_prefs_json FROM notification_preferences WHERE user_id = ?",
+            (uid,),
+        )
+        if row:
+            channel_prefs = json.loads(row_get(row, "channel_prefs_json") or "{}")
+            # Merge with defaults for any missing types
+            defaults = _default_channel_prefs()
+            for t, prefs in defaults.items():
+                if t not in channel_prefs:
+                    channel_prefs[t] = prefs
+            return NotificationChannelPrefs(
+                email_enabled=bool(row_get(row, "email_enabled")),
+                push_enabled=bool(row_get(row, "push_enabled")),
+                in_app_enabled=bool(row_get(row, "in_app_enabled")),
+                channel_prefs=channel_prefs,
+            )
+        # Return defaults if no preferences stored
+        return NotificationChannelPrefs(channel_prefs=_default_channel_prefs())
+
+
+@router.patch("/preferences")
+def update_notification_preferences(body: UpdateChannelPrefsBody, auth: dict = Depends(verify_bearer)) -> NotificationChannelPrefs:
+    """Update notification channel preferences for the current user."""
+    uid = uid_from_auth(auth)
+    created = iso_now()
+
+    with get_conn() as conn:
+        # Get existing preferences
+        row = db_fetchone(
+            conn,
+            "SELECT email_enabled, push_enabled, in_app_enabled, channel_prefs_json FROM notification_preferences WHERE user_id = ?",
+            (uid,),
+        )
+
+        if row:
+            email_enabled = body.email_enabled if body.email_enabled is not None else bool(row_get(row, "email_enabled"))
+            push_enabled = body.push_enabled if body.push_enabled is not None else bool(row_get(row, "push_enabled"))
+            in_app_enabled = body.in_app_enabled if body.in_app_enabled is not None else bool(row_get(row, "in_app_enabled"))
+            channel_prefs = json.loads(row_get(row, "channel_prefs_json") or "{}")
+
+            if body.channel_prefs:
+                # Merge with existing, keeping existing for types not specified
+                channel_prefs = {**channel_prefs, **body.channel_prefs}
+        else:
+            # First time setup - use defaults
+            email_enabled = body.email_enabled if body.email_enabled is not None else True
+            push_enabled = body.push_enabled if body.push_enabled is not None else True
+            in_app_enabled = body.in_app_enabled if body.in_app_enabled is not None else True
+            channel_prefs = _default_channel_prefs()
+            if body.channel_prefs:
+                channel_prefs = {**channel_prefs, **body.channel_prefs}
+
+        # Upsert preferences
+        if row:
+            db_execute(
+                conn,
+                """
+                UPDATE notification_preferences
+                SET email_enabled = ?, push_enabled = ?, in_app_enabled = ?, channel_prefs_json = ?, updated_at = ?
+                WHERE user_id = ?
+                """,
+                (int(email_enabled), int(push_enabled), int(in_app_enabled), json.dumps(channel_prefs), created, uid),
+            )
+        else:
+            db_execute(
+                conn,
+                """
+                INSERT INTO notification_preferences (user_id, email_enabled, push_enabled, in_app_enabled, channel_prefs_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (uid, int(email_enabled), int(push_enabled), int(in_app_enabled), json.dumps(channel_prefs), created),
+            )
+
+    return NotificationChannelPrefs(
+        email_enabled=email_enabled,
+        push_enabled=push_enabled,
+        in_app_enabled=in_app_enabled,
+        channel_prefs=channel_prefs,
+    )

@@ -17,7 +17,6 @@ const FLAGS: Record<string, FlagConfig> = {
   "ambient-glow": { defaultValue: true, description: "Ambient backlight effect on player" },
   "spoiler-guard": { defaultValue: true, description: "Progressive spoiler protection" },
   "offline-sync": { defaultValue: true, description: "Offline PWA sync outbox" },
-  "card-preview": { defaultValue: true, description: "Netflix-style card hover preview panel" },
   "top10-row": { defaultValue: true, description: "Top 10 ranked row on home page" },
   "browse-mega-menu": { defaultValue: true, description: "Browse mega-menu in navigation" },
   "person-pages": { defaultValue: true, description: "Person detail pages (/person/[id])" },

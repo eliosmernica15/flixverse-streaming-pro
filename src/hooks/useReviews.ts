@@ -16,16 +16,20 @@ import {
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { useUserProfileContext } from '@/contexts/UserProfileContext';
+import { useToast } from '@/hooks/use-toast';
 import { Review } from '@/integrations/firebase/types';
 import { enqueuePendingJob } from '@/lib/pendingJobs';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonReviews } from '@/hooks/useReviewsPython';
 
-export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => {
+function useFirestoreReviews(contentId?: number, contentType?: 'movie' | 'tv') {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [likedReviewIds, setLikedReviewIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
   const { profile } = useUserProfileContext();
+  const { toast } = useToast();
 
   // Fetch reviews for a specific content
   useEffect(() => {
@@ -65,12 +69,17 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     }, (error) => {
       console.error('Error fetching reviews:', error);
       if (error.code === 'failed-precondition') {
+        toast({
+          title: 'Reviews temporarily unavailable',
+          description: 'A required database index is missing. The team has been notified.',
+          variant: 'destructive',
+        });
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [contentId, contentType, user]);
+  }, [contentId, contentType, toast, user]);
 
   useEffect(() => {
     if (!user || !isAuthenticated || reviews.length === 0) {
@@ -281,4 +290,12 @@ export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => 
     getAverageRating,
     reviewCount: reviews.length
   };
+}
+
+export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => {
+  /* eslint-disable react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session */
+  return isPythonBackendEnabled()
+    ? usePythonReviews(contentId, contentType)
+    : useFirestoreReviews(contentId, contentType);
+  /* eslint-enable react-hooks/rules-of-hooks */
 };

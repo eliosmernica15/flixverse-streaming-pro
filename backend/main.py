@@ -3,26 +3,67 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db, storage_label
-from routers import notifications, parties
+from database import close_db_pool, init_db, storage_label
+from routers import (
+    account,
+    content,
+    notifications,
+    parties,
+    profile,
+    settings,
+    social,
+    subscriptions,
+)
 
-init_db()
+_database_init_failed = False
 
-app = FastAPI(title="FlixVerse API", version="1.1.0")
+# Keep the API process available during database outages; report degraded
+# health and let request-level database errors remain visible.
+try:
+    init_db()
+except Exception as exc:  # noqa: BLE001
+    import sys as _sys
+
+    _database_init_failed = True
+    print(f"[init_db] skipped (will retry next cold start): {exc}", file=_sys.stderr)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        yield
+    finally:
+        close_db_pool()
+
+
+app = FastAPI(title="FlixVerse API", version="1.2.0", lifespan=lifespan)
 
 API_PREFIX = "/api/flixverse" if os.environ.get("VERCEL") == "1" else ""
 
+app.include_router(account.router, prefix=API_PREFIX)
 app.include_router(notifications.router, prefix=API_PREFIX)
 app.include_router(parties.router, prefix=API_PREFIX)
+app.include_router(profile.router, prefix=API_PREFIX)
+app.include_router(content.router, prefix=API_PREFIX)
+app.include_router(social.router, prefix=API_PREFIX)
+app.include_router(settings.router, prefix=API_PREFIX)
+app.include_router(subscriptions.router, prefix=API_PREFIX)
 
 
 @app.get(f"{API_PREFIX}/health" if API_PREFIX else "/health")
 def health() -> dict[str, str]:
     storage = storage_label()
+    if _database_init_failed:
+        return {
+            "status": "degraded",
+            "storage": storage,
+            "platform": "vercel" if os.environ.get("VERCEL") else "local",
+            "error": "Database initialization or schema check failed",
+        }
     if os.environ.get("VERCEL") == "1" and storage == "none":
         return {
             "status": "degraded",
@@ -33,15 +74,24 @@ def health() -> dict[str, str]:
     return {"status": "ok", "storage": storage, "platform": "vercel" if os.environ.get("VERCEL") else "local"}
 
 
-origins = os.environ.get(
-    "CORS_ORIGINS",
-    "http://localhost:3000,https://flixverse-streaming-pro.vercel.app,https://*.vercel.app",
-).split(",")
+configured_origins = os.environ.get("CORS_ORIGINS")
+origins = [
+    origin.strip()
+    for origin in (
+        configured_origins.split(",")
+        if configured_origins is not None
+        else [
+            "http://localhost:3000",
+            "https://flixverse-streaming-pro.vercel.app",
+        ]
+    )
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in origins if o.strip()] or ["*"],
-    allow_credentials=True,
+    allow_origins=origins,
+    allow_credentials=bool(origins) and "*" not in origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

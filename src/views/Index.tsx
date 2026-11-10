@@ -5,6 +5,8 @@ import HeroBanner from "@/components/HeroBanner";
 import MovieCarousel from "@/components/MovieCarousel";
 import PersonalizedWelcome from "@/components/PersonalizedWelcome";
 import LazySection from "@/components/LazySection";
+import HomeGenreRail from "@/components/HomeGenreRail";
+import { Top10RowSkeleton } from "@/components/skeletons/ContentSkeletons";
 import { PlaySomething } from "@/components/PlaySomething";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeContent } from "@/hooks/queries/useHomeContent";
@@ -19,7 +21,7 @@ import { isFeatureEnabled } from "@/lib/featureFlags";
 
 const Top10Row = dynamic(() => import("@/components/Top10Row"), {
   ssr: false,
-  loading: () => <div className="h-64 skeleton-shimmer rounded-2xl" />,
+  loading: () => <Top10RowSkeleton />,
 });
 
 const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), {
@@ -28,6 +30,11 @@ const ContinueWatching = dynamic(() => import("@/components/ContinueWatching"), 
 });
 
 const PersonalizedHomeRows = dynamic(() => import("@/components/PersonalizedHomeRows"), {
+  ssr: false,
+  loading: () => null,
+});
+
+const PickedForYou = dynamic(() => import("@/components/PickedForYou"), {
   ssr: false,
   loading: () => null,
 });
@@ -56,7 +63,7 @@ const Index = () => {
         <div className="h-[72vh] sm:h-[88vh] lg:h-[92vh] bg-zinc-950 skeleton shimmer-overlay" />
       ) : null}
 
-      <div className="relative z-20 -mt-20 sm:-mt-24 mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
+      <div className="relative z-20 -mt-16 sm:-mt-20 mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-6 lg:px-10 max-w-[1800px] mx-auto">
         <PersonalizedWelcome />
         <div className="w-full shrink-0 sm:w-auto [&_button]:w-full sm:[&_button]:w-auto sm:[&_button]:justify-center">
           <PlaySomething />
@@ -64,7 +71,9 @@ const Index = () => {
       </div>
 
       <div className="relative z-10">
-        <div className="space-y-14 lg:space-y-20 pb-20 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto">
+        <div className="space-y-12 lg:space-y-16 pb-16 lg:pb-24 px-4 sm:px-6 lg:px-10 max-w-[1800px] mx-auto">
+          <HomeGenreRail />
+
           {isAuthenticated && (
             <Reveal>
               <ContinueWatching />
@@ -73,6 +82,10 @@ const Index = () => {
 
           <Reveal>
             <PersonalizedHomeRows />
+          </Reveal>
+
+          <Reveal delay={20}>
+            <PickedForYou />
           </Reveal>
 
           <Reveal>
@@ -85,13 +98,16 @@ const Index = () => {
             />
           </Reveal>
 
-          {isFeatureEnabled("top10-row") && (data?.trendingMovies?.length ?? 0) >= 10 && (
+          {isFeatureEnabled("top10-row") &&
+            (isLoading || (data?.trendingMovies?.length ?? 0) >= 10) && (
             <Reveal delay={40}>
-              <Top10Row movies={data!.trendingMovies!} />
+              {data?.trendingMovies?.length ? (
+                <Top10Row movies={data.trendingMovies} />
+              ) : (
+                <Top10RowSkeleton />
+              )}
             </Reveal>
           )}
-
-          <div className="divider-glow" aria-hidden />
 
           <Reveal delay={80}>
             <MovieCarousel
@@ -105,8 +121,6 @@ const Index = () => {
 
           <LazySection minHeight={360}>
             <>
-              <div className="divider-glow" aria-hidden />
-
               <Reveal delay={0}>
                 <MovieCarousel
                   title={t("topRated")}
@@ -116,8 +130,6 @@ const Index = () => {
                   exploreAllPath="/browse/top-rated"
                 />
               </Reveal>
-
-              <div className="divider-glow" aria-hidden />
 
               <Reveal delay={80}>
                 <MovieCarousel
@@ -129,8 +141,6 @@ const Index = () => {
                 />
               </Reveal>
 
-              <div className="divider-glow" aria-hidden />
-
               <Reveal delay={160}>
                 <MovieCarousel
                   title={t("trendingTv")}
@@ -141,8 +151,6 @@ const Index = () => {
                 />
               </Reveal>
 
-              <div className="divider-glow" aria-hidden />
-
               <Reveal delay={240}>
                 <MovieCarousel
                   title={t("popularTv")}
@@ -152,8 +160,6 @@ const Index = () => {
                   exploreAllPath="/browse/popular-tv"
                 />
               </Reveal>
-
-              <div className="divider-glow" aria-hidden />
 
               <Reveal delay={320}>
                 <MovieCarousel

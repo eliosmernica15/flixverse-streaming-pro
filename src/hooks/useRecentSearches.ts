@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 
-const STORAGE_KEY = "flixverse-recent-searches";
+// Colon form matches the key the live search surfaces (SearchBar,
+// SearchResults) read and write, so recents stay shared across all of them.
+const STORAGE_KEY = "flixverse:recent-searches";
 const MAX_RECENT = 10;
 
 export function useRecentSearches() {

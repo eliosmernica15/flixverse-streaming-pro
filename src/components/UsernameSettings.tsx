@@ -122,12 +122,23 @@ export function UsernameSettings({ compact = false }: UsernameSettingsProps) {
       const data = (await res.json().catch(() => ({}))) as {
         username?: string;
         error?: string;
+        detail?: string;
       };
 
       if (!res.ok) {
+        // 503 means the backend couldn't reach Firebase to verify the token —
+        // the user's session is fine, the auth *backend* is having a moment.
+        // Don't scare them with "could not save"; tell them to retry.
+        if (res.status === 503) {
+          toast({
+            title: "Verifying your session…",
+            description: "Please try again in a moment.",
+          });
+          return;
+        }
         toast({
           title: "Could not save username",
-          description: data.error || "Please try again.",
+          description: data.error || data.detail || "Please try again.",
           variant: "destructive",
         });
         if (res.status === 409) setAvailability("taken");

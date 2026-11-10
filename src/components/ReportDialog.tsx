@@ -12,6 +12,7 @@ interface ReportDialogProps {
   targetType: "review" | "comment" | "timeline_comment" | "profile";
   targetId: string;
   targetOwnerId?: string;
+  onSubmit?: (reason: string, details?: string) => Promise<boolean>;
 }
 
 const REPORT_REASONS = [
@@ -30,6 +31,7 @@ export function ReportDialog({
   targetType,
   targetId,
   targetOwnerId,
+  onSubmit,
 }: ReportDialogProps) {
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState("");
@@ -49,22 +51,34 @@ export function ReportDialog({
 
     setSubmitting(true);
     try {
-      const { getFirestore, collection, addDoc } = await import("firebase/firestore");
-      const db = getFirestore();
-      await addDoc(collection(db, "reports"), {
-        reporterId: user.uid,
-        targetType,
-        targetId,
-        targetOwnerId: targetOwnerId || null,
-        reason,
-        details: details.trim() || null,
-        status: "pending",
-        createdAt: Date.now(),
-      });
-      toast({ title: "Report submitted", description: "Thank you for helping keep FlixVerse safe." });
-      onClose();
-      setReason("");
-      setDetails("");
+      if (onSubmit) {
+        // Use custom submit handler (e.g., from useReport hook)
+        const success = await onSubmit(reason, details.trim() || undefined);
+        if (success) {
+          toast({ title: "Report submitted", description: "Thank you for helping keep FlixVerse safe." });
+          onClose();
+          setReason("");
+          setDetails("");
+        }
+      } else {
+        // Default Firestore submission
+        const { getFirestore, collection, addDoc } = await import("firebase/firestore");
+        const db = getFirestore();
+        await addDoc(collection(db, "reports"), {
+          reporterId: user.uid,
+          targetType,
+          targetId,
+          targetOwnerId: targetOwnerId || null,
+          reason,
+          details: details.trim() || null,
+          status: "pending",
+          createdAt: Date.now(),
+        });
+        toast({ title: "Report submitted", description: "Thank you for helping keep FlixVerse safe." });
+        onClose();
+        setReason("");
+        setDetails("");
+      }
     } catch {
       toast({ title: "Error", description: "Failed to submit report.", variant: "destructive" });
     } finally {

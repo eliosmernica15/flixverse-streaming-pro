@@ -4,6 +4,8 @@
  * Requires: sharp (npm install sharp)
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports -- standalone CJS script run directly with node */
+
 const fs = require("fs");
 const path = require("path");
 

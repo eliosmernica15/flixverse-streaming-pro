@@ -1,0 +1,464 @@
+﻿/* =====================================================================
+ * CINEMA STAGE
+ *
+ * A generated 3D environment behind the player. Every value that varies
+ * per title arrives as a CSS custom property from CinemaStage.tsx:
+ *
+ *   --stage-primary / --stage-accent / --stage-base / --stage-glow
+ *   --stage-vanish       vanishing-point horizontal offset
+ *   --stage-wall-angle   Y rotation of the side planes
+ *   --stage-strength     0-1 master opacity multiplier
+ *   --stage-energy       0-1 animation speed multiplier
+ *   --stage-vignette     0-1 edge darkening
+ *   --stage-lean-x/y     pointer parallax, written by a rAF loop
+ *
+ * There is no per-frame JavaScript here. The room is static geometry that
+ * composites on the GPU; only the motes animate, and `prefers-reduced-motion`
+ * turns them into a still field.
+ *
+ * Performance contract:
+ *   - `contain: strict` promotes the whole stage to its own layer once.
+ *   - `pointer-events: none` so it can never steal a click from the player.
+ *   - `will-change` is deliberately NOT set globally; the stage already sits
+ *     on its own composited layer, and adding it per-child would multiply GPU
+ *     memory across the dozens of motes.
+ * ===================================================================== */
+
+.cinema-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  isolation: isolate;
+  perspective: 1200px;
+  perspective-origin: calc(50% + var(--stage-vanish, 0%)) 46%;
+  opacity: 0;
+  transition: opacity 700ms ease-out;
+  background: var(--stage-base, #050506);
+}
+
+/* -- 1. The void --------------------------------------------------- */
+.cinema-stage-void {
+  position: absolute;
+  inset: -10%;
+  background:
+    radial-gradient(
+      58% 52% at calc(50% + var(--stage-vanish, 0%)) 44%,
+      color-mix(in oklab, var(--stage-primary) 22%, transparent) 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      84% 70% at 50% 108%,
+      color-mix(in oklab, var(--stage-accent) 16%, transparent) 0%,
+      transparent 70%
+    );
+  opacity: var(--stage-strength, 1);
+  transition: opacity 900ms ease-out;
+}
+
+/* -- 2. Room geometry ---------------------------------------------- */
+.cinema-stage-room {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform:
+    rotateX(var(--stage-lean-x, 0deg))
+    rotateY(var(--stage-lean-y, 0deg));
+  transition: transform 120ms linear;
+}
+
+.cinema-stage-ceiling {
+  position: absolute;
+  left: -30%;
+  right: -30%;
+  top: -46%;
+  height: 62%;
+  transform-origin: bottom center;
+  transform: rotateX(62deg);
+  background: var(--stage-ceiling, transparent);
+  opacity: calc(0.55 * var(--stage-strength, 1));
+  filter: blur(2px);
+}
+
+.cinema-stage-wall {
+  position: absolute;
+  top: -14%;
+  bottom: -14%;
+  width: 46%;
+  opacity: calc(0.5 * var(--stage-strength, 1));
+  filter: blur(1px);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--stage-primary) 12%, transparent) 0%,
+    transparent 82%
+  );
+}
+
+.cinema-stage-wall--left {
+  left: 0;
+  transform-origin: left center;
+  transform: rotateY(var(--stage-wall-angle, 30deg));
+}
+
+.cinema-stage-wall--right {
+  right: 0;
+  transform-origin: right center;
+  transform: rotateY(calc(var(--stage-wall-angle, 30deg) * -1));
+  background: linear-gradient(
+    270deg,
+    color-mix(in oklab, var(--stage-accent) 12%, transparent) 0%,
+    transparent 82%
+  );
+}
+
+.cinema-stage-floor {
+  position: absolute;
+  left: -34%;
+  right: -34%;
+  bottom: -34%;
+  height: 66%;
+  transform-origin: top center;
+  transform: rotateX(-68deg);
+  background: var(--stage-floor, transparent);
+  opacity: calc(0.8 * var(--stage-strength, 1));
+  overflow: hidden;
+}
+
+/* A soft specular streak on the floor: reads as polish, sells the plane. */
+.cinema-stage-floor-sheen {
+  position: absolute;
+  inset: -10% -20%;
+  background: radial-gradient(
+    42% 64% at 50% 0%,
+    color-mix(in oklab, var(--stage-glow) 18%, transparent) 0%,
+    transparent 74%
+  );
+  opacity: 0.7;
+  transform: translate(
+    calc(var(--stage-shift-x, 0px) * -0.5),
+    calc(var(--stage-shift-y, 0px) * -0.4)
+  );
+}
+
+/* -- 3. Projector beam --------------------------------------------- */
+.cinema-stage-projector {
+  position: absolute;
+  left: 50%;
+  top: 6%;
+  width: 92%;
+  height: 96%;
+  transform: translateX(-50%);
+  background: conic-gradient(
+    from 180deg at 50% 0%,
+    transparent 42%,
+    color-mix(in oklab, var(--stage-glow) 9%, transparent) 50%,
+    transparent 58%
+  );
+  filter: blur(42px);
+  opacity: calc(0.7 * var(--stage-strength, 1));
+  mix-blend-mode: screen;
+  transform-origin: top center;
+  animation: cinema-projector-breathe 9s ease-in-out infinite alternate;
+}
+
+@keyframes cinema-projector-breathe {
+  from {
+    opacity: calc(0.5 * var(--stage-strength, 1));
+    transform: translateX(-50%) scaleY(0.985);
+  }
+  to {
+    opacity: calc(0.82 * var(--stage-strength, 1));
+    transform: translateX(-50%) scaleY(1.02);
+  }
+}
+
+/* -- 4. Motes ------------------------------------------------------ */
+.cinema-stage-motes {
+  position: absolute;
+  inset: 0;
+  transform: translate3d(
+    calc(var(--stage-shift-x, 0px) * 0.35),
+    calc(var(--stage-shift-y, 0px) * 0.35),
+    0
+  );
+  transition: transform 160ms linear;
+}
+
+.cinema-stage-mote {
+  position: absolute;
+  border-radius: 999px;
+  background: var(--stage-glow, #fff);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--stage-glow) 60%, transparent);
+  animation-name: cinema-mote-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform;
+}
+
+@keyframes cinema-mote-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(var(--mote-drift-x, 12px), var(--mote-drift-y, -20px), 0) scale(1.12);
+  }
+}
+
+/* -- 5. Vignette + grain ------------------------------------------- */
+.cinema-stage-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    74% 64% at calc(50% + var(--stage-vanish, 0%)) 50%,
+    transparent 38%,
+    rgba(0, 0, 0, calc(0.82 * var(--stage-vignette, 0.8))) 100%
+  );
+}
+
+.cinema-stage-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.038;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* -- 6. Reduced motion: a still room, not an empty one ------------- */
+.cinema-stage--static .cinema-stage-mote,
+.cinema-stage--static .cinema-stage-projector {
+  animation: none;
+}
+.cinema-stage--static .cinema-stage-mote {
+  opacity: 0.22;
+}
+.cinema-stage--static .cinema-stage-motes,
+.cinema-stage--static .cinema-stage-room,
+.cinema-stage--static .cinema-stage-floor-sheen {
+  transform: none;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinema-stage-mote,
+  .cinema-stage-projector {
+    animation: none;
+  }
+  .cinema-stage-motes,
+  .cinema-stage-room,
+  .cinema-stage-floor-sheen {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Phones: the walls and the beam are the expensive parts (large blurred
+   surfaces). Keep the void, the floor and the motes - that is where the
+   atmosphere actually comes from at that size. */
+@media (max-width: 768px) {
+  .cinema-stage-wall,
+  .cinema-stage-ceiling {
+    display: none;
+  }
+  .cinema-stage-projector {
+    filter: blur(30px);
+    width: 140%;
+  }
+  .cinema-stage-grain {
+    display: none;
+  }
+}
+
+/* =====================================================================
+ * CINEMA PULSE (4D frame reaction)
+ *
+ * Applied to the shell by PlayerShell when `fireHaptic` broadcasts a cinema
+ * beat. A 0.5 % scale breath plus a warm inner rim - enough to register
+ * peripherally, never enough to disturb the picture.
+ * ===================================================================== */
+
+.player-shell--cinema-pulse .player-window {
+  animation: cinema-shell-pulse 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cinema-shell-pulse {
+  0% {
+    transform: scale(1);
+  }
+  26% {
+    transform: scale(1.005);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.player-shell--cinema-pulse .player-window-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--stage-glow, #ffffff) 22%, transparent),
+    inset 0 0 60px color-mix(in oklab, var(--stage-glow, #ffffff) 12%, transparent);
+  animation: cinema-shell-rim 260ms ease-out forwards;
+}
+
+@keyframes cinema-shell-rim {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-shell--cinema-pulse .player-window,
+  .player-shell--cinema-pulse .player-window-body::after {
+    animation: none;
+  }
+}
+
+/* =====================================================================
+ * CARD DEPTH SYSTEM v2
+ *
+ * Extends the existing .netflix-card-* depth planes with:
+ *   - a directional key light that sweeps with the cursor (--tilt-sheen-*)
+ *   - a rim light on the leading edge of the tilt
+ *   - a grounded contact shadow that shortens as the card lifts
+ *
+ * All values come from CSS custom properties written by `use3DTilt`, so this
+ * is pure compositor work.
+ * ===================================================================== */
+
+.movie-card-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--tilt-active, 0);
+  transition: opacity 280ms ease-out;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      transparent 26%
+    ),
+    linear-gradient(
+      315deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      transparent 22%
+    );
+  mix-blend-mode: screen;
+}
+
+/* Key light: a soft ellipse that tracks the pointer across the poster. */
+.movie-card-keylight {
+  position: absolute;
+  inset: -16%;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: calc(var(--tilt-active, 0) * 0.9);
+  transition: opacity 300ms ease-out;
+  background: radial-gradient(
+    46% 46% at var(--tilt-sheen-x, 50%) var(--tilt-sheen-y, 50%),
+    rgba(255, 255, 255, 0.26) 0%,
+    rgba(255, 255, 255, 0.08) 34%,
+    transparent 68%
+  );
+  mix-blend-mode: soft-light;
+}
+
+/* Contact shadow under the card: tightens as the card lifts toward you. */
+.movie-card-shadow {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -10px;
+  height: 18px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(0, 0, 0, 0.62) 0%,
+    transparent 72%
+  );
+  filter: blur(7px);
+  opacity: calc(0.45 + var(--tilt-active, 0) * 0.4);
+  transform: scaleX(calc(1 - var(--tilt-active, 0) * 0.14));
+  transform-origin: center;
+  transition: transform 300ms ease-out, opacity 300ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .movie-card-rim,
+  .movie-card-keylight {
+    display: none;
+  }
+  .movie-card-shadow {
+    opacity: 0.4;
+    transform: none;
+  }
+}
+
+/* =====================================================================
+ * SPATIAL VOICE BADGE
+ *
+ * Shows which side of the stereo stage a remote participant's voice is
+ * placed on. Honest UI: it reflects the actual panner value.
+ * ===================================================================== */
+
+.party-voice-pan {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.party-voice-pan-bar {
+  position: relative;
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.party-voice-pan-dot {
+  position: absolute;
+  top: -1px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #34d399;
+  transform: translateX(-50%);
+  transition: left 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Mood theming - applied via player-shell--mood-* class from cinemaPresets. */
+.player-shell--mood-horror { --cinema-temp: -250; --cinema-bloom-boost: 0.85; }
+.player-shell--mood-scifi { --cinema-temp: 200; --cinema-bloom-boost: 1.15; }
+.player-shell--mood-fantasy { --cinema-temp: 50; --cinema-bloom-boost: 1.2; }
+.player-shell--mood-action { --cinema-temp: -150; --cinema-bloom-boost: 1.25; }
+.player-shell--mood-romance { --cinema-temp: 150; --cinema-bloom-boost: 1.0; }
+.player-shell--mood-comedy { --cinema-temp: 100; --cinema-bloom-boost: 1.05; }
+.player-shell--mood-drama { --cinema-temp: -50; --cinema-bloom-boost: 0.95; }
+.player-shell--mood-documentary { --cinema-temp: 0; --cinema-bloom-boost: 0.9; }
+.player-shell--mood-neutral { --cinema-temp: 0; --cinema-bloom-boost: 1.0; }
