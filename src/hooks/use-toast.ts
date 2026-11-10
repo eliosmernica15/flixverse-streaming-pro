@@ -15,12 +15,14 @@ type ToasterToast = ToastProps & {
   action?: ToastActionElement
 }
 
-const actionTypes = {
+// Exported so the canonical action-name registry has a value-level
+// consumer; `ActionType` below derives from it at the type level.
+export const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
   UPDATE_TOAST: "UPDATE_TOAST",
   DISMISS_TOAST: "DISMISS_TOAST",
   REMOVE_TOAST: "REMOVE_TOAST",
-} as const
+} as const;
 
 let count = 0
 

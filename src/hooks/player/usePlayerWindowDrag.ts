@@ -114,6 +114,15 @@ export function usePlayerWindowDrag(
     };
   }, [isDragging, clampPosition]);
 
+  useEffect(() => {
+    if (!position) return;
+    const onResize = () => {
+      setPosition((prev) => (prev ? clampPosition(prev.x, prev.y) : null));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [position, clampPosition]);
+
   const windowStyle: CSSProperties | undefined = position
     ? {
         position: "fixed",

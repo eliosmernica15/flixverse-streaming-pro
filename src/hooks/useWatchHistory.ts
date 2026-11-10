@@ -5,7 +5,6 @@ import {
   where,
   orderBy,
   onSnapshot,
-  setDoc,
   deleteDoc,
   doc,
   limit
@@ -14,11 +13,14 @@ import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client
 import { useAuth } from './useAuth';
 import { MutationDispatcher } from '@/lib/offline/mutationDispatcher';
 import { WatchHistory } from '@/integrations/firebase/types';
+import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
+import { usePythonWatchHistory } from '@/hooks/useWatchHistoryPython';
 
-export const useWatchHistory = () => {
+/** Firestore implementation. Selected when Python backend is disabled. */
+function useFirestoreWatchHistory() {
   const [history, setHistory] = useState<WatchHistory[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   // Fetch watch history for the current user
   useEffect(() => {
@@ -71,11 +73,6 @@ export const useWatchHistory = () => {
       throw new Error('User must be logged in to track watch history');
     }
 
-    // Create a unique ID for this watch entry
-    const historyId = contentType === 'tv' && season && episode
-      ? `${user.uid}_${contentId}_s${season}e${episode}`
-      : `${user.uid}_${contentId}`;
-
     const completed = progressSeconds >= totalDurationSeconds * 0.9;
 
     await MutationDispatcher.dispatch('UPDATE_PROGRESS', {
@@ -111,13 +108,19 @@ export const useWatchHistory = () => {
 
   // Clear all history
   const clearHistory = async () => {
-    if (!user || history.length === 0) return;
+    if (!user || history.length === 0) return { success: 0, failed: 0 };
 
     const db = requireFirebaseDb();
-    const promises = history.map(item =>
-      deleteDoc(doc(db, 'watch_history', item.id))
+    const results = await Promise.allSettled(
+      history.map(item => deleteDoc(doc(db, 'watch_history', item.id))
+      )
     );
-    await Promise.all(promises);
+    const success = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.length - success;
+    if (failed > 0) {
+      console.error(`clearHistory: ${failed} of ${results.length} deletions failed`);
+    }
+    return { success, failed };
   };
 
   // Get continue watching items (not completed, with valid duration to avoid NaN/glitches)
@@ -146,4 +149,11 @@ export const useWatchHistory = () => {
     getContinueWatching,
     getRecentlyWatched
   };
+}
+
+/** Public facade — routes to Python API on Vercel, Firestore elsewhere. */
+export const useWatchHistory = () => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session
+  return isPythonBackendEnabled() ? usePythonWatchHistory() : useFirestoreWatchHistory();
 };
+

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Maximize2, Minimize2, X, Users, LogOut, GripVertical } from "lucide-react";
+import { Maximize2, Minimize2, X, Users, LogOut, GripVertical, MessageCircle } from "lucide-react";
 import { buildStreamingSources } from "@/lib/streamingSources";
 import { usePlaybackClock } from "@/hooks/player/usePlaybackClock";
 import { useEmbedBridge } from "@/hooks/player/useEmbedBridge";
@@ -13,8 +13,11 @@ import {
 } from "@/hooks/player/usePlayerWindowResize";
 import { useVolumeDucking } from "@/hooks/player/useVolumeDucking";
 import { useTimelineComments } from "@/hooks/player/useTimelineComments";
+import { useCaptions } from "@/hooks/player/useCaptions";
+import { CaptionOverlay } from "./CaptionOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocale } from "@/hooks/useLocale";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { isSpoilerGuardEnabled } from "@/lib/player/spoilerGuard";
 import { EmbedFrame } from "./EmbedFrame";
@@ -23,13 +26,21 @@ import { FlixPartySidebar } from "./FlixPartySidebar";
 import { FlixPartyInviteDialog } from "./FlixPartyInviteDialog";
 import { PartyCameraGrid, PartyCameraPiP } from "./PartyMediaPanel";
 import { PartyGuestSplash } from "./PartyGuestSplash";
-import { AmbientGlowFrame } from "./AmbientGlowFrame";
+import { SnapToHostPill } from "./SnapToHostPill";
+import { SpatialReactionsLayer } from "./SpatialReactionsLayer";
+import { useCinemaHaptics } from "@/hooks/player/useCinemaHaptics";
+import { CINEMA_PULSE_EVENT, isHapticsEnabled } from "@/lib/player/haptics";
 import { PlayerOverlayControls } from "./PlayerOverlayControls";
 import { AddCommentDialog } from "./AddCommentDialog";
 import { UpNextCountdown } from "./UpNextCountdown";
 import type { SyncStatus } from "./SyncStatusBadge";
 import { trackPlaybackStart } from "@/lib/analytics";
-import { releasePageScrollLock } from "@/lib/player/releaseScrollLock";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useNetworkQuality } from "@/hooks/useNetworkQuality";
+import { pickServerByQuality } from "@/lib/streamingSources";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { NTPClient } from "@/lib/player/ntpClockSync";
+import { parseChaptersFromEvent, type Chapter } from "@/lib/player/chapterParser";
 import "@/app/video-player.css";
 
 interface PlayerShellProps {
@@ -42,6 +53,7 @@ interface PlayerShellProps {
   season?: number;
   episode?: number;
   posterPath?: string;
+  /** TMDB genre ids for the title — drives the cinema mood preset. */
   resumePosition?: number;
   totalDuration?: number;
   episodeCount?: number;
@@ -55,13 +67,17 @@ const LOAD_TIMEOUT_MS = 15_000;
 function partyStatusLabel(status: SyncStatus): string {
   switch (status) {
     case "connected":
-      return "Party live";
+      return "Live · synced";
     case "connecting":
       return "Connecting…";
     case "drift":
       return "Re-syncing…";
+    case "resyncing":
+      return "Hard resync";
+    case "staging":
+      return "On hold · syncing start";
     case "disconnected":
-      return "Party offline";
+      return "Offline";
     default:
       return "Party";
   }
@@ -73,6 +89,8 @@ function partyStatusClass(status: SyncStatus): string {
       return "player-party-live";
     case "connecting":
     case "drift":
+    case "resyncing":
+    case "staging":
       return "player-party-syncing";
     default:
       return "player-party-offline";
@@ -97,46 +115,80 @@ export function PlayerShell({
   const [currentServer, setCurrentServer] = useState(initialServer ?? 0);
   const [embedState, setEmbedState] = useState<"loading" | "ready" | "error">("loading");
   const [showShortcutsMenu, setShowShortcutsMenu] = useState(false);
+  const [showServerSelector, setShowServerSelector] = useState(false);
   const [showHint, setShowHint] = useState(true);
   const [liveDuration, setLiveDuration] = useState(0);
   const [showUpNext, setShowUpNext] = useState(false);
+  const [showSkipIntro, setShowSkipIntro] = useState(false);
+  const [showSkipRecap, setShowSkipRecap] = useState(false);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [introChapter, setIntroChapter] = useState<Chapter | null>(null);
+  const [recapChapter, setRecapChapter] = useState<Chapter | null>(null);
   const [commentAt, setCommentAt] = useState<number | null>(null);
+  const [cursorIdle, setCursorIdle] = useState(true);
+  const [captionsOn, setCaptionsOn] = useState(false);
+  const cursorIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleEndedRef = useRef<() => void>(() => {});
 
   const { user } = useAuth();
   const locale = useLocale();
+  const networkQuality = useNetworkQuality();
+  const { preferences, updatePreferences } = useUserPreferences();
   const timelineEnabled = isFeatureEnabled("timeline-comments");
-  const glowEnabled = isFeatureEnabled("ambient-glow");
+
+  // Audio language. The user's `preferredLanguage` preference wins; otherwise we
+  // fall back to the site locale (so Albanian-locale visitors get Albanian by
+  // default and everyone else gets English). We restrict to {en, sq} because
+  // YapGrid will happily serve a Hindi-dubbed source if `lang` is left open.
+  const ALLOWED_LANGS = ["en", "sq"] as const;
+  type StreamLang = (typeof ALLOWED_LANGS)[number];
+  const defaultLang: StreamLang = (() => {
+    if (
+      preferences.preferredLanguage &&
+      (ALLOWED_LANGS as readonly string[]).includes(preferences.preferredLanguage)
+    ) {
+      return preferences.preferredLanguage as StreamLang;
+    }
+    return locale === "sq" ? "sq" : "en";
+  })();
+  const [streamLang, setStreamLang] = useState<StreamLang>(defaultLang);
 
   const autoFailoverRef = useRef(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const windowRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const playerDrag = usePlayerWindowDrag(shellRef, windowRef);
 
   const streamingSources = useMemo(
     () =>
       buildStreamingSources(movieId, mediaType, season, episode, {
-        lang: locale === "sq" ? "sq" : undefined,
+        lang: streamLang,
         title,
       }),
-    [movieId, mediaType, season, episode, locale, title]
+    [movieId, mediaType, season, episode, streamLang, title]
   );
   const currentSource = streamingSources[currentServer];
-  const effectiveDuration = liveDuration || totalDuration || 120 * 60;
 
-  const { currentTime, seekTo, syncTo } = usePlaybackClock({
-    movieId,
-    mediaType,
-    title,
-    posterPath: posterPath || null,
-    season,
-    episode,
-    initialPosition: resumePosition,
-    totalDuration: effectiveDuration,
-    isPlaying: embedState === "ready",
-  });
+  // Network-aware initial quality: when the caller did not pin a server, pick
+  // one that matches the connection. Runs once per source list change.
+  const autoQualityAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialServer !== undefined) return;
+    if (autoQualityAppliedRef.current) return;
+    if (!streamingSources.length) return;
+    autoQualityAppliedRef.current = true;
+    const label =
+      networkQuality === "high" ? "4K" : networkQuality === "medium" ? "1080p" : "720p";
+    const idx = pickServerByQuality(streamingSources, label, 0);
+    if (idx !== currentServer) {
+      setCurrentServer(idx);
+      setEmbedState("loading");
+      setLiveDuration(0);
+    }
+  }, [streamingSources, networkQuality, initialServer, currentServer]);
+  const effectiveDuration = liveDuration || totalDuration || 120 * 60;
 
   const nextEpisode = useMemo(() => {
     if (mediaType !== "tv" || !season || !episode) return null;
@@ -146,12 +198,7 @@ export function PlayerShell({
     return { season: season + 1, episode: 1 };
   }, [mediaType, season, episode, episodeCount]);
 
-  const handleEnded = useCallback(() => {
-    if (mediaType === "tv" && onAdvanceEpisode && nextEpisode) {
-      setShowUpNext(true);
-    }
-  }, [mediaType, onAdvanceEpisode, nextEpisode]);
-
+  
   const {
     isPlaying,
     volume,
@@ -172,7 +219,35 @@ export function PlayerShell({
     totalDuration: effectiveDuration,
     onTimeUpdate: (time) => syncTo(time),
     onDurationChange: (duration) => setLiveDuration(duration),
-    onEnded: handleEnded,
+    onEnded: () => handleEndedRef.current?.(),
+  });
+
+  /**
+   * The local clock must follow the *embed's* play state, not merely "the
+   * embed finished loading".
+   *
+   * It used to be wired to `embedState === "ready"`, which is true from the
+   * moment the iframe loads until it is unmounted. That meant the playhead
+   * kept advancing while the film was paused: the progress bar crept forward,
+   * and — far worse — in a watch party the host broadcast that invented
+   * position every heartbeat, dragging every guest forward with it.
+   *
+   * `isPlaying` is a real belief about playback, updated from provider
+   * `PLAYER_EVENT`s and from our own optimistic transport commands, so it is
+   * the correct driver. When the provider is silent (cross-origin embeds that
+   * never post events) it stays at its initial `true`, which preserves the
+   * previous behaviour for exactly those players.
+   */
+  const { currentTime, seekTo, syncTo } = usePlaybackClock({
+    movieId,
+    mediaType,
+    title,
+    posterPath: posterPath || null,
+    season,
+    episode,
+    initialPosition: resumePosition,
+    totalDuration: effectiveDuration,
+    isPlaying: isPlaying && embedState === "ready",
   });
 
   const timeline = useTimelineComments({
@@ -180,17 +255,37 @@ export function PlayerShell({
     enabled: timelineEnabled && embedState === "ready",
   });
 
+  // Self-hosted captions overlay. We only enable this when the user explicitly
+  // picked a non-English language (so they actually want the captions we
+  // ship), and only when the embed is loaded AND the CC button is on. The
+  // captions system is wired on top of the embed — the embed's own player-side
+  // subtitle picker still works for English sources.
+  const captions = useCaptions({
+    tmdbId: movieId,
+    mediaType,
+    season,
+    episode,
+    duration: effectiveDuration,
+    enabled: captionsOn && embedState === "ready" && streamLang !== "en",
+    lang: streamLang,
+  });
+
+  // `timeline.getMarkers` / `getCommentsNear` are recreated on every render by
+  // the hook, so listing them would defeat the memo. `timeline.comments` is
+  // the actual input that changes; the callbacks only read it.
   const overlayMarkers = useMemo(() => {
     const markers = timeline.getMarkers(effectiveDuration);
     if (!isSpoilerGuardEnabled()) return markers;
     return markers.filter((m) => m.timestamp <= currentTime + 1);
-  }, [timeline.getMarkers, timeline.comments, effectiveDuration, currentTime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeline.comments, effectiveDuration, currentTime]);
 
   const overlayNearby = useMemo(() => {
     const near = timeline.getCommentsNear(currentTime, 8);
     if (!isSpoilerGuardEnabled()) return near;
     return near.filter((c) => c.timestampSeconds <= currentTime + 1);
-  }, [timeline.getCommentsNear, timeline.comments, currentTime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeline.comments, currentTime]);
 
   const party = usePlayerPartySync({
     movieId,
@@ -214,13 +309,32 @@ export function PlayerShell({
     guestJoinMode,
   });
 
-  const { media, guestServerIndex } = party;
+   const { media, guestServerIndex, resyncSeekUrl, setResyncSeekUrl, broadcastNextEpisode } = party;
   const layout = usePartyLayout();
-  const guestServerAppliedRef = useRef(false);
   const mobilePartyPreparedRef = useRef(false);
 
   const inParty = !!party.partyRoomId;
   const isMobile = layout.isMobile;
+
+  // Binge sync: auto-advance to next episode when episode ends
+  const handleEnded = useCallback(() => {
+    if (mediaType === "tv" && onAdvanceEpisode && nextEpisode) {
+      // Binge sync: auto-advance to next episode for party host without showing UpNext overlay
+      if (inParty && party.isPartyHost && party.partyRoomId) {
+        // Use NTP-corrected transition time for precise sync
+        const transitionTime = NTPClient.now() + 500; // Small buffer for network latency
+        broadcastNextEpisode(nextEpisode.season, nextEpisode.episode, currentServer, transitionTime);
+        // Also call onAdvanceEpisode locally for the host to navigate
+        onAdvanceEpisode(nextEpisode.season, nextEpisode.episode);
+      } else {
+        // Non-party or guest: show UpNext countdown for manual advance
+        setShowUpNext(true);
+      }
+    }
+  }, [mediaType, onAdvanceEpisode, nextEpisode, inParty, party, currentServer, broadcastNextEpisode]);
+
+  // Update the ref so useEmbedBridge can call it
+  handleEndedRef.current = handleEnded;
 
   const playerResize = usePlayerWindowResize(shellRef, windowRef, {
     enabled: !isMobile,
@@ -262,16 +376,22 @@ export function PlayerShell({
     setLiveDuration(0);
     setPlaying(true);
     setReady(false);
-  }, [setPlaying, setReady]);
+    // Host switching mid-party pulls every guest to the same source.
+    if (party.partyRoomId && party.isPartyHost) {
+      party.broadcastServerChange(index, currentTime);
+    }
+  }, [setPlaying, setReady, party, currentTime]);
 
+  const [followedGuestServer, setFollowedGuestServer] = useState<number | null>(null);
   useEffect(() => {
-    if (guestServerIndex === null || guestServerAppliedRef.current || party.isPartyHost) return;
+    if (guestServerIndex === null || party.isPartyHost) return;
     if (guestServerIndex < 0 || guestServerIndex >= streamingSources.length) return;
-    guestServerAppliedRef.current = true;
+    if (guestServerIndex === followedGuestServer) return;
+    setFollowedGuestServer(guestServerIndex);
     if (guestServerIndex !== currentServer) {
       switchServer(guestServerIndex);
     }
-  }, [guestServerIndex, party.isPartyHost, currentServer, streamingSources.length, switchServer]);
+  }, [guestServerIndex, followedGuestServer, party.isPartyHost, currentServer, streamingSources.length, switchServer]);
 
   useVolumeDucking({
     enabled: !!party.partyRoomId && (media.micOn || media.anyoneSpeaking),
@@ -279,6 +399,56 @@ export function PlayerShell({
     baseVolume: volume,
     setVolume,
   });
+
+  // 4D haptics: real low-band audio transients when a same-origin <video>
+  // exists, plus a tactile confirmation on every transport action. Opt-in —
+  // `isHapticsEnabled()` is a persisted user preference, default off.
+  //
+  // The transport event must carry only the *kind*: `at` used to be
+  // `Math.floor(currentTime)`, which changes every second of playback and
+  // made the haptics hook pulse once per second for the whole film.
+  const hapticsEnabled = useMemo(() => isHapticsEnabled(), []);
+  const transportBeat = useMemo(
+    () => ({ kind: isPlaying ? ("play" as const) : ("pause" as const), at: 0 }),
+    [isPlaying]
+  );
+  useCinemaHaptics({
+    enabled: hapticsEnabled && embedState === "ready",
+    videoRef: undefined,
+    transportEvent: transportBeat,
+  });
+
+  /**
+   * Visual half of the 4D response. `fireHaptic` broadcasts
+   * `flixverse:cinema-pulse` on every beat; here we turn that into a 220 ms
+   * frame breath (see `.cinema-pulse` in video-player.css). It is the only
+   * channel that works on a desktop with no vibration motor, so without this
+   * listener the "4D" feedback was invisible for most viewers.
+   */
+  const pulseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pulsing, setPulsing] = useState(false);
+
+  useEffect(() => {
+    if (!hapticsEnabled) return;
+    if (typeof window === "undefined") return;
+
+    const onPulse = () => {
+      // Re-trigger the animation class even when a second beat lands before
+      // the first finishes: drop the class, force a reflow, re-add it.
+      setPulsing(false);
+      if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+      pulseTimeoutRef.current = setTimeout(() => {
+        setPulsing(true);
+        pulseTimeoutRef.current = setTimeout(() => setPulsing(false), 240);
+      }, 16);
+    };
+
+    window.addEventListener(CINEMA_PULSE_EVENT, onPulse);
+    return () => {
+      window.removeEventListener(CINEMA_PULSE_EVENT, onPulse);
+      if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+    };
+  }, [hapticsEnabled]);
 
   const cameraLayout = inParty && showCameras;
 
@@ -290,14 +460,35 @@ export function PlayerShell({
     switchServer((currentServer - 1 + streamingSources.length) % streamingSources.length);
   }, [currentServer, streamingSources.length, switchServer]);
 
+  // Switch the preferred audio/subtitle language and reload the current server
+  // with the new `lang` query string. YapGrid re-runs its source selection
+  // on every iframe load, so this is the only reliable way to switch.
+  const handleSetStreamLang = useCallback(
+    (next: StreamLang) => {
+      if (next === streamLang) return;
+      setStreamLang(next);
+      // Persist the choice in the user's preferences so it sticks across sessions.
+      updatePreferences({ preferredLanguage: next });
+      // Reset to server 0 so the user sees the new-language source first.
+      setCurrentServer(0);
+      setEmbedState("loading");
+      setLiveDuration(0);
+    },
+    [streamLang, updatePreferences]
+  );
+
   const handleClose = useCallback(() => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => undefined);
     }
-    releasePageScrollLock();
+    // Leave party before closing to ensure WebRTC tracks and media are cleaned up
+    if (inParty) {
+      void party.handleLeaveParty();
+      party.resetPartySession();
+    }
     onClose();
-  }, [onClose]);
+  }, [inParty, onClose, party]);
 
   const toggleExpanded = cycleLayoutFocus;
 
@@ -360,6 +551,21 @@ export function PlayerShell({
     }
   }, [mediaType, onAdvanceEpisode, nextEpisode, effectiveDuration, embedState, currentTime]);
 
+  // Skip intro / recap — heuristic: intro is typically in the first 90s,
+  // recap in the first 30s of a subsequent episode. Show a button during
+  // those windows so the user can jump past them.
+  useEffect(() => {
+    if (mediaType !== "tv" || embedState !== "ready") {
+      setShowSkipIntro(false);
+      setShowSkipRecap(false);
+      return;
+    }
+    const introWindow = currentTime > 5 && currentTime < 90;
+    const recapWindow = currentTime > 0 && currentTime < 30 && (episode ?? 1) > 1;
+    setShowSkipIntro(introWindow);
+    setShowSkipRecap(recapWindow && !introWindow);
+  }, [mediaType, embedState, currentTime, episode]);
+
   const playNextEpisode = useCallback(() => {
     if (!nextEpisode || !onAdvanceEpisode) return;
     setShowUpNext(false);
@@ -403,6 +609,15 @@ export function PlayerShell({
     }
   }, [isMobile, inParty, party.showPartyPanel, layout.partyPanelMode, layout]);
 
+  // Fix floating video spawning in middle: when party opens, recenter to default flex layout
+  const isFloating = playerDrag.isFloating;
+  useEffect(() => {
+    if ((showPartyPanel || inParty) && isFloating) {
+      playerDrag.resetPosition();
+      playerResize.resetSize();
+    }
+  }, [showPartyPanel, inParty, isFloating, playerDrag, playerResize]);
+
   const toggleBrowserFullscreen = useCallback(async () => {
     const el = windowRef.current;
     if (!el) return;
@@ -436,19 +651,62 @@ export function PlayerShell({
   }, [embedState, togglePlay, isPlaying, currentTime, party]);
 
   useEffect(() => {
-    const prevBody = document.body.style.overflow;
-    const prevHtml = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
+    const el = windowRef.current;
+    if (!el) return;
 
+    const markMoving = () => {
+      setCursorIdle(false);
+      if (cursorIdleTimerRef.current) clearTimeout(cursorIdleTimerRef.current);
+      cursorIdleTimerRef.current = setTimeout(() => setCursorIdle(true), 2000);
+    };
+
+    el.addEventListener("mousemove", markMoving);
+    el.addEventListener("pointerdown", markMoving);
+    el.addEventListener("touchstart", markMoving, { passive: true });
+
+    return () => {
+      el.removeEventListener("mousemove", markMoving);
+      el.removeEventListener("pointerdown", markMoving);
+      el.removeEventListener("touchstart", markMoving);
+      if (cursorIdleTimerRef.current) clearTimeout(cursorIdleTimerRef.current);
+    };
+  }, []);
+
+  useBodyScrollLock(true);
+
+  // Cleanup on unmount: leave party, stop WebRTC tracks, clean up local stream
+  useEffect(() => {
+    return () => {
+      if (inParty) {
+        // Leave party gracefully to stop WebRTC tracks and clean up media
+        void party.handleLeaveParty();
+        party.resetPartySession();
+      }
+      // Clear any pending timeouts
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+      if (cursorIdleTimerRef.current) clearTimeout(cursorIdleTimerRef.current);
+      if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+      // Ensure body scroll lock is released
+      // (useBodyScrollLock handles this, but explicit safety)
+    };
+  }, [inParty, party]);
+
+  // Mirror the playhead into a ref for the keydown handler.
+  //
+  // The handler is an 80-line closure over `party`, `media`, `layout` and
+  // dozens of callbacks — all of which are fresh identities on most renders.
+  // Depending on `currentTime` (which ticks 4×/sec) meant the whole handler
+  // was torn down and re-attached four times a second for the entire film.
+  // Reading the clock through a ref removes that dependency entirely.
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
+
+  useEffect(() => {
     const hintTimer = setTimeout(() => setShowHint(false), 10000);
 
     return () => {
       clearTimeout(hintTimer);
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-      document.body.style.overflow = prevBody;
-      document.documentElement.style.overflow = prevHtml;
-      releasePageScrollLock();
     };
   }, []);
 
@@ -492,15 +750,22 @@ export function PlayerShell({
 
       const handled = [
         " ", "k", "K", "m", "M", "t", "T", "f", "F", "g", "G", "v", "V", "p", "P",
-        "c", "C",
+        "c", "C", "l", "L",
         "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
-        "n", "N", "]", "[", "?", "/", "+", "=", "-", "_",
+        "n", "N", "]", "[", "S", "?", "/", "+", "=", "-", "_",
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
         "Escape",
       ];
       if (handled.includes(e.key)) e.preventDefault();
 
       if (e.key === "Escape") {
+        // The server picker renders above everything (z-10002) with its own
+        // backdrop. Escape used to fall through to the party/close handlers,
+        // so dismissing it could close the whole player instead.
+        if (showServerSelector) {
+          setShowServerSelector(false);
+          return;
+        }
         if (commentAt !== null) {
           setCommentAt(null);
           return;
@@ -561,13 +826,17 @@ export function PlayerShell({
       }
       if (e.key === "f" || e.key === "F") {
         void toggleBrowserFullscreen();
-        return;
       }
-      if (embedState !== "ready") {
-        if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
-        if (e.key === "[") prevServer();
-        return;
+      else if (e.key === "l" || e.key === "L") {
+        // Cycle audio language: EN → SQ → EN
+        handleSetStreamLang(streamLang === "en" ? "sq" : "en");
       }
+       if (embedState !== "ready") {
+         if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
+         if (e.key === "[") prevServer();
+         if (e.key === "S" || e.key === "s") { setShowServerSelector((p) => !p); return; }
+         return;
+       }
 
       if (e.key === " " || e.key === "k" || e.key === "K") togglePlayPause();
       else if (e.key === "m" || e.key === "M") toggleMute();
@@ -585,16 +854,22 @@ export function PlayerShell({
       else if (e.key === "ArrowDown") adjustVolume(e.shiftKey ? -0.2 : -0.1);
       else if (e.key === "+" || e.key === "=") adjustVolume(0.1);
       else if (e.key === "-" || e.key === "_") adjustVolume(-0.1);
-      else if (e.key === "c" || e.key === "C") openCommentAt(currentTime);
-      else if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
-      else if (e.key === "[") prevServer();
-      else if (/^[0-9]$/.test(e.key)) seekToPercent(parseInt(e.key, 10) * 10);
+      else if ((e.key === "c" || e.key === "C") && e.shiftKey) {
+        e.preventDefault();
+        setCaptionsOn((v) => !v);
+      }
+      else if (e.key === "c" || e.key === "C") openCommentAt(currentTimeRef.current);
+       else if (e.key === "n" || e.key === "N" || e.key === "]") nextServer();
+       else if (e.key === "[") prevServer();
+       else if (e.key === "S" || e.key === "s") setShowServerSelector((p) => !p);
+       else if (/^[0-9]$/.test(e.key)) seekToPercent(parseInt(e.key, 10) * 10);
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     embedState,
+    showServerSelector,
     handleClose,
     togglePlayPause,
     toggleMute,
@@ -615,16 +890,43 @@ export function PlayerShell({
     commentAt,
     showUpNext,
     openCommentAt,
-    currentTime,
+    streamLang,
+    handleSetStreamLang,
   ]);
 
-  const onIframeLoad = () => {
-    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    autoFailoverRef.current = 0;
-    setEmbedState("ready");
-    setReady(true);
-    trackPlaybackStart(movieId, mediaType, currentSource.id);
-  };
+  // Listen for skip-intro/recap events from EmbedFrame
+  useEffect(() => {
+    const handleSkipIntro = (event: CustomEvent) => {
+      const startTime = event.detail.startTime;
+      const introEndTime = introChapter?.endTime || 90;
+      seek(introEndTime);
+      syncTo(introEndTime);
+    };
+
+    const handleSkipRecap = (event: CustomEvent) => {
+      const startTime = event.detail.startTime;
+      const recapEndTime = recapChapter?.endTime || 30;
+      seek(recapEndTime);
+      syncTo(recapEndTime);
+    };
+
+    window.addEventListener("flixverse:skip-intro", handleSkipIntro as EventListener);
+    window.addEventListener("flixverse:skip-recap", handleSkipRecap as EventListener);
+
+    return () => {
+      window.removeEventListener("flixverse:skip-intro", handleSkipIntro as EventListener);
+      window.removeEventListener("flixverse:skip-recap", handleSkipRecap as EventListener);
+    };
+  }, [introChapter, recapChapter, seek, syncTo]);
+
+   const onIframeLoad = () => {
+     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+     autoFailoverRef.current = 0;
+     setResyncSeekUrl(null);
+     setEmbedState("ready");
+     setReady(true);
+     trackPlaybackStart(movieId, mediaType, currentSource.id);
+   };
 
   const onIframeError = () => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -648,9 +950,12 @@ export function PlayerShell({
     playerDrag.isDragging ? "player-shell--window-dragging" : "",
     playerResize.isResizing ? "player-shell--window-resizing" : "",
     playerResize.isCustomSize ? "player-shell--window-custom-size" : "",
+    pulsing ? "player-shell--cinema-pulse" : "",
   ]
     .filter(Boolean)
     .join(" ");
+
+  const isOnline = useOnlineStatus();
 
   return (
     <div
@@ -659,6 +964,18 @@ export function PlayerShell({
       role="dialog"
       aria-label={`Watching ${title}`}
     >
+      {!isOnline && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[200] -translate-x-1/2 rounded-full border border-amber-500/30 bg-amber-500/15 px-4 py-1.5 text-xs font-medium text-amber-200 backdrop-blur-md"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+            You&apos;re offline. Streaming may be unavailable.
+          </span>
+        </div>
+      )}
       <PartyGuestSplash
         phase={party.guestSplashPhase}
         title={title}
@@ -667,12 +984,6 @@ export function PlayerShell({
         visible={party.guestSplashVisible}
       />
       <div className={`player-layout ${cameraLayout ? "player-layout--camera" : ""} ${inParty ? `player-layout--cam-${effectiveCameraLayout}` : ""}`}>
-        {glowEnabled && (
-          <AmbientGlowFrame
-            posterPath={posterPath || null}
-            isActive={embedState === "ready"}
-          />
-        )}
         <div className="player-layout-main">
           <div
             ref={windowRef}
@@ -696,6 +1007,8 @@ export function PlayerShell({
                 <p className="player-window-title">{title}</p>
                 <p className="player-window-sub">
                   {currentSource.name} · {currentServer + 1}/{streamingSources.length}
+                  <span className="text-gray-500" aria-label={`Quality ${currentSource.quality}`}> · {currentSource.quality}</span>
+                  <span className="text-gray-500" aria-label={`Audio language ${streamLang.toUpperCase()}`}> · {streamLang.toUpperCase()}</span>
                   {party.partyRoomId && (
                     <span className={partyStatusClass(party.partySyncStatus)}>
                       {" "}
@@ -732,6 +1045,18 @@ export function PlayerShell({
                   <Users className="w-4 h-4" />
                 </button>
               )}
+
+              {timelineEnabled && (
+                <button
+                  type="button"
+                  className="player-window-btn"
+                  onClick={() => openCommentAt(currentTime)}
+                  aria-label="Add comment at current time"
+                  title="Add comment (C)"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </button>
+              )}
               <PlayerShortcutsDropdown
                 open={showShortcutsMenu}
                 onToggle={() => setShowShortcutsMenu((p) => !p)}
@@ -766,19 +1091,49 @@ export function PlayerShell({
             className="player-window-body"
             style={playerResize.bodyHeight ? { height: playerResize.bodyHeight, aspectRatio: "auto" } : undefined}
           >
-            <EmbedFrame
-              currentSource={currentSource}
-              currentServer={currentServer}
-              streamingSourcesCount={streamingSources.length}
-              embedState={embedState}
-              title={title}
-              iframeRef={iframeRef}
-              onIframeLoad={onIframeLoad}
-              onIframeError={onIframeError}
-              onRetry={nextServer}
+           <EmbedFrame
+               currentSource={resyncSeekUrl ? { ...currentSource, url: resyncSeekUrl } : currentSource}
+               currentServer={currentServer}
+               streamingSourcesCount={streamingSources.length}
+               embedState={embedState}
+               title={title}
+               iframeRef={iframeRef}
+               onIframeLoad={onIframeLoad}
+               onIframeError={onIframeError}
+               onRetry={nextServer}
+               chapters={chapters}
+               introChapter={introChapter}
+               recapChapter={recapChapter}
+              />
+
+            {/* Guest-only manual resync when drift persists beyond 2s. */}
+            <SnapToHostPill
+              active={inParty && !party.isPartyHost && embedState === "ready" && !party.staging}
+              driftMs={party.partyDriftMs}
+              getHostTime={party.projectedHostTime}
+              onSnap={party.snapToHost}
             />
+
+            {/* Party quick-emoji reactions float over the picture. */}
+            <SpatialReactionsLayer
+              messages={party.partyMessages}
+              enabled={inParty && embedState === "ready"}
+            />
+
+            {/* Self-hosted caption overlay — only when the user wants non-English */}
+            {captions.cues.length > 0 && (
+              <CaptionOverlay
+                cue={captions.getCueAt(currentTime)}
+                visible={!cursorIdle && isPlaying}
+                source={captions.source}
+              />
+            )}
+
             {timelineEnabled && embedState === "ready" && !showUpNext && (
-              <div className="player-overlay-bar">
+              <div
+                className={`player-overlay-bar ${cursorIdle ? "is-cursor-idle" : "is-cursor-active"}`}
+                aria-hidden={!cursorIdle}
+              >
                 <PlayerOverlayControls
                   currentTime={currentTime}
                   totalDuration={effectiveDuration}
@@ -786,13 +1141,40 @@ export function PlayerShell({
                   nearbyComments={overlayNearby}
                   onSeek={seekOverlay}
                   onAddComment={openCommentAt}
-                  onLikeComment={(id) => {
-                    void timeline.likeComment(id);
-                  }}
-                  isPlaying={isPlaying}
-                  controlsVisible
+                  onLikeComment={timeline.likeComment}
                 />
               </div>
+            )}
+            {/* Skip intro button - shows when intro chapter exists and we're in the intro window */}
+            {showSkipIntro && introChapter && (
+              <button
+                type="button"
+                className="player-skip-btn"
+                onClick={() => {
+                  const introEndTime = introChapter.endTime || 90;
+                  seek(introEndTime);
+                  syncTo(introEndTime);
+                }}
+                aria-label="Skip intro"
+              >
+                Skip Intro ⏭
+              </button>
+            )}
+
+            {/* Skip recap button - shows when recap chapter exists and we're in the recap window */}
+            {showSkipRecap && recapChapter && (
+              <button
+                type="button"
+                className="player-skip-btn"
+                onClick={() => {
+                  const recapEndTime = recapChapter.endTime || 30;
+                  seek(recapEndTime);
+                  syncTo(recapEndTime);
+                }}
+                aria-label="Skip recap"
+              >
+                Skip Recap ⏭
+              </button>
             )}
             {showUpNext && nextEpisode && onAdvanceEpisode && (
               <UpNextCountdown
@@ -806,7 +1188,7 @@ export function PlayerShell({
 
           {showHint && embedState === "ready" && (
             <p className="player-hint" aria-live="polite">
-              T maximize · C comment · G watch together · ? shortcuts
+              T maximize · C comment · Shift+C captions · G watch together · L language · ? shortcuts
             </p>
           )}
 
@@ -864,8 +1246,6 @@ export function PlayerShell({
             episode={episode}
             title={title}
             posterPath={posterPath || null}
-            currentTime={currentTime}
-            isPlaying={isPlaying}
             onSyncToPosition={seekTo}
             partyJoinUrl={party.partyJoinUrl}
             media={media}
@@ -875,6 +1255,24 @@ export function PlayerShell({
             kickParticipant={party.kickParticipant}
             setParticipantMicMuted={party.setParticipantMicMuted}
             setParticipantCamDisabled={party.setParticipantCamDisabled}
+            transferHost={party.transferHost ?? undefined}
+            sendMuteAll={party.sendMuteAll}
+            realtimeProcessed={party.realtime?.processed}
+            realtimeReady={party.realtime?.isReady}
+            peerCount={party.partyRoom?.participants?.length}
+            syncStage={party.syncStage}
+            staging={party.staging}
+            controlsMode={party.controlsMode}
+            onSetControlsMode={party.setControlsMode}
+            onSyncStart={party.startSyncedStart}
+            onReleaseSyncNow={party.releaseSyncedStart}
+            onCancelSync={party.cancelSyncedStart}
+            pendingQueue={party.pendingQueue}
+            suggestToQueue={party.suggestToQueue}
+            voteQueueItem={party.voteQueueItem}
+            confirmQueueItem={party.confirmQueueItem}
+            removeQueueItem={party.removeQueueItem}
+            removeOwnQueueItem={party.removeOwnQueueItem}
           />
         )}
       </div>
@@ -912,18 +1310,50 @@ export function PlayerShell({
         </button>
       )}
 
-      {commentAt !== null && (
-        <AddCommentDialog
-          timestamp={commentAt}
-          onClose={() => setCommentAt(null)}
-          onSubmit={async (text) => {
-            await timeline.addComment(commentAt, text);
-            setCommentAt(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
+       {commentAt !== null && (
+         <AddCommentDialog
+           timestamp={commentAt}
+           onClose={() => setCommentAt(null)}
+           onSubmit={async (text) => {
+             await timeline.addComment(commentAt, text);
+             setCommentAt(null);
+           }}
+         />
+       )}
+
+       {showServerSelector && (
+         <div className="fixed inset-0 z-[10002] flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Select server" onClick={() => setShowServerSelector(false)}>
+           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
+           <div className="relative z-[10003] w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-gray-900/98 backdrop-blur-xl shadow-2xl shadow-black/50 p-4" onClick={(e) => e.stopPropagation()}>
+             <div className="flex items-center justify-between mb-3">
+               <h2 className="text-lg font-bold text-white">Servers</h2>
+               <button type="button" onClick={() => setShowServerSelector(false)} className="rounded-lg p-1 text-gray-400 hover:text-white focus-ring transition-colors" aria-label="Close server list">
+                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+               </button>
+             </div>
+             <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+               {streamingSources.map((source, index) => (
+                 <button
+                   key={source.id}
+                   type="button"
+                   onClick={() => { switchServer(index); setShowServerSelector(false); }}
+                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left ${currentServer === index ? "bg-red-600/20 border-red-500/40 text-white" : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20"}`}
+                   aria-current={currentServer === index ? "true" : undefined}
+                 >
+                   <span className="text-lg" aria-hidden>{source.icon}</span>
+                   <div className="flex-1 min-w-0">
+                     <p className="text-sm font-semibold truncate">{source.name}</p>
+                     <p className="text-xs text-gray-500">{source.quality} · {source.reliability === "high" ? "Recommended" : "Alternative"}</p>
+                   </div>
+                   {currentServer === index && <span className="text-xs font-bold text-red-400 shrink-0">ACTIVE</span>}
+                 </button>
+               ))}
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   );
+ }
 
 export default PlayerShell;

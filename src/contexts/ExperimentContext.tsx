@@ -39,14 +39,6 @@ const DEFAULT_EXPERIMENTS: Experiment[] = [
     ],
     enabled: true,
   },
-  {
-    id: "card-preview",
-    variants: [
-      { id: "control", name: "enabled", weight: 80 },
-      { id: "variant-a", name: "disabled", weight: 20 },
-    ],
-    enabled: true,
-  },
 ];
 
 const STORAGE_KEY = "flixverse-experiments";

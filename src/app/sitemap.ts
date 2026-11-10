@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { BROWSE_CATEGORIES } from "@/utils/browseCategories";
 import { SITE_URL } from "@/lib/seo/metadata";
 import { fetchAllSitemapContent } from "@/lib/seo/sitemap-tmdb";
+import { fetchPopularPeople, fetchPopularCollections } from "@/lib/seo/sitemap-tmdb";
 
 /** Build sitemap at deploy time — avoids runtime TMDB timeouts on Vercel. */
 export const dynamic = "force-static";
@@ -21,6 +22,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/tv-shows`, lastModified, changeFrequency: "daily", priority: 0.95 },
     { url: `${SITE_URL}/new-and-popular`, lastModified, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/search`, lastModified, changeFrequency: "weekly", priority: 0.75 },
+    { url: `${SITE_URL}/plans`, lastModified, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/contact`, lastModified, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${SITE_URL}/help`, lastModified, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${SITE_URL}/privacy`, lastModified, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${SITE_URL}/terms`, lastModified, changeFrequency: "yearly", priority: 0.3 },
   ];
 
   const browseRoutes: MetadataRoute.Sitemap = Object.keys(BROWSE_CATEGORIES).map((category) => ({
@@ -43,5 +49,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Static + browse routes still ship if TMDB is unavailable
   }
 
-  return [...staticRoutes, ...browseRoutes, ...contentRoutes];
+  // Add popular people pages
+  let personRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const people = await fetchPopularPeople(20);
+    personRoutes = people.map((person) => ({
+      url: `${SITE_URL}/person/${person.id}`,
+      lastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
+  } catch {
+    // Skip if TMDB is unavailable
+  }
+
+  // Add popular collections
+  let collectionRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const collections = await fetchPopularCollections(15);
+    collectionRoutes = collections.map((collection) => ({
+      url: `${SITE_URL}/collection/${collection.id}`,
+      lastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
+  } catch {
+    // Skip if TMDB is unavailable
+  }
+
+  return [...staticRoutes, ...browseRoutes, ...contentRoutes, ...personRoutes, ...collectionRoutes];
 }

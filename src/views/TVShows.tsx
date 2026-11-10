@@ -1,12 +1,17 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import MovieCarousel from "@/components/MovieCarousel";
-import PageHero from "@/components/PageHero";
+import CatalogQuickFilters from "@/components/CatalogQuickFilters";
 import PageContainer from "@/components/PageContainer";
+import LazySection from "@/components/LazySection";
 import { useTVShowsCatalog } from "@/hooks/queries/useTVShowsCatalog";
 import Reveal from "@/components/Reveal";
-import { Tv, Flame, Trophy, Calendar, Radio, Zap, Laugh, Drama, Search, Rocket, FileText } from "lucide-react";
+import { Tv, Flame, Trophy, Calendar, Radio, Zap, Laugh, Drama, Search, Rocket, FileText, CalendarDays } from "lucide-react";
 import { TMDBMovie } from "@/utils/tmdbApi";
+import { matchesCatalogFilters, releasedWithinDays, type CatalogFilters } from "@/lib/catalogFilters";
+
+const PRIORITY_KEYS = new Set(["trending", "airingToday", "onTheAir", "popular", "topRated"]);
 
 const SECTIONS = [
   { key: "trending", title: "Trending TV Shows", icon: <Flame className="w-5 h-5 text-orange-400" />, exploreAllPath: "/browse/trending-tv-shows" },
@@ -24,49 +29,126 @@ const SECTIONS = [
 
 const TVShows = () => {
   const { data = {}, isLoading, isFetching, isError, refetch } = useTVShowsCatalog();
+  const [filters, setFilters] = useState<CatalogFilters>({ yearRange: "all", genreId: null });
+  const filteredData = useMemo(
+    () => Object.fromEntries(
+      Object.entries(data).map(([key, shows]) => [
+        key,
+        (shows as TMDBMovie[]).filter((show) => matchesCatalogFilters(show, filters)),
+      ])
+    ) as Record<string, TMDBMovie[]>,
+    [data, filters]
+  );
+  const newThisWeek = useMemo(() => {
+    const unique = new Map<number, TMDBMovie>();
+    Object.values(data).flat().forEach((show) => {
+      if (releasedWithinDays(show, 7) && matchesCatalogFilters(show, filters)) unique.set(show.id, show);
+    });
+    return [...unique.values()].sort((a, b) =>
+      (b.first_air_date || b.release_date || "").localeCompare(a.first_air_date || a.release_date || "")
+    );
+  }, [data, filters]);
   const loadedCount = Object.keys(data).length;
 
-  return (
-    <>
-      <PageHero
-        title="TV Shows"
-        subtitle="Binge-worthy series for every mood"
-        meta={loadedCount > 0 ? `${loadedCount} curated collections` : undefined}
-        accent="purple"
-        icon={<Tv className="w-6 h-6 text-white" />}
-      />
+  const renderSection = (section: (typeof SECTIONS)[number], index: number) => {
+    const shows = filteredData[section.key];
+    return (
+      <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
+        <MovieCarousel
+          title={section.title}
+          movies={shows || []}
+          loading={!shows?.length && (isLoading || isFetching)}
+          icon={section.icon}
+          exploreAllPath={section.exploreAllPath}
+        />
+      </Reveal>
+    );
+  };
 
-      <PageContainer>
+  const prioritySections = SECTIONS.filter((s) => PRIORITY_KEYS.has(s.key));
+  const deferredSections = SECTIONS.filter((s) => !PRIORITY_KEYS.has(s.key));
+
+  return (
+    <div className="relative">
+      <header className="relative pt-24 pb-10 px-4 sm:px-6 lg:px-10 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(168, 85, 247, 0.18) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 100% 100%, rgba(59, 130, 246, 0.10) 0%, transparent 60%)",
+          }}
+        />
+        <div className="max-w-[1800px] mx-auto flex items-end gap-4">
+          <div className="p-3 rounded-lg bg-white/5 ring-1 ring-white/10">
+            <Tv className="h-7 w-7 text-purple-400" />
+          </div>
+          <div className="min-w-0">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400 mb-1.5">
+              {loadedCount > 0 ? `${loadedCount} curated collections` : "Loading…"}
+            </span>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-[1.05]">
+              TV Shows
+            </h1>
+            <p className="text-gray-400 text-sm sm:text-base mt-2">
+              Binge-worthy series for every mood
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <PageContainer className="!pt-0">
         <div className="space-y-10">
-          {SECTIONS.map((section, index) => {
-            const shows = (data as Record<string, TMDBMovie[]>)[section.key];
-            return (
-              <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
-                <MovieCarousel
-                  title={section.title}
-                  movies={shows || []}
-                  loading={!shows?.length && (isLoading || isFetching)}
-                  icon={section.icon}
-                  exploreAllPath={section.exploreAllPath}
-                />
-                {index < SECTIONS.length - 1 && <div className="divider-glow mt-10" />}
-              </Reveal>
-            );
-          })}
+          <CatalogQuickFilters
+            filters={filters}
+            onChange={setFilters}
+            genres={[
+              { id: 10759, label: "Action & Adventure" },
+              { id: 16, label: "Animation" },
+              { id: 35, label: "Comedy" },
+              { id: 80, label: "Crime" },
+              { id: 99, label: "Documentary" },
+              { id: 18, label: "Drama" },
+              { id: 9648, label: "Mystery" },
+              { id: 10765, label: "Sci-Fi & Fantasy" },
+            ]}
+          />
+          <Reveal>
+            <MovieCarousel
+              title="New This Week"
+              movies={newThisWeek}
+              loading={isLoading || isFetching}
+              icon={<CalendarDays className="w-5 h-5 text-emerald-400" />}
+              priority
+            />
+          </Reveal>
+          {prioritySections.map((section, index) => renderSection(section, index))}
+
+          <LazySection minHeight={480} className="space-y-10">
+            <>
+              {deferredSections.map((section, index) =>
+                renderSection(section, prioritySections.length + index)
+              )}
+            </>
+          </LazySection>
 
           {isError && !isLoading && (
-            <div className="text-center py-12 glass-card rounded-2xl max-w-md mx-auto border border-white/8">
+            <div className="text-center py-12 glass-soft rounded-2xl max-w-md mx-auto border border-white/8">
               <Tv className="w-8 h-8 text-gray-500 mx-auto mb-4" />
               <h3 className="text-xl font-bold text-white mb-2">No TV shows available</h3>
               <p className="text-gray-400 mb-6">Please try again in a moment</p>
-              <button type="button" onClick={() => refetch()} className="btn-primary px-6 py-2.5">
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 px-6 py-2.5 text-sm font-semibold text-white transition-colors focus-ring"
+              >
                 Reload
               </button>
             </div>
           )}
         </div>
       </PageContainer>
-    </>
+    </div>
   );
 };
 

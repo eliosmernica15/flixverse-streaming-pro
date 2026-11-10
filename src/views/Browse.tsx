@@ -1,25 +1,49 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useMemo, type ReactNode } from "react";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
-import PageContainer from "@/components/PageContainer";
-import Reveal from "@/components/Reveal";
 import { Sparkles, AlertCircle, ArrowDownWideNarrow, Star, CalendarDays, ArrowDownAZ } from "lucide-react";
 import { useBrowseCategory, getBrowseCategoryConfig } from "@/hooks/queries/useBrowseCategory";
 
 type SortKey = "featured" | "rating" | "newest" | "az";
 
+const SORT_KEYS: SortKey[] = ["featured", "rating", "newest", "az"];
+
 const Browse = () => {
   const { category } = useParams<{ category: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const t = useTranslations("browse");
-  const tc = useTranslations("common");
   const tn = useTranslations("nav");
   const config = getBrowseCategoryConfig(category);
   const { data: movies = [], isLoading, isError, refetch } = useBrowseCategory(category);
-  const [sort, setSort] = useState<SortKey>("featured");
+  const requestedSort = searchParams.get("sort");
+  const sort: SortKey = SORT_KEYS.includes(requestedSort as SortKey)
+    ? (requestedSort as SortKey)
+    : "featured";
+  const requestedDecade = searchParams.get("decade") || "";
+  const currentDecade = Math.floor(new Date().getFullYear() / 10) * 10;
+  const decade = /^\d{4}$/.test(requestedDecade) &&
+    Number(requestedDecade) >= 1950 &&
+    Number(requestedDecade) <= currentDecade &&
+    Number(requestedDecade) % 10 === 0
+    ? requestedDecade
+    : "all";
+  const requestedRating = Number(searchParams.get("rating"));
+  const minRating = [6, 7, 8].includes(requestedRating) ? requestedRating : 0;
+  const requestedLanguage = searchParams.get("language") || "";
+  const language = /^[a-z]{2,3}$/i.test(requestedLanguage) ? requestedLanguage.toLowerCase() : "all";
+
+  const updateQuery = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const sorts = useMemo<{ key: SortKey; label: string; icon: ReactNode }[]>(
     () => [
@@ -36,9 +60,22 @@ const Browse = () => {
     return t.has(category as never) ? t(category as never) : config.title;
   }, [category, config, t]);
 
+  const filteredMovies = useMemo(() => {
+    const decadeStart = decade === "all" ? null : Number(decade);
+    return movies.filter((movie) => {
+      const releaseDate = movie.release_date || movie.first_air_date || "";
+      const year = Number(releaseDate.slice(0, 4));
+      const yearMatches = decadeStart === null ||
+        (Number.isInteger(year) && year >= decadeStart && year < decadeStart + 10);
+      return yearMatches &&
+        (movie.vote_average || 0) >= minRating &&
+        (language === "all" || movie.original_language === language);
+    });
+  }, [decade, language, minRating, movies]);
+
   const sortedMovies = useMemo(() => {
-    if (sort === "featured") return movies;
-    const copy = [...movies];
+    if (sort === "featured") return filteredMovies;
+    const copy = [...filteredMovies];
     switch (sort) {
       case "rating":
         return copy.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
@@ -55,7 +92,18 @@ const Browse = () => {
       default:
         return copy;
     }
-  }, [movies, sort]);
+  }, [filteredMovies, sort]);
+
+  const languages = useMemo(
+    () => [...new Set(movies.map((movie) => movie.original_language).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b)),
+    [movies]
+  );
+  const decades = useMemo(() => {
+    return Array.from({ length: Math.max(0, (currentDecade - 1950) / 10 + 1) }, (_, index) =>
+      String(currentDecade - index * 10)
+    );
+  }, [currentDecade]);
 
   if (!category) {
     return (
@@ -92,37 +140,47 @@ const Browse = () => {
 
   return (
     <div className="page-enter">
-      <header className="relative pt-20 pb-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-[1800px] mx-auto flex items-center gap-4">
-          <div className="p-2.5 bg-gradient-to-br from-red-500/20 to-purple-500/10 rounded-xl border border-white/5 glow-ring">
-            <Sparkles className="w-6 h-6 text-red-500" />
+      <header className="relative pt-24 pb-8 px-4 sm:px-6 lg:px-10 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 60%)",
+          }}
+        />
+        <div className="max-w-[1800px] mx-auto flex items-end gap-4">
+          <div className="p-3 rounded-lg bg-white/5 ring-1 ring-white/10">
+            <Sparkles className="h-7 w-7 text-indigo-400" />
           </div>
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{categoryTitle}</h1>
-            <p className="text-gray-500 text-sm mt-1">
-              {isLoading ? tc("loading") : t("titles", { count: movies.length })}
-            </p>
+          <div className="min-w-0">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 mb-1.5">
+              {isLoading ? "Loading…" : t("titles", { count: movies.length })}
+            </span>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-[1.1]">
+              {categoryTitle}
+            </h1>
           </div>
         </div>
       </header>
 
-      <PageContainer className="!pt-0">
+      <main className="pb-16 px-4 sm:px-6 lg:px-10 max-w-[1800px] mx-auto">
         {/* Filter / sort bar */}
-        <div className="glass-panel rounded-2xl p-3 sm:p-4 mb-8 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-gray-400">
+        <div className="glass-soft rounded-lg p-2 mb-6 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm text-gray-400 px-2">
             <ArrowDownWideNarrow className="w-4 h-4 text-red-500" />
-            <span className="hidden sm:inline">Sort by</span>
+            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-wider">Sort by</span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {sorts.map((s) => (
               <button
                 key={s.key}
                 type="button"
-                onClick={() => setSort(s.key)}
-                className={`chip min-h-[40px] transition-all focus-ring ${
+                onClick={() => updateQuery("sort", s.key === "featured" ? "" : s.key)}
+                className={`inline-flex items-center gap-1.5 min-h-[36px] rounded-md px-3 text-xs font-semibold transition-colors focus-ring ${
                   sort === s.key
-                    ? "!bg-red-500/90 !text-white border-red-400/40"
-                    : "hover:bg-white/10 text-gray-300"
+                    ? "bg-white text-black"
+                    : "text-gray-300 hover:bg-white/10 hover:text-white"
                 }`}
                 aria-pressed={sort === s.key}
               >
@@ -131,23 +189,58 @@ const Browse = () => {
               </button>
             ))}
           </div>
+          <div className="flex flex-wrap items-center gap-2 px-2">
+            <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("decade")}
+              <select
+                value={decade}
+                onChange={(event) => updateQuery("decade", event.target.value === "all" ? "" : event.target.value)}
+                className="min-h-9 rounded-md border border-white/10 bg-zinc-900 px-2 text-xs font-medium normal-case tracking-normal text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <option value="all">{t("allDecades")}</option>
+                {decades.map((value) => <option key={value} value={value}>{value}s</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("minimumRating")}
+              <select
+                value={minRating}
+                onChange={(event) => updateQuery("rating", event.target.value === "0" ? "" : event.target.value)}
+                className="min-h-9 rounded-md border border-white/10 bg-zinc-900 px-2 text-xs font-medium normal-case tracking-normal text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <option value={0}>{t("anyRating")}</option>
+                {[6, 7, 8].map((value) => <option key={value} value={value}>{value}+</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("language")}
+              <select
+                value={language}
+                onChange={(event) => updateQuery("language", event.target.value === "all" ? "" : event.target.value)}
+                className="min-h-9 rounded-md border border-white/10 bg-zinc-900 px-2 text-xs font-medium normal-case tracking-normal text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <option value="all">{t("allLanguages")}</option>
+                {languages.map((value) => <option key={value} value={value}>{value.toUpperCase()}</option>)}
+              </select>
+            </label>
+          </div>
         </div>
 
         {isLoading && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 3xl:grid-cols-8 gap-3 md:gap-4">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="aspect-[2/3] rounded-2xl skeleton shimmer-overlay" />
+              <div key={i} className="aspect-[2/3] rounded-md skeleton-shimmer" />
             ))}
           </div>
         )}
 
         {isError && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 text-center glass-panel rounded-2xl max-w-md mx-auto">
-            <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-            <p className="text-gray-300 mb-4">{tn("tryAgain")}</p>
+          <div className="flex flex-col items-center justify-center py-16 text-center glass-soft rounded-2xl max-w-md mx-auto">
+            <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
+            <p className="text-gray-300 mb-4 text-sm">{tn("tryAgain")}</p>
             <button
               onClick={() => refetch()}
-              className="btn-primary min-h-[44px] px-6 py-3 focus-ring"
+              className="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors focus-ring"
             >
               {t("retry")}
             </button>
@@ -155,27 +248,28 @@ const Browse = () => {
         )}
 
         {!isLoading && !isError && sortedMovies.length > 0 && (
-          <Reveal as="div" className="stagger grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 content-auto">
-            {sortedMovies.map((movie) => (
-              <div key={movie.id} className="hover-lift-sm rounded-2xl">
-                <MovieCard
-                  movie={movie}
-                  comingSoon={category === "coming-soon" || category === "upcoming"}
-                />
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 3xl:grid-cols-8 gap-3 md:gap-4 content-auto">
+            {sortedMovies.map((movie, idx) => (
+              <MovieCard
+                key={movie.id}
+                movie={movie}
+                index={idx}
+                priority={idx < 6}
+                comingSoon={category === "coming-soon" || category === "upcoming"}
+              />
             ))}
-          </Reveal>
+          </div>
         )}
 
         {!isLoading && !isError && sortedMovies.length === 0 && (
-          <div className="text-center py-20">
-            <div className="glass-panel rounded-2xl border border-white/8 p-10 max-w-md mx-auto">
+          <div className="text-center py-16">
+            <div className="glass-soft rounded-2xl p-10 max-w-md mx-auto">
               <Sparkles className="w-10 h-10 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-300">{t("empty")}</p>
+              <p className="text-gray-300 text-sm">{t("empty")}</p>
             </div>
           </div>
         )}
-      </PageContainer>
+      </main>
     </div>
   );
 };

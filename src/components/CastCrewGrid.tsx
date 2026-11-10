@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Stagger from "@/components/Stagger";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getImageUrl, TMDBMovie } from "@/utils/tmdbApi";
+import { getImageUrl } from "@/utils/tmdbApi";
 
 interface CastMember {
   id: number;
@@ -51,6 +52,7 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
             <h3 className="text-lg font-bold text-white">Cast</h3>
             {cast.length > maxVisible && (
               <button
+                type="button"
                 onClick={() => setShowAll(!showAll)}
                 className="text-sm text-gray-400 hover:text-white transition-colors"
               >
@@ -59,9 +61,11 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
             )}
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+            <Stagger>
             {visibleCast.map((person) => (
               <button
                 key={`${person.id}-${person.order}`}
+                type="button"
                 onClick={() => handlePersonClick(person.id)}
                 className="group glass-panel hover-lift-sm focus-ring flex flex-col items-center p-3 rounded-xl"
               >
@@ -91,6 +95,7 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
                 </p>
               </button>
             ))}
+            </Stagger>
           </div>
         </div>
       )}
@@ -103,6 +108,7 @@ export function CastCrewGrid({ cast, crew, maxVisible = 10 }: CastCrewGridProps)
             {uniqueCrew.map((person) => (
               <button
                 key={person.id}
+                type="button"
                 onClick={() => handlePersonClick(person.id)}
                 className="group glass-panel hover-lift-sm focus-ring flex items-center gap-3 p-3 rounded-xl text-left"
               >

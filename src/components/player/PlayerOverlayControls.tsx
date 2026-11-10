@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { MessageCircle, Plus } from "lucide-react";
+import { memo, useState, useRef, useCallback } from "react";
 import type { TimelineComment } from "@/hooks/player/useTimelineComments";
 import { TimelineCommentPopup } from "./TimelineCommentPopup";
 
@@ -19,8 +18,6 @@ interface PlayerOverlayControlsProps {
   onSeek: (seconds: number) => void;
   onAddComment: (timestamp: number) => void;
   onLikeComment: (commentId: string) => void;
-  isPlaying: boolean;
-  controlsVisible: boolean;
   buffered?: number;
 }
 
@@ -35,16 +32,13 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function PlayerOverlayControls({
+export const PlayerOverlayControls = memo(function PlayerOverlayControls({
   currentTime,
   totalDuration,
   markers,
   nearbyComments,
   onSeek,
-  onAddComment,
   onLikeComment,
-  isPlaying: _isPlaying,
-  controlsVisible: _controlsVisible,
   buffered,
 }: PlayerOverlayControlsProps) {
   const [isHovering, setIsHovering] = useState(false);
@@ -195,18 +189,6 @@ export function PlayerOverlayControls({
           </div>
         )}
       </div>
-
-      {/* Add comment at current time */}
-      <button
-        type="button"
-        className="video-add-comment"
-        onClick={() => onAddComment(currentTime)}
-        aria-label="Add comment at current time"
-        title="Add comment (C)"
-      >
-        <MessageCircle className="w-3.5 h-3.5" />
-        <Plus className="w-3 h-3" />
-      </button>
     </div>
   );
-}
+});

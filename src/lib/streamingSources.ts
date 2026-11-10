@@ -1,4 +1,5 @@
 import { buildYapGridEmbedUrl, YAPGRID_LANES } from "./player/yapgrid";
+import ALLOWED_EMBED_HOSTS from "./embedHosts.json";
 
 export interface StreamingSource {
   id: string;
@@ -6,24 +7,17 @@ export interface StreamingSource {
   icon: string;
   quality: "HD" | "FHD" | "4K";
   reliability: "high" | "medium";
+  /**
+   * Iframe `src` — the raw provider URL (direct cross-origin iframe).
+   * (`providerUrl` duplicates it for postMessage origin detection.)
+   */
   url: string;
   /** Original provider URL (for postMessage origin detection). */
   providerUrl: string;
 }
 
-/** Allowed embed hostnames — must match security-headers.mjs frame-src. */
-export const ALLOWED_EMBED_HOSTS = [
-  "vidlink.pro",
-  "videasy.net",
-  "player.videasy.net",
-  "vidfast.pro",
-  "vidsrc.me",
-  "vidsrc.net",
-  "2embed.cc",
-  "multiembed.mov",
-  "embed.su",
-  "yapgrid.com",
-] as const;
+/** Allowed embed hostnames; security-headers.mjs builds frame-src from this list. */
+export { ALLOWED_EMBED_HOSTS };
 
 export function isAllowedEmbedUrl(url: string): boolean {
   try {
@@ -32,6 +26,20 @@ export function isAllowedEmbedUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Unwrap legacy proxy URLs so old links can still be resolved directly. */
+export function unproxyEmbedUrl(iframeSrc: string): string {
+  try {
+    const url = new URL(iframeSrc, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    if (url.pathname === "/api/embed") {
+      const embedded = url.searchParams.get("src");
+      if (embedded) return decodeURIComponent(embedded);
+    }
+  } catch {
+    // ignore
+  }
+  return iframeSrc;
 }
 
 export type BuildStreamingOptions = {
@@ -49,12 +57,37 @@ export function buildStreamingSources(
 ): StreamingSource[] {
   const isTv = mediaType === "tv" && season && episode;
   const lang = opts?.lang?.toLowerCase();
+  // VidSrc's canonical domain is `vidsrcme.ru` (per the current docs).
+  // It accepts both IMDB ids (`tt...`) and TMDB ids (numeric). It exposes
+  // a `?ds_lang=<iso639-1>` (or comma-separated priority list) parameter
+  // that pre-selects subtitle tracks, plus `?sub_url=...` for custom .vtt
+  // tracks. `vidsrc.to` is the per-domain mirror documented separately
+  // and uses the simpler `?sub_file=...` parameter.
+  const allowedLangs = new Set(["en", "sq"]);
+  const playerLang = lang && allowedLangs.has(lang) ? lang : "en";
+
+  const vidsrcBase = isTv
+    ? `https://vidsrcme.ru/embed/tv/${movieId}/${season}/${episode}`
+    : `https://vidsrcme.ru/embed/movie/${movieId}`;
+  const vidsrcUrl = `${vidsrcBase}?autoplay=true&ds_lang=${playerLang}`;
+
+  const vidsrcToBase = isTv
+    ? `https://vidsrc.to/embed/tv/${movieId}/${season}/${episode}`
+    : `https://vidsrc.to/embed/movie/${movieId}`;
+  const vidsrcToUrl = `${vidsrcToBase}?autoplay=true`;
 
   const vidfastBase = isTv
     ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
     : `https://vidfast.pro/movie/${movieId}?autoPlay=true`;
-  const vidfastUrl = lang === "sq" ? `${vidfastBase}&sub=sq` : vidfastBase;
+  const vidfastUrl = playerLang === "sq" ? `${vidfastBase}&sub=sq` : vidfastBase;
 
+  // YapGrid server tokens. We pin G (sg_g4) first because it's YapGrid's own
+  // default in their test player, runs on the Vidrock Edge direct-MP4 CDN,
+  // and is the most likely source to have clean English audio on popular titles.
+  // The old `?server=x|y|z` short labels are display-only — the real
+  // server tokens are sg_g4 / sx_a1 / sy_b2 / sz_c3. Passing the short
+  // label falls back to YapGrid's "auto" mode, which on the upstream we
+  // hit was returning a Hindi-dubbed mirror.
   const yapgridSources: (Omit<StreamingSource, "url"> & { providerUrl: string })[] =
     YAPGRID_LANES.map((lane) => {
       const url = buildYapGridEmbedUrl({
@@ -62,21 +95,59 @@ export function buildStreamingSources(
         mediaType,
         season,
         episode,
-        server: lane,
-        lang,
+        server: lane.token,
+        lang: playerLang,
         title: opts?.title,
       });
       return {
-        id: `yapgrid-${lane}`,
-        name: `YapGrid ${lane.toUpperCase()}`,
+        id: `yapgrid-${lane.id}`,
+        name: `YapGrid ${lane.label}`,
         icon: "🇦🇱",
         quality: "FHD" as const,
-        reliability: "high" as const,
+        reliability: lane.id === "g" ? ("high" as const) : ("medium" as const),
         providerUrl: url,
       };
     });
 
-  const raw: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
+  const primary: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
+    {
+      // VidSrc (`vidsrcme.ru`) — the canonical VidSrc domain. Accepts both
+      // IMDB ids (`tt...`) and TMDB ids (numeric). Uses the `?ds_lang=<iso>`
+      // parameter (or comma-separated priority list) to pre-select subtitle
+      // tracks, plus `?sub_url=...` for custom .vtt tracks. We pass
+      // `?autoplay=true&ds_lang=<en|sq>` so the in-player CC menu opens
+      // with the user's preferred language already highlighted.
+      id: "vidsrc",
+      name: "VidSrc",
+      icon: "📺",
+      quality: "HD",
+      reliability: "high",
+      providerUrl: vidsrcUrl,
+    },
+    {
+      // vidsrc.to — per-domain mirror with the same embed API. The docs
+      // describe it as using `?sub_file=` instead of `?sub_url=`, but
+      // `?autoplay=true` works the same. Kept as a fallback in case the
+      // canonical domain is slow or down.
+      id: "vidsrc-to",
+      name: "VidSrc.to",
+      icon: "📺",
+      quality: "HD",
+      reliability: "medium",
+      providerUrl: vidsrcToUrl,
+    },
+    {
+      // Videasy's canonical domain is `player.videasy.to` (the older
+      // `player.videasy.net` is deprecated per their docs).
+      id: "videasy",
+      name: "Videasy",
+      icon: "🎬",
+      quality: "4K",
+      reliability: "high",
+      providerUrl: isTv
+        ? `https://player.videasy.to/tv/${movieId}/${season}/${episode}?autoplay=true`
+        : `https://player.videasy.to/movie/${movieId}?autoplay=true`,
+    },
     {
       id: "vidlink",
       name: "VidLink",
@@ -88,16 +159,8 @@ export function buildStreamingSources(
         : `https://vidlink.pro/movie/${movieId}?autoplay=true`,
     },
     {
-      id: "videasy",
-      name: "Videasy",
-      icon: "🎬",
-      quality: "4K",
-      reliability: "high",
-      providerUrl: isTv
-        ? `https://player.videasy.net/tv/${movieId}/${season}/${episode}?autoplay=true`
-        : `https://player.videasy.net/movie/${movieId}?autoplay=true`,
-    },
-    {
+      // VidFast works on the actual website per the user, even though
+      // our test environment can't reach the embed endpoint. Keep it.
       id: "vidfast",
       name: "VidFast",
       icon: "⚡",
@@ -105,52 +168,30 @@ export function buildStreamingSources(
       reliability: "high",
       providerUrl: vidfastUrl,
     },
-    {
-      id: "vidsrc",
-      name: "VidSrc",
-      icon: "📺",
-      quality: "HD",
-      reliability: "high",
-      providerUrl: isTv
-        ? `https://vidsrc.me/embed/tv?tmdb=${movieId}&season=${season}&episode=${episode}`
-        : `https://vidsrc.me/embed/movie?tmdb=${movieId}`,
-    },
-    {
-      id: "2embed",
-      name: "2Embed",
-      icon: "🎞️",
-      quality: "HD",
-      reliability: "medium",
-      providerUrl: isTv
-        ? `https://www.2embed.cc/embedtv/${movieId}&s=${season}&e=${episode}`
-        : `https://www.2embed.cc/embed/${movieId}`,
-    },
-    {
-      id: "superembed",
-      name: "SuperEmbed",
-      icon: "📽️",
-      quality: "FHD",
-      reliability: "medium",
-      providerUrl: isTv
-        ? `https://multiembed.mov/?video_id=${movieId}&tmdb=1&s=${season}&e=${episode}`
-        : `https://multiembed.mov/?video_id=${movieId}&tmdb=1`,
-    },
-    {
-      id: "embed-su",
-      name: "Embed SU",
-      icon: "🎥",
-      quality: "HD",
-      reliability: "medium",
-      providerUrl: isTv
-        ? `https://embed.su/embed/tv/${movieId}/${season}/${episode}`
-        : `https://embed.su/embed/movie/${movieId}`,
-    },
+    // NOTE: YapGrid lanes are NOT listed here — `ordered` below appends
+    // all four yapgridSources (g/x/y/z) after the primary providers.
+    // Listing yapgrid-g here too produced a duplicate "YapGrid G" entry
+    // in the server selector.
+    // Dead / blocked / 404 sources have been removed:
+    //   - vidsrc.sbs — returns 200 but body says "blocked"
+    //   - vidsrc.pm — doesn't work in our test env (user flagged)
+    //   - vidsrc.in / vidsrc.su / vidsrc.me / multiembed.mov — blocked
+    //     or 404 in our tests
+    //   - embed.su — DNS dead
+    //   - player.videasy.net — superseded by player.videasy.to per docs
+    //   - 2embed.cc — returns 200 but the body is a thin page that shows
+    //     up as a blank iframe; left out entirely
   ];
 
-  const ordered = lang === "sq" ? [...yapgridSources, ...raw] : [...raw, yapgridSources[0]!];
+  // YapGrid is intentionally LAST — its audio is upstream-controlled and
+  // we can't force it to English/Albanian, so it should only be tried after
+  // every better-behaved provider has failed.
+  const ordered = [...primary, ...yapgridSources];
 
   return ordered.map((s) => ({
     ...s,
+    // Keep provider content cross-origin. The server-side HTML proxy is
+    // intentionally not used: provider scripts depend on their own origin.
     url: s.providerUrl,
   }));
 }

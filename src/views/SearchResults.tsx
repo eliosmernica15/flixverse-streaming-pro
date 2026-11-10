@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
-import Reveal from "@/components/Reveal";
-import { searchMultiWithPagination, getContentImage, TMDBMovie } from "@/utils/tmdbApi";
-import { Search, Clock, X } from "lucide-react";
+import Stagger from "@/components/Stagger";
+import { searchMultiWithPagination, getContentImage, TMDBMovie, searchCollectionsWithPagination, TMDBCollection } from "@/utils/tmdbApi";
+import { Search, Clock, X, User } from "lucide-react";
 import { SearchFilters, SearchFilterState } from "@/components/SearchFilters";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { trackSearch } from "@/lib/analytics";
@@ -30,17 +32,19 @@ interface SearchResultItem {
 }
 
 const SearchResults = () => {
+  const router = useRouter();
   const t = useTranslations("search");
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<SearchFilterState>({
-    mediaType: "all",
-    year: "",
-    sort: "relevance",
+    mediaType: (searchParams.get("media") as SearchFilterState["mediaType"]) || "all",
+    year: searchParams.get("year") || "",
+    sort: (searchParams.get("sort") as SearchFilterState["sort"]) || "relevance",
   });
   const [allResults, setAllResults] = useState<TMDBMovie[]>([]);
   const [allPeople, setAllPeople] = useState<SearchResultItem[]>([]);
+  const [allCollections, setAllCollections] = useState<TMDBCollection[]>([]);
 
   const [recent, setRecent] = useState<string[]>([]);
 
@@ -73,13 +77,22 @@ const SearchResults = () => {
 
   const runSearch = (value: string) => {
     const trimmed = value.trim();
-    if (trimmed) window.location.href = `/search?q=${encodeURIComponent(trimmed)}`;
+    if (trimmed) router.push(`/search?q=${encodeURIComponent(trimmed)}`);
   };
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["search", query, page],
     queryFn: () => searchMultiWithPagination(query, page),
-    enabled: query.length > 0,
+    enabled: query.length > 0 && filters.mediaType !== "collections",
+    staleTime: 2 * 60 * 1000,
+    placeholderData: (previous) => previous,
+  });
+
+  // Fetch collections when collections tab is active
+  const { data: collectionsData, isLoading: collectionsLoading, isFetching: collectionsFetching } = useQuery({
+    queryKey: ["search-collections", query, page],
+    queryFn: () => searchCollectionsWithPagination(query, page),
+    enabled: query.length > 0 && filters.mediaType === "collections",
     staleTime: 2 * 60 * 1000,
     placeholderData: (previous) => previous,
   });
@@ -102,13 +115,28 @@ const SearchResults = () => {
     }
   }, [data, page]);
 
-  const totalPages = data?.total_pages ?? 1;
-  const loading = isLoading || isFetching;
+  // Merge collections results for infinite scroll
+  useEffect(() => {
+    if (!collectionsData?.results) return;
+    const collections = collectionsData.results as TMDBCollection[];
+
+    if (page === 1) {
+      setAllCollections(collections);
+    } else {
+      setAllCollections((prev) => [...prev, ...collections]);
+    }
+  }, [collectionsData, page]);
+
+  // Determine which data source to use based on active filter
+  const isCollectionsTab = filters.mediaType === "collections";
+  const totalPages = isCollectionsTab ? (collectionsData?.total_pages ?? 1) : (data?.total_pages ?? 1);
+  const loading = isCollectionsTab ? (collectionsLoading || collectionsFetching) : (isLoading || isFetching);
   const hasMore = page < totalPages;
 
   // Apply client-side filters
   const filteredResults = allResults.filter((item) => {
     if (filters.mediaType === "person") return false;
+    if (filters.mediaType === "collections") return false;
     if (filters.mediaType === "movie" && item.media_type !== "movie") return false;
     if (filters.mediaType === "tv" && item.media_type !== "tv") return false;
     if (filters.year) {
@@ -118,9 +146,11 @@ const SearchResults = () => {
     return true;
   });
 
-  const filteredPeople = filters.mediaType === "all" || filters.mediaType === "person"
+  const filteredPeople = (filters.mediaType === "all" || filters.mediaType === "person") && !isCollectionsTab
     ? allPeople
     : [];
+
+  const filteredCollections = isCollectionsTab ? allCollections : [];
 
   // Sort
   const sortedResults = [...filteredResults].sort((a, b) => {
@@ -148,9 +178,10 @@ const SearchResults = () => {
 
   useEffect(() => {
     if (query && !loading) {
-      trackSearch(query, sortedResults.length + filteredPeople.length);
+      const collectionsCount = isCollectionsTab ? filteredCollections.length : 0;
+      trackSearch(query, sortedResults.length + filteredPeople.length + collectionsCount);
     }
-  }, [query, loading, sortedResults.length, filteredPeople.length]);
+  }, [query, loading, sortedResults.length, filteredPeople.length, filteredCollections.length, isCollectionsTab]);
 
   const { sentinelRef } = useInfiniteScroll({
     enabled: query.length > 0,
@@ -161,165 +192,262 @@ const SearchResults = () => {
 
   const handleFiltersChange = (newFilters: SearchFilterState) => {
     setFilters(newFilters);
+    // Sync filters to URL for shareable/deep-linkable results
+    const url = new URL(window.location.href);
+    url.searchParams.set("q", query);
+    if (newFilters.mediaType !== "all") url.searchParams.set("media", newFilters.mediaType);
+    else url.searchParams.delete("media");
+    if (newFilters.year) url.searchParams.set("year", newFilters.year);
+    else url.searchParams.delete("year");
+    if (newFilters.sort !== "relevance") url.searchParams.set("sort", newFilters.sort);
+    else url.searchParams.delete("sort");
+    router.replace(url.toString(), { scroll: false });
   };
 
   return (
-    <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-[1800px] mx-auto page-enter">
-      <div className="mb-8">
-        <span className="eyebrow">{t("results")}</span>
-        <h1 className="display-title text-balance mt-1">
-          {query ? (
-            <>
-              {t("results")} <span className="gradient-text">&quot;{query}&quot;</span>
-            </>
-          ) : (
-            t("findFavorite")
-          )}
-        </h1>
-      </div>
-
-      {/* Inline search input */}
-      <div className="mb-5">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input
-            id="search-input"
-            type="search"
-            defaultValue={query}
-            placeholder={t("placeholderLong")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const val = (e.target as HTMLInputElement).value;
-                runSearch(val);
-              }
-            }}
-            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20 focus-visible:ring-2 focus-visible:ring-red-500/60 transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Recent searches */}
-      {recent.length > 0 && (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-gray-500 mr-1 flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" /> Recent
+    <div className="page-enter">
+      {/* Cinematic header */}
+      <header className="relative pt-24 pb-8 px-4 sm:px-6 lg:px-10 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(239, 68, 68, 0.15) 0%, transparent 60%)",
+          }}
+        />
+        <div className="max-w-[1800px] mx-auto">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-red-500 mb-1.5">
+            {query ? t("results") : "Search"}
           </span>
-          {recent.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => runSearch(r)}
-              className="chip hover:bg-white/10 text-gray-300 transition-colors focus-ring min-h-[36px]"
-            >
-              {r}
-              <span
-                role="button"
-                tabIndex={-1}
-                aria-hidden
-                className="ml-1 text-gray-500 hover:text-white"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRecent((prev) => prev.filter((x) => x !== r));
-                  try {
-                    localStorage.setItem(RECENT_KEY, JSON.stringify(recent.filter((x) => x !== r)));
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-              >
-                <X className="w-3 h-3" />
-              </span>
-            </button>
-          ))}
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-[1.1]">
+            {query ? (
+              <>
+                {t("results")} <span className="text-white">&quot;{query}&quot;</span>
+              </>
+            ) : (
+              t("findFavorite")
+            )}
+          </h1>
         </div>
-      )}
+      </header>
 
-      {!query ? (
-        <div className="text-center py-16">
-          <div className="glass-panel rounded-3xl p-10 max-w-md mx-auto">
-            <Search className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-gray-300">{t("findFavorite")}</p>
+      <main className="pb-16 px-4 sm:px-6 lg:px-10 max-w-[1800px] mx-auto">
+        {/* Inline search input */}
+        <div className="mb-5">
+          <div className="relative max-w-2xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              id="search-input"
+              type="search"
+              defaultValue={query}
+              placeholder={t("placeholderLong")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = (e.target as HTMLInputElement).value;
+                  runSearch(val);
+                }
+              }}
+              className="w-full bg-white/5 border border-white/10 rounded-md pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-red-500/40 focus-visible:ring-2 focus-visible:ring-red-500/40 transition-colors"
+            />
           </div>
         </div>
-      ) : loading && allResults.length === 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] rounded-2xl skeleton-shimmer" />
-          ))}
-        </div>
-        ) : sortedResults.length === 0 && filteredPeople.length === 0 && !loading ? (
-          <div className="text-center py-16">
-            <div className="glass-panel rounded-3xl p-10 max-w-md mx-auto">
-              <Search className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-300">{t("noResults")}</p>
-              <p className="mt-2 text-sm text-gray-500">{t("tryDifferent")}</p>
-            </div>
+
+        {/* Recent searches */}
+        {recent.length > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mr-1 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Recent
+            </span>
+            {recent.map((r) => (
+              <div
+                key={r}
+                className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-gray-300"
+              >
+                <button
+                  type="button"
+                  onClick={() => runSearch(r)}
+                  className="hover:text-white transition-colors focus-ring rounded"
+                >
+                  {r}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Remove ${r} from recent searches`}
+                  className="p-0.5 text-gray-500 hover:text-white transition-colors focus-ring rounded"
+                  onClick={() => {
+                    setRecent((prev) => {
+                      const updated = prev.filter((x) => x !== r);
+                      try {
+                        localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+                      } catch {
+                        /* ignore */
+                      }
+                      return updated;
+                    });
+                  }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!query ? (
+          <div className="glass-soft rounded-2xl py-16 px-8 text-center max-w-md mx-auto">
+            <Search className="w-10 h-10 text-red-500 mx-auto mb-4" />
+            <p className="text-gray-300 text-sm">{t("findFavorite")}</p>
+            <p className="text-gray-500 text-xs mt-2">Try a movie title, actor, or director.</p>
+          </div>
+        ) : loading && allResults.length === 0 && filteredCollections.length === 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="aspect-[2/3] rounded-md skeleton-shimmer" />
+            ))}
+          </div>
+        ) : sortedResults.length === 0 && filteredPeople.length === 0 && filteredCollections.length === 0 && !loading ? (
+          <div className="glass-soft rounded-2xl py-16 px-8 text-center max-w-md mx-auto">
+            <Search className="w-10 h-10 text-gray-500 mx-auto mb-4" />
+            <p className="text-gray-300 text-sm">{t("noResults")}</p>
+            <p className="text-gray-500 text-xs mt-2">{t("tryDifferent")}</p>
           </div>
         ) : (
           <>
             <SearchFilters
               filters={filters}
               onChange={handleFiltersChange}
-              resultCount={sortedResults.length + filteredPeople.length}
+              resultCount={
+                isCollectionsTab
+                  ? filteredCollections.length
+                  : sortedResults.length + filteredPeople.length
+              }
             />
 
             {sortedResults.length > 0 && (
-              <Reveal as="section" className="stagger mb-12 content-auto">
-                <SectionHeader title={t("moviesAndTv")} eyebrow={t("results")} />
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 mt-2">
-                  {sortedResults.map((item) => (
-                    <div key={`${item.id}-${item.media_type}`} className="hover-lift-sm rounded-2xl">
-                      <MovieCard movie={item} />
-                    </div>
-                  ))}
+              <section className="mb-12 content-auto">
+                <SectionHeader title={t("moviesAndTv")} eyebrow={`${sortedResults.length} titles`} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3">
+                  <Stagger>
+                    {sortedResults.map((item) => (
+                      <MovieCard key={`${item.id}-${item.media_type}`} movie={item} />
+                    ))}
+                  </Stagger>
                 </div>
-              </Reveal>
+              </section>
             )}
 
             {filteredPeople.length > 0 && (
-              <Reveal as="section" className="mb-12 content-auto">
-                <SectionHeader title={t("people")} eyebrow={t("castAndCrew")} />
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-2">
-                  {filteredPeople.map((person) => (
-                    <a
-                      key={`person-${person.id}`}
-                      href={`/person/${person.id}`}
-                      className="flex flex-col items-center p-4 rounded-2xl surface hover:surface-elevated transition-colors border border-white/10 hover-lift-sm focus-ring"
-                    >
-                      <img
-                        src={getContentImage(person, "profile", "medium")}
-                        alt={person.name ?? "Person"}
-                        loading="lazy"
-                        className="w-20 h-20 rounded-full object-cover border-2 border-white/20"
-                      />
-                      <span className="mt-2 text-sm font-medium text-center line-clamp-2">{person.name}</span>
-                      {person.known_for_department && (
-                        <span className="text-xs text-gray-400">{person.known_for_department}</span>
-                      )}
-                    </a>
-                  ))}
+              <section className="mb-12 content-auto">
+                <SectionHeader title={t("people")} eyebrow={`${filteredPeople.length} people`} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 mt-3">
+                  <Stagger>
+                  {filteredPeople.map((person) => {
+                    const profileImg = person.profile_path
+                      ? getContentImage(person, "profile", "medium")
+                      : null;
+                    return (
+                      <Link
+                        key={`person-${person.id}`}
+                        href={`/person/${person.id}`}
+                        className="group flex flex-col items-center p-4 rounded-xl border border-white/8 bg-white/3 hover:bg-white/5 hover:border-white/15 transition-all hover:-translate-y-0.5 focus-ring"
+                      >
+                        <div className="relative w-20 h-20 rounded-full overflow-hidden ring-2 ring-white/15 group-hover:ring-red-500/60 transition-all shrink-0 bg-white/5">
+                          {profileImg ? (
+                            <Image
+                              src={profileImg}
+                              alt={person.name ?? "Person"}
+                              fill
+                              sizes="80px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500/20 to-purple-500/20">
+                              <User className="w-8 h-8 text-white/60" />
+                            </div>
+                          )}
+                        </div>
+                        <span className="mt-2 text-sm font-semibold text-center text-white line-clamp-2 group-hover:text-red-400 transition-colors">
+                          {person.name}
+                        </span>
+                        {person.known_for_department && (
+                          <span className="mt-1.5 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-300">
+                            {person.known_for_department}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                  </Stagger>
                 </div>
-              </Reveal>
+              </section>
             )}
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="h-4" />
+            {/* Collections */}
+            {isCollectionsTab && filteredCollections.length > 0 && (
+              <section className="mb-12 content-auto">
+                <SectionHeader title={t("collections")} eyebrow={`${filteredCollections.length} collections`} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3">
+                  <Stagger>
+                    {filteredCollections.map((collection) => (
+                      <Link
+                        key={`collection-${collection.id}`}
+                        href={`/collection/${collection.id}`}
+                        className="group flex flex-col aspect-[2/3] rounded-xl border border-white/8 bg-white/3 overflow-hidden hover:bg-white/5 hover:border-white/15 transition-all hover:-translate-y-0.5 focus-ring"
+                      >
+                        <div className="relative w-full h-full overflow-hidden">
+                          {collection.poster_path ? (
+                            <Image
+                              src={getContentImage(collection, "poster", "medium")}
+                              alt={collection.name ?? "Collection"}
+                              fill
+                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 16vw"
+                              className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-red-500/20 to-purple-500/20" />
+                          )}
+                          {/* Part count badge */}
+                          <div className="absolute bottom-2 right-2 rounded-full bg-black/80 backdrop-blur px-2 py-0.5 text-xs font-medium text-white">
+                            {collection.part_count} {collection.part_count === 1 ? "title" : "titles"}
+                          </div>
+                        </div>
+                        <div className="p-3 flex-1 flex flex-col justify-between min-h-[60px]">
+                          <span className="text-sm font-semibold text-white line-clamp-2 group-hover:text-red-400 transition-colors">
+                            {collection.name}
+                          </span>
+                          {collection.overview && (
+                            <p className="mt-1 text-xs text-gray-400 line-clamp-2">
+                              {collection.overview}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </Stagger>
+                </div>
+              </section>
+            )}
 
-          {/* Loading more indicator */}
-          {loading && allResults.length > 0 && (
-            <div className="flex justify-center py-8">
-              <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
-            </div>
-          )}
+            {/* Infinite scroll sentinel */}
+            <div ref={sentinelRef} className="h-4" />
 
-          {!hasMore && allResults.length > 0 && (
-            <p className="text-center text-gray-500 text-sm py-8">
-              You&apos;ve reached the end of results
-            </p>
-          )}
-        </>
-      )}
-    </main>
+            {/* Loading more indicator */}
+            {loading && (allResults.length > 0 || filteredCollections.length > 0) && (
+              <div className="flex justify-center py-8">
+                <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+              </div>
+            )}
+
+            {!hasMore && (allResults.length > 0 || filteredCollections.length > 0) && (
+              <p className="text-center text-gray-500 text-xs py-8 uppercase tracking-wider">
+                You&apos;ve reached the end of results
+              </p>
+            )}
+          </>
+        )}
+      </main>
+    </div>
   );
 };
 
