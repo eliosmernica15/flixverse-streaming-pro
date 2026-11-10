@@ -432,7 +432,6 @@ def _postgres_pool() -> Any:
                     kwargs={
                         "row_factory": dict_row,
                         "connect_timeout": 10,
-                        "options": "-c statement_timeout=10000",
                     },
                     min_size=1,
                     max_size=8,
@@ -469,7 +468,6 @@ def get_conn() -> Iterator[Any]:
             _postgres_url(),
             row_factory=dict_row,
             connect_timeout=10,
-            options="-c statement_timeout=10000",
         ) as conn:
             yield conn
     elif os.environ.get("VERCEL") == "1":
