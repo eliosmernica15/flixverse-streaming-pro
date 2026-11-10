@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { verifyAuthHeader } from "@/lib/firebase/verifyAuth";
+import { callPythonJson } from "@/app/api/_lib/pythonOrigin";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
+import { z } from "zod";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -18,7 +20,21 @@ const PRICE_MAP: Record<string, string | undefined> = {
 
 export const runtime = "nodejs";
 
+interface IdentityResponse {
+  uid: string;
+  email: string | null;
+  name: string | null;
+}
+
+const checkoutSchema = z.object({
+  planId: z.enum(["standard", "premium"]),
+  billingPeriod: z.enum(["monthly", "yearly"]),
+});
+
 export async function POST(request: NextRequest) {
+  const limit = await rateLimitByIp(request, "billing-checkout", 10, "1 h");
+  if (!limit.success) return rateLimitResponse(limit);
+
   const stripe = getStripe();
   if (!stripe) {
     return NextResponse.json(
@@ -27,20 +43,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const auth = await verifyAuthHeader(request);
-  if (!auth) {
+  const ident = await callPythonJson<IdentityResponse>(request, "/account/identity");
+  if (ident.error || !ident.data?.uid) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const { uid, email } = ident.data;
 
-  const body = await request.json();
-  const { planId, billingPeriod } = body as {
-    planId: "standard" | "premium";
-    billingPeriod: "monthly" | "yearly";
-  };
-
-  if (!planId) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  const parsed = checkoutSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid checkout options" }, { status: 400 });
   }
+  const { planId, billingPeriod } = parsed.data;
 
   const priceKey = `${planId}_${billingPeriod}` as keyof typeof PRICE_MAP;
   const priceId = PRICE_MAP[priceKey];
@@ -54,12 +67,12 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      customer_email: auth.email,
+      customer_email: email ?? undefined,
       line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { userId: auth.uid, planId },
+      metadata: { userId: uid, planId },
       subscription_data: {
         trial_period_days: 7,
-        metadata: { userId: auth.uid, planId },
+        metadata: { userId: uid, planId },
       },
       success_url: `${origin}/plans?success=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/plans?canceled=1`,

@@ -31,6 +31,29 @@ export function ContinueWatchingSkeleton() {
   );
 }
 
+export function Top10RowSkeleton() {
+  return (
+    <section aria-hidden="true">
+      <div className="mb-4 sm:mb-5">
+        <div className="mb-2 h-2.5 w-28 rounded skeleton-shimmer" />
+        <div className="h-7 w-48 rounded-lg skeleton-shimmer" />
+      </div>
+      <div className="flex gap-3 overflow-hidden pb-4">
+        {Array.from({ length: 5 }, (_, index) => (
+          <div key={index} className="flex shrink-0 items-end">
+            <div className="-mr-6 h-24 w-12 rounded skeleton-shimmer sm:-mr-8 sm:h-32 sm:w-16" />
+            <div className="w-28 sm:w-32 md:w-36 lg:w-40">
+              <div className="aspect-[2/3] rounded-md skeleton-shimmer" />
+              <div className="mt-2 h-3 w-4/5 rounded skeleton-shimmer" />
+              <div className="mt-1.5 h-2.5 w-1/2 rounded skeleton-shimmer" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function HistoryListSkeleton() {
   return (
     <div className="space-y-3">

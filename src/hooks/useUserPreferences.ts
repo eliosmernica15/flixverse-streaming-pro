@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { setPerformanceMode } from '@/hooks/usePerformanceMode';
 
 export interface UserPreferences {
   favoriteGenres: string[];
@@ -8,6 +9,7 @@ export interface UserPreferences {
   viewHistory: number[];
   lastVisited: string;
   personalizedRecommendations: boolean;
+  performanceMode: boolean;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -17,6 +19,7 @@ const defaultPreferences: UserPreferences = {
   viewHistory: [],
   lastVisited: new Date().toISOString(),
   personalizedRecommendations: true,
+  performanceMode: false,
 };
 
 export const useUserPreferences = () => {
@@ -24,13 +27,24 @@ export const useUserPreferences = () => {
 
   useEffect(() => {
     const saved = localStorage.getItem('userPreferences');
+    const savedPerformanceMode = localStorage.getItem('flixverse-performance-mode') === 'true';
+    let nextPreferences = defaultPreferences;
+
     if (saved) {
       try {
-        setPreferences(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        nextPreferences = {
+        ...defaultPreferences,
+        ...(parsed && typeof parsed === 'object' ? parsed : {}),
+        };
+        nextPreferences.performanceMode = savedPerformanceMode || nextPreferences.performanceMode;
       } catch (error) {
         console.error('Error parsing user preferences:', error);
       }
     }
+
+    setPreferences(nextPreferences);
+    setPerformanceMode(nextPreferences.performanceMode);
   }, []);
 
   const updatePreferences = (updates: Partial<UserPreferences>) => {

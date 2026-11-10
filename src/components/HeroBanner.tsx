@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Image from "next/image";
-import { Play, Star, Plus, Info, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Plus, Check, ChevronLeft, ChevronRight, Volume2, Sparkles, ChevronDown } from "lucide-react";
 import { TMDBMovie, getBackdropUrl, getContentTitle, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
@@ -12,11 +12,12 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 import { useDominantColors } from "@/hooks/player/useDominantColors";
+import { useDepthParallax } from "@/hooks/useDepthParallax";
 import { rgbToCss } from "@/lib/player/extractDominantColors";
 import { useTranslations } from "next-intl";
+import { usePerformanceMode } from "@/hooks/usePerformanceMode";
 
 interface HeroBannerProps {
-  /** Single movie or array for rotation */
   movie: TMDBMovie;
   movies?: TMDBMovie[];
 }
@@ -25,20 +26,32 @@ const ROTATION_INTERVAL_MS = 8000;
 const MAX_ROTATION = 5;
 
 const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
-  const allMovies = (propMovies && propMovies.length > 1
-    ? propMovies.slice(0, MAX_ROTATION)
-    : [movie]);
+  // Memoised: this array feeds a prefetch effect. Rebuilding it every render
+  // made that effect re-run on every state change (rotation tick, mute
+  // toggle, hover) and re-issue `router.prefetch` for up to five routes.
+  const allMovies = useMemo(
+    () => (propMovies && propMovies.length > 1 ? propMovies.slice(0, MAX_ROTATION) : [movie]),
+    [propMovies, movie]
+  );
   const [activeIndex, setActiveIndex] = useState(0);
+  const [muted, setMuted] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isHoveredRef = useRef(false);
 
   const t = useTranslations("hero");
-  const tCommon = useTranslations("common");
   const { isAuthenticated } = useAuth();
   const { addToList, isInList } = useUserMovieListContext();
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
   const reducedMotion = useReducedMotion();
+  const performanceMode = usePerformanceMode();
+  const canAutoRotate = allMovies.length > 1 && !reducedMotion && !performanceMode;
+
+  // Layered depth: the backdrop, the atmospheric glows and the copy sit on
+  // three planes and drift by different amounts as the pointer moves. The
+  // hook writes CSS variables only — pointer movement never re-renders React.
+  const heroRef = useDepthParallax<HTMLDivElement>(26);
 
   const currentMovie = allMovies[activeIndex];
   const contentType = getContentType(currentMovie);
@@ -47,40 +60,82 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
     currentMovie.genre_ids
   );
 
-  const c1 = colors[0] ? rgbToCss(colors[0], 0.15) : "rgba(239, 68, 68, 0.15)";
-  const c2 = colors[1] ? rgbToCss(colors[1], 0.10) : "rgba(168, 85, 247, 0.10)";
-
-  // Prefetch all hero movies
+  // Phase A hero parallax: the backdrop layer eases down at 0.3× scroll.
+  // rAF-throttled, capped at one viewport, disabled for reduced motion.
+  const backdropRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    for (const m of allMovies) {
+    if (reducedMotion || performanceMode) return;
+    if (typeof window === "undefined") return;
+    let raf = 0;
+    const applyParallax = () => {
+      raf = 0;
+      const node = backdropRef.current;
+      if (!node) return;
+      const y = Math.min(window.scrollY, window.innerHeight);
+      node.style.transform = `translate3d(0, ${(y * 0.3).toFixed(1)}px, 0)`;
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(applyParallax);
+    };
+    applyParallax();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [performanceMode, reducedMotion]);
+
+  const c1 = colors[0] ? rgbToCss(colors[0], 0.18) : "rgba(229, 9, 20, 0.18)";
+  const c2 = colors[1] ? rgbToCss(colors[1], 0.12) : "rgba(124, 58, 237, 0.12)";
+
+  useEffect(() => {
+    for (const m of performanceMode ? allMovies.slice(0, 1) : allMovies) {
       const ct = getContentType(m);
       prefetchContentDetails(queryClient, m.id, ct);
       router.prefetch(`/movie/${m.id}?type=${ct}`);
     }
-  }, [allMovies, queryClient, router]);
+  }, [allMovies, performanceMode, queryClient, router]);
 
-  // Rotation timer
-  useEffect(() => {
-    if (allMovies.length <= 1 || reducedMotion) return;
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
+  const startTimer = useCallback(() => {
+    stopTimer();
+    if (!canAutoRotate || document.hidden || isHoveredRef.current) return;
     timerRef.current = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % allMovies.length);
     }, ROTATION_INTERVAL_MS);
+  }, [allMovies.length, canAutoRotate, stopTimer]);
+
+  useEffect(() => {
+    if (!canAutoRotate) {
+      stopTimer();
+      return;
+    }
+    const onVisibility = () => {
+      if (document.hidden) stopTimer();
+      else startTimer();
+    };
+
+    startTimer();
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      stopTimer();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [allMovies.length, reducedMotion]);
+  }, [canAutoRotate, startTimer, stopTimer]);
 
   const goToSlide = useCallback((index: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    stopTimer();
     setActiveIndex(index);
-    if (allMovies.length > 1 && !reducedMotion) {
-      timerRef.current = setInterval(() => {
-        setActiveIndex((prev) => (prev + 1) % allMovies.length);
-      }, ROTATION_INTERVAL_MS);
-    }
-  }, [allMovies.length, reducedMotion]);
+    startTimer();
+  }, [startTimer, stopTimer]);
 
   const goPrev = useCallback(() => {
     goToSlide(activeIndex === 0 ? allMovies.length - 1 : activeIndex - 1);
@@ -91,13 +146,29 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   }, [activeIndex, allMovies.length, goToSlide]);
 
   const title = getContentTitle(currentMovie);
-  const backdropUrl = currentMovie.backdrop_path ? getBackdropUrl(currentMovie.backdrop_path, "large") : "";
   const releaseYear = currentMovie.release_date
     ? new Date(currentMovie.release_date).getFullYear()
     : currentMovie.first_air_date
       ? new Date(currentMovie.first_air_date).getFullYear()
       : "";
   const isInMyList = isAuthenticated ? isInList(currentMovie.id) : false;
+  const rating = typeof currentMovie.vote_average === "number" ? currentMovie.vote_average : 0;
+  const isSeries = currentMovie.media_type === "tv";
+  // Real metadata only. The movie branch used to render a random runtime
+  // during SSR, which both invented data and produced a hydration mismatch
+  // (server HTML ≠ client HTML) on every home-page load.
+  const metaLabel = (() => {
+    if (isSeries) {
+      const seasons = currentMovie.number_of_seasons;
+      if (!seasons || seasons <= 0) return null;
+      return `${seasons} Season${seasons > 1 ? "s" : ""}`;
+    }
+    const minutes = currentMovie.runtime;
+    if (!minutes || minutes <= 0) return null;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  })();
 
   const handlePlayClick = () => {
     if (!isAuthenticated) {
@@ -131,33 +202,38 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
   return (
     <div
-      className="relative h-[72vh] sm:h-[88vh] lg:h-[92vh] overflow-hidden contain-paint"
+      ref={heroRef}
+      className="group/hero hero-depth relative h-[78vh] sm:h-[88vh] lg:h-[92vh] min-h-[520px] overflow-hidden contain-paint bg-black"
       onMouseEnter={() => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
+        isHoveredRef.current = true;
+        stopTimer();
       }}
       onMouseLeave={() => {
-        if (allMovies.length <= 1 || reducedMotion) return;
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-          setActiveIndex((prev) => (prev + 1) % allMovies.length);
-        }, ROTATION_INTERVAL_MS);
+        isHoveredRef.current = false;
+        startTimer();
       }}
     >
-      {/* Backdrops — crossfade between slides */}
+      <div ref={backdropRef} className="hero-depth-backdrop absolute inset-0 will-change-transform">
       {allMovies.map((m, i) => {
         const url = m.backdrop_path ? getBackdropUrl(m.backdrop_path, "large") : "";
         const isActive = i === activeIndex;
+        const slideKey = `${m.id}-${m.media_type ?? "movie"}`;
         return (
           <div
-            key={m.id}
-            className={`absolute inset-0 transition-opacity duration-[800ms] ${isActive ? "opacity-100" : "opacity-0"}`}
+            key={slideKey}
+            className={`absolute inset-0 transition-opacity [transition-duration:1200ms] ease-out ${isActive ? "opacity-100" : "opacity-0"}`}
+            aria-hidden={!isActive}
           >
             <div className={`absolute inset-0 ${isActive && !reducedMotion ? "hero-ken-burns" : ""}`}>
               {url ? (
-                <Image src={url} alt={getContentTitle(m)} fill priority={i === 0} sizes="100vw" className="object-cover object-center" />
+                <Image
+                  src={url}
+                  alt={getContentTitle(m)}
+                  fill
+                  priority={i === 0}
+                  sizes="100vw"
+                  className="object-cover object-center"
+                />
               ) : (
                 <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-black" />
               )}
@@ -165,123 +241,181 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
           </div>
         );
       })}
+      </div>
 
-      <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-black/20" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-black/85 via-black/25 to-transparent" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,transparent,rgba(0,0,0,0.45))]" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-black/10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/50" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-transparent to-transparent h-32" />
+      {/* Depth vignette — pulls focus to the title without changing the palette. */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_52%,rgba(0,0,0,0.4)_100%)]" />
+      {/* Mobile-only stronger bottom fade so the title never crowds the CTA row. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/60 to-transparent sm:hidden" />
 
       {!reducedMotion && (
         <>
-          <div className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full blur-3xl pointer-events-none transition-colors duration-1000" style={{ backgroundColor: c1 }} />
-          <div className="absolute top-1/3 right-0 w-80 h-80 rounded-full blur-3xl pointer-events-none transition-colors duration-1000" style={{ backgroundColor: c2 }} />
+          <div
+            className="absolute -bottom-32 -left-32 w-[28rem] h-[28rem] rounded-full blur-3xl pointer-events-none transition-colors duration-1000"
+            style={{ backgroundColor: c1 }}
+          />
+          <div
+            className="absolute top-1/4 -right-20 w-[24rem] h-[24rem] rounded-full blur-3xl pointer-events-none transition-colors duration-1000"
+            style={{ backgroundColor: c2 }}
+          />
         </>
       )}
 
-      <div className="relative z-10 flex items-end lg:items-center h-full pb-20 sm:pb-28 lg:pb-0">
+      <div className="relative z-10 flex items-end lg:items-center h-full pb-24 sm:pb-32 lg:pb-0">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
-           <div className="max-w-3xl animate-fade-in-up" key={currentMovie.id}>
-             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-5">
-               <span className="eyebrow">{releaseYear ? `${releaseYear}` : t("nowStreaming")}</span>
-               <span className="chip bg-gradient-to-r from-red-600 to-red-500 text-white border-0 shadow-lg shadow-red-500/20">
-                 {currentMovie.media_type === "tv" ? tCommon("series") : tCommon("movie")}
-               </span>
-               <span className="chip glass-card">
-                 <span className="h-2 w-2 rounded-full bg-green-500" />
-                 <span>{t("featured")}</span>
-               </span>
-             </div>
+          <div className="hero-depth-content max-w-2xl lg:max-w-3xl" key={currentMovie.id}>
+            <div className="anim-slide-up-soft flex flex-wrap items-center gap-2 mb-4">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-white/30 bg-white/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
+                <Sparkles className="h-3 w-3 text-yellow-400" />
+                {t("featured")}
+              </span>
+              {rating > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/5 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                  <span className="text-yellow-400">★</span>
+                  {rating.toFixed(1)}
+                </span>
+              )}
+              {releaseYear && (
+                <span className="text-sm font-medium text-white/80">{releaseYear}</span>
+              )}
+              {metaLabel && (
+                <>
+                  <span className="text-white/40">•</span>
+                  <span className="text-sm font-medium text-white/80">{metaLabel}</span>
+                </>
+              )}
+              <span className="text-white/40">•</span>
+              <span className="inline-flex items-center gap-1 rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-black tracking-wider text-white">
+                HD
+              </span>
+              {isSeries && (
+                <>
+                  <span className="text-white/40">•</span>
+                  <span className="inline-flex items-center gap-1 rounded border border-purple-400/40 bg-purple-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-200">
+                    Series
+                  </span>
+                </>
+              )}
+            </div>
 
-             <h1 className="display-title gradient-text text-balance mb-3 sm:mb-5 text-3xl sm:text-4xl md:text-5xl lg:text-6xl">
-               {title}
-             </h1>
+            <h1
+              className="hero-text-shadow-strong mb-4 sm:mb-6 text-balance font-black tracking-tight text-white animate-letter text-3xl sm:text-5xl md:text-6xl lg:text-7xl 2xl:text-8xl 3xl:text-[9rem] 4xl:text-[11rem]"
+              style={{ lineHeight: "1.05" }}
+            >
+              {title.split(" ").map((word, i) => (
+                <span key={i} className="inline-block opacity-0" style={{ animation: `letter-fade 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${i * 50}ms forwards` }}>
+                  {word}&nbsp;
+                </span>
+              ))}
+            </h1>
 
-             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-               <span className="chip bg-yellow-500/15 border-yellow-500/20 font-bold text-yellow-400">
-                 <Star className="h-3.5 w-3.5 fill-current" />
-                 <span>{currentMovie.vote_average?.toFixed(1)}</span>
-               </span>
-               <span className="chip glass-card">
-                 {currentMovie.media_type === "tv" ? t("tvSeries") : t("featureFilm")}
-               </span>
-               <span className="chip glass-card">{t("hdAvailable")}</span>
-             </div>
-
-            <p className="text-sm sm:text-base md:text-lg mb-6 sm:mb-8 text-gray-300 leading-relaxed line-clamp-3 max-w-2xl">
+            <p className="hero-text-shadow mb-6 sm:mb-8 max-w-2xl text-sm sm:text-base md:text-lg leading-relaxed text-gray-200/90 line-clamp-3 sm:line-clamp-3">
               {currentMovie.overview}
             </p>
 
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-              <button onClick={handlePlayClick} className="btn-primary group flex items-center space-x-2 sm:space-x-3 px-5 py-3 sm:px-8 sm:py-4 text-base sm:text-lg hover:scale-[1.02] active:scale-[0.98] press-effect btn-shine focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
-                <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-current group-hover:scale-110 transition-transform" />
+            <div className="anim-slide-left flex flex-wrap items-center gap-2.5 sm:gap-3">
+              <button
+                onClick={handlePlayClick}
+                className="cta-primary !rounded-md !px-6 !py-2.5 sm:!px-8 sm:!py-3.5 !text-sm sm:!text-base shadow-2xl"
+                aria-label={`Play ${title}`}
+              >
+                <Play className="h-5 w-5 sm:h-6 sm:w-6 fill-current" />
                 <span>{t("playNow")}</span>
               </button>
-              <button onClick={handleAddToList} className="btn-glass group flex items-center space-x-2 sm:space-x-3 px-5 py-3 sm:px-8 sm:py-4 text-base sm:text-lg font-semibold hover:scale-[1.02] active:scale-[0.98] press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70">
-                {isInMyList ? <Check className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" /> : <Plus className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-90 transition-transform duration-300" />}
+
+              <button
+                onClick={handleAddToList}
+                className="cta-secondary !rounded-md !px-5 !py-2.5 sm:!px-6 sm:!py-3.5 !text-sm sm:!text-base"
+                aria-label={isInMyList ? t("inList") : t("addToList")}
+              >
+                {isInMyList ? (
+                  <Check className="h-5 w-5 sm:h-6 sm:w-6" />
+                ) : (
+                  <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
+                )}
                 <span>{isInMyList ? t("inList") : t("addToList")}</span>
               </button>
-              <button onClick={handleMoreInfo} className="group p-3 sm:p-4 glass-card rounded-xl hover:bg-white/15 transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black" title={t("moreInfo")}>
-                <Info className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+
+              <button
+                onClick={handleMoreInfo}
+                className="cta-icon !rounded-full"
+                aria-label={t("moreInfo")}
+                title={t("moreInfo")}
+              >
+                <ChevronDown className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMuted((m) => !m)}
+                className="cta-icon !rounded-full ml-auto hidden sm:inline-flex"
+                aria-label={muted ? "Unmute" : "Mute"}
+                title={muted ? "Unmute preview" : "Mute preview"}
+              >
+                <Volume2 className={`h-5 w-5 sm:h-6 sm:w-6 ${muted ? "opacity-60" : ""}`} />
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black via-black/70 to-transparent pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none z-[1]" />
 
-      {/* Rotation controls */}
       {allMovies.length > 1 && (
-        <div className="absolute bottom-8 left-0 right-0 z-20">
-          <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-            {/* Prev/Next arrows */}
-            <div className="hidden sm:flex items-center gap-2">
-              <button onClick={goPrev} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label={t("prevTitle")}>
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button onClick={goNext} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70" aria-label={t("nextTitle")}>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+        <>
+          <button
+            type="button"
+            onClick={goPrev}
+            className="absolute left-0 top-0 bottom-0 z-20 hidden w-16 items-center justify-center text-white opacity-0 transition-opacity duration-300 hover:opacity-100 group-hover/hero:opacity-100 sm:flex"
+            aria-label={t("prevTitle")}
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md transition-all duration-200 hover:bg-black/70 hover:scale-110">
+              <ChevronLeft className="h-7 w-7" />
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            className="absolute right-0 top-0 bottom-0 z-20 hidden w-16 items-center justify-center text-white opacity-0 transition-opacity duration-300 hover:opacity-100 group-hover/hero:opacity-100 sm:flex"
+            aria-label={t("nextTitle")}
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md transition-all duration-200 hover:bg-black/70 hover:scale-110">
+              <ChevronRight className="h-7 w-7" />
+            </span>
+          </button>
+        </>
+      )}
 
-            {/* Dot indicators */}
-            <div className="flex items-center gap-2 mx-auto sm:mx-0">
-              {allMovies.map((m, i) => (
-                <button
-                  key={m.id}
-                  onClick={() => goToSlide(i)}
-                  className={`h-1 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 ${
-                    i === activeIndex ? "w-8 bg-red-500" : "w-2 bg-white/30 hover:bg-white/50"
-                  }`}
-                  aria-label={`Go to ${getContentTitle(m)}`}
-                />
-              ))}
-            </div>
-
-            <div className="hidden sm:block w-20" /> {/* Spacer for centering */}
-          </div>
-
-          {/* Auto-rotation progress bar */}
-          {!reducedMotion && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/5">
-              <div
-                key={activeIndex}
-                className="h-full bg-red-500"
-                style={{
-                  animation: `hero-progress ${ROTATION_INTERVAL_MS}ms linear`,
-                  width: "100%",
-                }}
+      {allMovies.length > 1 && (
+        <div className="absolute right-4 sm:right-8 bottom-6 sm:bottom-8 z-20 flex items-center gap-1.5">
+          {allMovies.map((m, i) => {
+            const isActive = i === activeIndex;
+            return (
+              <button
+                key={`${m.id}-${m.media_type ?? "movie"}`}
+                type="button"
+                onClick={() => goToSlide(i)}
+                className={`h-1 rounded-full transition-all duration-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+                  isActive
+                    ? "w-10 bg-white shadow-md"
+                    : "w-6 bg-white/30 hover:bg-white/50"
+                }`}
+                aria-label={`Go to ${getContentTitle(m)}`}
+                aria-current={isActive ? "true" : undefined}
               />
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 
       {!reducedMotion && allMovies.length <= 1 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden lg:flex flex-col items-center space-y-2 animate-fade-in">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden lg:flex flex-col items-center space-y-2 animate-fade-in pointer-events-none">
           <span className="text-xs text-gray-500 uppercase tracking-widest">Scroll to explore</span>
           <div className="w-6 h-10 border-2 border-gray-600 rounded-full flex justify-center hero-scroll-indicator">
-            <div className="w-1.5 h-3 bg-red-500 rounded-full mt-2" />
+            <div className="w-1.5 h-3 bg-white rounded-full mt-2" />
           </div>
         </div>
       )}

@@ -61,21 +61,27 @@ export async function rateLimitByIp(
   const ip = getClientIp(request);
   const key = `ip:${ip}`;
 
-  const limiter = getLimiter(name, requests, window);
-  if (limiter) {
-    const result = await limiter.limit(key);
-    return {
-      success: result.success,
-      limit: result.limit,
-      remaining: result.remaining,
-      reset: result.reset,
-    };
-  }
-
   const windowMs =
     window.endsWith("h") ? parseInt(window) * 3_600_000 :
     window.endsWith("m") ? parseInt(window) * 60_000 :
     parseInt(window) * 1_000;
+
+  const limiter = getLimiter(name, requests, window);
+  if (limiter) {
+    try {
+      const result = await limiter.limit(key);
+      return {
+        success: result.success,
+        limit: result.limit,
+        remaining: result.remaining,
+        reset: result.reset,
+      };
+    } catch (err) {
+      // Upstash outage — degrade to in-memory limiting instead of 500ing the route
+      console.error(`[rate-limit] Upstash error for ${name}:`, err);
+      return inMemoryLimit(`${name}:${key}`, requests, windowMs);
+    }
+  }
 
   return inMemoryLimit(`${name}:${key}`, requests, windowMs);
 }
@@ -87,20 +93,28 @@ export async function rateLimitByUser(
   window: `${number} s` | `${number} m` | `${number} h` = "1 m"
 ): Promise<LimitResult> {
   const key = `uid:${uid}`;
-  const limiter = getLimiter(name, requests, window);
-  if (limiter) {
-    const result = await limiter.limit(key);
-    return {
-      success: result.success,
-      limit: result.limit,
-      remaining: result.remaining,
-      reset: result.reset,
-    };
-  }
   const windowMs =
     window.endsWith("h") ? parseInt(window) * 3_600_000 :
     window.endsWith("m") ? parseInt(window) * 60_000 :
     parseInt(window) * 1_000;
+
+  const limiter = getLimiter(name, requests, window);
+  if (limiter) {
+    try {
+      const result = await limiter.limit(key);
+      return {
+        success: result.success,
+        limit: result.limit,
+        remaining: result.remaining,
+        reset: result.reset,
+      };
+    } catch (err) {
+      // Upstash outage — degrade to in-memory limiting instead of 500ing the route
+      console.error(`[rate-limit] Upstash error for ${name}:`, err);
+      return inMemoryLimit(`${name}:${key}`, requests, windowMs);
+    }
+  }
+
   return inMemoryLimit(`${name}:${key}`, requests, windowMs);
 }
 

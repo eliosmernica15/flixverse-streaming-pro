@@ -3,10 +3,22 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from "next-intl";
-import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2, Download } from "lucide-react";
-import { getImageUrl, getBackdropUrl, TMDBMovie, TMDBSeason, isNotReleasedYet } from "@/utils/tmdbApi";
+import { Play, Star, X, Heart, Calendar, Clock, Users, ArrowLeft, Tv, Film, ChevronDown, PlayCircle, Loader2, Share2, Download, Volume2, VolumeX, PartyPopper } from "lucide-react";
+import { getBackdropUrl, TMDBMovie, isNotReleasedYet } from "@/utils/tmdbApi";
+
+/** Minimal cast/crew entry shape returned inside TMDB `credits` payloads. */
+interface TmdbCreditsPerson {
+  id: number;
+  name: string;
+  character?: string;
+  order?: number;
+  job?: string;
+  department?: string;
+  profile_path?: string;
+}
 import { useContentDetails } from "@/hooks/queries/useContentDetails";
 import { useRelatedContent } from "@/hooks/queries/useRelatedContent";
 import { useToast } from "@/hooks/use-toast";
@@ -24,9 +36,14 @@ import QuickRating from "./QuickRating";
 import MovieCard from "./MovieCard";
 import SectionHeader from "./SectionHeader";
 import Reveal from "./Reveal";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { AmbientGlowFrame } from "./player/AmbientGlowFrame";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { stripPartyQueryParams } from "@/lib/player/partyUrl";
-import { releasePageScrollLock } from "@/lib/player/releaseScrollLock";
+import { isFeatureEnabled } from "@/lib/featureFlags";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { FeatureErrorBoundary } from "./FeatureErrorBoundary";
+import { PlayerErrorFallback } from "./player/PlayerErrorFallback";
 
 const VideoPlayer = dynamic(() => import("./VideoPlayer"), { ssr: false });
 const ReviewSection = dynamic(() => import("./ReviewSection"), { ssr: false });
@@ -63,6 +80,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { hasPremium } = useSubscription();
+  const flixPartyEnabled = isFeatureEnabled("flixparty");
   const { addToList, removeFromList, isInList, isOperating, loading: loadingList } = useUserMovieListContext();
   const pathname = usePathname();
   const { getProgress } = useWatchHistoryContext();
@@ -85,6 +103,15 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!showSeasonDropdown) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSeasonDropdown(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showSeasonDropdown]);
+
   const openPlayer = () => {
     userClosedPlayerRef.current = false;
     setPlayerSession((k) => k + 1);
@@ -103,24 +130,9 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     }
   }, [autoplay, content, showPlayer, guestJoinMode]);
 
-  useEffect(() => {
-    if (!showPlayer) {
-      releasePageScrollLock();
-      return;
-    }
-    const prevBody = document.body.style.overflow;
-    const prevHtml = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevBody;
-      document.documentElement.style.overflow = prevHtml;
-      releasePageScrollLock();
-    };
-  }, [showPlayer]);
+  useBodyScrollLock(showPlayer);
 
   const handleClose = () => {
-    releasePageScrollLock();
     onClose();
   };
 
@@ -128,7 +140,6 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
   const handleClosePlayer = () => {
     userClosedPlayerRef.current = true;
     setShowPlayer(false);
-    releasePageScrollLock();
     const currentParams = stripPartyQueryParams(new URLSearchParams(searchParams.toString()));
     currentParams.delete("resume");
     const newQs = currentParams.toString();
@@ -247,6 +258,35 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
     }
   };
 
+  const handleWatchParty = async () => {
+    if (!content) return;
+
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      toast({
+        title: t("signInRequired"),
+        description: t("signInForWatchParty"),
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 1500);
+      return;
+    }
+
+    const contentTitle = content?.title || content?.name || 'Unknown';
+
+    // Open the player first, then start the party
+    openPlayer();
+    toast({
+      title: t("startingWatchParty"),
+      description: t("startingWatchPartyDesc", { title: contentTitle }),
+    });
+
+    // The party will be started inside the player via the WatchParty component
+    // which is rendered in PlayerShell when showPlayer becomes true
+  };
+
   const handleDownload = async () => {
     if (!content) return;
     if (!hasPremium) {
@@ -332,18 +372,18 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
   return (
     <div
-      className={`min-h-screen w-full bg-black transition-all duration-500 ease-out overflow-x-hidden ${isVisible ? 'opacity-100' : 'opacity-0'
+      className={`min-h-screen w-full bg-black transition-all duration-500 ease-out overflow-x-clip ${isVisible ? 'opacity-100' : 'opacity-0'
         }`}
     >
-      <div className="relative w-full">
+      <div className="relative w-full overflow-visible">
         {/* Back Button */}
         <button
           type="button"
           onClick={handleClose}
-          className="fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] sm:top-6 sm:left-6 z-[999] flex items-center space-x-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur-xl transition-all duration-300 group cursor-pointer hover:bg-white/10 focus-ring sm:px-4"
+          className="fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] sm:top-6 sm:left-6 z-[999] inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/70 px-3.5 py-2 backdrop-blur-xl transition-all duration-200 group cursor-pointer hover:bg-white/10 hover:border-white/30 focus-ring sm:px-4"
         >
-          <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-x-1 transition-transform" />
-          <span className="text-white text-xs sm:text-sm font-medium">{t("back")}</span>
+          <ArrowLeft className="w-4 h-4 sm:w-4 sm:h-4 text-white group-hover:-translate-x-1 transition-transform" />
+          <span className="text-white text-xs sm:text-sm font-semibold">{t("back")}</span>
         </button>
 
         {/* Hero Section */}
@@ -357,60 +397,65 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"></div>
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent"></div>
           </div>
+          {/* C3 — poster-dominant ambient glow over the backdrop, under the content (respects the user's ambient-glow setting) */}
+          <AmbientGlowFrame posterPath={content.poster_path} isActive />
 
           {/* Content */}
           <div className={`relative z-10 flex flex-col justify-center min-h-screen w-full px-4 sm:px-6 md:px-12 lg:px-20 py-20 sm:py-24 transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
             }`}>
             <div className="max-w-4xl w-full">
               {/* Content Type Badge */}
-              <div className="flex items-center space-x-3 mb-4 sm:mb-6">
-                <span className="badge-shine inline-flex items-center space-x-1.5 rounded-full bg-red-600 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white sm:px-3 sm:py-1.5">
-                  {isTV ? <Tv className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <Film className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
-                  <span>{isTV ? tc("series") : tc("movie")}</span>
+              <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap">
+                <span className="badge-pill badge-hd">
+                  {isTV ? <Tv className="h-3 w-3" /> : <Film className="h-3 w-3" />}
+                  <span>{isTV ? "Series" : "Film"}</span>
                 </span>
                 {content.vote_average > 7.5 && !isUnreleased && (
-                  <span className="rounded-full bg-yellow-500/20 px-2 py-1.5 text-[10px] font-bold text-yellow-400 sm:px-3 sm:py-1.5">
-                    ⭐ Top Rated
-                  </span>
+                  <span className="badge-pill badge-top">⭐ Top Rated</span>
                 )}
                 {isUnreleased && (
-                  <span className="rounded-full bg-amber-500/30 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-400 sm:px-3 sm:py-1.5">
+                  <span className="badge-pill bg-amber-500/20 text-amber-400 border border-amber-500/30">
                     {t("comingSoon")}
                   </span>
+                )}
+                {(content as { adult?: boolean }).adult && (
+                  <span className="badge-pill !bg-white/10 !border-white/20 text-white">18+</span>
                 )}
               </div>
 
               {/* Title */}
-              <h1 className="display-title text-balance mb-3 text-white leading-[1.1] tracking-tight sm:mb-4 text-3xl sm:text-4xl md:text-6xl lg:text-7xl">
+              <h1 className="hero-text-shadow-strong mb-3 text-white text-balance font-black tracking-tight sm:mb-4 text-3xl sm:text-4xl md:text-6xl lg:text-7xl" style={{ lineHeight: "1.05" }}>
                 {contentTitle}
               </h1>
 
               {/* Tagline */}
               {content.tagline && (
-                <p className="mb-6 text-lg font-light italic text-gray-400 md:text-xl">{content.tagline}</p>
+                <p className="hero-text-shadow mb-6 text-base font-light italic text-gray-300 md:text-xl">{content.tagline}</p>
               )}
 
               {/* Meta Info */}
-              <div className="mb-6 flex flex-wrap items-center gap-3">
-                <span className="chip bg-yellow-500/15 font-bold text-yellow-400">
-                  <Star className="h-4 w-4 fill-current" />
-                  <span>{content.vote_average.toFixed(1)}</span>
-                </span>
+              <div className="mb-6 flex flex-wrap items-center gap-2.5">
+                {content.vote_average > 0 && (
+                  <span className={`badge-pill ${content.vote_average >= 7 ? "badge-rating-green" : content.vote_average >= 5.5 ? "badge-rating-amber" : "badge-rating-red"}`}>
+                    <Star className="h-3 w-3 fill-current" />
+                    <span>{content.vote_average.toFixed(1)}</span>
+                  </span>
+                )}
                 {releaseDate && (
-                  <span className="chip glass-card">
-                    <Calendar className="h-3.5 w-3.5" />
+                  <span className="meta-pill">
+                    <Calendar className="h-3 w-3" />
                     <span>{isUnreleased ? `Releases ${new Date(releaseDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : new Date(releaseDate).getFullYear()}</span>
                   </span>
                 )}
                 {content.runtime && (
-                  <span className="chip glass-card">
-                    <Clock className="h-3.5 w-3.5" />
+                  <span className="meta-pill">
+                    <Clock className="h-3 w-3" />
                     <span>{Math.floor(content.runtime / 60)}h {content.runtime % 60}m</span>
                   </span>
                 )}
                 {isTV && content.number_of_seasons && (
-                  <span className="chip glass-card">
-                    <Users className="h-3.5 w-3.5" />
+                  <span className="meta-pill">
+                    <Users className="h-3 w-3" />
                     <span>
                       {content.number_of_seasons > 1
                         ? t("seasonsPlural", { count: content.number_of_seasons })
@@ -418,13 +463,14 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     </span>
                   </span>
                 )}
+                <span className="inline-flex items-center rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-black tracking-wider text-white">HD</span>
               </div>
 
               {/* Genres */}
               {content.genres && content.genres.length > 0 && (
                 <div className="mb-8 flex flex-wrap gap-2">
                   {content.genres.map((genre) => (
-                    <span key={genre.id} className="chip border-red-500/20 bg-red-500/10 text-red-300">
+                    <span key={genre.id} className="meta-pill border-red-500/30 bg-red-500/10 text-red-300">
                       {genre.name}
                     </span>
                   ))}
@@ -432,25 +478,23 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               )}
 
               {/* Overview */}
-              <p className="text-sm sm:text-base md:text-lg text-gray-300 mb-6 sm:mb-10 max-w-3xl leading-relaxed">
+              <p className="hero-text-shadow text-sm sm:text-base md:text-lg text-gray-200/90 mb-6 sm:mb-10 max-w-3xl leading-relaxed">
                 {content.overview}
               </p>
 
               {/* TV Show Season/Episode Selector - In Hero (only for released content) */}
               {isTV && !isUnreleased && content.seasons && content.seasons.length > 0 && (
-                <div className="mb-6 sm:mb-8 w-full max-w-2xl bg-black/40 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-white/10">
-                  {/* Season & Episode Row */}
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                    {/* Season Selector */}
+                <div className="mb-6 sm:mb-8 w-full max-w-2xl rounded-xl bg-black/50 backdrop-blur-md p-3 sm:p-5 ring-1 ring-white/10">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <div className="flex-1">
-                      <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">{t("season")}</label>
+                      <label className="block text-gray-400 text-xs mb-1.5 font-semibold uppercase tracking-wider">{t("season")}</label>
                       <select
                         value={selectedSeason}
                         onChange={(e) => {
                           setSelectedSeason(Number(e.target.value));
                           setSelectedEpisode(1);
                         }}
-                        className="w-full bg-white/10 border border-white/20 text-white rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-lg font-semibold appearance-none cursor-pointer hover:bg-white/15 transition-all focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full bg-white/5 border border-white/15 text-white rounded-md px-3 py-2.5 text-sm font-semibold appearance-none cursor-pointer hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500/40"
                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
                       >
                         {content.seasons
@@ -463,13 +507,12 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                       </select>
                     </div>
 
-                    {/* Episode Selector */}
                     <div className="flex-1">
-                      <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">{t("episode")}</label>
+                      <label className="block text-gray-400 text-xs mb-1.5 font-semibold uppercase tracking-wider">{t("episode")}</label>
                       <select
                         value={selectedEpisode}
                         onChange={(e) => setSelectedEpisode(Number(e.target.value))}
-                        className="w-full bg-white/10 border border-white/20 text-white rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-lg font-semibold appearance-none cursor-pointer hover:bg-white/15 transition-all focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full bg-white/5 border border-white/15 text-white rounded-md px-3 py-2.5 text-sm font-semibold appearance-none cursor-pointer hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500/40"
                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
                       >
                         {Array.from(
@@ -484,23 +527,22 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                     </div>
                   </div>
 
-                  {/* Current Selection Display */}
-                  <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex items-center space-x-2 sm:space-x-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                        <Tv className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-md bg-red-600 flex items-center justify-center">
+                        <Tv className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <p className="text-white font-bold text-sm sm:text-base">S{selectedSeason} E{selectedEpisode}</p>
-                        <p className="text-gray-400 text-xs sm:text-sm">{t("readyToStream")}</p>
+                        <p className="text-white font-bold text-sm">S{selectedSeason} E{selectedEpisode}</p>
+                        <p className="text-gray-400 text-xs">{t("readyToStream")}</p>
                       </div>
                     </div>
                     {!isUnreleased && (
                       <button
                         onClick={() => handleWatch()}
-                        className="bg-red-600 hover:bg-red-500 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-full font-semibold transition-all hover:scale-105 flex items-center space-x-1.5 sm:space-x-2 text-sm sm:text-base"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-bold text-black transition-colors hover:bg-white/85 focus-ring"
                       >
-                        <Play className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
+                        <Play className="w-3.5 h-3.5 fill-current" />
                         <span>{tc("play")}</span>
                       </button>
                     )}
@@ -508,58 +550,111 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                {!isUnreleased && (
-                  <button
-                    onClick={() => handleWatch()}
-                    className="btn-primary group inline-flex items-center space-x-3 rounded-full px-8 py-4 text-lg font-bold shadow-2xl shadow-white/20 transition-all duration-300 hover:scale-105 focus-ring"
-                  >
-                    <Play className="h-6 w-6 fill-current group-hover:scale-110 transition-transform" />
-                    <span>{isTV ? `${tc("play")} S${selectedSeason}E${selectedEpisode}` : tc("play")}</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={handleWatchTrailer}
-                  className="btn-glass group inline-flex items-center space-x-3 rounded-full border border-white/20 px-6 py-4 font-semibold text-white transition-all duration-300 hover:scale-105 focus-ring"
-                >
-                  <Play className="h-5 w-5" />
-                  <span>{t("trailer")}</span>
-                </button>
-
-                <button
-                  onClick={handleAddToList}
-                  disabled={isOperating(movieId) || loadingList}
-                  className={`group rounded-full border p-4 transition-all duration-300 hover:scale-110 focus-ring ${isInList(movieId)
-                    ? 'border-red-500 bg-red-500 text-white'
-                    : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
-                    } ${(isOperating(movieId) || loadingList) ? 'cursor-not-allowed opacity-50' : ''}`}
-                  title={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
-                >
-                  {isOperating(movieId) ? (
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  ) : (
-                    <Heart className={`h-6 w-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
+              {/* Enhanced Action Bar - Consolidated & Prominent */}
+              <div className="mt-6 flex flex-col sm:flex-row items-stretch gap-3 w-full max-w-3xl">
+                {/* Primary Actions Row */}
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 flex-1">
+                  {/* Play Button - Primary CTA */}
+                  {!isUnreleased && (
+                    <button
+                      onClick={() => handleWatch()}
+                      className="cta-primary !rounded-xl !px-7 !py-3.5 sm:!px-10 sm:!py-4 !text-base sm:!text-lg flex-1 sm:flex-initial min-h-[52px] sm:min-h-[56px] justify-center group transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                      aria-label={tc("play")}
+                    >
+                      <Play className="h-5 w-5 sm:h-6 sm:w-6 fill-current mr-2 group-hover:-translate-x-0.5 transition-transform" />
+                      <span>{isTV ? `${tc("play")} S${selectedSeason}E${selectedEpisode}` : tc("play")}</span>
+                    </button>
                   )}
-                </button>
 
-                <button
-                  onClick={handleDownload}
-                  className="group rounded-full border border-white/20 bg-white/10 p-4 text-white transition-all duration-300 hover:scale-110 hover:bg-white/20 focus-ring"
-                  title={hasPremium ? tc("download") : t("premiumRequired")}
-                >
-                  <Download className={`h-6 w-6 ${!hasPremium ? "opacity-60" : ""}`} />
-                </button>
+                  {/* Watch Trailer Button */}
+                  {trailer && (
+                    <button
+                      onClick={handleWatchTrailer}
+                      className="cta-secondary !rounded-xl !px-6 !py-3.5 sm:!px-8 sm:!py-4 !text-base sm:!text-lg min-h-[52px] sm:min-h-[56px] justify-center group transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <Play className="h-5 w-5 mr-2" />
+                      <span>{t("trailer")}</span>
+                    </button>
+                  )}
 
-                <button
-                  onClick={handleShare}
-                  className="group rounded-full border border-white/20 bg-white/10 p-4 text-white transition-all duration-300 hover:scale-110 hover:bg-white/20 focus-ring"
-                  title={tc("share")}
-                >
-                  <Share2 className="h-6 w-6" />
-                </button>
+                  {/* Watch Party CTA - Always visible before player opens */}
+                  {!isUnreleased && isAuthenticated && flixPartyEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => handleWatchParty()}
+                      className="cta-accent !rounded-xl !px-6 !py-3.5 sm:!px-8 sm:!py-4 !text-base sm:!text-lg min-h-[52px] sm:min-h-[56px] justify-center group transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
+                      aria-label={t("watchParty")}
+                    >
+                      <PartyPopper className="h-5 w-5 sm:h-6 sm:w-6 group-hover:rotate-12 transition-transform" />
+                      <span>{t("watchParty")}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Secondary Actions Row */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 justify-end sm:justify-start w-full sm:w-auto">
+                  {/* Add to List */}
+                  <button
+                    onClick={handleAddToList}
+                    disabled={isOperating(movieId) || loadingList}
+                    className={`cta-icon !rounded-xl ${isInList(movieId) ? '!bg-red-500/30 !border-red-500' : ''} ${(isOperating(movieId) || loadingList) ? 'cursor-not-allowed opacity-50' : ''} min-h-[48px] min-w-[48px] sm:min-h-[52px] sm:min-w-[52px] transition-all duration-200 hover:scale-105`}
+                    title={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
+                    aria-label={isInList(movieId) ? tc("removeFromList") : tc("addToList")}
+                    aria-pressed={isInList(movieId)}
+                  >
+                    {isOperating(movieId) ? (
+                      <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
+                    ) : (
+                      <Heart className={`h-5 w-5 sm:h-6 sm:w-6 ${isInList(movieId) ? 'fill-current' : ''}`} />
+                    )}
+                  </button>
+
+                  {/* Download */}
+                  <button
+                    onClick={handleDownload}
+                    className="cta-icon !rounded-xl min-h-[48px] min-w-[48px] sm:min-h-[52px] sm:min-w-[52px] transition-all duration-200 hover:scale-105"
+                    title={hasPremium ? tc("download") : t("premiumRequired")}
+                    aria-label={tc("download")}
+                    disabled={!hasPremium}
+                    aria-disabled={!hasPremium}
+                  >
+                    <Download className={`h-5 w-5 sm:h-6 sm:w-6 ${!hasPremium ? "opacity-40" : ""}`} />
+                  </button>
+
+                  {/* Share */}
+                  <button
+                    onClick={handleShare}
+                    className="cta-icon !rounded-xl min-h-[48px] min-w-[48px] sm:min-h-[52px] sm:min-w-[52px] transition-all duration-200 hover:scale-105"
+                    title={tc("share")}
+                    aria-label={tc("share")}
+                  >
+                    <Share2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </button>
+                </div>
               </div>
+
+              {/* Watch Party Promo (when not authenticated) */}
+              {!isUnreleased && !isAuthenticated && flixPartyEnabled && (
+                <div className="mt-4 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-red-500/10 via-purple-500/10 to-blue-500/10 border border-white/10">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                        <PartyPopper className="h-5 w-5 text-red-400" />
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold text-sm">{t("watchPartyCTA")}</p>
+                        <p className="text-gray-400 text-xs">{t("watchPartyCTADesc")}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => window.location.href = '/auth'}
+                      className="flex-shrink-0 cta-primary !rounded-lg !px-4 !py-2 !text-sm"
+                    >
+                      {tc("signIn")}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -589,28 +684,26 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 
         {/* Seasons & Episodes Section for TV Shows (only for released content) */}
         {isTV && !isUnreleased && content.seasons && content.seasons.length > 0 && (
-          <div className="w-full px-4 md:px-16 py-12 md:py-20 bg-gradient-to-b from-gray-900 to-black">
+          <div className="w-full px-4 md:px-16 py-12 md:py-20">
             <div className="max-w-7xl mx-auto">
-              {/* Season Selector */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <h2 className="text-2xl md:text-3xl font-bold text-white">{t("episodes")}</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 overflow-visible">
+                <SectionHeader title={t("episodes")} eyebrow={`${content.number_of_seasons || 0} ${content.number_of_seasons === 1 ? "season" : "seasons"}`} />
 
-                {/* Season Dropdown */}
                 <div className="relative z-30">
                   <button
                     onClick={() => setShowSeasonDropdown(!showSeasonDropdown)}
-                    className="flex items-center space-x-3 bg-white/10 hover:bg-white/15 backdrop-blur-sm px-5 py-3 rounded-xl border border-white/10 transition-all min-w-[200px] justify-between"
+                    className="flex items-center gap-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm px-4 py-2.5 rounded-md ring-1 ring-white/10 transition-colors min-w-[200px] justify-between focus-ring"
                   >
-                    <span className="text-white font-medium">
+                    <span className="text-white text-sm font-semibold">
                       {t("season")} {selectedSeason}
                     </span>
-                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showSeasonDropdown ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showSeasonDropdown ? 'rotate-180' : ''}`} />
                   </button>
 
                   {showSeasonDropdown && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowSeasonDropdown(false)} />
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900/98 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl max-h-64 overflow-y-auto">
+                      <div className="absolute top-full right-0 mt-2 w-[280px] bg-[#0a0a0c]/98 backdrop-blur-xl border border-white/10 rounded-md overflow-hidden z-50 shadow-2xl max-h-64 overflow-y-auto">
                         {content.seasons
                           .filter(season => season.season_number > 0)
                           .map((season) => (
@@ -622,13 +715,13 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                                 setSelectedEpisode(1);
                                 setShowSeasonDropdown(false);
                               }}
-                              className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-all ${selectedSeason === season.season_number
-                                ? 'bg-red-600 text-white'
-                                : 'text-gray-300 hover:bg-white/10'
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${selectedSeason === season.season_number
+                                ? 'bg-white text-black font-semibold'
+                                : 'text-gray-300 hover:bg-white/5'
                                 }`}
                             >
                               <span className="font-medium">{season.name}</span>
-                              <span className="text-sm opacity-70">({season.episode_count} eps)</span>
+                              <span className="text-xs opacity-70">({season.episode_count} eps)</span>
                             </button>
                           ))}
                       </div>
@@ -637,7 +730,6 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 </div>
               </div>
 
-              {/* Episodes Grid */}
               {(() => {
                 const currentSeason = content.seasons.find(s => s.season_number === selectedSeason);
                 const episodeCount = currentSeason?.episode_count || 10;
@@ -662,13 +754,13 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                               setSelectedEpisode(episodeNum);
                             }
                           }}
-                          className={`w-full h-full group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all duration-200 hover:scale-105 min-h-[72px] ${selectedEpisode === episodeNum
-                            ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/20 ring-2 ring-red-400/40'
-                            : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
+                          className={`w-full h-full group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-md ring-1 transition-all duration-200 hover:scale-105 min-h-[68px] ${selectedEpisode === episodeNum
+                            ? 'bg-white text-black ring-white shadow-lg'
+                            : 'bg-white/5 text-gray-300 ring-white/10 hover:bg-white/10 hover:ring-white/20'
                             }`}
                           aria-label={`${t("episode")} ${episodeNum}${selectedEpisode === episodeNum ? `, ${t("tapToSelect")}` : ''}`}
                         >
-                          <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-white' : 'text-red-500 group-hover:text-red-400'}`} />
+                          <PlayCircle className={`w-4 h-4 sm:w-5 sm:h-5 mb-0.5 sm:mb-1 ${selectedEpisode === episodeNum ? 'text-black' : 'text-red-500 group-hover:text-red-400'}`} />
                           <span className="font-bold text-xs sm:text-sm">E{episodeNum}</span>
                         </button>
                       </SpoilerProtectedEpisode>
@@ -677,18 +769,17 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 );
               })()}
 
-              {/* Play Selected Episode */}
-              <div className="mt-6 sm:mt-8 p-3 sm:p-5 bg-gradient-to-r from-red-600/10 to-transparent rounded-xl sm:rounded-2xl border border-red-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+              <div className="mt-6 sm:mt-8 p-4 sm:p-5 rounded-xl bg-white/5 ring-1 ring-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 <div className="text-center sm:text-left">
-                  <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">{t("readyToPlay")}</p>
-                  <p className="text-white text-base sm:text-xl font-bold">{t("seasonEpisode", { season: selectedSeason, episode: selectedEpisode })}</p>
-                  <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 sm:mt-1">{t("tapToSelect")}</p>
+                  <p className="text-gray-400 text-xs mb-0.5">{t("readyToPlay")}</p>
+                  <p className="text-white text-base sm:text-lg font-bold">{t("seasonEpisode", { season: selectedSeason, episode: selectedEpisode })}</p>
+                  <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5">{t("tapToSelect")}</p>
                 </div>
                 <button
                   onClick={() => handleWatch()}
-                  className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-5 sm:px-8 py-2.5 sm:py-4 rounded-full font-bold text-sm sm:text-lg transition-all duration-300 hover:scale-105 shadow-lg shadow-red-500/30"
+                  className="cta-primary !rounded-md !px-5 !py-2.5 sm:!px-6 sm:!py-3 !text-sm sm:!text-base"
                 >
-                  <Play className="w-4 h-4 sm:w-6 sm:h-6 fill-current" />
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
                   <span>{tc("play")} S{selectedSeason}E{selectedEpisode}</span>
                 </button>
               </div>
@@ -696,17 +787,28 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           </div>
         )}
 
-        {/* Trailer Section */}
+        {/* Trailer Section — cinematic card with viewport autoplay + mute toggle */}
         {trailer && (
-          <div className="w-full px-4 md:px-16 py-12 md:py-20 bg-gray-900">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 md:mb-12 text-center">{t("trailer")}</h2>
-            <div className="aspect-video max-w-6xl mx-auto">
-              <iframe
-                src={`https://www.youtube.com/embed/${trailer.key}`}
-                title={t("trailer")}
-                className="w-full h-full rounded-lg"
-                allowFullScreen
-              ></iframe>
+          <div className="w-full px-4 md:px-16 py-12 md:py-20">
+            <div className="max-w-6xl mx-auto">
+              <SectionHeader title={t("trailer")} eyebrow="Official" />
+              <div className="mt-6 rounded-2xl bg-gradient-to-r from-red-500/30 via-white/10 to-purple-500/30 p-[1.5px]">
+                <div className="relative overflow-hidden rounded-2xl bg-black">
+                  <TrailerEmbed videoKey={trailer.key} title={t("trailer")} />
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {[
+                  { label: tc("rating"), value: `${content.vote_average.toFixed(1)}/10` },
+                  ...(releaseDate ? [{ label: isTV ? "First air date" : "Release date", value: new Date(releaseDate).toLocaleDateString() }] : []),
+                  ...(content.runtime ? [{ label: "Runtime", value: `${content.runtime} min` }] : []),
+                ].map((stat) => (
+                  <div key={stat.label} className="glass-soft rounded-xl p-3 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">{stat.label}</p>
+                    <p className="mt-0.5 text-sm font-semibold text-white">{stat.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -714,47 +816,39 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
         {/* Detail tabs */}
         <Tabs defaultValue="overview" className="content-auto w-full px-4 py-12 sm:px-6 md:px-16 md:py-16">
           <div className="max-w-7xl mx-auto">
-            <TabsList className="mb-8 flex flex-wrap gap-2">
-              <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
-              <TabsTrigger value="cast">{t("cast")}</TabsTrigger>
-              <TabsTrigger value="similar">{t("similar")}</TabsTrigger>
-              <TabsTrigger value="reviews">Reviews</TabsTrigger>
+            <TabsList className="mb-8 inline-flex flex-wrap gap-1 glass-soft rounded-lg p-1">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-black rounded-md px-4 py-2 text-sm font-semibold text-gray-300 transition-all">{t("overview")}</TabsTrigger>
+              <TabsTrigger value="cast" className="data-[state=active]:bg-white data-[state=active]:text-black rounded-md px-4 py-2 text-sm font-semibold text-gray-300 transition-all">{t("cast")}</TabsTrigger>
+              <TabsTrigger value="similar" className="data-[state=active]:bg-white data-[state=active]:text-black rounded-md px-4 py-2 text-sm font-semibold text-gray-300 transition-all">{t("similar")}</TabsTrigger>
+              <TabsTrigger value="reviews" className="data-[state=active]:bg-white data-[state=active]:text-black rounded-md px-4 py-2 text-sm font-semibold text-gray-300 transition-all">Reviews</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
               <Reveal>
-                <section className="glass-panel rounded-2xl p-6 sm:p-8">
+                <section className="glass-soft rounded-2xl p-6 sm:p-8">
                   <SectionHeader title={t("overview")} eyebrow={contentTitle} />
                   <div className="mt-6 grid gap-8 md:grid-cols-2 md:gap-12">
-                    <div>
-                      <h3 className="mb-4 text-xl font-semibold text-white sm:text-2xl">{t("overview")}</h3>
-                      <div className="space-y-3 text-sm text-gray-300 sm:text-base lg:text-lg">
-                        {releaseDate && (
-                          <p>
-                            <span className="font-semibold text-white">
-                              {isTV ? 'First Air Date:' : 'Release Date:'}
-                            </span> {new Date(releaseDate).toLocaleDateString()}
-                          </p>
-                        )}
-                        <p><span className="font-semibold text-white">{tc("rating")}:</span> {content.vote_average.toFixed(1)}/10</p>
-                        {content.runtime && <p><span className="font-semibold text-white">Runtime:</span> {content.runtime} minutes</p>}
-                        {isTV && content.number_of_seasons && (
-                          <p><span className="font-semibold text-white">{t("season")}:</span> {content.number_of_seasons}</p>
-                        )}
-                        {content.genres && (
-                          <p><span className="font-semibold text-white">Genres:</span> {content.genres.map(g => g.name).join(', ')}</p>
-                        )}
-                      </div>
+                    <div className="space-y-2.5 text-sm text-gray-300 sm:text-base">
+                      {releaseDate && (
+                        <p><span className="font-semibold text-white">{isTV ? 'First Air Date:' : 'Release Date:'}</span> {new Date(releaseDate).toLocaleDateString()}</p>
+                      )}
+                      <p><span className="font-semibold text-white">{tc("rating")}:</span> {content.vote_average.toFixed(1)}/10</p>
+                      {content.runtime && <p><span className="font-semibold text-white">Runtime:</span> {content.runtime} minutes</p>}
+                      {isTV && content.number_of_seasons && (
+                        <p><span className="font-semibold text-white">{t("season")}:</span> {content.number_of_seasons}</p>
+                      )}
+                      {content.genres && (
+                        <p><span className="font-semibold text-white">Genres:</span> {content.genres.map(g => g.name).join(', ')}</p>
+                      )}
                     </div>
                     <div>
-                      <h3 className="mb-4 text-xl font-semibold text-white sm:text-2xl">{t("overview")}</h3>
                       <p className="text-sm leading-relaxed text-gray-300 sm:text-base lg:text-lg">{content.overview}</p>
                     </div>
                   </div>
                 </section>
               </Reveal>
               <Reveal className="mt-6">
-                <div className="glass-panel rounded-2xl p-6">
+                <div className="glass-soft rounded-2xl p-6">
                   <h3 className="mb-4 text-lg font-semibold text-white">{isTV ? tc("series") : tc("movie")}</h3>
                   <QuickRating
                     contentId={content.id}
@@ -771,19 +865,19 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   <SectionHeader title={t("cast")} />
                   <div className="mt-6">
                     <CastCrewGrid
-                      cast={content.credits.cast.map((c) => ({
+                      cast={content.credits.cast.map((c: TmdbCreditsPerson) => ({
                         id: c.id,
                         name: c.name || "Unknown",
-                        character: (c as any).character || "",
-                        profile_path: c.profile_path,
-                        order: (c as any).order || 0,
+                        character: c.character || "",
+                        profile_path: c.profile_path ?? null,
+                        order: c.order || 0,
                       }))}
-                      crew={content.credits.crew.map((c) => ({
+                      crew={content.credits.crew.map((c: TmdbCreditsPerson) => ({
                         id: c.id,
                         name: c.name || "Unknown",
-                        job: (c as any).job || "",
-                        department: (c as any).department || "",
-                        profile_path: c.profile_path,
+                        job: c.job || "",
+                        department: c.department || "",
+                        profile_path: c.profile_path ?? null,
                       }))}
                     />
                   </div>
@@ -795,7 +889,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
               {relatedContent.length > 0 && (
                 <Reveal>
                   <SectionHeader title={t("similar")} />
-                  <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+                  <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 md:grid-cols-5 lg:grid-cols-6">
                     {relatedContent.map((movie, index) => (
                       <MovieCard
                         key={`related-${movie.id}-${index}`}
@@ -818,7 +912,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                 />
               </Reveal>
               <Reveal className="mt-6">
-                <div className="glass-panel rounded-2xl p-4">
+                <div className="glass-soft rounded-2xl p-4">
                   <TrendingDiscussions tmdbId={content.id} />
                 </div>
               </Reveal>
@@ -851,7 +945,11 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
           const episodeCount = currentSeasonData?.episode_count;
 
           return (
-            <div key={`player-${playerSession}-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ""}`}>
+            <FeatureErrorBoundary
+              key={`player-${playerSession}-${content.id}-${isTV ? `s${selectedSeason}e${selectedEpisode}` : ""}`}
+              featureName="Video player"
+              fallback={<PlayerErrorFallback onClose={handleClosePlayer} />}
+            >
               <VideoPlayer
                 movieId={content.id}
                 title={contentTitle}
@@ -871,7 +969,7 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
                   setSelectedEpisode(nextEpisode);
                 }}
               />
-            </div>
+            </FeatureErrorBoundary>
           );
         })(),
         document.body
@@ -881,3 +979,83 @@ const MovieDetails = ({ movieId, mediaType, onClose, autoplay = false, resumePos
 };
 
 export default MovieDetails;
+
+/**
+ * B2 — trailer embed that autoplays muted only once scrolled into view and
+ * pauses when scrolled away. Falls back to a static facade tap-to-play for
+ * reduced-motion users. A mute/unmute control sits over the player.
+ */
+function TrailerEmbed({ videoKey, title }: { videoKey: string; title: string }) {
+  const reducedMotion = useReducedMotion();
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [inView, setInView] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    const node = wrapRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => setInView(entries[0]?.isIntersecting ?? false),
+      { rootMargin: "0px 0px -25% 0px", threshold: 0.35 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (playing && reducedMotion) setPlaying(false);
+  }, [playing, reducedMotion]);
+
+  const shouldEmbed = (inView && !reducedMotion) || playing;
+  const src = `https://www.youtube.com/embed/${videoKey}?rel=0&modestbranding=1${
+    playing ? "&autoplay=1" : ""
+  }${muted ? "&mute=1" : ""}`;
+
+  return (
+    <div ref={wrapRef} className="relative aspect-video">
+      {shouldEmbed ? (
+        <iframe
+          src={src}
+          title={title}
+          className="h-full w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPlaying(true)}
+          aria-label={`Play trailer: ${title}`}
+          className="group relative block h-full w-full"
+        >
+          <Image
+            src={`https://i.ytimg.com/vi/${videoKey}/maxresdefault.jpg`}
+            alt=""
+            fill
+            sizes="(max-width: 768px) 100vw, 1152px"
+            className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+          />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+          <span className="cta-primary absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !px-6 !py-3">
+            <Play className="h-5 w-5 fill-current" />
+            <span>Play trailer</span>
+          </span>
+        </button>
+      )}
+      {shouldEmbed && (
+        <button
+          type="button"
+          onClick={() => setMuted((m) => !m)}
+          aria-label={muted ? "Unmute trailer" : "Mute trailer"}
+          className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-black/70 text-white backdrop-blur-md transition-colors hover:bg-black/90 focus-ring"
+        >
+          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+        </button>
+      )}
+    </div>
+  );
+}

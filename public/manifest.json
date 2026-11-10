@@ -56,6 +56,11 @@
       "name": "My List",
       "url": "/my-list",
       "description": "Your watchlist"
+    },
+    {
+      "name": "Offline Library",
+      "url": "/offline-library",
+      "description": "Your cached titles, works offline"
     }
   ]
 }
