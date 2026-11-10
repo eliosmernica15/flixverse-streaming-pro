@@ -11,6 +11,8 @@ import {
   where,
   orderBy,
   limit,
+  type UpdateData,
+  type DocumentData,
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -510,7 +512,7 @@ function useFlixPartyFirestore({ roomId }: UseFlixPartyOptions) {
       lastHeartbeatRef.current = now;
 
       const db = requireFirebaseDb();
-      const patch: Record<string, unknown> = {
+      const patch: UpdateData<DocumentData> = {
         playbackState: state,
         lastKnownTime: currentTime,
         updatedAt: now,
