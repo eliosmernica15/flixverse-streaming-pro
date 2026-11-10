@@ -116,9 +116,18 @@ def _verify_via_identity_toolkit(token: str) -> dict[str, Any]:
         with urllib.request.urlopen(req, timeout=12) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        # Identity Toolkit explicitly rejected the token (400/401 from Google).
+        # That means the token is bad, not that we couldn't reach the service.
         raise HTTPException(status_code=401, detail="Invalid token") from exc
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=401, detail="Invalid token") from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        # Network failure reaching Firebase (DNS, TCP, TLS, or timeout).
+        # Don't lie and say the token is invalid — the front-end needs to
+        # know the auth backend itself is unreachable so it can back off
+        # and retry instead of forcing the user to sign out.
+        raise HTTPException(
+            status_code=503,
+            detail=f"Auth backend unreachable: {exc}",
+        ) from exc
 
     users = body.get("users") or []
     if not users:
@@ -136,7 +145,11 @@ def _verify_via_identity_toolkit(token: str) -> dict[str, Any]:
     }
 
 
-def verify_bearer(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+def _verify_bearer(
+    authorization: str | None,
+    *,
+    check_revoked: bool,
+) -> dict[str, Any]:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing authorization")
 
@@ -146,9 +159,70 @@ def verify_bearer(authorization: str | None = Header(default=None)) -> dict[str,
 
     try:
         _init_firebase()
-        return firebase_auth.verify_id_token(token, check_revoked=False)
+        return firebase_auth.verify_id_token(token, check_revoked=check_revoked)
+    except HTTPException:
+        # Already classified by an inner handler (401 bad token, 503 unreachable).
+        # Don't re-wrap it in a generic 401.
+        raise
+    except (
+        firebase_auth.RevokedIdTokenError,
+        firebase_auth.UserDisabledError,
+        firebase_auth.InvalidIdTokenError,
+        firebase_auth.ExpiredIdTokenError,
+    ) as exc:
+        raise HTTPException(status_code=401, detail="Invalid or revoked token") from exc
     except Exception:
+        if check_revoked:
+            # The REST fallback cannot check revocation. Fail closed instead
+            # of accepting a token whose revocation status is unavailable.
+            raise HTTPException(status_code=503, detail="Auth backend unavailable")
+        # The REST fallback preserves the existing non-sensitive endpoint
+        # behavior while distinguishing invalid tokens from Firebase outages.
         return _verify_via_identity_toolkit(token)
+
+
+def _app_check_monitor(token: str | None) -> None:
+    """Monitor-mode App Check: verify and log; never blocks.
+
+    Enable with APPCHECK_MONITOR=1. Enforcement stays env-gated behind
+    APPCHECK_ENFORCE=1 so production behavior only changes deliberately.
+    """
+    enforce = os.environ.get("APPCHECK_ENFORCE", "").lower() in ("1", "true", "yes")
+    monitor = os.environ.get("APPCHECK_MONITOR", "").lower() in ("1", "true", "yes")
+    if not (enforce or monitor):
+        return
+    if not token:
+        print("[appcheck] monitor: request without X-Firebase-AppCheck token" if not enforce else "[appcheck] enforce: missing token")
+        if enforce:
+            raise HTTPException(status_code=401, detail="App Check token required")
+        return
+    try:
+        _init_firebase()
+        from firebase_admin import app_check
+        app_check.verify_token(token)
+        if monitor:
+            print("[appcheck] monitor: token verified ok")
+    except Exception as exc:
+        print(f"[appcheck] monitor: token verification failed: {exc}" if not enforce else f"[appcheck] enforce: token invalid: {exc}")
+        if enforce:
+            raise HTTPException(status_code=401, detail="Invalid App Check token")
+
+
+def verify_bearer(
+    authorization: str | None = Header(default=None),
+    x_firebase_appcheck: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _app_check_monitor(x_firebase_appcheck)
+    return _verify_bearer(authorization, check_revoked=False)
+
+
+def verify_bearer_revoked(
+    authorization: str | None = Header(default=None),
+    x_firebase_appcheck: str | None = Header(default=None),
+) -> dict[str, Any]:
+    """Verify a bearer token and reject disabled or revoked accounts."""
+    _app_check_monitor(x_firebase_appcheck)
+    return _verify_bearer(authorization, check_revoked=True)
 
 
 def uid_from_auth(auth: dict[str, Any]) -> str:

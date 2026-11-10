@@ -1,12 +1,16 @@
 import "./globals.css";
 import "./advanced-ui.css";
 import "./video-player.css";
+import "./cinema-stage.css";
+import "./depth-parallax.css";
 import "./ui-polish.css";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import { WebsiteJsonLd, OrganizationJsonLd } from "@/components/seo/JsonLd";
 import type { Metadata, Viewport } from "next";
 import { DEFAULT_DESCRIPTION, DEFAULT_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo/metadata";
+import { localeToHtmlLang } from "@/i18n/config";
+import { headers } from "next/headers";
 
 export const metadata: Metadata = {
     metadataBase: new URL(SITE_URL),
@@ -58,6 +62,11 @@ export const metadata: Metadata = {
     },
     alternates: {
         canonical: SITE_URL,
+        languages: {
+            "en": `${SITE_URL}/en`,
+            "es": `${SITE_URL}/es`,
+            "sq": `${SITE_URL}/sq`,
+        },
         types: {
             "application/rss+xml": `${SITE_URL}/sitemap.xml`,
         },
@@ -81,15 +90,23 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
     themeColor: "#000000",
     colorScheme: "dark",
+    width: "device-width",
+    initialScale: 1,
+    minimumScale: 1,
+    maximumScale: 5,
+    userScalable: true,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const headersList = await headers();
+    const acceptLang = headersList.get("accept-language") ?? "";
+    const locale = acceptLang.startsWith("sq") ? "sq" : acceptLang.startsWith("es") ? "es" : "en";
     return (
-        <html lang="en" suppressHydrationWarning>
+        <html lang={localeToHtmlLang(locale)} data-scroll-behavior="smooth" suppressHydrationWarning>
             <head>
                 <link rel="preconnect" href="https://api.themoviedb.org" />
                 <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />

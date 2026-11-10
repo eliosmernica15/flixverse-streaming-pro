@@ -1,7 +1,6 @@
 import { ImageResponse } from "next/og";
 import { SITE_NAME } from "@/lib/seo/metadata";
 
-export const runtime = "edge";
 export const alt = `${SITE_NAME} — Watch Free Movies & TV Shows Online`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -49,10 +48,12 @@ export default function OpenGraphImage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 36,
             }}
           >
-            ✦
+            {/* SVG mark — no dynamic font download needed */}
+            <svg width="36" height="36" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <path fill="#ffffff" d="M16 2 L18 12 L28 14 L18 16 L16 28 L14 16 L4 14 L14 12 Z" />
+            </svg>
           </div>
           <span
             style={{

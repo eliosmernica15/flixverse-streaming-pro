@@ -1,32 +1,60 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { extractDominantColors, RGBColor, DEFAULT_PALETTE } from "@/lib/player/extractDominantColors";
+
+/**
+ * Callers historically passed the raw TMDB file path (e.g. "/abc.jpg") instead
+ * of a full URL, which made the Image hit the site root and 404. Accept both:
+ * absolute http(s) URLs are used as-is; anything else is treated as a TMDB
+ * image path.
+ */
+function toImageUrl(input: string | null | undefined): string | null {
+  const url = (input || "").trim();
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const normalized = url.startsWith("/") ? url : `/${url}`;
+  return `https://image.tmdb.org/t/p/w342${normalized}`;
+}
 
 export function useDominantColors(imageUrl: string | null | undefined, genreIds?: number[]) {
   const [colors, setColors] = useState<RGBColor[]>(DEFAULT_PALETTE);
   const [loading, setLoading] = useState(false);
 
+  // `genreIds` arrives as a fresh array from the API on many renders; keying
+  // the effect on its identity re-ran the whole extraction (and cancelled the
+  // in-flight one) on every render, so a poster could sit on the default red
+  // palette forever. The effect depends on the *contents* instead.
+  const genreKey = Array.isArray(genreIds) ? genreIds.join(",") : "";
+  const genreIdsRef = useRef<number[] | undefined>(genreIds);
+  genreIdsRef.current = genreIds;
+
   useEffect(() => {
-    if (!imageUrl) {
+    const resolvedUrl = toImageUrl(imageUrl);
+    if (!resolvedUrl) {
       setColors(DEFAULT_PALETTE);
       return;
     }
 
-    // Check sessionStorage cache
-    const cacheKey = `dominant_colors:${imageUrl}`;
+    // Check sessionStorage cache (keyed by the resolved URL)
+    const cacheKey = `dominant_colors:${resolvedUrl}`;
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
-        setColors(JSON.parse(cached));
-        return;
+        const parsed = JSON.parse(cached) as RGBColor[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setColors(parsed);
+          return;
+        }
       }
     } catch {
       // ignore storage errors
     }
 
+    let cancelled = false;
     setLoading(true);
 
     const runExtraction = () => {
-      extractDominantColors(imageUrl, genreIds).then((palette) => {
+      extractDominantColors(resolvedUrl, genreIdsRef.current).then((palette) => {
+        if (cancelled) return;
         setColors(palette);
         setLoading(false);
         try {
@@ -39,15 +67,23 @@ export function useDominantColors(imageUrl: string | null | undefined, genreIds?
 
     // Use requestIdleCallback if available, fallback to setTimeout
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const handle = (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(runExtraction);
-      return () => {
-        (window as Window & { cancelIdleCallback: (h: number) => void }).cancelIdleCallback(handle);
+      const idleWindow = window as Window & {
+        requestIdleCallback: (cb: () => void) => number;
+        cancelIdleCallback?: (h: number) => void;
       };
-    } else {
-      const handle = setTimeout(runExtraction, 100);
-      return () => clearTimeout(handle);
+      const handle = idleWindow.requestIdleCallback(runExtraction);
+      return () => {
+        cancelled = true;
+        idleWindow.cancelIdleCallback?.(handle);
+      };
     }
-  }, [imageUrl, genreIds]);
+
+    const handle = setTimeout(runExtraction, 100);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [imageUrl, genreKey]);
 
   return { colors, loading };
 }
