@@ -1,4 +1,4 @@
-const CACHE_VERSION = "flixverse-v9";
+const CACHE_VERSION = "flixverse-v10";
 const OFFLINE_URL = "/offline";
 
 const NAV_TIMEOUT_MS = 4500; // per attempt
@@ -38,14 +38,21 @@ function fetchWithTimeout(request, timeoutMs) {
   );
 }
 
-/** One network attempt, then a short pause and one retry. Null on total failure. */
-async function fetchWithRetry(request, timeoutMs, retryDelayMs) {
+/** One network attempt, then a short pause and one retry. Null on total failure (or upstream 5xx when failOn5xx is set). */
+async function fetchWithRetry(request, timeoutMs, retryDelayMs, { failOn5xx = false } = {}) {
+  const attempt = async () => {
+    const response = await fetchWithTimeout(request, timeoutMs);
+    if (failOn5xx && response.status >= 500) {
+      throw new Error(`upstream ${response.status}`);
+    }
+    return response;
+  };
   try {
-    return await fetchWithTimeout(request, timeoutMs);
+    return await attempt();
   } catch {
     await delay(retryDelayMs);
     try {
-      return await fetchWithTimeout(request, timeoutMs);
+      return await attempt();
     } catch {
       return null;
     }
@@ -80,7 +87,11 @@ self.addEventListener("fetch", (event) => {
  * the offline page: a single dropped packet should never flash the offline UI.
  */
 async function networkOnlyNavigate(request) {
-  const response = await fetchWithRetry(request, NAV_TIMEOUT_MS, NAV_RETRY_DELAY_MS);
+  // An upstream 5xx is as useless to the user as a dropped connection — retry,
+  // then show the branded auto-recovering offline page instead of a raw error.
+  const response = await fetchWithRetry(request, NAV_TIMEOUT_MS, NAV_RETRY_DELAY_MS, {
+    failOn5xx: true,
+  });
   if (response) return response;
 
   const cache = await caches.open(CACHE_VERSION);
