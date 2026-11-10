@@ -175,7 +175,12 @@ export async function callPythonJson<T = unknown>(
     } catch {
       data = null;
     }
-    return { status: res.status, data, error: res.ok ? null : text };
+    if (!res.ok) {
+      // Never hand the raw upstream body to the client (it can contain internals);
+      // log it server-side for operators instead.
+      console.error(`[python] ${path} -> ${res.status}: ${text.slice(0, 2000)}`);
+    }
+    return { status: res.status, data, error: res.ok ? null : "Upstream service returned an error" };
   } catch (err) {
     return {
       status: 503,

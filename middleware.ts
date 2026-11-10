@@ -12,5 +12,9 @@ export function middleware(_request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/:path*",
+  // Skip immutable/static assets — they don't need CSP or a correlation ID.
+  // Pages and API routes still get both.
+  matcher: [
+    "/((?!_next/static|_next/image|.*\\.(?:ico|svg|png|jpe?g|gif|webp|txt|xml|json|webmanifest)).*)",
+  ],
 };

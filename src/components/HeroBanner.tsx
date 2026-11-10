@@ -221,7 +221,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
         return (
           <div
             key={slideKey}
-            className={`absolute inset-0 transition-opacity duration-[1200ms] ease-out ${isActive ? "opacity-100" : "opacity-0"}`}
+            className={`absolute inset-0 transition-opacity [transition-duration:1200ms] ease-out ${isActive ? "opacity-100" : "opacity-0"}`}
             aria-hidden={!isActive}
           >
             <div className={`absolute inset-0 ${isActive && !reducedMotion ? "hero-ken-burns" : ""}`}>

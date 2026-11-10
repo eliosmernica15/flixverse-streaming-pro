@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 import { getCachedTmdbSeoContent, tmdbBackdropUrl } from "@/lib/seo/tmdb-server";
 import { SITE_NAME } from "@/lib/seo/metadata";
 
-export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

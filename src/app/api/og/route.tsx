@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ImageResponse } from "next/og";
 import { SITE_NAME } from "@/lib/seo/metadata";
 
-export const runtime = "edge";
+// Defaults to the Node.js runtime — the Edge runtime is deprecated in Next 16.
 
 /** Only allow images from hosts we control/trust — the edge function fetches this URL server-side. */
 const ALLOWED_IMAGE_HOSTS = new Set([

@@ -37,7 +37,10 @@ export async function GET(
     }
   );
 
-  // Suggest a filename for the archive download
-  res.headers.set("content-disposition", 'attachment; filename="flixverse-export.json"');
+  // Only suggest a download filename when the upstream export actually succeeded —
+  // never force error JSON into a "flixverse-export.json" attachment.
+  if (res.status >= 200 && res.status < 300) {
+    res.headers.set("content-disposition", 'attachment; filename="flixverse-export.json"');
+  }
   return res;
 }
