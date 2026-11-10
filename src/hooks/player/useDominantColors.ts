@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { extractDominantColors, RGBColor, DEFAULT_PALETTE } from "@/lib/player/extractDominantColors";
 
+/**
+ * Callers historically passed the raw TMDB file path (e.g. "/abc.jpg") instead
+ * of a full URL, which made the Image hit the site root and 404. Accept both:
+ * absolute http(s) URLs are used as-is; anything else is treated as a TMDB
+ * image path.
+ */
+function toImageUrl(input: string | null | undefined): string | null {
+  const url = (input || "").trim();
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const normalized = url.startsWith("/") ? url : `/${url}`;
+  return `https://image.tmdb.org/t/p/w342${normalized}`;
+}
+
 export function useDominantColors(imageUrl: string | null | undefined, genreIds?: number[]) {
   const [colors, setColors] = useState<RGBColor[]>(DEFAULT_PALETTE);
   const [loading, setLoading] = useState(false);
@@ -14,13 +28,14 @@ export function useDominantColors(imageUrl: string | null | undefined, genreIds?
   genreIdsRef.current = genreIds;
 
   useEffect(() => {
-    if (!imageUrl) {
+    const resolvedUrl = toImageUrl(imageUrl);
+    if (!resolvedUrl) {
       setColors(DEFAULT_PALETTE);
       return;
     }
 
-    // Check sessionStorage cache
-    const cacheKey = `dominant_colors:${imageUrl}`;
+    // Check sessionStorage cache (keyed by the resolved URL)
+    const cacheKey = `dominant_colors:${resolvedUrl}`;
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
@@ -38,7 +53,7 @@ export function useDominantColors(imageUrl: string | null | undefined, genreIds?
     setLoading(true);
 
     const runExtraction = () => {
-      extractDominantColors(imageUrl, genreIdsRef.current).then((palette) => {
+      extractDominantColors(resolvedUrl, genreIdsRef.current).then((palette) => {
         if (cancelled) return;
         setColors(palette);
         setLoading(false);
