@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { spawn, ChildProcess } from "child_process";
-import { setTimeout } from "timers/promises";
+import { setTimeout as sleep } from "timers/promises";
 
 /**
  * Watch-party emulator-backed verification — full §8 protocol against local emulators.
@@ -78,7 +78,7 @@ async function startEmulators(): Promise<void> {
       output += data.toString();
       // Wait for emulators to be ready
       if (output.includes("All emulators started") || output.includes("i  functions: Skipping")) {
-        setTimeout(2000).then(resolve);
+        void sleep(2000).then(resolve);
       }
     });
 
@@ -256,7 +256,7 @@ async function waitForPartyState(
     if (Math.abs(time - expectedTime) < 0.5 && playing === expectedPlaying) {
       return;
     }
-    await setTimeout(100);
+    await sleep(100);
   }
   throw new Error(`Party state did not converge: expected time ~${expectedTime}, playing=${expectedPlaying}`);
 }
@@ -315,7 +315,7 @@ test.describe("watch party sync protocol (emulator-backed)", () => {
     await updatePartyPlayback(partyId, 120, true, hostUser.uid);
 
     // Wait a moment for host to be playing
-    await setTimeout(1000);
+    await sleep(1000);
 
     // Guest joins late (simulating late-join)
     await guest.goto(`/movie/550?type=movie&party=${partyId}&guest=1`);

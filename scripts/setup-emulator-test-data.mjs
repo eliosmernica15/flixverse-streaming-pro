@@ -9,8 +9,8 @@
  */
 
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getAuth, connectAuthEmulator, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, doc, setDoc, serverTimestamp, connectFirestoreEmulator } from "firebase/firestore";
 
 const app = initializeApp({
   apiKey: "test",
@@ -22,8 +22,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Use emulators
-auth.useEmulator("http://127.0.0.1:9099");
-const { connectFirestoreEmulator } = await import("firebase/firestore");
+connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 connectFirestoreEmulator(db, "127.0.0.1", 8080);
 
 async function setupTestData() {
