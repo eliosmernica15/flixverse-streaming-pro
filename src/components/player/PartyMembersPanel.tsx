@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { Mic, MicOff, Video, VideoOff, Crown, UserX, Volume2 } from "lucide-react";
 import type { FlixPartyParticipant } from "@/hooks/player/useFlixParty";
+import Image from "next/image";
 
 interface PartyMembersPanelProps {
   participants: FlixPartyParticipant[];
@@ -30,7 +31,7 @@ export function PartyMembersPanel({
         <Crown className="w-3.5 h-3.5 text-amber-400" />
         In this party ({participants.length})
       </p>
-      <ul className="party-members-list">
+      <ul className="party-members-list lg:grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6">
         {participants.map((p) => {
           const isSelf = p.userId === currentUserId;
           const isPartyHost = p.userId === hostId;
@@ -38,12 +39,11 @@ export function PartyMembersPanel({
             <li key={p.userId} className="party-member-row">
               <div className="party-member-info">
                 {p.avatarUrl ? (
-                  <img
+                  <Image
                     src={p.avatarUrl}
                     alt=""
-                    loading="lazy"
-                    decoding="async"
-                    referrerPolicy="no-referrer"
+                    width={26}
+                    height={26}
                     className="party-member-avatar"
                     onError={(e) => {
                       (e.currentTarget as HTMLElement).style.display = "none";
@@ -61,8 +61,8 @@ export function PartyMembersPanel({
                   </span>
                   <span className="party-member-role">
                     {isPartyHost ? "Host" : "Guest"}
-                    {p.micMutedByHost && " · mic muted by host"}
-                    {p.camDisabledByHost && " · cam off by host"}
+                    {p.micMutedByHost && " Â· mic muted by host"}
+                    {p.camDisabledByHost && " Â· cam off by host"}
                   </span>
                 </div>
               </div>

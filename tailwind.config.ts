@@ -14,13 +14,16 @@ export default {
 			center: true,
 			padding: '2rem',
 			screens: {
-				'2xl': '1400px'
-			}
+				'2xl': '1400px',
+				'4xl': '2400px',
+			},
 		},
 		extend: {
 			screens: {
 				xs: '480px',
 				'3xl': '1920px',
+				'4xl': '2560px',
+				'5xl': '3840px',
 			},
 			colors: {
 				border: 'hsl(var(--border))',
@@ -210,6 +213,6 @@ export default {
 			'shimmer-fast': 'shimmer-fast 1.4s linear infinite'
 		}
 		}
-	},
-	plugins: [require("tailwindcss-animate")],
+	},  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Tailwind loads this config through jiti, which supports CJS require
+  plugins: [require("tailwindcss-animate")],
 } satisfies Config;

@@ -43,14 +43,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   doc,
+  getDoc,
   limit,
   onSnapshot,
   orderBy,
   query,
   setDoc,
   serverTimestamp,
+  updateDoc,
   writeBatch,
-  deleteDoc,
   getDocs,
 } from "firebase/firestore";
 import { requireFirebaseDb } from "@/integrations/firebase/client";
@@ -64,7 +65,17 @@ export type PartyRealtimeEventType =
   | "seek"
   | "heartbeat"
   | "speaking"
-  | "server-change";
+  | "server-change"
+  // Binge sync: host advances to the next episode; guests navigate.
+  | "next-episode"
+  // Staged simultaneous start (see usePlayerPartySync Synced Start):
+  // host holds everyone paused at a timestamp, then releases both sides
+  // at the same wall-clock moment so the guest never taps anything.
+  | "sync-stage"
+  | "sync-go"
+  // Collaborative controls (F9): a guest requests a playback action; the
+  // host applies it and re-broadcasts so everyone converges.
+  | "guest-control";
 
 export interface PartyRealtimeEvent {
   type: PartyRealtimeEventType;
@@ -83,8 +94,35 @@ export interface PartyRealtimeEvent {
 }
 
 const REPLAY_BUFFER = 32;
-const HOUSEKEEP_INTERVAL_MS = 4_000;
+const HOUSEKEEP_INTERVAL_MS = 20_000;
 const HOUSEKEEP_KEEP = 64;
+
+/**
+ * Heartbeats are the only high-frequency traffic on this channel and they do
+ * not need durability: a guest that misses one is corrected by the next one
+ * 1.5 s later, and a late joiner reads the room doc for its starting
+ * position. Persisting them costs one Firestore write per participant per
+ * second — enough to exhaust a free-tier quota inside a single film and make
+ * every *other* write (chat, presence, signaling) start failing. So the host
+ * keeps ONE document for heartbeats and overwrites it in place; only
+ * meaningful transport events (play/pause/seek/…) are appended to the log.
+ */
+const HEARTBEAT_DOC_ID = "heartbeat";
+
+/**
+ * Fire-and-forget Sentry breadcrumb for transport anomalies. Loaded lazily
+ * so the Sentry chunk is only fetched when something odd actually happens;
+ * a no-op when Sentry has no DSN configured.
+ */
+function reportSyncAnomaly(message: string, data?: Record<string, unknown>) {
+  import("@sentry/nextjs")
+    .then((Sentry) => {
+      Sentry.addBreadcrumb({ message, level: "warning", data });
+    })
+    .catch(() => {
+      // Sentry unavailable — nothing to do.
+    });
+}
 
 type Unsubscribe = () => void;
 
@@ -92,6 +130,8 @@ interface UsePartyRealtimeOptions {
   roomId: string | null;
   /** Only the host emits events. */
   isHost: boolean;
+  /** Guests may emit request events only while collaborative controls are enabled. */
+  controlsMode?: "HOST_ONLY" | "COLLABORATIVE";
   /** Per-event callback for non-heartbeat sync events. */
   onEvent: (event: PartyRealtimeEvent) => void;
   /** Optional callback for heartbeat events (higher frequency, separate path). */
@@ -112,6 +152,7 @@ interface UsePartyRealtimeResult {
 export function usePartyRealtime({
   roomId,
   isHost,
+  controlsMode = "HOST_ONLY",
   onEvent,
   onHeartbeat,
 }: UsePartyRealtimeOptions): UsePartyRealtimeResult {
@@ -119,8 +160,44 @@ export function usePartyRealtime({
   const [isReady, setIsReady] = useState(false);
   const [processed, setProcessed] = useState(0);
 
+  // `processed` is display-only telemetry (it feeds a badge). Publishing a
+  // state update for every heartbeat re-renders the entire player subtree at
+  // the heartbeat cadence — the single biggest source of "the party is laggy"
+  // reports. The authoritative count lives in a ref; state is refreshed at
+  // most twice a second.
+  const processedRef = useRef(0);
+  const processedPublishAtRef = useRef(0);
+  const bumpProcessed = useCallback(() => {
+    processedRef.current += 1;
+    const now = Date.now();
+    if (now - processedPublishAtRef.current < 500) return;
+    processedPublishAtRef.current = now;
+    setProcessed(processedRef.current);
+  }, []);
+
   const seqRef = useRef(0);
+  // Flips true the first time a host send has attempted to seed its local
+  // sequence from the persisted room-doc high-water mark.
+  const seqSeededRef = useRef(false);
   const lastSeenSeqRef = useRef(-1);
+  // Wall-clock of the last accepted event. The host's seq restarts at 0 on
+  // every page reload, so a strict `seq > lastSeen` cursor would discard ALL
+  // events after a host refresh as "old". An event that is much newer than
+  // anything seen before is therefore accepted as a new epoch even when its
+  // seq is not greater than the cursor. Heartbeats arrive every ~800ms, so
+  // a 15s gap reliably indicates a fresh epoch, never normal jitter.
+  const lastTsRef = useRef(0);
+  // Guest controls are requests, not host playback events. They use a
+  // separate sequence domain and should only be accepted if they were
+  // written after this listener started; otherwise a reconnect could replay
+  // an old play/pause request.
+  const guestControlCutoffRef = useRef(0);
+  const EPOCH_GAP_MS = 15_000;
+  // Live listener window. limit(1) drops intermediate events when the host
+  // emits twice between snapshots (e.g. pause+seek within one heartbeat
+  // interval) — only the newest survives. A small window replayed in seq
+  // order delivers every event exactly once via the cursor below.
+  const LIVE_WINDOW = 12;
   const onEventRef = useRef(onEvent);
   const onHeartbeatRef = useRef(onHeartbeat);
   onEventRef.current = onEvent;
@@ -137,6 +214,7 @@ export function usePartyRealtime({
     }
 
     const db = requireFirebaseDb();
+    guestControlCutoffRef.current = NTPClient.now();
     const eventsRef = collection(db, "flix_parties", roomId, "events");
     const replayQuery = query(eventsRef, orderBy("seq", "desc"), limit(REPLAY_BUFFER));
 
@@ -154,9 +232,26 @@ export function usePartyRealtime({
 
         for (const { data: ev } of ordered) {
           if (ev.senderId === userId) continue;
-          if (ev.seq <= lastSeenSeqRef.current) continue;
-          lastSeenSeqRef.current = ev.seq;
-          setProcessed((n) => n + 1);
+          const isGuestControl = ev.type === "guest-control";
+          if (isGuestControl && ev.ts < guestControlCutoffRef.current) {
+            continue;
+          }
+          if (
+            !isGuestControl &&
+            ev.seq <= lastSeenSeqRef.current &&
+            ev.ts <= lastTsRef.current + EPOCH_GAP_MS
+          ) {
+            continue;
+          }
+          // Plain assignment (not max): batches are processed oldest-first,
+          // and after a host reload the seq restarts low — max() would pin
+          // the cursor at the pre-reload high-water mark and reject every
+          // subsequent event as "old".
+          if (!isGuestControl) {
+            lastSeenSeqRef.current = ev.seq;
+            lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
+          }
+          bumpProcessed();
           if (ev.type === "heartbeat") {
             onHeartbeatRef.current?.(ev);
           } else {
@@ -165,27 +260,48 @@ export function usePartyRealtime({
         }
 
         // Now attach a live listener for any new events going forward.
-        const liveQ = query(eventsRef, orderBy("seq", "desc"), limit(1));
+        const liveQ = query(eventsRef, orderBy("seq", "desc"), limit(LIVE_WINDOW));
         liveUnsub = onSnapshot(
           liveQ,
           (liveSnap) => {
             if (unsubscribed) return;
-            liveSnap.docChanges().forEach((change) => {
-              if (change.type !== "added") return;
-              const ev = change.doc.data() as PartyRealtimeEvent;
-              if (ev.senderId === userId) return;
-              if (ev.seq <= lastSeenSeqRef.current) return;
-              lastSeenSeqRef.current = ev.seq;
-              setProcessed((n) => n + 1);
+            // A snapshot may contain several new docs at once; deliver them
+            // oldest-first so play/seek/heartbeat apply in host order.
+            //
+            // `modified` matters as much as `added`: heartbeats overwrite a
+            // single document, so they only ever arrive as modifications.
+            const fresh = liveSnap
+              .docChanges()
+              .filter((change) => change.type === "added" || change.type === "modified")
+              .map((change) => change.doc.data() as PartyRealtimeEvent)
+              .filter((ev) => ev.senderId !== userId)
+              .filter(
+                (ev) =>
+                  (ev.type === "guest-control" &&
+                    ev.ts >= guestControlCutoffRef.current) ||
+                  ev.seq > lastSeenSeqRef.current ||
+                  ev.ts > lastTsRef.current + EPOCH_GAP_MS
+              )
+              .sort((a, b) => a.seq - b.seq);
+            for (const ev of fresh) {
+              if (ev.type !== "guest-control") {
+                lastSeenSeqRef.current = ev.seq;
+                lastTsRef.current = Math.max(lastTsRef.current, ev.ts);
+              }
+              bumpProcessed();
               if (ev.type === "heartbeat") {
                 onHeartbeatRef.current?.(ev);
               } else {
                 onEventRef.current(ev);
               }
-            });
+            }
           },
           (err) => {
             console.warn("[usePartyRealtime] snapshot error:", err);
+            reportSyncAnomaly("party-realtime:snapshot-error", {
+              roomId,
+              message: err instanceof Error ? err.message : String(err),
+            });
           }
         );
 
@@ -193,6 +309,10 @@ export function usePartyRealtime({
       })
       .catch((err) => {
         console.warn("[usePartyRealtime] replay fetch failed:", err);
+        reportSyncAnomaly("party-realtime:replay-failed", {
+          roomId,
+          message: err instanceof Error ? err.message : String(err),
+        });
         setIsReady(true); // Still mark ready — we'll just miss the replay tail
       });
 
@@ -201,25 +321,35 @@ export function usePartyRealtime({
       liveUnsub?.();
       setIsReady(false);
     };
-  }, [roomId, userId]);
+  }, [roomId, userId, bumpProcessed]);
 
   // Host: keep the buffer trimmed so it doesn't grow forever. We delete
   // the oldest events beyond HOUSEKEEP_KEEP so the subcollection stays
   // bounded. This is cheap, idempotent, and safe.
+  //
+  // Two things matter here: the trim is driven by the *number of events the
+  // host has sent* rather than a wall-clock interval (a 20 s timer deleting
+  // 16 docs at a time never keeps up with a 1.5 s heartbeat cadence), and it
+  // is skipped entirely when the host has sent nothing since the last pass.
+  const sentSinceTrimRef = useRef(0);
+
   useEffect(() => {
     if (!roomId || !isHost) return;
     const db = requireFirebaseDb();
     const eventsRef = collection(db, "flix_parties", roomId, "events");
     const trim = async () => {
+      // Nothing new to trim; avoid a read per tick.
+      if (sentSinceTrimRef.current === 0) return;
+      sentSinceTrimRef.current = 0;
       try {
-        const snap = await getDocs(query(eventsRef, orderBy("seq", "desc"), limit(HOUSEKEEP_KEEP + 16)));
-        const old = snap.docs
-          .map((d) => ({ id: d.id, seq: (d.data() as PartyRealtimeEvent).seq }))
-          .filter((d) => d.seq < snap.docs[HOUSEKEEP_KEEP - 1]?.data?.()?.seq)
-          .slice(0, 16);
+        const snap = await getDocs(
+          query(eventsRef, orderBy("seq", "desc"), limit(HOUSEKEEP_KEEP + 16))
+        );
+        if (snap.docs.length <= HOUSEKEEP_KEEP) return;
+        const old = snap.docs.slice(HOUSEKEEP_KEEP, HOUSEKEEP_KEEP + 16);
         if (old.length === 0) return;
         const batch = writeBatch(db);
-        old.forEach((o) => batch.delete(doc(eventsRef, o.id)));
+        old.forEach((o) => batch.delete(o.ref));
         await batch.commit();
       } catch {
         // best-effort
@@ -229,6 +359,13 @@ export function usePartyRealtime({
     return () => clearInterval(id);
   }, [roomId, isHost]);
 
+  // Re-seed whenever this client (re)gains the crown: after a Pass the Crown
+  // the persisted high-water mark jumps ahead, and a previously-seeded local
+  // counter would otherwise emit sequence numbers guests reject as stale.
+  useEffect(() => {
+    if (isHost) seqSeededRef.current = false;
+  }, [isHost, roomId]);
+
   const nextSeq = useCallback(() => {
     seqRef.current += 1;
     return seqRef.current;
@@ -236,13 +373,39 @@ export function usePartyRealtime({
 
   const send = useCallback(
     async (type: PartyRealtimeEventType, data: PartyRealtimeEvent["data"]) => {
-      if (!roomId || !isHost) return;
+      const isGuestControl =
+        type === "guest-control" && controlsMode === "COLLABORATIVE";
+      if (!roomId || (!isHost && !isGuestControl)) return;
       if (!userId || userId === "anon") return;
       if (isRateLimited("PARTY_REALTIME", userId)) return;
 
       const db = requireFirebaseDb();
-      const seq = seqRef.current + 1;
-      seqRef.current = seq;
+
+      // One-time per session: seed the local sequence from the hostSeq the
+      // previous host session persisted on the room doc. Without this, a
+      // host reload restarts seq at 0 and relies on the wall-clock epoch
+      // gap rule (EPOCH_GAP_MS) to distinguish new events — correct but
+      // fragile; a persisted high-water mark makes the ordering strictly
+      // monotonic across reloads. Reads/writes for this are one per
+      // session plus one per non-heartbeat event (play/pause/seek are
+      // rare; heartbeats skip the write on purpose).
+      if (isHost && !seqSeededRef.current) {
+        seqSeededRef.current = true;
+        try {
+          const roomSnap = await getDoc(doc(db, "flix_parties", roomId));
+          const persisted = (
+            roomSnap.data() as { hostSeq?: number } | undefined
+          )?.hostSeq;
+          if (typeof persisted === "number" && persisted > seqRef.current) {
+            seqRef.current = persisted;
+          }
+        } catch {
+          // Best effort — the epoch gap rule still covers us.
+        }
+      }
+
+      const seq = isHost ? seqRef.current + 1 : 0;
+      if (isHost) seqRef.current = seq;
 
       const ev: PartyRealtimeEvent = {
         type,
@@ -254,16 +417,54 @@ export function usePartyRealtime({
       };
 
       const eventsRef = collection(db, "flix_parties", roomId, "events");
+
+      // Heartbeats overwrite a single well-known document. A listener on the
+      // subcollection still sees the change (it is an update, so delivery is
+      // via `modified`, not `added`), which the live listener handles below.
+      if (type === "heartbeat") {
+        try {
+          await setDoc(doc(eventsRef, HEARTBEAT_DOC_ID), {
+            ...ev,
+            _serverTs: serverTimestamp(),
+          });
+        } catch (err) {
+          reportSyncAnomaly("party-realtime:heartbeat-failed", {
+            roomId,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      const eventId = isGuestControl
+        ? `guest_${userId}_${Date.now()}_${crypto.randomUUID()}`
+        : `${seq.toString().padStart(20, "0")}_${type}`;
       try {
-        await setDoc(doc(eventsRef, `${seq.toString().padStart(20, "0")}_${type}`), {
+        await setDoc(doc(eventsRef, eventId), {
           ...ev,
           _serverTs: serverTimestamp(),
         });
+        if (!isGuestControl) sentSinceTrimRef.current += 1;
+        // Persist the high-water mark on ordering-critical events only.
+        try {
+          if (!isHost) return;
+          await updateDoc(doc(db, "flix_parties", roomId), {
+            hostSeq: seq,
+            hostSeqAt: ev.ts,
+          });
+        } catch {
+          // Best effort — epoch gap rule still covers us.
+        }
       } catch (err) {
         console.warn("[usePartyRealtime] send failed:", err);
+        reportSyncAnomaly("party-realtime:send-failed", {
+          roomId,
+          type,
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     },
-    [roomId, isHost, userId]
+    [roomId, isHost, controlsMode, userId]
   );
 
   return useMemo(

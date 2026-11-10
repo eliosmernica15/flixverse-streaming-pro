@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Image from "next/image";
-import { Play, Plus, Info, Check, ChevronLeft, ChevronRight, Volume2, Sparkles, ChevronDown } from "lucide-react";
+import { Play, Plus, Check, ChevronLeft, ChevronRight, Volume2, Sparkles, ChevronDown } from "lucide-react";
 import { TMDBMovie, getBackdropUrl, getContentTitle, getContentType } from "@/utils/tmdbApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserMovieListContext } from "@/contexts/UserMovieListContext";
@@ -12,33 +12,46 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchContentDetails } from "@/hooks/queries/useContentDetails";
 import { useDominantColors } from "@/hooks/player/useDominantColors";
+import { useDepthParallax } from "@/hooks/useDepthParallax";
 import { rgbToCss } from "@/lib/player/extractDominantColors";
 import { useTranslations } from "next-intl";
+import { usePerformanceMode } from "@/hooks/usePerformanceMode";
 
 interface HeroBannerProps {
   movie: TMDBMovie;
   movies?: TMDBMovie[];
 }
 
-const ROTATION_INTERVAL_MS = 9000;
+const ROTATION_INTERVAL_MS = 8000;
 const MAX_ROTATION = 5;
 
 const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
-  const allMovies = (propMovies && propMovies.length > 1
-    ? propMovies.slice(0, MAX_ROTATION)
-    : [movie]);
+  // Memoised: this array feeds a prefetch effect. Rebuilding it every render
+  // made that effect re-run on every state change (rotation tick, mute
+  // toggle, hover) and re-issue `router.prefetch` for up to five routes.
+  const allMovies = useMemo(
+    () => (propMovies && propMovies.length > 1 ? propMovies.slice(0, MAX_ROTATION) : [movie]),
+    [propMovies, movie]
+  );
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isHoveredRef = useRef(false);
 
   const t = useTranslations("hero");
-  const tCommon = useTranslations("common");
   const { isAuthenticated } = useAuth();
   const { addToList, isInList } = useUserMovieListContext();
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
   const reducedMotion = useReducedMotion();
+  const performanceMode = usePerformanceMode();
+  const canAutoRotate = allMovies.length > 1 && !reducedMotion && !performanceMode;
+
+  // Layered depth: the backdrop, the atmospheric glows and the copy sit on
+  // three planes and drift by different amounts as the pointer moves. The
+  // hook writes CSS variables only — pointer movement never re-renders React.
+  const heroRef = useDepthParallax<HTMLDivElement>(26);
 
   const currentMovie = allMovies[activeIndex];
   const contentType = getContentType(currentMovie);
@@ -47,55 +60,82 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
     currentMovie.genre_ids
   );
 
+  // Phase A hero parallax: the backdrop layer eases down at 0.3× scroll.
+  // rAF-throttled, capped at one viewport, disabled for reduced motion.
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (reducedMotion || performanceMode) return;
+    if (typeof window === "undefined") return;
+    let raf = 0;
+    const applyParallax = () => {
+      raf = 0;
+      const node = backdropRef.current;
+      if (!node) return;
+      const y = Math.min(window.scrollY, window.innerHeight);
+      node.style.transform = `translate3d(0, ${(y * 0.3).toFixed(1)}px, 0)`;
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(applyParallax);
+    };
+    applyParallax();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [performanceMode, reducedMotion]);
+
   const c1 = colors[0] ? rgbToCss(colors[0], 0.18) : "rgba(229, 9, 20, 0.18)";
   const c2 = colors[1] ? rgbToCss(colors[1], 0.12) : "rgba(124, 58, 237, 0.12)";
 
   useEffect(() => {
-    for (const m of allMovies) {
+    for (const m of performanceMode ? allMovies.slice(0, 1) : allMovies) {
       const ct = getContentType(m);
       prefetchContentDetails(queryClient, m.id, ct);
       router.prefetch(`/movie/${m.id}?type=${ct}`);
     }
-  }, [allMovies, queryClient, router]);
+  }, [allMovies, performanceMode, queryClient, router]);
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const startTimer = useCallback(() => {
+    stopTimer();
+    if (!canAutoRotate || document.hidden || isHoveredRef.current) return;
+    timerRef.current = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % allMovies.length);
+    }, ROTATION_INTERVAL_MS);
+  }, [allMovies.length, canAutoRotate, stopTimer]);
 
   useEffect(() => {
-    if (allMovies.length <= 1 || reducedMotion) return;
-
-    const startTimer = () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = setInterval(() => {
-        setActiveIndex((prev) => (prev + 1) % allMovies.length);
-      }, ROTATION_INTERVAL_MS);
-    };
-    const stopTimer = () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
+    if (!canAutoRotate) {
+      stopTimer();
+      return;
+    }
     const onVisibility = () => {
       if (document.hidden) stopTimer();
       else startTimer();
     };
 
-    if (!document.hidden) startTimer();
+    startTimer();
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       stopTimer();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [allMovies.length, reducedMotion]);
+  }, [canAutoRotate, startTimer, stopTimer]);
 
   const goToSlide = useCallback((index: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    stopTimer();
     setActiveIndex(index);
-    if (allMovies.length > 1 && !reducedMotion) {
-      timerRef.current = setInterval(() => {
-        setActiveIndex((prev) => (prev + 1) % allMovies.length);
-      }, ROTATION_INTERVAL_MS);
-    }
-  }, [allMovies.length, reducedMotion]);
+    startTimer();
+  }, [startTimer, stopTimer]);
 
   const goPrev = useCallback(() => {
     goToSlide(activeIndex === 0 ? allMovies.length - 1 : activeIndex - 1);
@@ -106,7 +146,6 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   }, [activeIndex, allMovies.length, goToSlide]);
 
   const title = getContentTitle(currentMovie);
-  const backdropUrl = currentMovie.backdrop_path ? getBackdropUrl(currentMovie.backdrop_path, "large") : "";
   const releaseYear = currentMovie.release_date
     ? new Date(currentMovie.release_date).getFullYear()
     : currentMovie.first_air_date
@@ -115,8 +154,21 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
   const isInMyList = isAuthenticated ? isInList(currentMovie.id) : false;
   const rating = typeof currentMovie.vote_average === "number" ? currentMovie.vote_average : 0;
   const isSeries = currentMovie.media_type === "tv";
-  const maturity = isSeries ? "TV-MA" : "R";
-  const seasons = isSeries ? `${(currentMovie as TMDBMovie & { number_of_seasons?: number }).number_of_seasons ?? 1} Season${((currentMovie as TMDBMovie & { number_of_seasons?: number }).number_of_seasons ?? 1) > 1 ? "s" : ""}` : `${Math.floor(Math.random() * 60) + 90}m`;
+  // Real metadata only. The movie branch used to render a random runtime
+  // during SSR, which both invented data and produced a hydration mismatch
+  // (server HTML ≠ client HTML) on every home-page load.
+  const metaLabel = (() => {
+    if (isSeries) {
+      const seasons = currentMovie.number_of_seasons;
+      if (!seasons || seasons <= 0) return null;
+      return `${seasons} Season${seasons > 1 ? "s" : ""}`;
+    }
+    const minutes = currentMovie.runtime;
+    if (!minutes || minutes <= 0) return null;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  })();
 
   const handlePlayClick = () => {
     if (!isAuthenticated) {
@@ -150,21 +202,18 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
   return (
     <div
-      className="group/hero relative h-[78vh] sm:h-[88vh] lg:h-[92vh] min-h-[520px] overflow-hidden contain-paint bg-black"
+      ref={heroRef}
+      className="group/hero hero-depth relative h-[78vh] sm:h-[88vh] lg:h-[92vh] min-h-[520px] overflow-hidden contain-paint bg-black"
       onMouseEnter={() => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
+        isHoveredRef.current = true;
+        stopTimer();
       }}
       onMouseLeave={() => {
-        if (allMovies.length <= 1 || reducedMotion) return;
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-          setActiveIndex((prev) => (prev + 1) % allMovies.length);
-        }, ROTATION_INTERVAL_MS);
+        isHoveredRef.current = false;
+        startTimer();
       }}
     >
+      <div ref={backdropRef} className="hero-depth-backdrop absolute inset-0 will-change-transform">
       {allMovies.map((m, i) => {
         const url = m.backdrop_path ? getBackdropUrl(m.backdrop_path, "large") : "";
         const isActive = i === activeIndex;
@@ -172,7 +221,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
         return (
           <div
             key={slideKey}
-            className={`absolute inset-0 transition-opacity duration-[1200ms] ease-out ${isActive ? "opacity-100" : "opacity-0"}`}
+            className={`absolute inset-0 transition-opacity [transition-duration:1200ms] ease-out ${isActive ? "opacity-100" : "opacity-0"}`}
             aria-hidden={!isActive}
           >
             <div className={`absolute inset-0 ${isActive && !reducedMotion ? "hero-ken-burns" : ""}`}>
@@ -192,10 +241,15 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
           </div>
         );
       })}
+      </div>
 
       <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-black/10" />
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/50" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-transparent to-transparent h-32" />
+      {/* Depth vignette — pulls focus to the title without changing the palette. */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_52%,rgba(0,0,0,0.4)_100%)]" />
+      {/* Mobile-only stronger bottom fade so the title never crowds the CTA row. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/60 to-transparent sm:hidden" />
 
       {!reducedMotion && (
         <>
@@ -212,7 +266,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
 
       <div className="relative z-10 flex items-end lg:items-center h-full pb-24 sm:pb-32 lg:pb-0">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div className="max-w-2xl lg:max-w-3xl" key={currentMovie.id}>
+          <div className="hero-depth-content max-w-2xl lg:max-w-3xl" key={currentMovie.id}>
             <div className="anim-slide-up-soft flex flex-wrap items-center gap-2 mb-4">
               <span className="inline-flex items-center gap-1.5 rounded-md border border-white/30 bg-white/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
                 <Sparkles className="h-3 w-3 text-yellow-400" />
@@ -224,14 +278,15 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
                   {rating.toFixed(1)}
                 </span>
               )}
-              <span className="inline-flex items-center rounded-md border border-white/20 bg-white/5 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
-                {maturity}
-              </span>
               {releaseYear && (
                 <span className="text-sm font-medium text-white/80">{releaseYear}</span>
               )}
-              <span className="text-white/40">•</span>
-              <span className="text-sm font-medium text-white/80">{seasons}</span>
+              {metaLabel && (
+                <>
+                  <span className="text-white/40">•</span>
+                  <span className="text-sm font-medium text-white/80">{metaLabel}</span>
+                </>
+              )}
               <span className="text-white/40">•</span>
               <span className="inline-flex items-center gap-1 rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-black tracking-wider text-white">
                 HD
@@ -247,7 +302,7 @@ const HeroBanner = ({ movie, movies: propMovies }: HeroBannerProps) => {
             </div>
 
             <h1
-              className="hero-text-shadow-strong mb-4 sm:mb-6 text-balance font-black tracking-tight text-white animate-letter text-3xl sm:text-5xl md:text-6xl lg:text-7xl"
+              className="hero-text-shadow-strong mb-4 sm:mb-6 text-balance font-black tracking-tight text-white animate-letter text-3xl sm:text-5xl md:text-6xl lg:text-7xl 2xl:text-8xl 3xl:text-[9rem] 4xl:text-[11rem]"
               style={{ lineHeight: "1.05" }}
             >
               {title.split(" ").map((word, i) => (

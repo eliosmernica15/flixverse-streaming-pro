@@ -9,11 +9,10 @@ import {
   query,
   where,
   orderBy,
-  onSnapshot,
   limit,
   getDocs
 } from 'firebase/firestore';
-import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
+import { requireFirebaseDb } from '@/integrations/firebase/client';
 import { useAuth } from './useAuth';
 import { Review, Comment, ContentRating, UserMovieListItem, WatchHistory } from '@/integrations/firebase/types';
 import { isPythonBackendEnabled } from '@/lib/pythonApi/config';
@@ -225,7 +224,9 @@ function useFirestoreUserActivity(userId?: string) {
 
 /** Public facade — Python first on Vercel, Firestore otherwise. */
 export const useUserActivity = (userId?: string) => {
+  /* eslint-disable react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session */
   return isPythonBackendEnabled()
     ? usePythonUserActivity(userId)
     : useFirestoreUserActivity(userId);
+  /* eslint-enable react-hooks/rules-of-hooks */
 };

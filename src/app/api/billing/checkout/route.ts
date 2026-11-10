@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { callPythonJson } from "@/app/api/_lib/pythonOrigin";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
+import { z } from "zod";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -24,7 +26,15 @@ interface IdentityResponse {
   name: string | null;
 }
 
+const checkoutSchema = z.object({
+  planId: z.enum(["standard", "premium"]),
+  billingPeriod: z.enum(["monthly", "yearly"]),
+});
+
 export async function POST(request: NextRequest) {
+  const limit = await rateLimitByIp(request, "billing-checkout", 10, "1 h");
+  if (!limit.success) return rateLimitResponse(limit);
+
   const stripe = getStripe();
   if (!stripe) {
     return NextResponse.json(
@@ -39,15 +49,11 @@ export async function POST(request: NextRequest) {
   }
   const { uid, email } = ident.data;
 
-  const body = (await request.json().catch(() => ({}))) as {
-    planId?: "standard" | "premium";
-    billingPeriod?: "monthly" | "yearly";
-  };
-  const { planId, billingPeriod } = body;
-
-  if (!planId || !billingPeriod) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  const parsed = checkoutSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid checkout options" }, { status: 400 });
   }
+  const { planId, billingPeriod } = parsed.data;
 
   const priceKey = `${planId}_${billingPeriod}` as keyof typeof PRICE_MAP;
   const priceId = PRICE_MAP[priceKey];

@@ -2,8 +2,9 @@
 
 import { useMemo, memo } from "react";
 import Link from "next/link";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import MovieCard from "./MovieCard";
+import CarouselEdgeFades from "./CarouselEdgeFades";
 import SectionHeader from "./SectionHeader";
 import { TMDBMovie } from "@/utils/tmdbApi";
 import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
@@ -123,6 +124,7 @@ const MovieCarousel = memo(
               }}
               className="w-full"
             >
+              <CarouselEdgeFades />
               <CarouselContent className="-ml-2 md:-ml-3">
                 {validMovies.map((movie, idx) => (
                   <CarouselItem

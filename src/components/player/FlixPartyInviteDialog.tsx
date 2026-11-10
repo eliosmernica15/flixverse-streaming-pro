@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { X, Copy, Share2, Check, QrCode, Link2, Users, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateQrDataUrl } from "@/lib/generateQrDataUrl";
+import Image from "next/image";
 
 interface FlixPartyInviteDialogProps {
   isOpen: boolean;
@@ -139,12 +140,13 @@ export function FlixPartyInviteDialog({
           <div className="flex flex-col items-center gap-3">
             <div className="relative rounded-2xl border border-white/15 bg-white p-4 shadow-xl">
               {qrDataUrl ? (
-                <img
+                <Image
                   src={qrDataUrl}
                   alt={`QR code for party ${displayCode}`}
                   width={200}
                   height={200}
                   className="rounded-lg"
+                  unoptimized
                 />
               ) : qrError ? (
                 <div className="grid h-[200px] w-[200px] place-items-center rounded-lg bg-gray-100 text-center text-xs text-gray-500">

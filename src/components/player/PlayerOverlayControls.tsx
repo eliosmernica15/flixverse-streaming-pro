@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { memo, useState, useRef, useCallback } from "react";
 import type { TimelineComment } from "@/hooks/player/useTimelineComments";
 import { TimelineCommentPopup } from "./TimelineCommentPopup";
 
@@ -18,8 +18,6 @@ interface PlayerOverlayControlsProps {
   onSeek: (seconds: number) => void;
   onAddComment: (timestamp: number) => void;
   onLikeComment: (commentId: string) => void;
-  isPlaying: boolean;
-  controlsVisible: boolean;
   buffered?: number;
 }
 
@@ -34,16 +32,13 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function PlayerOverlayControls({
+export const PlayerOverlayControls = memo(function PlayerOverlayControls({
   currentTime,
   totalDuration,
   markers,
   nearbyComments,
   onSeek,
-  onAddComment,
   onLikeComment,
-  isPlaying: _isPlaying,
-  controlsVisible: _controlsVisible,
   buffered,
 }: PlayerOverlayControlsProps) {
   const [isHovering, setIsHovering] = useState(false);
@@ -196,4 +191,4 @@ export function PlayerOverlayControls({
       </div>
     </div>
   );
-}
+});

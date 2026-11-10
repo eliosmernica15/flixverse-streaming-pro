@@ -1,25 +1,49 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useMemo, type ReactNode } from "react";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
-import PageContainer from "@/components/PageContainer";
-import Reveal from "@/components/Reveal";
 import { Sparkles, AlertCircle, ArrowDownWideNarrow, Star, CalendarDays, ArrowDownAZ } from "lucide-react";
 import { useBrowseCategory, getBrowseCategoryConfig } from "@/hooks/queries/useBrowseCategory";
 
 type SortKey = "featured" | "rating" | "newest" | "az";
 
+const SORT_KEYS: SortKey[] = ["featured", "rating", "newest", "az"];
+
 const Browse = () => {
   const { category } = useParams<{ category: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const t = useTranslations("browse");
-  const tc = useTranslations("common");
   const tn = useTranslations("nav");
   const config = getBrowseCategoryConfig(category);
   const { data: movies = [], isLoading, isError, refetch } = useBrowseCategory(category);
-  const [sort, setSort] = useState<SortKey>("featured");
+  const requestedSort = searchParams.get("sort");
+  const sort: SortKey = SORT_KEYS.includes(requestedSort as SortKey)
+    ? (requestedSort as SortKey)
+    : "featured";
+  const requestedDecade = searchParams.get("decade") || "";
+  const currentDecade = Math.floor(new Date().getFullYear() / 10) * 10;
+  const decade = /^\d{4}$/.test(requestedDecade) &&
+    Number(requestedDecade) >= 1950 &&
+    Number(requestedDecade) <= currentDecade &&
+    Number(requestedDecade) % 10 === 0
+    ? requestedDecade
+    : "all";
+  const requestedRating = Number(searchParams.get("rating"));
+  const minRating = [6, 7, 8].includes(requestedRating) ? requestedRating : 0;
+  const requestedLanguage = searchParams.get("language") || "";
+  const language = /^[a-z]{2,3}$/i.test(requestedLanguage) ? requestedLanguage.toLowerCase() : "all";
+
+  const updateQuery = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const sorts = useMemo<{ key: SortKey; label: string; icon: ReactNode }[]>(
     () => [
@@ -36,9 +60,22 @@ const Browse = () => {
     return t.has(category as never) ? t(category as never) : config.title;
   }, [category, config, t]);
 
+  const filteredMovies = useMemo(() => {
+    const decadeStart = decade === "all" ? null : Number(decade);
+    return movies.filter((movie) => {
+      const releaseDate = movie.release_date || movie.first_air_date || "";
+      const year = Number(releaseDate.slice(0, 4));
+      const yearMatches = decadeStart === null ||
+        (Number.isInteger(year) && year >= decadeStart && year < decadeStart + 10);
+      return yearMatches &&
+        (movie.vote_average || 0) >= minRating &&
+        (language === "all" || movie.original_language === language);
+    });
+  }, [decade, language, minRating, movies]);
+
   const sortedMovies = useMemo(() => {
-    if (sort === "featured") return movies;
-    const copy = [...movies];
+    if (sort === "featured") return filteredMovies;
+    const copy = [...filteredMovies];
     switch (sort) {
       case "rating":
         return copy.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
@@ -55,7 +92,18 @@ const Browse = () => {
       default:
         return copy;
     }
-  }, [movies, sort]);
+  }, [filteredMovies, sort]);
+
+  const languages = useMemo(
+    () => [...new Set(movies.map((movie) => movie.original_language).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b)),
+    [movies]
+  );
+  const decades = useMemo(() => {
+    return Array.from({ length: Math.max(0, (currentDecade - 1950) / 10 + 1) }, (_, index) =>
+      String(currentDecade - index * 10)
+    );
+  }, [currentDecade]);
 
   if (!category) {
     return (
@@ -128,7 +176,7 @@ const Browse = () => {
               <button
                 key={s.key}
                 type="button"
-                onClick={() => setSort(s.key)}
+                onClick={() => updateQuery("sort", s.key === "featured" ? "" : s.key)}
                 className={`inline-flex items-center gap-1.5 min-h-[36px] rounded-md px-3 text-xs font-semibold transition-colors focus-ring ${
                   sort === s.key
                     ? "bg-white text-black"
@@ -141,10 +189,45 @@ const Browse = () => {
               </button>
             ))}
           </div>
+          <div className="flex flex-wrap items-center gap-2 px-2">
+            <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("decade")}
+              <select
+                value={decade}
+                onChange={(event) => updateQuery("decade", event.target.value === "all" ? "" : event.target.value)}
+                className="min-h-9 rounded-md border border-white/10 bg-zinc-900 px-2 text-xs font-medium normal-case tracking-normal text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <option value="all">{t("allDecades")}</option>
+                {decades.map((value) => <option key={value} value={value}>{value}s</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("minimumRating")}
+              <select
+                value={minRating}
+                onChange={(event) => updateQuery("rating", event.target.value === "0" ? "" : event.target.value)}
+                className="min-h-9 rounded-md border border-white/10 bg-zinc-900 px-2 text-xs font-medium normal-case tracking-normal text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <option value={0}>{t("anyRating")}</option>
+                {[6, 7, 8].map((value) => <option key={value} value={value}>{value}+</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("language")}
+              <select
+                value={language}
+                onChange={(event) => updateQuery("language", event.target.value === "all" ? "" : event.target.value)}
+                className="min-h-9 rounded-md border border-white/10 bg-zinc-900 px-2 text-xs font-medium normal-case tracking-normal text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <option value="all">{t("allLanguages")}</option>
+                {languages.map((value) => <option key={value} value={value}>{value.toUpperCase()}</option>)}
+              </select>
+            </label>
+          </div>
         </div>
 
         {isLoading && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 3xl:grid-cols-8 gap-3 md:gap-4">
             {Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className="aspect-[2/3] rounded-md skeleton-shimmer" />
             ))}
@@ -165,7 +248,7 @@ const Browse = () => {
         )}
 
         {!isLoading && !isError && sortedMovies.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 content-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 3xl:grid-cols-8 gap-3 md:gap-4 content-auto">
             {sortedMovies.map((movie, idx) => (
               <MovieCard
                 key={movie.id}

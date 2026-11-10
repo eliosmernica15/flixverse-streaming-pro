@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
+import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { UserMovieListItem } from "@/integrations/firebase/types";
 import { trackListAdd, trackListRemove } from "@/lib/analytics";
 import { TMDBMovie } from "@/utils/tmdbApi";
@@ -40,7 +40,7 @@ export function usePythonUserMovieList() {
       return;
     }
     void refresh();
-    if (useHttpTransport()) {
+    if (usesHttpTransport()) {
       const poll = setInterval(() => void refresh(), POLL_MS);
       const onVisible = () => {
         if (document.visibilityState === "visible") void refresh();

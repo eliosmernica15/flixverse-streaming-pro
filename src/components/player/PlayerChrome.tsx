@@ -143,7 +143,18 @@ export function PlayerChrome({
 
       {/* Server selector modal */}
       {showServerSelector && (
-        <div className="video-server-modal" role="dialog" aria-modal="true" aria-label="Select server">
+        <div
+          className="video-server-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Select server"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setShowServerSelector(false);
+            }
+          }}
+        >
           <div className="video-server-backdrop" onClick={() => setShowServerSelector(false)} />
           <div className="video-server-sheet">
             <div className="video-server-head">

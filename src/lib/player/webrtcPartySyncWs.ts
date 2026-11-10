@@ -1,5 +1,5 @@
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { getPythonWsBase, useHttpTransport } from "@/lib/pythonApi/config";
+import { getPythonWsBase, usesHttpTransport } from "@/lib/pythonApi/config";
 
 export interface SignalMessage {
   senderId: string;
@@ -24,27 +24,56 @@ export interface PartySyncTransport {
 
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
   ...(process.env.NEXT_PUBLIC_TURN_URL
-    ? [{
-        urls: process.env.NEXT_PUBLIC_TURN_URL,
-        username: process.env.NEXT_PUBLIC_TURN_USERNAME,
-        credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
-      }]
+    ? [
+        {
+          urls: process.env.NEXT_PUBLIC_TURN_URL,
+          username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+          credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+        },
+      ]
     : []),
 ];
 
+const PEER_STALL_MS = 18_000;
+const MAX_SEEN_SIGNALS = 512;
+
+interface PeerState {
+  pc: RTCPeerConnection;
+  polite: boolean;
+  makingOffer: boolean;
+  hasRemoteDescription: boolean;
+  pendingCandidates: RTCIceCandidateInit[];
+  forwardedTrackIds: Set<string>;
+  stallTimer: ReturnType<typeof setTimeout> | null;
+}
+
+/**
+ * Shared WebRTC engine for the self-hosted (Python) transport.
+ *
+ * Mirrors the semantics of the Firestore transport byte for byte, because
+ * both feed the exact same sync state machine: perfect negotiation (no offer
+ * glare), queued ICE candidates (they frequently precede the offer), caller
+ * ownership of local tracks, host-side track forwarding, and a stall watchdog
+ * that rebuilds a peer that never connects.
+ */
 abstract class WebRTCPartySyncBase implements PartySyncTransport {
   protected roomId: string;
   protected userId: string;
   protected isHost: boolean;
   protected hostId: string | null;
-  protected peers = new Map<string, RTCPeerConnection>();
+  protected peers = new Map<string, PeerState>();
   protected channels = new Map<string, RTCDataChannel>();
   protected remoteStreams = new Map<string, MediaStream>();
   protected localStream: MediaStream | null = null;
   protected onMessage: (msg: unknown) => void;
   protected mediaCallbacks: MediaCallbacks;
   protected seenSignals = new Set<string>();
+  protected seenOrder: string[] = [];
+  protected destroyed = false;
+  protected clonedTracks = new Set<MediaStreamTrack>();
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     roomId: string,
@@ -75,158 +104,369 @@ abstract class WebRTCPartySyncBase implements PartySyncTransport {
   }
 
   async setLocalStream(stream: MediaStream | null) {
-    this.localStream?.getTracks().forEach((t) => {
-      if (!stream?.getTracks().some((nt) => nt.id === t.id)) t.stop();
-    });
     this.localStream = stream;
-    for (const [peerId, pc] of this.peers) {
-      await this.syncLocalTracks(peerId, pc);
-      await this.renegotiate(peerId, pc);
-    }
-  }
-
-  protected async renegotiate(peerId: string, pc: RTCPeerConnection) {
-    if (!this.localStream?.getTracks().length) return;
-    if (pc.signalingState !== "stable") return;
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await this.sendSignal(peerId, "offer", offer);
-    } catch {
-      /* ICE may still be negotiating */
-    }
-  }
-
-  protected createPeer(peerId: string): RTCPeerConnection {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    pc.onicecandidate = (event) => {
-      if (event.candidate) void this.sendSignal(peerId, "candidate", event.candidate.toJSON());
-    };
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") this.closePeer(peerId);
-    };
-    pc.ontrack = (event) => {
-      const stream = event.streams[0] || new MediaStream([event.track]);
-      this.remoteStreams.set(peerId, stream);
-      this.mediaCallbacks.onRemoteStream?.(peerId, stream);
-    };
-    this.peers.set(peerId, pc);
-    return pc;
-  }
-
-  protected async syncLocalTracks(peerId: string, pc: RTCPeerConnection) {
-    const senders = pc.getSenders();
-    for (const track of this.localStream?.getTracks() || []) {
-      const existing = senders.find((s) => s.track?.kind === track.kind);
-      if (existing) await existing.replaceTrack(track);
-      else pc.addTrack(track, this.localStream!);
-    }
-    if (!this.localStream) {
-      for (const sender of senders) await sender.replaceTrack(null);
-    }
-  }
-
-  protected attachChannel(peerId: string, channel: RTCDataChannel) {
-    channel.onmessage = (e) => {
-      try {
-        this.onMessage(JSON.parse(e.data as string));
-      } catch {
-        /* ignore */
-      }
-    };
-    this.channels.set(peerId, channel);
-  }
-
-  protected async connectAsHost(guestId: string) {
-    const pc = this.createPeer(guestId);
-    const channel = pc.createDataChannel("sync");
-    this.attachChannel(guestId, channel);
-    if (this.localStream) await this.syncLocalTracks(guestId, pc);
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await this.sendSignal(guestId, "offer", offer);
-  }
-
-  protected async connectAsGuest(hostId: string) {
-    if (this.peers.has(hostId)) return;
-    const pc = this.createPeer(hostId);
-    pc.ondatachannel = (event) => this.attachChannel(hostId, event.channel);
-    if (this.localStream) await this.syncLocalTracks(hostId, pc);
-  }
-
-  protected async ingestSignal(data: SignalMessage & { senderId: string }) {
-    const key = `${data.senderId}:${data.type}:${data.payload?.slice?.(0, 40) ?? ""}`;
-    if (this.seenSignals.has(key)) return;
-    this.seenSignals.add(key);
-    await this.handleSignal(data);
-  }
-
-  protected async handleSignal(data: SignalMessage & { senderId: string }) {
-    const peerId = data.senderId;
-    let pc = this.peers.get(peerId);
-    try {
-      const payload = JSON.parse(data.payload);
-      if (data.type === "offer") {
-        if (!pc) {
-          pc = this.createPeer(peerId);
-          if (!this.isHost) pc.ondatachannel = (e) => this.attachChannel(peerId, e.channel);
-        }
-        await pc.setRemoteDescription(new RTCSessionDescription(payload));
-        if (this.localStream) await this.syncLocalTracks(peerId, pc);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await this.sendSignal(peerId, "answer", answer);
-      } else if (data.type === "answer") {
-        if (!pc) return;
-        await pc.setRemoteDescription(new RTCSessionDescription(payload));
-      } else if (data.type === "candidate") {
-        if (!pc) {
-          if (this.isHost) pc = this.createPeer(peerId);
-          else if (this.hostId === peerId) pc = this.createPeer(peerId);
-          else return;
-        }
-        await pc.addIceCandidate(new RTCIceCandidate(payload));
-      }
-    } catch (err) {
-      console.warn("WebRTC signal failed:", err);
-    }
-  }
-
-  protected abstract sendSignal(targetId: string, type: SignalMessage["type"], payload: unknown): Promise<void>;
-
-  sendMessage(message: unknown) {
-    const payload = JSON.stringify(message);
-    for (const channel of this.channels.values()) {
-      if (channel.readyState === "open") channel.send(payload);
-    }
+    await Promise.all([...this.peers.values()].map((peer) => this.syncLocalTracks(peer)));
   }
 
   get isConnected(): boolean {
     for (const channel of this.channels.values()) {
       if (channel.readyState === "open") return true;
     }
-    for (const pc of this.peers.values()) {
-      if (pc.connectionState === "connected") {
-        return true;
-      }
+    for (const peer of this.peers.values()) {
+      if (peer.pc.connectionState === "connected") return true;
     }
     return false;
   }
 
+  protected createPeer(peerId: string): PeerState {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const peer: PeerState = {
+      pc,
+      polite: !this.isHost,
+      makingOffer: false,
+      hasRemoteDescription: false,
+      pendingCandidates: [],
+      forwardedTrackIds: new Set(),
+      stallTimer: null,
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) void this.sendSignal(peerId, "candidate", event.candidate.toJSON());
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected") {
+        if (peer.stallTimer) {
+          clearTimeout(peer.stallTimer);
+          peer.stallTimer = null;
+        }
+        return;
+      }
+      if (pc.connectionState === "failed") this.scheduleReconnect(peerId);
+      else if (pc.connectionState === "closed") this.closePeer(peerId);
+    };
+
+    pc.ontrack = (event) => {
+      const stream = event.streams[0] ?? new MediaStream([event.track]);
+      this.remoteStreams.set(peerId, stream);
+      this.mediaCallbacks.onRemoteStream?.(peerId, stream);
+      event.track.addEventListener("ended", () => {
+        this.remoteStreams.delete(peerId);
+        this.mediaCallbacks.onRemoteStreamRemoved?.(peerId);
+      });
+      if (this.isHost) this.forwardStreamToOthers(peerId, stream);
+    };
+
+    pc.onnegotiationneeded = () => void this.negotiate(peerId, peer);
+
+    this.peers.set(peerId, peer);
+    this.armStallTimer(peerId, peer);
+    return peer;
+  }
+
+  private armStallTimer(peerId: string, peer: PeerState) {
+    if (peer.stallTimer) clearTimeout(peer.stallTimer);
+    peer.stallTimer = setTimeout(() => {
+      peer.stallTimer = null;
+      if (this.destroyed || !this.peers.has(peerId)) return;
+      if (peer.pc.connectionState === "connected") return;
+      this.scheduleReconnect(peerId);
+    }, PEER_STALL_MS);
+  }
+
+  private scheduleReconnect(peerId: string) {
+    if (this.destroyed) return;
+    this.closePeer(peerId);
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.destroyed || this.peers.has(peerId)) return;
+      if (this.isHost) void this.connectAsHost(peerId);
+      else if (this.hostId === peerId) void this.connectAsGuest(peerId);
+    }, 1200 + Math.random() * 800);
+  }
+
+  protected async syncLocalTracks(peer: PeerState) {
+    const { pc } = peer;
+    const tracks = this.localStream?.getTracks() ?? [];
+    for (const track of tracks) {
+      const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
+      if (sender) {
+        if (sender.track !== track) {
+          try {
+            await sender.replaceTrack(track);
+          } catch {
+            // mid-renegotiation; retried on the next pass
+          }
+        }
+      } else {
+        try {
+          pc.addTrack(track, this.localStream!);
+        } catch {
+          // duplicate
+        }
+      }
+    }
+    for (const sender of pc.getSenders()) {
+      if (!sender.track) continue;
+      if (!tracks.some((t) => t.kind === sender.track!.kind)) {
+        try {
+          await sender.replaceTrack(null);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  private forwardStreamToOthers(fromPeerId: string, stream: MediaStream) {
+    for (const [peerId, peer] of this.peers) {
+      if (peerId === fromPeerId) continue;
+      for (const track of stream.getTracks()) {
+        const key = `${fromPeerId}:${track.id}`;
+        if (peer.forwardedTrackIds.has(key)) continue;
+        try {
+          const cloned = track.clone();
+          this.clonedTracks.add(cloned);
+          cloned.addEventListener("ended", () => this.clonedTracks.delete(cloned));
+          peer.pc.addTrack(cloned, stream);
+          peer.forwardedTrackIds.add(key);
+        } catch {
+          // already attached
+        }
+      }
+    }
+  }
+
+  /** Perfect negotiation — the polite (guest) side yields on collision. */
+  private async negotiate(peerId: string, peer: PeerState) {
+    if (this.destroyed) return;
+    const { pc } = peer;
+    if (peer.makingOffer) return;
+    try {
+      peer.makingOffer = true;
+      await pc.setLocalDescription(await pc.createOffer());
+      await this.sendSignal(peerId, "offer", pc.localDescription);
+    } catch (err) {
+      if (!this.destroyed) console.warn("[webrtc] offer failed:", err);
+    } finally {
+      peer.makingOffer = false;
+    }
+  }
+
+  protected attachChannel(peerId: string, channel: RTCDataChannel) {
+    const existing = this.channels.get(peerId);
+    if (existing && existing !== channel) {
+      try {
+        existing.close();
+      } catch {
+        // ignore
+      }
+    }
+    channel.onmessage = (e) => {
+      try {
+        this.onMessage(JSON.parse(e.data as string));
+      } catch {
+        // ignore
+      }
+    };
+    channel.onclose = () => {
+      if (this.channels.get(peerId) === channel) this.channels.delete(peerId);
+    };
+    this.channels.set(peerId, channel);
+  }
+
+  protected async connectAsHost(guestId: string) {
+    if (this.destroyed || this.peers.has(guestId)) return;
+    const peer = this.createPeer(guestId);
+    const channel = peer.pc.createDataChannel("sync", { ordered: true });
+    this.attachChannel(guestId, channel);
+    await this.syncLocalTracks(peer);
+  }
+
+  protected async connectAsGuest(hostId: string) {
+    if (this.destroyed || this.peers.has(hostId)) return;
+    const peer = this.createPeer(hostId);
+    peer.pc.ondatachannel = (event) => this.attachChannel(hostId, event.channel);
+    await this.syncLocalTracks(peer);
+    if (this.localStream?.getTracks().length) void this.negotiate(hostId, peer);
+  }
+
+  protected rememberSignal(key: string): boolean {
+    if (this.seenSignals.has(key)) return false;
+    this.seenSignals.add(key);
+    this.seenOrder.push(key);
+    while (this.seenOrder.length > MAX_SEEN_SIGNALS) {
+      const evicted = this.seenOrder.shift();
+      if (evicted) this.seenSignals.delete(evicted);
+    }
+    return true;
+  }
+
+  protected async ingestSignal(data: SignalMessage & { senderId: string }) {
+    // Prefer a stable identity for de-duplication. The previous key was a
+    // truncated payload prefix, which collided across renegotiations and
+    // silently dropped legitimate answers.
+    const key =
+      (data as SignalMessage & { id?: string }).id ??
+      `${data.senderId}:${data.type}:${data.createdAt}`;
+    if (!this.rememberSignal(key)) return;
+    await this.handleSignal(data);
+  }
+
+  protected async handleSignal(data: SignalMessage & { senderId: string }) {
+    if (this.destroyed) return;
+    const peerId = data.senderId;
+    let peer = this.peers.get(peerId);
+    try {
+      const payload = JSON.parse(data.payload);
+
+      if (data.type === "offer") {
+        if (!peer) {
+          peer = this.createPeer(peerId);
+          if (!this.isHost) {
+            peer.pc.ondatachannel = (e) => this.attachChannel(peerId, e.channel);
+          }
+        }
+        const collision = peer.makingOffer || peer.pc.signalingState !== "stable";
+        if (collision && !peer.polite) return;
+        if (collision) {
+          try {
+            await peer.pc.setLocalDescription({ type: "rollback" });
+          } catch {
+            // engine without rollback support
+          }
+        }
+        await peer.pc.setRemoteDescription(new RTCSessionDescription(payload));
+        peer.hasRemoteDescription = true;
+        await this.flushCandidates(peer);
+        await this.syncLocalTracks(peer);
+        const answer = await peer.pc.createAnswer();
+        await peer.pc.setLocalDescription(answer);
+        await this.sendSignal(peerId, "answer", answer);
+        return;
+      }
+
+      if (data.type === "answer") {
+        if (!peer) return;
+        if (peer.pc.signalingState !== "have-local-offer") return;
+        await peer.pc.setRemoteDescription(new RTCSessionDescription(payload));
+        peer.hasRemoteDescription = true;
+        await this.flushCandidates(peer);
+        return;
+      }
+
+      if (!peer) {
+        if (this.isHost) peer = this.createPeer(peerId);
+        else if (this.hostId === peerId) peer = this.createPeer(peerId);
+        else return;
+      }
+      if (peer.hasRemoteDescription) {
+        await peer.pc.addIceCandidate(new RTCIceCandidate(payload));
+      } else {
+        peer.pendingCandidates.push(payload as RTCIceCandidateInit);
+      }
+    } catch (err) {
+      if (this.peers.has(peerId)) console.warn("[webrtc] signal failed:", err);
+    }
+  }
+
+  private async flushCandidates(peer: PeerState) {
+    const queued = peer.pendingCandidates;
+    peer.pendingCandidates = [];
+    for (const candidate of queued) {
+      try {
+        await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch {
+        // stale
+      }
+    }
+  }
+
+  protected abstract sendSignal(
+    targetId: string,
+    type: SignalMessage["type"],
+    payload: unknown
+  ): Promise<void>;
+
+  sendMessage(message: unknown) {
+    let payload: string;
+    try {
+      payload = JSON.stringify(message);
+    } catch {
+      return;
+    }
+    for (const channel of this.channels.values()) {
+      if (channel.readyState === "open") {
+        try {
+          channel.send(payload);
+        } catch {
+          // closed mid-send
+        }
+      }
+    }
+  }
+
   protected closePeer(peerId: string) {
-    this.channels.get(peerId)?.close();
-    this.channels.delete(peerId);
+    const peer = this.peers.get(peerId);
+    if (peer?.stallTimer) {
+      clearTimeout(peer.stallTimer);
+      peer.stallTimer = null;
+    }
+
+    const channel = this.channels.get(peerId);
+    if (channel) {
+      channel.onclose = null;
+      try {
+        channel.close();
+      } catch {
+        // ignore
+      }
+      this.channels.delete(peerId);
+    }
+
     this.remoteStreams.delete(peerId);
     this.mediaCallbacks.onRemoteStreamRemoved?.(peerId);
-    const pc = this.peers.get(peerId);
-    if (pc) {
-      pc.close();
+
+    if (peer) {
+      for (const sender of peer.pc.getSenders()) {
+        const track = sender.track;
+        if (track && this.clonedTracks.has(track)) {
+          try {
+            track.stop();
+          } catch {
+            // ignore
+          }
+          this.clonedTracks.delete(track);
+        }
+      }
+      peer.forwardedTrackIds.clear();
+      try {
+        peer.pc.close();
+      } catch {
+        // ignore
+      }
       this.peers.delete(peerId);
     }
   }
 
   destroy() {
+    this.destroyed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     for (const peerId of [...this.peers.keys()]) this.closePeer(peerId);
+    for (const track of this.clonedTracks) {
+      try {
+        track.stop();
+      } catch {
+        // ignore
+      }
+    }
+    this.clonedTracks.clear();
+    // The local stream is owned by the caller; never stop its tracks here.
+    this.localStream = null;
   }
 }
 
@@ -258,20 +498,28 @@ export class WebRTCPartySyncWs extends WebRTCPartySyncBase {
 
   protected async sendSignal(targetId: string, type: SignalMessage["type"], payload: unknown) {
     if (this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(
-      JSON.stringify({
-        senderId: this.userId,
-        targetId,
-        type,
-        payload: JSON.stringify(payload),
-        createdAt: Date.now(),
-      })
-    );
+    try {
+      this.ws.send(
+        JSON.stringify({
+          senderId: this.userId,
+          targetId,
+          type,
+          payload: JSON.stringify(payload),
+          createdAt: Date.now(),
+        })
+      );
+    } catch {
+      // socket closed between the check and the send
+    }
   }
 
   destroy() {
     super.destroy();
-    this.ws.close();
+    try {
+      this.ws.close();
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -279,6 +527,13 @@ export class WebRTCPartySyncWs extends WebRTCPartySyncBase {
 export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
   private since = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollInFlight = false;
+  /** Set by destroy(); guards every async continuation. */
+  private stopped = false;
+  // Fast while establishing the peer connection, slow once live: signals
+  // only matter during setup. 8 req/s forever was melting machines.
+  private static readonly FAST_POLL_MS = 400;
+  private static readonly STEADY_POLL_MS = 3000;
 
   constructor(
     roomId: string,
@@ -289,22 +544,46 @@ export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
     mediaCallbacks: MediaCallbacks = {}
   ) {
     super(roomId, userId, isHost, hostId, onMessage, mediaCallbacks);
-    this.pollTimer = setInterval(() => void this.pollSignals(), 120);
+    this.schedule(WebRTCPartySyncHttp.FAST_POLL_MS);
     void this.pollSignals();
   }
 
+  private schedule(delay: number) {
+    if (this.stopped) return;
+    if (this.pollTimer) clearTimeout(this.pollTimer);
+    this.pollTimer = setTimeout(() => void this.pollSignals(), delay);
+  }
+
   private async pollSignals() {
+    // Background tab: skip (re-aligns on foreground via room polling).
+    // In-flight guard: a stalled request must never stack overlapping ones.
+    if (this.stopped || this.destroyed) return;
+    if (typeof document !== "undefined" && document.hidden) {
+      this.schedule(WebRTCPartySyncHttp.STEADY_POLL_MS);
+      return;
+    }
+    if (this.pollInFlight) return;
+    this.pollInFlight = true;
     try {
       const data = await pythonFetch<{ signals: SignalMessage[] }>(
         `/parties/${this.roomId}/signals?since=${this.since}`
       );
+      if (this.stopped) return;
       for (const sig of data.signals) {
         if (sig.createdAt > this.since) this.since = sig.createdAt;
         if (sig.targetId && sig.targetId !== this.userId) continue;
         await this.ingestSignal(sig);
       }
+      this.schedule(
+        this.isConnected
+          ? WebRTCPartySyncHttp.STEADY_POLL_MS
+          : WebRTCPartySyncHttp.FAST_POLL_MS
+      );
     } catch {
-      /* retry on next poll */
+      // Back off on failure instead of hammering a dead endpoint.
+      this.schedule(WebRTCPartySyncHttp.STEADY_POLL_MS);
+    } finally {
+      this.pollInFlight = false;
     }
   }
 
@@ -325,8 +604,9 @@ export class WebRTCPartySyncHttp extends WebRTCPartySyncBase {
   }
 
   destroy() {
+    this.stopped = true;
     if (this.pollTimer) {
-      clearInterval(this.pollTimer);
+      clearTimeout(this.pollTimer);
       this.pollTimer = null;
     }
     super.destroy();
@@ -351,7 +631,7 @@ export async function createPartySyncTransport(
   onMessage: (msg: unknown) => void,
   mediaCallbacks: MediaCallbacks = {}
 ): Promise<PartySyncTransport> {
-  if (useHttpTransport()) {
+  if (usesHttpTransport()) {
     return new WebRTCPartySyncHttp(roomId, userId, isHost, hostId, onMessage, mediaCallbacks);
   }
 

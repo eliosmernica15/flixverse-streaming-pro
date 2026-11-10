@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
+import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 
 export interface PythonSubscription {
   plan: "free" | "standard" | "premium";
@@ -44,7 +44,7 @@ export function usePythonSubscription() {
       }
     };
     void fetchSub();
-    if (useHttpTransport()) {
+    if (usesHttpTransport()) {
       const poll = setInterval(() => void fetchSub(), POLL_MS);
       return () => clearInterval(poll);
     }

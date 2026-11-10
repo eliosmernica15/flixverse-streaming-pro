@@ -1,6 +1,8 @@
 import "./globals.css";
 import "./advanced-ui.css";
 import "./video-player.css";
+import "./cinema-stage.css";
+import "./depth-parallax.css";
 import "./ui-polish.css";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
@@ -88,6 +90,11 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
     themeColor: "#000000",
     colorScheme: "dark",
+    width: "device-width",
+    initialScale: 1,
+    minimumScale: 1,
+    maximumScale: 5,
+    userScalable: true,
 };
 
 export default async function RootLayout({
@@ -99,7 +106,7 @@ export default async function RootLayout({
     const acceptLang = headersList.get("accept-language") ?? "";
     const locale = acceptLang.startsWith("sq") ? "sq" : acceptLang.startsWith("es") ? "es" : "en";
     return (
-        <html lang={localeToHtmlLang(locale)} suppressHydrationWarning>
+        <html lang={localeToHtmlLang(locale)} data-scroll-behavior="smooth" suppressHydrationWarning>
             <head>
                 <link rel="preconnect" href="https://api.themoviedb.org" />
                 <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />

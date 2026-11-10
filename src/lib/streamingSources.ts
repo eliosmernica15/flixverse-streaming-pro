@@ -1,4 +1,5 @@
 import { buildYapGridEmbedUrl, YAPGRID_LANES } from "./player/yapgrid";
+import ALLOWED_EMBED_HOSTS from "./embedHosts.json";
 
 export interface StreamingSource {
   id: string;
@@ -7,31 +8,16 @@ export interface StreamingSource {
   quality: "HD" | "FHD" | "4K";
   reliability: "high" | "medium";
   /**
-   * Iframe `src` — same-origin proxy URL (`/api/embed?src=...`) for cross-origin
-   * providers, raw provider URL for same-origin providers. We proxy the embed
-   * through our own origin so:
-   *   1. The iframe is same-origin and can be controlled by the host page.
-   *   2. vidsrcme.ru's `sbx.js` sandbox-detection redirect (which fires when
-   *      it detects a cross-origin / sandboxed parent) never triggers, because
-   *      the page the browser actually loads is served by us.
-   *   3. We can strip any provider-side sandbox-detection script or
-   *      `/sandbox.php` redirect from the proxied HTML.
+   * Iframe `src` — the raw provider URL (direct cross-origin iframe).
+   * (`providerUrl` duplicates it for postMessage origin detection.)
    */
   url: string;
   /** Original provider URL (for postMessage origin detection). */
   providerUrl: string;
 }
 
-/** Allowed embed hostnames — must match security-headers.mjs frame-src. */
-export const ALLOWED_EMBED_HOSTS = [
-  "vidsrcme.ru",
-  "vidsrc.to",
-  "vidlink.pro",
-  "videasy.to",
-  "player.videasy.to",
-  "vidfast.pro",
-  "yapgrid.com",
-] as const;
+/** Allowed embed hostnames; security-headers.mjs builds frame-src from this list. */
+export { ALLOWED_EMBED_HOSTS };
 
 export function isAllowedEmbedUrl(url: string): boolean {
   try {
@@ -42,18 +28,7 @@ export function isAllowedEmbedUrl(url: string): boolean {
   }
 }
 
-/**
- * Wrap a provider URL in our same-origin /api/embed proxy so the iframe loads
- * from our origin. The proxy re-fetches the provider URL server-side, strips
- * any sandbox-detection scripts, and returns the HTML. The provider's real
- * origin is still encoded in the response's `X-Embed-Provider` header so
- * postMessage origin detection (`resolveEmbedSrc`) still works.
- */
-export function proxyEmbedUrl(providerUrl: string): string {
-  return `/api/embed?src=${encodeURIComponent(providerUrl)}`;
-}
-
-/** Extract the real provider URL when loaded through /api/embed proxy. */
+/** Unwrap legacy proxy URLs so old links can still be resolved directly. */
 export function unproxyEmbedUrl(iframeSrc: string): string {
   try {
     const url = new URL(iframeSrc, typeof window !== "undefined" ? window.location.origin : "http://localhost");
@@ -193,18 +168,10 @@ export function buildStreamingSources(
       reliability: "high",
       providerUrl: vidfastUrl,
     },
-    {
-      // YapGrid — left as a last-resort fallback per the user. The
-      // server tokens (sg_g4 / sx_a1 / sy_b2 / sz_c3) and `?lang=` /
-      // `?sub_url=` / `?server=` parameters are all set in the yapgrid.ts
-      // builder.
-      id: "yapgrid-g",
-      name: "YapGrid G",
-      icon: "🇦🇱",
-      quality: "FHD",
-      reliability: "medium",
-      providerUrl: yapgridSources[0].providerUrl,
-    },
+    // NOTE: YapGrid lanes are NOT listed here — `ordered` below appends
+    // all four yapgridSources (g/x/y/z) after the primary providers.
+    // Listing yapgrid-g here too produced a duplicate "YapGrid G" entry
+    // in the server selector.
     // Dead / blocked / 404 sources have been removed:
     //   - vidsrc.sbs — returns 200 but body says "blocked"
     //   - vidsrc.pm — doesn't work in our test env (user flagged)
@@ -223,13 +190,9 @@ export function buildStreamingSources(
 
   return ordered.map((s) => ({
     ...s,
-    // Route every provider through the same-origin /api/embed proxy so
-    // vidsrcme.ru's sbx.js sandbox-detection redirect (and similar
-    // anti-embed scripts from other providers) never fires. The
-    // `providerUrl` is kept as the raw URL so postMessage origin
-    // detection (`resolveEmbedSrc` / `detectProvider`) can still tell
-    // which provider the inner page is talking to.
-    url: proxyEmbedUrl(s.providerUrl),
+    // Keep provider content cross-origin. The server-side HTML proxy is
+    // intentionally not used: provider scripts depend on their own origin.
+    url: s.providerUrl,
   }));
 }
 

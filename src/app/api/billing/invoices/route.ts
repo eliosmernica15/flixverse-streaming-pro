@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { callPythonJson } from "@/app/api/_lib/pythonOrigin";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -19,6 +20,9 @@ interface SubscriptionResponse {
 
 /** List recent invoices for the authenticated subscriber. */
 export async function GET(request: NextRequest) {
+  const limit = await rateLimitByIp(request, "billing-invoices", 20, "1 h");
+  if (!limit.success) return rateLimitResponse(limit);
+
   const stripe = getStripe();
   if (!stripe) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });

@@ -14,6 +14,14 @@
 
 ## TL;DR — what works right now and what doesn't
 
+### Provider iframe security tradeoff
+Provider pages are embedded directly and remain unsandboxed because the working players require
+their own origin and full JavaScript; sandboxing or proxying these providers breaks playback. The
+unused `/api/embed` proxy was removed to avoid retaining a caller-controlled server-side fetch path.
+`EmbedFrame` limits iframe capabilities and records sandbox/source mutations, while the embed bridge
+records unexpected message origins in a bounded audit log. Do not add a sandbox or restore the proxy
+without verifying actual playback across the supported providers.
+
 ### Sources that work (kept in the player)
 | Provider | URL pattern | Notes |
 | --- | --- | --- |

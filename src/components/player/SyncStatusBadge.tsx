@@ -1,12 +1,14 @@
 "use client";
 
-import { Radio, RadioTower, Wifi, WifiOff, Loader2, Signal, Activity } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Radio, Wifi, WifiOff, Loader2, Signal, Activity, Pause } from "lucide-react";
 
 export type SyncStatus =
   | "connected"
   | "connecting"
   | "drift"
   | "resyncing"
+  | "staging"
   | "disconnected";
 
 interface SyncStatusBadgeProps {
@@ -44,6 +46,12 @@ const STATUS_CONFIG: Record<SyncStatus, { label: string; tone: string; dot: stri
     dot: "bg-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.7)]",
     icon: Loader2,
   },
+  staging: {
+    label: "On hold",
+    tone: "text-sky-300 bg-sky-500/10 border-sky-500/30",
+    dot: "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.7)]",
+    icon: Pause,
+  },
   disconnected: {
     label: "Offline",
     tone: "text-red-300 bg-red-500/10 border-red-500/30",
@@ -53,6 +61,18 @@ const STATUS_CONFIG: Record<SyncStatus, { label: string; tone: string; dot: stri
 };
 
 export function SyncStatusBadge({ status, driftMs, processed, peers, className = "" }: SyncStatusBadgeProps) {
+  // D5 — pulse the Live badge briefly whenever a fresh event batch lands.
+  const prevProcessedRef = useRef(processed);
+  const [pulse, setPulse] = useState(false);
+  useEffect(() => {
+    const before = prevProcessedRef.current;
+    prevProcessedRef.current = processed;
+    if (status !== "connected" || typeof processed !== "number") return;
+    if (typeof before === "number" && processed <= before) return;
+    setPulse(true);
+    const t = setTimeout(() => setPulse(false), 1200);
+    return () => clearTimeout(t);
+  }, [processed, status]);
   const config = STATUS_CONFIG[status];
   const Icon = config.icon;
 
@@ -62,11 +82,15 @@ export function SyncStatusBadge({ status, driftMs, processed, peers, className =
       : null;
 
   const animateIcon =
-    status === "connecting" || status === "drift" || status === "resyncing";
+    status === "connecting" || status === "drift" || status === "resyncing" || status === "staging";
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border ${config.tone} ${className}`}
+      role="status"
+      aria-live="polite"
+      className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border transition-shadow ${config.tone} ${
+        pulse ? "shadow-[0_0_16px_rgba(16,185,129,0.45)]" : ""
+      } ${className ?? ""}`}
       title={
         typeof processed === "number" || typeof peers === "number"
           ? `Events: ${processed ?? 0} · Peers: ${peers ?? 0}`

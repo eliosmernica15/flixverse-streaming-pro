@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
+import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { UserProfile } from "@/integrations/firebase/types";
 
 const POLL_MS = 60000;
@@ -55,7 +55,7 @@ export function usePythonUserProfile() {
       return;
     }
     void refresh();
-    if (useHttpTransport()) {
+    if (usesHttpTransport()) {
       const poll = setInterval(() => void refresh(), POLL_MS);
       return () => clearInterval(poll);
     }

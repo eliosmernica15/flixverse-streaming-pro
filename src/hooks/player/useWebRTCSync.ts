@@ -1,17 +1,35 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+
 import { WebRTCPartySync } from "@/lib/player/webrtcPartySync";
 import { createPartySyncTransport, type PartySyncTransport } from "@/lib/player/webrtcPartySyncWs";
 import { useAuth } from "@/hooks/useAuth";
 import { NTPClient } from "@/lib/player/ntpClockSync";
 import { isPythonBackendEnabled } from "@/lib/pythonApi/config";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 
 export interface SyncMessage {
-  type: "play" | "pause" | "seek" | "heartbeat" | "chat" | "speaking";
+  type:
+    | "play"
+    | "pause"
+    | "seek"
+    | "heartbeat"
+    | "chat"
+    | "speaking"
+    | "server-change"
+    | "sync-stage"
+    | "sync-go"
+    | "next-episode"
+    | "mute-all";
   timestamp: number;
   data: {
     currentTime?: number;
     text?: string;
     speaking?: boolean;
+    season?: number;
+    episode?: number;
+    serverIndex?: number;
+    movieId?: number;
+    mediaType?: string;
     [key: string]: unknown;
   };
 }
@@ -29,6 +47,7 @@ interface UseWebRTCSyncOptions {
   onPlaybackSync?: (msg: SyncMessage) => void;
   onRemoteStream?: (peerId: string, stream: MediaStream) => void;
   onRemoteStreamRemoved?: (peerId: string) => void;
+  onMuteAll?: () => void;
 }
 
 /**
@@ -47,8 +66,10 @@ export function useWebRTCSync({
   onPlaybackSync,
   onRemoteStream,
   onRemoteStreamRemoved,
+  onMuteAll,
 }: UseWebRTCSyncOptions) {
   const { user } = useAuth();
+  const pageVisible = usePageVisibility();
   const [rtcConnected, setRtcConnected] = useState(false);
   const [messages, setMessages] = useState<SyncMessage[]>([]);
   const syncRef = useRef<WebRTCPartySync | PartySyncTransport | null>(null);
@@ -56,16 +77,35 @@ export function useWebRTCSync({
   const onPlaybackSyncRef = useRef(onPlaybackSync);
   const onRemoteStreamRef = useRef(onRemoteStream);
   const onRemoteStreamRemovedRef = useRef(onRemoteStreamRemoved);
+  const onMuteAllRef = useRef(onMuteAll);
+  const pageVisibleRef = useRef(pageVisible);
   onPlaybackSyncRef.current = onPlaybackSync;
   onRemoteStreamRef.current = onRemoteStream;
   onRemoteStreamRemovedRef.current = onRemoteStreamRemoved;
+  onMuteAllRef.current = onMuteAll;
+  pageVisibleRef.current = pageVisible;
 
   useEffect(() => {
     void NTPClient.calibrate();
   }, []);
 
+  // Depend on the uid, not the whole Firebase user object: that object is
+  // replaced on every token refresh / profile update, which would tear down
+  // the peer connections mid-call. `uid` is the only field this effect reads.
+  const uid = user?.uid ?? null;
+
+  /**
+   * Stable ref for the roster. Declared above the effect that builds the
+   * transport so that effect can seed it without a stale read; the value is
+   * refreshed on every render below.
+   */
+  const participantKeyRef = useRef("");
+
   useEffect(() => {
-    if (!roomId || !user) {
+    if (!roomId || !uid) {
+      syncRef.current?.destroy();
+      syncRef.current = null;
+      syncInitRef.current = null;
       setRtcConnected(false);
       return;
     }
@@ -79,8 +119,10 @@ export function useWebRTCSync({
       syncInitRef.current?.hostId === resolvedHostId
     ) {
       const poll = setInterval(() => {
-        if (syncRef.current) setRtcConnected(syncRef.current.isConnected);
-      }, 200);
+        if (pageVisibleRef.current && syncRef.current) {
+          setRtcConnected(syncRef.current.isConnected);
+        }
+      }, 500);
       return () => clearInterval(poll);
     }
 
@@ -97,8 +139,25 @@ export function useWebRTCSync({
           setMessages((prev) => [...prev, msg]);
           return;
         }
-        if (["play", "pause", "seek", "heartbeat"].includes(msg.type)) {
+        // Playback + party-control traffic shares one handler so every
+        // delivery path (events, room poll, RTC) lands the same state
+        // machine. Unknown types are ignored, never crash.
+        if (
+          [
+            "play",
+            "pause",
+            "seek",
+            "heartbeat",
+            "server-change",
+            "sync-stage",
+            "sync-go",
+          ].includes(msg.type)
+        ) {
           onPlaybackSyncRef.current?.(msg);
+        }
+        // Handle mute-all command from host
+        if (msg.type === "mute-all") {
+          onMuteAllRef.current?.();
         }
       };
 
@@ -112,7 +171,7 @@ export function useWebRTCSync({
       if (isPythonBackendEnabled()) {
         sync = await createPartySyncTransport(
           roomId,
-          user.uid,
+          uid,
           isHost,
           isHost ? null : hostId,
           onMsg,
@@ -125,7 +184,7 @@ export function useWebRTCSync({
       } else {
         const firestoreSync = new WebRTCPartySync(
           roomId,
-          user.uid,
+          uid,
           isHost,
           isHost ? null : hostId,
           onMsg,
@@ -137,11 +196,20 @@ export function useWebRTCSync({
 
       syncRef.current = sync;
       syncInitRef.current = { roomId, isHost, hostId: resolvedHostId };
+
+      // Apply the roster that is current *now* — the effect that watches it
+      // already ran while this async IIFE was still awaiting.
+      if (isHost) {
+        const key = participantKeyRef.current;
+        sync.syncParticipants(key ? key.split("|") : []);
+      }
     })();
 
     const poll = setInterval(() => {
-      if (syncRef.current) setRtcConnected(syncRef.current.isConnected);
-    }, 200);
+      if (pageVisibleRef.current && syncRef.current) {
+        setRtcConnected(syncRef.current.isConnected);
+      }
+    }, 500);
 
     return () => {
       cancelled = true;
@@ -151,12 +219,30 @@ export function useWebRTCSync({
       syncInitRef.current = null;
       setRtcConnected(false);
     };
-  }, [roomId, user?.uid, isHost, hostId]);
+  }, [roomId, uid, isHost, hostId]);
+
+  // Participants arrive as a fresh array every render. Key the effect on the
+  // *stable* joined id list (computed with useMemo) so an unchanged roster
+  // never re-runs `syncParticipants`, which would tear down and rebuild every
+  // RTCPeerConnection on each parent render.
+  const participantKey = useMemo(() => participantIds.join("|"), [participantIds]);
 
   useEffect(() => {
     if (!isHost || !syncRef.current) return;
-    syncRef.current.syncParticipants(participantIds);
-  }, [isHost, participantIds.join(",")]);
+    // Read the ids back from the key so the effect has no array identity
+    // dependency and stays statically checkable.
+    const ids = participantKey ? participantKey.split("|") : [];
+    syncRef.current.syncParticipants(ids);
+  }, [isHost, participantKey]);
+
+  // Latest roster, read by the connection effect when the transport is
+  // finally constructed.
+  //
+  // The transport is created asynchronously, so a roster that arrived while it
+  // was being built used to be dropped on the floor: the host's first guest
+  // got no peer connection until some *unrelated* roster change happened
+  // later, which is why the first camera in a party often stayed black.
+  participantKeyRef.current = participantKey;
 
   const sendMessageRtc = useCallback((type: SyncMessage["type"], data: SyncMessage["data"]) => {
     if (!syncRef.current) return;
@@ -168,6 +254,10 @@ export function useWebRTCSync({
     syncRef.current.sendMessage(msg);
   }, []);
 
+  const sendMuteAll = useCallback(() => {
+    sendMessageRtc("mute-all", {});
+  }, [sendMessageRtc]);
+
   const setLocalStreamRtc = useCallback(async (stream: MediaStream | null) => {
     await syncRef.current?.setLocalStream(stream);
   }, []);
@@ -175,6 +265,7 @@ export function useWebRTCSync({
   return {
     isConnected: rtcConnected,
     sendMessage: sendMessageRtc,
+    sendMuteAll,
     messages,
     setLocalStream: setLocalStreamRtc,
     syncRef,

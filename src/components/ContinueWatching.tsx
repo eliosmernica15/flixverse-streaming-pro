@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
@@ -6,6 +7,7 @@ import { getImageUrl } from '@/utils/tmdbApi';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ContinueWatchingSkeleton } from '@/components/skeletons/ContentSkeletons';
+import CarouselEdgeFades from '@/components/CarouselEdgeFades';
 import {
   Carousel,
   CarouselContent,
@@ -14,7 +16,7 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 
-const ContinueWatching = () => {
+const ContinueWatching = memo(() => {
   const { getContinueWatching, removeFromHistory, loading } = useWatchHistoryContext();
   const { isAuthenticated } = useAuth();
   const router = useRouter();
@@ -73,6 +75,7 @@ const ContinueWatching = () => {
           opts={{ align: 'start', loop: false, skipSnaps: false, dragFree: true }}
           className="w-full"
         >
+          <CarouselEdgeFades />
           <CarouselContent className="-ml-2 md:-ml-3 pb-2">
             {items.map((item) => {
               const progressPercentage = formatProgress(item.progress_seconds, item.total_duration_seconds);
@@ -170,6 +173,8 @@ const ContinueWatching = () => {
       </div>
     </section>
   );
-};
+});
+
+ContinueWatching.displayName = "ContinueWatching";
 
 export default ContinueWatching;

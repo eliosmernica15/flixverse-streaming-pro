@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  User, Settings, Film, Tv, Star, Heart, Clock,
+  Settings, Film, Tv, Star, Heart, Clock,
   Calendar, Edit2, Camera, LogOut, ChevronRight, Trash2,
   MessageCircle, TrendingUp, Award, CreditCard, Users
 } from 'lucide-react';
@@ -62,7 +62,9 @@ const Profile = () => {
   const [uploading, setUploading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cropperOpen, setCropperOpen] = useState(false);
+  const [bannerCropperOpen, setBannerCropperOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedBannerImage, setSelectedBannerImage] = useState<string | null>(null);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -127,6 +129,39 @@ const Profile = () => {
     } finally {
       setUploading(false);
       setSelectedImage(null);
+    }
+  };
+
+  const handleBannerUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Banner must be under 5MB", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      setSelectedBannerImage(reader.result?.toString() || null);
+      setBannerCropperOpen(true);
+      event.target.value = '';
+    });
+    reader.readAsDataURL(file);
+  };
+
+  const handleBannerCropComplete = async (croppedBlob: Blob) => {
+    if (!user || !croppedBlob || croppedBlob.size === 0) return;
+    setBannerCropperOpen(false);
+    setUploading(true);
+    try {
+      const result = await uploadToCloudinary(croppedBlob, `profile_banners/${user.uid}`);
+      await updateProfile({ banner_url: result.secure_url });
+      toast({ title: "Banner updated", description: "Your profile banner has been updated" });
+    } catch (error: unknown) {
+      console.error('Banner upload error:', error);
+      toast({ title: "Upload failed", description: "Failed to update banner", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      setSelectedBannerImage(null);
     }
   };
 
@@ -212,7 +247,7 @@ const Profile = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Error",
         description: "Failed to sign out",
@@ -233,6 +268,13 @@ const Profile = () => {
     return null;
   }
 
+  const badges = [
+    ...(getStats().totalReviews >= 5 ? [{ label: "Film Critic", icon: MessageCircle, desc: "Wrote 5+ reviews", color: "text-purple-300 bg-purple-500/15 border-purple-400/30" }] : []),
+    ...(getStats().totalRatings >= 20 ? [{ label: "Taste Maker", icon: Star, desc: "Rated 20+ titles", color: "text-yellow-300 bg-yellow-500/15 border-yellow-400/30" }] : []),
+    ...(getStats().totalWatched >= 30 ? [{ label: "Binge Watcher", icon: Award, desc: "Watched 30+ titles", color: "text-green-300 bg-green-500/15 border-green-400/30" }] : []),
+    ...(movieList.length >= 10 ? [{ label: "Curator", icon: Heart, desc: "Saved 10+ titles", color: "text-red-300 bg-red-500/15 border-red-400/30" }] : []),
+  ] as { label: string; icon: typeof Heart; desc: string; color: string }[];
+
   const recentlyWatched = getRecentlyWatched();
   const continueWatching = getContinueWatching();
   const moviesCount = movieList.filter(m => m.media_type === 'movie').length;
@@ -252,16 +294,25 @@ const Profile = () => {
         <div className="relative">
           {/* Cover Image — cinematic */}
           <div className="relative h-48 md:h-64 overflow-hidden">
-            <div
-              aria-hidden
-              className="absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(ellipse 80% 60% at 30% 30%, rgba(239, 68, 68, 0.35) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 80%, rgba(168, 85, 247, 0.30) 0%, transparent 60%), linear-gradient(135deg, #1a0509 0%, #0a0a0c 50%, #0a0612 100%)",
-              }}
-            />
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599735161-8f4b80604bb9?w=1920')] bg-cover bg-center opacity-20 mix-blend-overlay" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+            {profile.banner_url ? (
+              <Image src={profile.banner_url} alt="Profile banner" fill className="object-cover" priority />
+            ) : (
+              <>
+                <div className="absolute inset-0 bg-gradient-to-br from-red-900/40 via-black/60 to-purple-900/30" />
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599735161-8f4b80604bb9?w=1920')] bg-cover bg-center opacity-20 mix-blend-overlay" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+              </>
+            )}
+            <label htmlFor="banner-upload" className="absolute top-3 right-12 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-black/60 transition-colors cursor-pointer focus-ring">
+              <Camera className="w-3.5 h-3.5" />
+              {profile.banner_url ? "Change Banner" : "Add Banner"}
+              <input id="banner-upload" type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} disabled={uploading} />
+            </label>
+            {profile.banner_url && (
+              <button type="button" onClick={async () => { await updateProfile({ banner_url: null }); toast({ title: "Banner removed" }); }} className="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-red-500/80 backdrop-blur-md border border-red-300/30 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 transition-colors focus-ring" aria-label="Remove banner">
+                <Trash2 className="w-3.5 h-3.5" /> Remove
+              </button>
+            )}
           </div>
 
           {/* Profile Info */}
@@ -349,6 +400,14 @@ const Profile = () => {
                 imageSrc={selectedImage}
                 onCropComplete={handleCropComplete}
                 aspect={1}
+              />
+
+              <ImageCropper
+                open={bannerCropperOpen}
+                onOpenChange={setBannerCropperOpen}
+                imageSrc={selectedBannerImage}
+                onCropComplete={handleBannerCropComplete}
+                aspect={3}
               />
 
               {/* Name & Actions */}
@@ -459,6 +518,19 @@ const Profile = () => {
                 </button>
               ))}
             </div>
+
+            {/* Achievement Badges */}
+            {badges.length > 0 && (
+              <div className="mt-6 flex flex-wrap gap-2 justify-center sm:justify-start">
+                {badges.map((b) => (
+                  <div key={b.label} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold backdrop-blur-sm ${b.color}`}>
+                    <b.icon className="w-3.5 h-3.5" />
+                    <span className="text-white">{b.label}</span>
+                    <span className="text-white/50">· {b.desc}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -557,7 +629,7 @@ const Profile = () => {
                         <span>Continue Watching</span>
                       </h3>
                       <div className="space-y-3 mb-6">
-                        {continueWatching.map((item, index) => {
+                        {continueWatching.map((item) => {
                           const progressPercentage = Math.round((item.progress_seconds / item.total_duration_seconds) * 100);
                           return (
                       <div
@@ -610,7 +682,7 @@ const Profile = () => {
                     <div>
                       <h3 className="text-lg font-semibold text-white mb-3">Recently Watched</h3>
                       <div className="space-y-3">
-                        {recentlyWatched.map((item, index) => (
+                        {recentlyWatched.map((item) => (
                           <div
                             key={item.id}
                             className="flex items-center space-x-4 bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"

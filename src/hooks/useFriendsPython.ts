@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfileContext } from "@/contexts/UserProfileContext";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
+import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { sendNotificationToUser } from "@/lib/notifications/createNotification";
 
 const POLL_MS = 25000;
@@ -113,7 +113,7 @@ export function usePythonFriends() {
       return;
     }
     void refresh();
-    if (useHttpTransport()) {
+    if (usesHttpTransport()) {
       const poll = setInterval(() => void refresh(), POLL_MS);
       return () => clearInterval(poll);
     }

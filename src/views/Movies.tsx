@@ -1,7 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import MovieCarousel from "@/components/MovieCarousel";
-import PageHero from "@/components/PageHero";
+import CatalogQuickFilters from "@/components/CatalogQuickFilters";
 import PageContainer from "@/components/PageContainer";
 import LazySection from "@/components/LazySection";
 import Reveal from "@/components/Reveal";
@@ -20,8 +21,10 @@ import {
   Sparkles,
   Compass,
   Wand2,
+  CalendarDays,
 } from "lucide-react";
 import { TMDBMovie } from "@/utils/tmdbApi";
+import { matchesCatalogFilters, releasedWithinDays, type CatalogFilters } from "@/lib/catalogFilters";
 
 const PRIORITY_KEYS = new Set(["trending", "nowPlaying", "topRated", "popular"]);
 
@@ -45,10 +48,29 @@ const SECTIONS = [
 
 const Movies = () => {
   const { data = {}, isLoading, isFetching, isError, refetch } = useMoviesCatalog();
+  const [filters, setFilters] = useState<CatalogFilters>({ yearRange: "all", genreId: null });
+  const filteredData = useMemo(
+    () => Object.fromEntries(
+      Object.entries(data).map(([key, movies]) => [
+        key,
+        (movies as TMDBMovie[]).filter((movie) => matchesCatalogFilters(movie, filters)),
+      ])
+    ) as Record<string, TMDBMovie[]>,
+    [data, filters]
+  );
+  const newThisWeek = useMemo(() => {
+    const unique = new Map<number, TMDBMovie>();
+    Object.values(data).flat().forEach((movie) => {
+      if (releasedWithinDays(movie, 7) && matchesCatalogFilters(movie, filters)) unique.set(movie.id, movie);
+    });
+    return [...unique.values()].sort((a, b) =>
+      (b.release_date || b.first_air_date || "").localeCompare(a.release_date || a.first_air_date || "")
+    );
+  }, [data, filters]);
   const loadedCount = Object.keys(data).length;
 
   const renderSection = (section: (typeof SECTIONS)[number], index: number) => {
-    const movies = (data as Record<string, TMDBMovie[]>)[section.key];
+    const movies = filteredData[section.key];
     return (
       <Reveal key={section.key} delay={Math.min(index, 6) * 60}>
         <MovieCarousel
@@ -85,7 +107,7 @@ const Movies = () => {
             <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-red-500 mb-1.5">
               {loadedCount > 0 ? `${loadedCount} curated collections` : "Loading…"}
             </span>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-[1.05]">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl 2xl:text-6xl 3xl:text-7xl 4xl:text-[8.5rem] font-black tracking-tight text-white leading-[1.05]">
               Movies
             </h1>
             <p className="text-gray-400 text-sm sm:text-base mt-2">
@@ -97,6 +119,29 @@ const Movies = () => {
 
       <PageContainer className="!pt-0">
         <div className="space-y-10">
+          <CatalogQuickFilters
+            filters={filters}
+            onChange={setFilters}
+            genres={[
+              { id: 28, label: "Action" },
+              { id: 12, label: "Adventure" },
+              { id: 16, label: "Animation" },
+              { id: 35, label: "Comedy" },
+              { id: 18, label: "Drama" },
+              { id: 27, label: "Horror" },
+              { id: 878, label: "Sci-Fi" },
+              { id: 53, label: "Thriller" },
+            ]}
+          />
+          <Reveal>
+            <MovieCarousel
+              title="New This Week"
+              movies={newThisWeek}
+              loading={isLoading || isFetching}
+              icon={<CalendarDays className="w-5 h-5 text-emerald-400" />}
+              priority
+            />
+          </Reveal>
           {prioritySections.map((section, index) => renderSection(section, index))}
 
           <LazySection minHeight={480} className="space-y-10">

@@ -4,7 +4,9 @@
  * Encrypted payload stored in Firestore — only room members can decrypt.
  */
 
-const ALGO: AesGcmParams = { name: "AES-GCM", iv: new Uint8Array(12) };
+const ROTATION_INTERVAL_MS = 60 * 60 * 1000;
+const ENCRYPTED_PAYLOAD_MAX_AGE_MS = ROTATION_INTERVAL_MS + 5 * 60 * 1000;
+const ROTATION_SKEW_MS = 5 * 60 * 1000;
 
 function bufToBase64(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -17,7 +19,7 @@ function base64ToBuf(b64: string): ArrayBuffer {
   return buf.buffer;
 }
 
-async function deriveKey(passphrase: string): Promise<CryptoKey> {
+async function deriveKey(passphrase: string, epoch: number, legacy = false): Promise<CryptoKey> {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
@@ -27,7 +29,12 @@ async function deriveKey(passphrase: string): Promise<CryptoKey> {
     ["deriveKey"]
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: enc.encode("flixverse-party"), iterations: 100000, hash: "SHA-256" },
+    {
+      name: "PBKDF2",
+      salt: enc.encode(legacy ? "flixverse-party" : `flixverse-party:${epoch}`),
+      iterations: 100000,
+      hash: "SHA-256",
+    },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,
@@ -44,13 +51,14 @@ export interface PartyPayload {
 }
 
 /**
- * Generate a random 6-character room key (URL-safe).
+ * Generate a URL-safe 120-bit root key. Six-character keys remain readable
+ * for old invite links, but new rooms use a high-entropy secret.
  */
 export function generateRoomKey(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let key = "";
-  const rand = crypto.getRandomValues(new Uint8Array(6));
-  for (let i = 0; i < 6; i++) key += chars[rand[i] % chars.length];
+  const rand = crypto.getRandomValues(new Uint8Array(24));
+  for (const byte of rand) key += chars[byte & 31];
   return key;
 }
 
@@ -60,9 +68,11 @@ export function generateRoomKey(): string {
  */
 export async function encryptPayload(
   payload: PartyPayload,
-  roomKey: string
+  roomKey: string,
+  issuedAtMs = Date.now()
 ): Promise<string> {
-  const key = await deriveKey(roomKey);
+  const epoch = Math.floor(issuedAtMs / ROTATION_INTERVAL_MS);
+  const key = await deriveKey(roomKey, epoch);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(JSON.stringify(payload));
 
@@ -77,7 +87,16 @@ export async function encryptPayload(
   combined.set(iv);
   combined.set(new Uint8Array(ciphertext), iv.length);
 
-  return bufToBase64(combined.buffer);
+  return `fv2:${epoch}:${issuedAtMs}:${bufToBase64(combined.buffer)}`;
+}
+
+export function isRoomEncryptionRotationDue(
+  encryptedPayload: string,
+  now = Date.now()
+): boolean {
+  const match = encryptedPayload.match(/^fv2:(\d+):(\d+):/);
+  if (!match) return true;
+  return Number(match[1]) < Math.floor(now / ROTATION_INTERVAL_MS);
 }
 
 /**
@@ -88,8 +107,24 @@ export async function decryptPayload(
   roomKey: string
 ): Promise<PartyPayload | null> {
   try {
-    const key = await deriveKey(roomKey);
-    const combined = new Uint8Array(base64ToBuf(encryptedBase64));
+    const match = encryptedBase64.match(/^fv2:(\d+):(\d+):(.+)$/);
+    const isLegacy = !match;
+    const epoch = isLegacy ? 0 : Number(match[1]);
+    const issuedAt = isLegacy ? 0 : Number(match[2]);
+    if (!isLegacy) {
+      const age = Date.now() - issuedAt;
+      if (
+        !Number.isSafeInteger(epoch) ||
+        !Number.isSafeInteger(issuedAt) ||
+        age < -ROTATION_SKEW_MS ||
+        age > ENCRYPTED_PAYLOAD_MAX_AGE_MS
+      ) {
+        return null;
+      }
+    }
+
+    const key = await deriveKey(roomKey, epoch, isLegacy);
+    const combined = new Uint8Array(base64ToBuf(isLegacy ? encryptedBase64 : match[3]));
 
     const iv = combined.slice(0, 12);
     const ciphertext = combined.slice(12);
@@ -122,7 +157,7 @@ export function buildPartyJoinUrl(roomId: string, roomKey: string): string {
 export function extractRoomKeyFromHash(): string | null {
   if (typeof window === "undefined") return null;
   const hash = window.location.hash;
-  const match = hash.match(/#key=([A-Z0-9]{6})/);
+  const match = hash.match(/#key=([A-Z0-9]{6}|[A-Z0-9]{24})/);
   return match?.[1] ?? null;
 }
 
@@ -165,7 +200,11 @@ export async function fetchPartyRoomMeta(
   roomId: string
 ): Promise<{ contentMeta: PartyContentMeta | null; encryptedPayload: string | null }> {
   try {
-    const res = await fetch(`/api/party/room?id=${encodeURIComponent(roomId)}`);
+    // Bounded: the join page/overlay would otherwise hang on this fetch
+    // forever with no error state when the API stalls.
+    const res = await fetch(`/api/party/room?id=${encodeURIComponent(roomId)}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok) return { contentMeta: null, encryptedPayload: null };
     const data = (await res.json()) as {
       contentMeta?: PartyContentMeta | null;

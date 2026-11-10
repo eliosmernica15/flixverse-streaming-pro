@@ -1,0 +1,89 @@
+/* =====================================================================
+ * DEPTH PARALLAX LAYERS
+ *
+ * `useDepthParallax` writes three custom properties on a host element:
+ *
+ *   --depth-x     pointer offset, -1..1
+ *   --depth-y     pointer offset, -1..1
+ *   --depth-mag   distance from centre, 0..1
+ *   --depth-px    maximum displacement in px (the hook's `strength`)
+ *
+ * Each layer declares its own multiplier. Near layers move further, far
+ * layers barely at all, and the copy sits between them - which is the whole
+ * trick that turns a flat composite into a space with depth.
+ *
+ * Everything here is transform-only, so it composites on the GPU and never
+ * triggers layout or paint. When the hook is inactive (touch, reduced motion,
+ * off-screen) the properties are absent and every layer falls back to 0,
+ * leaving a perfectly ordinary static layout.
+ * ===================================================================== */
+
+.hero-depth {
+  perspective: 1400px;
+  perspective-origin: 50% 45%;
+}
+
+/* Far plane: the artwork itself. Barely moves - it is the space. */
+.hero-depth-backdrop {
+  transform: translate3d(
+    calc(var(--depth-x, 0) * var(--depth-px, 0px) * -0.22),
+    calc(var(--depth-y, 0) * var(--depth-px, 0px) * -0.14),
+    0
+  );
+  transition: transform 120ms linear;
+  /* A slight push-in as the pointer approaches the centre reads as the
+     camera leaning into the scene rather than the image sliding. */
+  scale: calc(1 + var(--depth-mag, 0) * 0.012);
+}
+
+/* Near plane: the typography and CTAs. The largest displacement, and the
+   only layer that gets a subtle shadow shift with the light. */
+.hero-depth-content {
+  transform: translate3d(
+    calc(var(--depth-x, 0) * var(--depth-px, 0px) * 0.42),
+    calc(var(--depth-y, 0) * var(--depth-px, 0px) * 0.24),
+    0
+  );
+  transition: transform 110ms linear;
+}
+
+/* The atmospheric colour blobs sit behind the copy but in front of the
+   artwork, so they read as haze between the two planes. */
+.hero-depth .blur-3xl {
+  translate:
+    calc(var(--depth-x, 0) * var(--depth-px, 0px) * 0.6)
+    calc(var(--depth-y, 0) * var(--depth-px, 0px) * 0.4);
+  transition: translate 180ms ease-out, background-color 1000ms ease-out;
+  opacity: calc(1 - var(--depth-mag, 0) * 0.12);
+}
+
+/* While the pointer is moving the scene is "live": lift the vignette a
+   touch so the extra depth is visible instead of being crushed to black. */
+.hero-depth::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(
+    120% 90% at calc(50% + var(--depth-x, 0) * 14%) calc(46% + var(--depth-y, 0) * 10%),
+    transparent 46%,
+    rgba(0, 0, 0, 0.34) 100%
+  );
+  opacity: calc(1 - var(--depth-mag, 0) * 0.4);
+  transition: opacity 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .hero-depth-backdrop,
+  .hero-depth-content,
+  .hero-depth .blur-3xl {
+    transform: none;
+    translate: none;
+    scale: none;
+    transition: none;
+  }
+  .hero-depth::after {
+    opacity: 1;
+  }
+}

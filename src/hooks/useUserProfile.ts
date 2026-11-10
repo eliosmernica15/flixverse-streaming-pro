@@ -149,5 +149,6 @@ function useFirestoreUserProfile() {
 }
 
 export const useUserProfile = () => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session
   return isPythonBackendEnabled() ? usePythonUserProfile() : useFirestoreUserProfile();
 };

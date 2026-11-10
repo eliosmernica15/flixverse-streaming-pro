@@ -45,6 +45,33 @@ async function fetchTmdbTitle(
   }
 }
 
+/** Resolve the IMDb id for a TMDB title (needed by yifysubtitles, which keys off IMDb ids). */
+async function fetchImdbId(
+  tmdbId: number,
+  mediaType: "movie" | "tv"
+): Promise<string | null> {
+  if (!hasServerTmdbCredentials()) return null;
+
+  const auth = getServerTmdbAuth();
+  let url = `${TMDB_BASE}/${mediaType}/${tmdbId}/external_ids`;
+  if (auth.queryApiKey) url += `?api_key=${encodeURIComponent(auth.queryApiKey)}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: auth.headers,
+      next: { revalidate: 86400 },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const imdbId = typeof data?.imdb_id === "string" ? data.imdb_id : null;
+    // IMDb ids look like "tt1234567"
+    return imdbId && /^tt\d+$/.test(imdbId) ? imdbId : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Try free subtitle aggregators in priority order. */
 async function fetchExternalSubtitles(
   tmdbId: number,
@@ -63,10 +90,16 @@ async function fetchExternalSubtitles(
     params.set("episode", String(episode));
   }
 
-  const endpoints = [
-    `https://sub.wyzie.ru/search?${params}`,
-    `https://subs.yifysubtitles.ch/api/v1/subtitles?imdb=${tmdbId}&lang=${lang}`,
-  ];
+  const endpoints = [`https://sub.wyzie.ru/search?${params}`];
+  // yifysubtitles only supports movies keyed by IMDb id — resolve via TMDB first
+  if (mediaType === "movie") {
+    const imdbId = await fetchImdbId(tmdbId, mediaType);
+    if (imdbId) {
+      endpoints.push(
+        `https://subs.yifysubtitles.ch/api/v1/subtitles?imdb=${imdbId}&lang=${lang}`
+      );
+    }
+  }
 
   for (const endpoint of endpoints) {
     try {
@@ -143,11 +176,22 @@ export async function GET(request: NextRequest) {
   const duration = parseFloat(searchParams.get("duration") || "7200");
   const format = (searchParams.get("format") || "json").toLowerCase();
 
-  if (!tmdbId) {
-    return NextResponse.json({ error: "tmdbId required" }, { status: 400 });
+  if (
+    !Number.isInteger(tmdbId) ||
+    tmdbId < 1 ||
+    !["movie", "tv"].includes(mediaType) ||
+    (season !== undefined && (!Number.isInteger(season) || season < 1 || season > 100)) ||
+    (episode !== undefined && (!Number.isInteger(episode) || episode < 1 || episode > 1000)) ||
+    !/^[a-z]{2}(?:-[A-Z]{2})?$/.test(lang) ||
+    !Number.isFinite(duration) ||
+    duration <= 0 ||
+    duration > 24 * 60 * 60 ||
+    !["json", "vtt"].includes(format)
+  ) {
+    return NextResponse.json({ error: "Invalid caption request" }, { status: 400 });
   }
 
-  let rawSrt = await fetchExternalSubtitles(tmdbId, mediaType, season, episode, lang);
+  const rawSrt = await fetchExternalSubtitles(tmdbId, mediaType, season, episode, lang);
   let source: "external" | "fallback" = "external";
 
   if (!rawSrt) {
@@ -194,7 +238,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { cues, source, lang },
+    { cues: finalCues, source, lang },
     { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } }
   );
 }

@@ -8,8 +8,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import MovieCard from "@/components/MovieCard";
 import SectionHeader from "@/components/SectionHeader";
-import Reveal from "@/components/Reveal";
-import { searchMultiWithPagination, getContentImage, TMDBMovie } from "@/utils/tmdbApi";
+import Stagger from "@/components/Stagger";
+import { searchMultiWithPagination, getContentImage, TMDBMovie, searchCollectionsWithPagination, TMDBCollection } from "@/utils/tmdbApi";
 import { Search, Clock, X, User } from "lucide-react";
 import { SearchFilters, SearchFilterState } from "@/components/SearchFilters";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -38,12 +38,13 @@ const SearchResults = () => {
   const query = searchParams.get("q")?.trim() ?? "";
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<SearchFilterState>({
-    mediaType: "all",
-    year: "",
-    sort: "relevance",
+    mediaType: (searchParams.get("media") as SearchFilterState["mediaType"]) || "all",
+    year: searchParams.get("year") || "",
+    sort: (searchParams.get("sort") as SearchFilterState["sort"]) || "relevance",
   });
   const [allResults, setAllResults] = useState<TMDBMovie[]>([]);
   const [allPeople, setAllPeople] = useState<SearchResultItem[]>([]);
+  const [allCollections, setAllCollections] = useState<TMDBCollection[]>([]);
 
   const [recent, setRecent] = useState<string[]>([]);
 
@@ -82,7 +83,16 @@ const SearchResults = () => {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["search", query, page],
     queryFn: () => searchMultiWithPagination(query, page),
-    enabled: query.length > 0,
+    enabled: query.length > 0 && filters.mediaType !== "collections",
+    staleTime: 2 * 60 * 1000,
+    placeholderData: (previous) => previous,
+  });
+
+  // Fetch collections when collections tab is active
+  const { data: collectionsData, isLoading: collectionsLoading, isFetching: collectionsFetching } = useQuery({
+    queryKey: ["search-collections", query, page],
+    queryFn: () => searchCollectionsWithPagination(query, page),
+    enabled: query.length > 0 && filters.mediaType === "collections",
     staleTime: 2 * 60 * 1000,
     placeholderData: (previous) => previous,
   });
@@ -105,13 +115,28 @@ const SearchResults = () => {
     }
   }, [data, page]);
 
-  const totalPages = data?.total_pages ?? 1;
-  const loading = isLoading || isFetching;
+  // Merge collections results for infinite scroll
+  useEffect(() => {
+    if (!collectionsData?.results) return;
+    const collections = collectionsData.results as TMDBCollection[];
+
+    if (page === 1) {
+      setAllCollections(collections);
+    } else {
+      setAllCollections((prev) => [...prev, ...collections]);
+    }
+  }, [collectionsData, page]);
+
+  // Determine which data source to use based on active filter
+  const isCollectionsTab = filters.mediaType === "collections";
+  const totalPages = isCollectionsTab ? (collectionsData?.total_pages ?? 1) : (data?.total_pages ?? 1);
+  const loading = isCollectionsTab ? (collectionsLoading || collectionsFetching) : (isLoading || isFetching);
   const hasMore = page < totalPages;
 
   // Apply client-side filters
   const filteredResults = allResults.filter((item) => {
     if (filters.mediaType === "person") return false;
+    if (filters.mediaType === "collections") return false;
     if (filters.mediaType === "movie" && item.media_type !== "movie") return false;
     if (filters.mediaType === "tv" && item.media_type !== "tv") return false;
     if (filters.year) {
@@ -121,9 +146,11 @@ const SearchResults = () => {
     return true;
   });
 
-  const filteredPeople = filters.mediaType === "all" || filters.mediaType === "person"
+  const filteredPeople = (filters.mediaType === "all" || filters.mediaType === "person") && !isCollectionsTab
     ? allPeople
     : [];
+
+  const filteredCollections = isCollectionsTab ? allCollections : [];
 
   // Sort
   const sortedResults = [...filteredResults].sort((a, b) => {
@@ -151,9 +178,10 @@ const SearchResults = () => {
 
   useEffect(() => {
     if (query && !loading) {
-      trackSearch(query, sortedResults.length + filteredPeople.length);
+      const collectionsCount = isCollectionsTab ? filteredCollections.length : 0;
+      trackSearch(query, sortedResults.length + filteredPeople.length + collectionsCount);
     }
-  }, [query, loading, sortedResults.length, filteredPeople.length]);
+  }, [query, loading, sortedResults.length, filteredPeople.length, filteredCollections.length, isCollectionsTab]);
 
   const { sentinelRef } = useInfiniteScroll({
     enabled: query.length > 0,
@@ -164,6 +192,16 @@ const SearchResults = () => {
 
   const handleFiltersChange = (newFilters: SearchFilterState) => {
     setFilters(newFilters);
+    // Sync filters to URL for shareable/deep-linkable results
+    const url = new URL(window.location.href);
+    url.searchParams.set("q", query);
+    if (newFilters.mediaType !== "all") url.searchParams.set("media", newFilters.mediaType);
+    else url.searchParams.delete("media");
+    if (newFilters.year) url.searchParams.set("year", newFilters.year);
+    else url.searchParams.delete("year");
+    if (newFilters.sort !== "relevance") url.searchParams.set("sort", newFilters.sort);
+    else url.searchParams.delete("sort");
+    router.replace(url.toString(), { scroll: false });
   };
 
   return (
@@ -262,13 +300,13 @@ const SearchResults = () => {
             <p className="text-gray-300 text-sm">{t("findFavorite")}</p>
             <p className="text-gray-500 text-xs mt-2">Try a movie title, actor, or director.</p>
           </div>
-        ) : loading && allResults.length === 0 ? (
+        ) : loading && allResults.length === 0 && filteredCollections.length === 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
             {Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className="aspect-[2/3] rounded-md skeleton-shimmer" />
             ))}
           </div>
-        ) : sortedResults.length === 0 && filteredPeople.length === 0 && !loading ? (
+        ) : sortedResults.length === 0 && filteredPeople.length === 0 && filteredCollections.length === 0 && !loading ? (
           <div className="glass-soft rounded-2xl py-16 px-8 text-center max-w-md mx-auto">
             <Search className="w-10 h-10 text-gray-500 mx-auto mb-4" />
             <p className="text-gray-300 text-sm">{t("noResults")}</p>
@@ -279,16 +317,22 @@ const SearchResults = () => {
             <SearchFilters
               filters={filters}
               onChange={handleFiltersChange}
-              resultCount={sortedResults.length + filteredPeople.length}
+              resultCount={
+                isCollectionsTab
+                  ? filteredCollections.length
+                  : sortedResults.length + filteredPeople.length
+              }
             />
 
             {sortedResults.length > 0 && (
               <section className="mb-12 content-auto">
                 <SectionHeader title={t("moviesAndTv")} eyebrow={`${sortedResults.length} titles`} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3">
-                  {sortedResults.map((item) => (
-                    <MovieCard key={`${item.id}-${item.media_type}`} movie={item} />
-                  ))}
+                  <Stagger>
+                    {sortedResults.map((item) => (
+                      <MovieCard key={`${item.id}-${item.media_type}`} movie={item} />
+                    ))}
+                  </Stagger>
                 </div>
               </section>
             )}
@@ -297,6 +341,7 @@ const SearchResults = () => {
               <section className="mb-12 content-auto">
                 <SectionHeader title={t("people")} eyebrow={`${filteredPeople.length} people`} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 mt-3">
+                  <Stagger>
                   {filteredPeople.map((person) => {
                     const profileImg = person.profile_path
                       ? getContentImage(person, "profile", "medium")
@@ -326,11 +371,60 @@ const SearchResults = () => {
                           {person.name}
                         </span>
                         {person.known_for_department && (
-                          <span className="text-[11px] text-gray-400 mt-0.5">{person.known_for_department}</span>
+                          <span className="mt-1.5 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-300">
+                            {person.known_for_department}
+                          </span>
                         )}
                       </Link>
                     );
                   })}
+                  </Stagger>
+                </div>
+              </section>
+            )}
+
+            {/* Collections */}
+            {isCollectionsTab && filteredCollections.length > 0 && (
+              <section className="mb-12 content-auto">
+                <SectionHeader title={t("collections")} eyebrow={`${filteredCollections.length} collections`} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 mt-3">
+                  <Stagger>
+                    {filteredCollections.map((collection) => (
+                      <Link
+                        key={`collection-${collection.id}`}
+                        href={`/collection/${collection.id}`}
+                        className="group flex flex-col aspect-[2/3] rounded-xl border border-white/8 bg-white/3 overflow-hidden hover:bg-white/5 hover:border-white/15 transition-all hover:-translate-y-0.5 focus-ring"
+                      >
+                        <div className="relative w-full h-full overflow-hidden">
+                          {collection.poster_path ? (
+                            <Image
+                              src={getContentImage(collection, "poster", "medium")}
+                              alt={collection.name ?? "Collection"}
+                              fill
+                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 16vw"
+                              className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-red-500/20 to-purple-500/20" />
+                          )}
+                          {/* Part count badge */}
+                          <div className="absolute bottom-2 right-2 rounded-full bg-black/80 backdrop-blur px-2 py-0.5 text-xs font-medium text-white">
+                            {collection.part_count} {collection.part_count === 1 ? "title" : "titles"}
+                          </div>
+                        </div>
+                        <div className="p-3 flex-1 flex flex-col justify-between min-h-[60px]">
+                          <span className="text-sm font-semibold text-white line-clamp-2 group-hover:text-red-400 transition-colors">
+                            {collection.name}
+                          </span>
+                          {collection.overview && (
+                            <p className="mt-1 text-xs text-gray-400 line-clamp-2">
+                              {collection.overview}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </Stagger>
                 </div>
               </section>
             )}
@@ -339,13 +433,13 @@ const SearchResults = () => {
             <div ref={sentinelRef} className="h-4" />
 
             {/* Loading more indicator */}
-            {loading && allResults.length > 0 && (
+            {loading && (allResults.length > 0 || filteredCollections.length > 0) && (
               <div className="flex justify-center py-8">
                 <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
               </div>
             )}
 
-            {!hasMore && allResults.length > 0 && (
+            {!hasMore && (allResults.length > 0 || filteredCollections.length > 0) && (
               <p className="text-center text-gray-500 text-xs py-8 uppercase tracking-wider">
                 You&apos;ve reached the end of results
               </p>

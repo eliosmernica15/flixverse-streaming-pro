@@ -4,8 +4,8 @@ import { getServerTmdbAuth } from '@/lib/tmdb/serverCredentials';
 /** Browser traffic goes through /api/tmdb so keys stay off the client bundle. */
 const TMDB_BASE_URL =
   typeof window !== "undefined" ? "/api/tmdb" : "https://api.themoviedb.org/3";
-const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
-const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces';
+export const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
+export const TMDB_BACKDROP_BASE_URL = 'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces';
 
 // TMDB image base URL - only use officially supported sizes to avoid 404s
 // Supported poster sizes: w92, w154, w185, w342, w500, w780, original
@@ -43,6 +43,7 @@ export interface TMDBMovie {
   poster_path: string;
   backdrop_path: string;
   vote_average: number;
+  original_language?: string;
   release_date?: string;
   first_air_date?: string;
   genre_ids: number[];
@@ -236,6 +237,9 @@ const apiCall = async (url: string, retries: number = 2): Promise<any> => {
         if (!response.ok) {
           if (response.status === 404) {
             return { results: [], success: false, status_code: 404 };
+          }
+          if (response.status === 401 || response.status === 403) {
+            return { results: [], success: false, status_code: response.status };
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -626,6 +630,57 @@ export const discoverTVShowsByGenre = async (genreId: number, page: number = 1):
 export const searchMovies = async (query: string, page: number = 1): Promise<TMDBMovie[]> => {
   const data = await apiCall(`${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}&page=${page}`);
   return data.results || [];
+};
+
+// Collection search
+export interface TMDBCollection {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string;
+  backdrop_path: string;
+  parts: TMDBMovie[];
+  part_count: number;
+}
+
+export interface SearchCollectionResponse {
+  results: TMDBCollection[];
+  page: number;
+  total_pages: number;
+  total_results: number;
+}
+
+export const searchCollections = async (query: string, page: number = 1): Promise<TMDBCollection[]> => {
+  const data = await apiCall(`${TMDB_BASE_URL}/search/collection?query=${encodeURIComponent(query)}&page=${page}`);
+  return data.results || [];
+};
+
+export const searchCollectionsWithPagination = async (
+  query: string,
+  page: number = 1
+): Promise<SearchCollectionResponse> => {
+  const data = await apiCall(
+    `${TMDB_BASE_URL}/search/collection?query=${encodeURIComponent(query)}&page=${page}`
+  );
+  return {
+    results: data.results || [],
+    page: data.page ?? 1,
+    total_pages: Math.min(data.total_pages ?? 1, 500),
+    total_results: data.total_results ?? 0,
+  };
+};
+
+// Collection details
+export const fetchCollectionDetails = async (collectionId: number): Promise<TMDBCollection | null> => {
+  const data = await apiCall(`${TMDB_BASE_URL}/collection/${collectionId}`);
+  if (data.success && data.id) {
+    return {
+      ...data,
+      parts: data.parts || [],
+      part_count: data.part_count || data.parts?.length || 0,
+    };
+  }
+  return null;
 };
 
 export const searchTVShows = async (query: string, page: number = 1): Promise<TMDBMovie[]> => {

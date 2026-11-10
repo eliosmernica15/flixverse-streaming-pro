@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { pythonFetch } from "@/lib/pythonApi/client";
-import { isPythonBackendEnabled, useHttpTransport } from "@/lib/pythonApi/config";
+import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { Comment } from "@/integrations/firebase/types";
 
 const POLL_MS = 25000;
@@ -36,7 +36,7 @@ export function usePythonComments(contentId?: number, contentType?: "movie" | "t
       return;
     }
     void refresh();
-    if (useHttpTransport()) {
+    if (usesHttpTransport()) {
       const poll = setInterval(() => void refresh(), POLL_MS);
       return () => clearInterval(poll);
     }

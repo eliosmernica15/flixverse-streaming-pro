@@ -79,7 +79,7 @@ function useFirestoreReviews(contentId?: number, contentType?: 'movie' | 'tv') {
     });
 
     return () => unsubscribe();
-  }, [contentId, contentType, user]);
+  }, [contentId, contentType, toast, user]);
 
   useEffect(() => {
     if (!user || !isAuthenticated || reviews.length === 0) {
@@ -293,7 +293,9 @@ function useFirestoreReviews(contentId?: number, contentType?: 'movie' | 'tv') {
 }
 
 export const useReviews = (contentId?: number, contentType?: 'movie' | 'tv') => {
+  /* eslint-disable react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session */
   return isPythonBackendEnabled()
     ? usePythonReviews(contentId, contentType)
     : useFirestoreReviews(contentId, contentType);
+  /* eslint-enable react-hooks/rules-of-hooks */
 };

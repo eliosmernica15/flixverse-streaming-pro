@@ -13,16 +13,18 @@ function isEditableTarget(target: EventTarget | null) {
 export function useGlobalShortcuts() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
-        return;
-      }
+      // Ctrl/Cmd+K is deliberately absent here: CommandPalette owns that
+      // accelerator so it can *toggle*. Handling it in both places made one
+      // keypress dispatch an open and then toggle the same state back, so the
+      // palette never appeared.
 
       if (event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey) {
         if (isEditableTarget(event.target)) return;
         event.preventDefault();
+        // Announce to assistive tech that search is open.
         window.dispatchEvent(new CustomEvent(FOCUS_SEARCH_EVENT));
+        const live = document.querySelector('[aria-live="polite"]');
+        if (live) (live as HTMLElement).textContent = "Search field focused";
         return;
       }
 

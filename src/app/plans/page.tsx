@@ -4,11 +4,21 @@ import PlansPricing from "@/components/PlansPricing";
 import { PlansCheckoutSuccess } from "@/components/PlansCheckoutSuccess";
 import { PlansCheckoutCanceled } from "@/components/PlansCheckoutCanceled";
 import { Sparkles, Check, Shield } from "lucide-react";
+import { buildPageMetadata, SITE_URL } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Plans — FlixVerse",
-  description: "Choose the FlixVerse plan that works for you.",
-};
+export const metadata = buildPageMetadata({
+  title: "Plans & Pricing — Choose Your FlixVerse Plan",
+  description: "Choose the FlixVerse plan that works for you. Start free, upgrade for premium features. Secure billing, cancel anytime.",
+  path: "/plans",
+  keywords: [
+    "FlixVerse plans",
+    "streaming subscription",
+    "premium movies",
+    "HD streaming",
+    "watch free movies",
+    "cancel anytime",
+  ],
+});
 
 const TRUST = [
   { icon: Check, label: "Cancel anytime" },

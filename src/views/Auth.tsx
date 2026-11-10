@@ -7,7 +7,9 @@ import {
   onAuthStateChanged,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { getFirebaseAuth, requireFirebaseDb } from '@/integrations/firebase/client';
@@ -29,8 +31,11 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [passwordless, setPasswordless] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+
+  const [magicEmail, setMagicEmail] = useState('');
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -41,6 +46,12 @@ const Auth = () => {
         router.push('/');
       }
     });
+
+    // Arriving from a magic link: hand off to the dedicated completion route.
+    if (typeof window !== 'undefined' && isSignInWithEmailLink(auth, window.location.href)) {
+      router.replace(`/auth/email-link${window.location.search}${window.location.hash}`);
+    }
+
     return () => unsubscribe();
   }, [router]);
 
@@ -132,6 +143,44 @@ const Auth = () => {
       toast({
         title: "Sign in failed",
         description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    }
+    setLoading(false);
+  };
+
+  const sendMagicLink = async () => {
+    const trimmedEmail = magicEmail.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      toast({
+        title: "Error",
+        description: "Enter a valid email to receive your sign-in link",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const auth = getFirebaseAuth();
+      if (!auth) throw new Error("Firebase is not configured");
+
+      const url = `${window.location.origin}/auth/email-link`;
+      await sendSignInLinkToEmail(auth, trimmedEmail, {
+        url,
+        handleCodeInApp: true,
+      });
+      // Persist the email so the completion page can prefill it
+      window.localStorage.setItem('flixverse-emailForSignIn', trimmedEmail);
+      toast({
+        title: "Check your inbox",
+        description: `We sent a sign-in link to ${trimmedEmail}. It expires in one hour.`,
+      });
+      setMagicEmail('');
+    } catch (error: unknown) {
+      toast({
+        title: "Couldn't send link",
+        description: error instanceof Error ? error.message : "Try again in a moment",
         variant: "destructive",
       });
     }
@@ -292,6 +341,46 @@ const Auth = () => {
                 </TabsList>
 
                 <TabsContent value="signin" className="space-y-4 mt-0">
+                    {passwordless ? (
+                      <form
+                        className="space-y-4"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          void sendMagicLink();
+                        }}
+                      >
+                        <div className="space-y-1.5">
+                          <Label htmlFor="magic-email" className="text-gray-300 text-xs font-semibold flex items-center space-x-1.5">
+                            <Mail className="w-3.5 h-3.5" />
+                            <span>Email</span>
+                          </Label>
+                          <Input
+                            id="magic-email"
+                            type="email"
+                            placeholder="you@example.com"
+                            value={magicEmail}
+                            onChange={(e) => setMagicEmail(e.target.value)}
+                            className="bg-black/40 border-white/10 text-white placeholder-gray-500 h-12 rounded-md focus:border-red-500/60 focus:ring-red-500/20 transition-all duration-200 focus-ring"
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          variant="gradient"
+                          loading={loading}
+                          className="w-full h-12 text-white font-bold text-base rounded-md bg-red-600 hover:bg-red-500 shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-200 btn-shine mt-2"
+                        >
+                          Send sign-in link
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => setPasswordless(false)}
+                          className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors focus-ring rounded py-1"
+                        >
+                          Use password instead
+                        </button>
+                      </form>
+                    ) : (
                     <form
                       className="space-y-4"
                       onSubmit={(e) => {
@@ -384,7 +473,16 @@ const Auth = () => {
                         </svg>
                         <span>Continue with Google</span>
                       </Button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPasswordless(true)}
+                        className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors focus-ring rounded py-1"
+                      >
+                        Email me a sign-in link instead
+                      </button>
                     </form>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="signup" className="space-y-4 mt-0">

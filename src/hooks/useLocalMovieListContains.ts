@@ -7,15 +7,26 @@ import { useSyncExternalStore } from "react";
  * the given id is in it. Avoids per-card `useState` + `useEffect` churn
  * that runs on every MovieCard mount.
  */
+let cachedRaw: string | null | undefined;
+let cachedList: number[] = [];
+
 function getSnapshot(listKey: string): number[] {
   if (typeof window === "undefined") return EMPTY_LIST;
   try {
     const raw = localStorage.getItem(listKey);
-    if (!raw) return EMPTY_LIST;
+    if (raw === cachedRaw) return cachedList;
+    cachedRaw = raw;
+    if (!raw) {
+      cachedList = EMPTY_LIST;
+      return cachedList;
+    }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : EMPTY_LIST;
+    cachedList = Array.isArray(parsed) ? parsed : EMPTY_LIST;
+    return cachedList;
   } catch {
-    return EMPTY_LIST;
+    cachedRaw = null;
+    cachedList = EMPTY_LIST;
+    return cachedList;
   }
 }
 
@@ -29,7 +40,10 @@ const LIST_KEY = "myMovieList";
 function subscribe(cb: () => void): () => void {
   if (typeof window === "undefined") return () => undefined;
   const onStorage = (e: StorageEvent) => {
-    if (e.key === LIST_KEY) cb();
+    if (e.key === LIST_KEY) {
+      cachedRaw = undefined;
+      cb();
+    }
   };
   window.addEventListener("storage", onStorage);
   return () => window.removeEventListener("storage", onStorage);

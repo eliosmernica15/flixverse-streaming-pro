@@ -1,13 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   collection,
   query,
   where,
   orderBy,
   onSnapshot,
-  addDoc,
-  deleteDoc,
-  doc,
   getDocs
 } from 'firebase/firestore';
 import { getFirebaseDb, requireFirebaseDb } from '@/integrations/firebase/client';
@@ -146,11 +143,9 @@ function useFirestoreUserMovieList() {
     setOperatingMovies(prev => new Set(prev).add(movieId));
 
     const originalList = [...movieList];
-    const itemToRemove = movieList.find(item => item.movie_id === movieId);
     setMovieList(prev => prev.filter(item => item.movie_id !== movieId));
 
     try {
-      const mediaType = itemToRemove?.media_type ?? 'movie';
       await MutationDispatcher.dispatch('REMOVE_WATCHLIST', {
         userId: user.uid,
         movieId,
@@ -190,5 +185,6 @@ function useFirestoreUserMovieList() {
 
 /** Public facade — Python first on Vercel, Firestore otherwise. */
 export const useUserMovieList = () => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- transport dispatch: environment-constant per origin, exactly one backend hook ever runs per session
   return isPythonBackendEnabled() ? usePythonUserMovieList() : useFirestoreUserMovieList();
 };
