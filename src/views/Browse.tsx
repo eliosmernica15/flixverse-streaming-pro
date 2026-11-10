@@ -95,7 +95,7 @@ const Browse = () => {
   }, [filteredMovies, sort]);
 
   const languages = useMemo(
-    () => [...new Set(movies.map((movie) => movie.original_language).filter(Boolean))]
+    () => [...new Set(movies.map((movie) => movie.original_language).filter((lang): lang is string => Boolean(lang)))]
       .sort((a, b) => a.localeCompare(b)),
     [movies]
   );

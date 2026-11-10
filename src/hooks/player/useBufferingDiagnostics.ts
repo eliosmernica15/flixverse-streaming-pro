@@ -80,9 +80,9 @@ export function useBufferingDiagnostics(): BufferingDiagnostics {
       try {
         const battery = await nav.getBattery?.();
         if (battery) {
-          setState((prev) => ({ ...prev, isBatterySaving: battery.savingPower }));
+          setState((prev) => ({ ...prev, isBatterySaving: (battery.savingPower ?? false) }));
           battery.addEventListener("chargingchange", () => {
-            setState((prev) => ({ ...prev, isBatterySaving: battery.savingPower }));
+            setState((prev) => ({ ...prev, isBatterySaving: (battery.savingPower ?? false) }));
           });
         }
       } catch {

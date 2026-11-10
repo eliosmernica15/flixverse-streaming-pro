@@ -48,7 +48,7 @@ interface UseEmbedBridgeProps {
 }
 
 /** Throttle function to limit call frequency */
-function throttle<T extends (...args: unknown[]) => void>(
+function throttle<T extends (...args: any[]) => any>(
   fn: T,
   delay: number
 ): T & { cancel: () => void } {
@@ -88,7 +88,7 @@ function throttle<T extends (...args: unknown[]) => void>(
 }
 
 /** Debounce function to delay calls until after quiet period */
-function debounce<T extends (...args: unknown[]) => void>(
+function debounce<T extends (...args: any[]) => any>(
   fn: T,
   delay: number
 ): T & { cancel: () => void; flush: () => void } {

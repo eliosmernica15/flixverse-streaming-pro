@@ -146,12 +146,12 @@ const MyList = () => {
           id: item.content_id,
           title: item.content_type === "movie" ? item.content_title : undefined,
           name: item.content_type === "tv" ? item.content_title : undefined,
-          poster_path: item.content_poster_path,
+          poster_path: item.content_poster_path ?? "",
           backdrop_path: "",
           overview: "",
           vote_average: 0,
           genre_ids: [],
-          media_type: item.content_type,
+          media_type: item.content_type ?? undefined,
         };
         await addToList(movie);
       }
