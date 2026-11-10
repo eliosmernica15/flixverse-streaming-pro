@@ -100,15 +100,26 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Start Firebase Emulators
-        uses: firebase/emulator-setup@v1
-        with:
-          firestore: "8080"
-          auth: "9099"
+        # The hosted firebase/emulator-setup action was removed. Run the
+        # emulators manually with firebase-tools from devDependencies.
+        run: |
+          npx firebase emulators:start --only firestore,auth --project demo-flixverse --non-interactive > /tmp/firebase-emulator.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8080 > /dev/null && curl -sf http://127.0.0.1:9099 > /dev/null; then
+              echo "Emulators are running"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Emulators failed to start; log follows"
+          cat /tmp/firebase-emulator.log
+          exit 1
 
       - name: Verify Emulators Running
+        # The start step already waits for the emulators; this just double-checks.
         run: |
-          curl -f http://127.0.0.1:8080 || exit 1
-          curl -f http://127.0.0.1:9099 || exit 1
+          curl -f http://127.0.0.1:8080 > /dev/null || exit 1
+          curl -f http://127.0.0.1:9099 > /dev/null || exit 1
           echo "Emulators are running"
 
       - name: Create test users and party in emulators
