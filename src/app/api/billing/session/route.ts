@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { syncSubscriptionToFirestore, type BillingPlan } from "@/lib/billing/subscriptionSync";
-import { verifyAuthHeader } from "@/lib/firebase/verifyAuth";
+import { getSubscriptionPeriodEndMs } from "@/lib/billing/stripeDahlia";
+import { callPythonJson } from "@/app/api/_lib/pythonOrigin";
+import { rateLimitByIp, rateLimitResponse } from "@/lib/rateLimitServer";
 
 export const runtime = "nodejs";
 
@@ -12,8 +14,17 @@ function getStripe() {
   return new Stripe(stripeSecret, { apiVersion: "2026-06-24.dahlia" });
 }
 
+interface IdentityResponse {
+  uid: string;
+  email: string | null;
+  name: string | null;
+}
+
 /** Verify a completed Stripe Checkout session and return plan details. */
 export async function GET(request: NextRequest) {
+  const limit = await rateLimitByIp(request, "billing-session", 20, "1 h");
+  if (!limit.success) return rateLimitResponse(limit);
+
   const stripe = getStripe();
   if (!stripe) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
@@ -24,7 +35,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "session_id required" }, { status: 400 });
   }
 
-  const auth = await verifyAuthHeader(request);
+  const ident = await callPythonJson<IdentityResponse>(request, "/account/identity");
+  const authedUid = ident.data?.uid ?? null;
+  if (ident.status !== 200 || !authedUid) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -34,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     const userId = session.metadata?.userId;
     const planId = (session.metadata?.planId as BillingPlan) || "standard";
-    if (auth && userId && auth.uid !== userId) {
+    if (!userId || authedUid !== userId) {
       return NextResponse.json({ error: "Session does not belong to this user" }, { status: 403 });
     }
     let status = "trialing";
@@ -43,8 +58,8 @@ export async function GET(request: NextRequest) {
     if (session.subscription) {
       const sub = await stripe.subscriptions.retrieve(session.subscription as string);
       status = sub.status;
-      const end = (sub as unknown as { current_period_end?: number }).current_period_end;
-      if (end) periodEndMs = end * 1000;
+      // dahlia: current_period_end lives on subscription items
+      periodEndMs = getSubscriptionPeriodEndMs(sub);
 
       if (userId) {
         await syncSubscriptionToFirestore({
@@ -54,7 +69,7 @@ export async function GET(request: NextRequest) {
           customerId: String(session.customer),
           subscriptionId: sub.id,
           periodEndMs: periodEndMs ?? Date.now() + 30 * 24 * 60 * 60 * 1000,
-        });
+        }, request.nextUrl.origin);
       }
     }
 

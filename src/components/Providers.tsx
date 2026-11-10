@@ -13,18 +13,28 @@ import { WatchHistoryProvider } from "@/contexts/WatchHistoryContext";
 import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import RouteProgress from "@/components/RouteProgress";
 import GlobalShortcuts from "@/components/GlobalShortcuts";
-import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
-import InstallPrompt from "@/components/InstallPrompt";
-import OfflineBanner from "@/components/OfflineBanner";
-import BackToTop from "@/components/BackToTop";
-import OfflineCacheSync from "@/components/OfflineCacheSync";
-import { CookieConsent } from "@/components/CookieConsent";
-import UsernameReminder from "@/components/UsernameReminder";
-import InviteAlertListener from "@/components/InviteAlertListener";
-import GuestJoinOverlay from "@/components/party/GuestJoinOverlay";
+import { ChunkReloadBoundary } from "@/components/ChunkReloadBoundary";
 
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"), { ssr: false });
 const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcutsHelp"), {
+  ssr: false,
+});
+const ServiceWorkerRegister = dynamic(() => import("@/components/ServiceWorkerRegister"), {
+  ssr: false,
+});
+const InstallPrompt = dynamic(() => import("@/components/InstallPrompt"), { ssr: false });
+const OfflineBanner = dynamic(() => import("@/components/OfflineBanner"), { ssr: false });
+const BackToTop = dynamic(() => import("@/components/BackToTop"), { ssr: false });
+const OfflineCacheSync = dynamic(() => import("@/components/OfflineCacheSync"), { ssr: false });
+const CookieConsent = dynamic(
+  () => import("@/components/CookieConsent").then((module) => module.CookieConsent),
+  { ssr: false }
+);
+const UsernameReminder = dynamic(() => import("@/components/UsernameReminder"), { ssr: false });
+const InviteAlertListener = dynamic(() => import("@/components/InviteAlertListener"), {
+  ssr: false,
+});
+const GuestJoinOverlay = dynamic(() => import("@/components/party/GuestJoinOverlay"), {
   ssr: false,
 });
 import { OfflineSyncProvider } from "@/components/offline/OfflineSyncProvider";
@@ -60,6 +70,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 <OfflineSyncProvider>
                 <ExperimentProvider>
                 <TooltipProvider>
+                    <ChunkReloadBoundary />
                     <RouteProgress />
                     <GlobalShortcuts />
                     <CommandPalette />

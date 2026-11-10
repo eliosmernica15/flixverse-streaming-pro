@@ -5,6 +5,7 @@ import { getUpcomingMoviesOnly } from "@/utils/popularMoviesRotator";
 import {
   fetchTrendingMovies,
   fetchPopularMovies,
+  fetchTopRatedMovies,
   fetchNowPlayingMovies,
   fetchTrendingTVShows,
   fetchAiringTodayTVShows,
@@ -18,6 +19,7 @@ export async function loadNewAndPopular() {
   const [
     trending,
     popular,
+    topRated,
     trulyUpcoming,
     trendingTV,
     nowPlayingMovies,
@@ -26,6 +28,7 @@ export async function loadNewAndPopular() {
   ] = await Promise.all([
     fetchTrendingMovies(),
     fetchPopularMovies(),
+    fetchTopRatedMovies(),
     getUpcomingMoviesOnly(),
     fetchTrendingTVShows(),
     fetchNowPlayingMovies(),
@@ -46,6 +49,9 @@ export async function loadNewAndPopular() {
   return {
     newReleases,
     popularContent: filterValid(popular),
+    criticallyAcclaimed: filterValid(topRated)
+      .filter((movie) => movie.vote_average >= 7.5)
+      .sort((a, b) => b.vote_average - a.vote_average),
     upcomingMovies: filterValid(trulyUpcoming),
     trendingShows: filterValid(trendingTV),
     nowPlaying: filterValid(nowPlayingMovies),

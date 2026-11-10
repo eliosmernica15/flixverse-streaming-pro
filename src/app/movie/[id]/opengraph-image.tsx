@@ -2,18 +2,19 @@ import { ImageResponse } from "next/og";
 import { getCachedTmdbSeoContent, tmdbBackdropUrl } from "@/lib/seo/tmdb-server";
 import { SITE_NAME } from "@/lib/seo/metadata";
 
-export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string }>;
+  // Next does not always pass searchParams to opengraph-image routes — treat it as optional
+  searchParams?: Promise<{ type?: string }>;
 };
 
 export default async function MovieOpenGraphImage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { type } = await searchParams;
+  const resolved = searchParams ? await searchParams : undefined;
+  const type = resolved?.type;
   const mediaType = type === "tv" ? "tv" : "movie";
   let content = await getCachedTmdbSeoContent(Number(id), mediaType);
   if (!content && !type) {

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Filter, X, ChevronDown } from "lucide-react";
 
 export interface SearchFilterState {
-  mediaType: "all" | "movie" | "tv" | "person";
+  mediaType: "all" | "movie" | "tv" | "person" | "collections";
   year: string;
   sort: "relevance" | "rating_desc" | "rating_asc" | "date_desc" | "date_asc";
 }
@@ -19,6 +19,7 @@ const MEDIA_TYPES = [
   { value: "all", label: "All" },
   { value: "movie", label: "Movies" },
   { value: "tv", label: "TV Shows" },
+  { value: "collections", label: "Collections" },
   { value: "person", label: "People" },
 ] as const;
 
@@ -65,24 +66,39 @@ export function SearchFilters({ filters, onChange, resultCount }: SearchFiltersP
         {filters.mediaType !== "all" && (
           <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-xs text-red-400">
             {MEDIA_TYPES.find((m) => m.value === filters.mediaType)?.label}
-            <button onClick={() => onChange({ ...filters, mediaType: "all" })}>
-              <X className="w-3 h-3" />
+            <button
+              onClick={() => onChange({ ...filters, mediaType: "all" })}
+              type="button"
+              aria-label={`Clear media type filter: ${MEDIA_TYPES.find((m) => m.value === filters.mediaType)?.label}`}
+              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded"
+            >
+              <X className="w-3 h-3" aria-hidden="true" />
             </button>
           </span>
         )}
         {filters.year && (
           <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30 text-xs text-blue-400">
             {filters.year}
-            <button onClick={() => onChange({ ...filters, year: "" })}>
-              <X className="w-3 h-3" />
+            <button
+              onClick={() => onChange({ ...filters, year: "" })}
+              type="button"
+              aria-label={`Clear decade filter: ${filters.year}`}
+              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+            >
+              <X className="w-3 h-3" aria-hidden="true" />
             </button>
           </span>
         )}
         {filters.sort !== "relevance" && (
           <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-500/15 border border-purple-500/30 text-xs text-purple-400">
             {SORT_OPTIONS.find((s) => s.value === filters.sort)?.label}
-            <button onClick={() => onChange({ ...filters, sort: "relevance" })}>
-              <X className="w-3 h-3" />
+            <button
+              onClick={() => onChange({ ...filters, sort: "relevance" })}
+              type="button"
+              aria-label={`Clear sort filter: ${SORT_OPTIONS.find((s) => s.value === filters.sort)?.label}`}
+              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded"
+            >
+              <X className="w-3 h-3" aria-hidden="true" />
             </button>
           </span>
         )}

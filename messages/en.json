@@ -133,13 +133,19 @@
     "signInRequired": "Sign in required",
     "signInForList": "Please sign in to add items to your list.",
     "signInToWatch": "Please sign in or sign up to watch movies and TV shows.",
+    "signInForWatchParty": "Please sign in to start a Watch Party.",
     "removedFromList": "Removed from My List",
     "addedToList": "Added to My List",
     "listError": "Failed to update your list.",
     "comingSoon": "Coming Soon",
     "cast": "Cast",
     "similar": "More Like This",
-    "overview": "Overview"
+    "overview": "Overview",
+    "watchParty": "Watch Party",
+    "watchPartyCTA": "Watch Together",
+    "watchPartyCTADesc": "Invite friends to watch in perfect sync. Free for Standard and Premium plans.",
+    "startingWatchParty": "Starting Watch Party...",
+    "startingWatchPartyDesc": "Launching {title} with your friends"
   },
   "plans": {
     "monthly": "Monthly",
@@ -207,9 +213,20 @@
     "moviesAndTv": "Movies & TV Shows",
     "results": "Results",
     "people": "People",
+    "collections": "Collections",
     "castAndCrew": "Cast & Crew",
     "noResults": "No results found",
-    "tryDifferent": "Try a different search term"
+    "tryDifferent": "Try a different search term",
+    "recent": "Recent searches",
+    "browse": "Browse",
+    "pages": "Pages",
+    "searching": "Searching...",
+    "seeAll": "See all results for",
+    "clear": "Clear search",
+    "removeRecent": "Remove {query} from recent searches",
+    "hintNavigate": "Navigate",
+    "hintSelect": "Select",
+    "hintClose": "Close"
   },
   "notFound": {
     "title": "Page not found",
@@ -222,6 +239,12 @@
     "topRated": "Top Rated",
     "newest": "Newest",
     "az": "A–Z",
+    "decade": "Decade",
+    "allDecades": "All decades",
+    "minimumRating": "Min rating",
+    "anyRating": "Any rating",
+    "language": "Language",
+    "allLanguages": "All languages",
     "noCategory": "Category not found",
     "titles": "{count} titles",
     "retry": "Retry",
@@ -270,6 +293,7 @@
   },
 
   "carousel": {
+    "genreRail": "Explore by genre",
     "trendingNow": "Trending Now",
     "nowPlaying": "Now Playing",
     "topRated": "Top Rated",
@@ -304,6 +328,7 @@
     "friends": "Friends",
     "chat": "Chat",
     "party": "Party",
+    "queue": "Queue",
     "host": "Host",
     "guest": "Guest",
     "shareLink": "Share link",
@@ -332,7 +357,29 @@
     "syncDescription": "Invite friends to watch together in sync",
     "friendsHint": "Tap Invite to send a notification — link copies automatically.",
     "requests": "{count} request",
-    "requestsPlural": "{count} requests"
+    "requestsPlural": "{count} requests",
+    "queueTitle": "Up Next Queue",
+    "queueHint": "Suggest what to watch next. Vote on suggestions. Host confirms the selection.",
+    "hostCanConfirm": "Only the host can confirm",
+    "queueEmpty": "Queue is empty",
+    "queueEmptyHint": "Search for movies or shows to add to the queue",
+    "searchPlaceholder": "Search for movies or shows...",
+    "addToQueue": "Add to Queue",
+    "suggested": "Added to queue",
+    "suggestFailed": "Failed to add to queue",
+    "searchFailed": "Search failed",
+    "voteFailed": "Failed to vote",
+    "confirmFailed": "Failed to confirm",
+    "removeFailed": "Failed to remove",
+    "voted": "Voted",
+    "vote": "Vote",
+    "confirm": "Confirm",
+    "remove": "Remove",
+    "yours": "Yours",
+    "confirmed": "Confirmed",
+    "queueConfirmed": "Confirmed!",
+    "willPlayNext": "will play next",
+    "queueItemRemoved": "Removed from queue"
   },
   "friends": {
     "friends": "Friends",
@@ -352,7 +399,9 @@
     "decline": "Decline",
     "add": "Add",
     "pending": "Pending",
-    "alreadyFriends": "Friends"
+    "alreadyFriends": "Friends",
+    "onlineNow": "Online now",
+    "offline": "Offline"
   },
   "player": {
     "upNext": "Up Next",
@@ -382,5 +431,16 @@
     "english": "English",
     "spanish": "Español",
     "albanian": "Shqip"
+  },
+  "collection": {
+    "back": "Back",
+    "collection": "Collection",
+    "loading": "Loading...",
+    "loadingDetails": "Loading collection details...",
+    "titles": "{count} titles",
+    "playAll": "Play All",
+    "addToList": "Add to List",
+    "moreInfo": "More Info",
+    "titlesInCollection": "Titles in this Collection"
   }
 }

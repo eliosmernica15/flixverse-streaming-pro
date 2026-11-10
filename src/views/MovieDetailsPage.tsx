@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { notFound, useParams, useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { MovieDetailSkeleton } from "@/components/skeletons/RouteSkeletons";
 
@@ -41,15 +41,8 @@ const MovieDetailsPage = () => {
     }
   }, [autoplay, resumePosition, toast]);
 
-  if (!movieId) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center px-4">
-        <div className="glass-panel rounded-3xl p-10 text-center max-w-md w-full">
-          <h2 className="text-2xl font-bold text-white mb-2">Title not found</h2>
-          <p className="text-gray-400">We couldn&apos;t find the movie or show you were looking for.</p>
-        </div>
-      </div>
-    );
+  if (!movieId || Number.isNaN(movieId) || movieId <= 0) {
+    notFound();
   }
 
   return (

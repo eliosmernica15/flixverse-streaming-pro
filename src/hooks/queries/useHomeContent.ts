@@ -36,11 +36,11 @@ function pickHeroMovies(hero: TMDBMovie | null, trending: TMDBMovie[]): TMDBMovi
 }
 
 async function loadHomePriority() {
-  const [heroMovie, trendingMovies, nowPlayingMovies] = await Promise.all([
-    getHeroMovieOfTheWeek(),
+  const [trendingMovies, nowPlayingMovies] = await Promise.all([
     fetchTrendingMovies(),
     fetchNowPlayingMovies(),
   ]);
+  const heroMovie = await getHeroMovieOfTheWeek(trendingMovies);
 
   const hero =
     heroMovie && !Array.isArray(heroMovie) ? heroMovie : trendingMovies?.[0] ?? null;

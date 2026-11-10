@@ -17,7 +17,7 @@ interface LazySectionProps {
 export default function LazySection({
   children,
   minHeight = 320,
-  rootMargin = "280px",
+  rootMargin = "180px",
   className,
   staggerIndex = 0,
 }: LazySectionProps) {
@@ -48,7 +48,7 @@ export default function LazySection({
   return (
     <div
       ref={ref}
-      className={className}
+      className={`content-visibility-auto${className ? ` ${className}` : ""}`}
       style={{
         minHeight: visible ? undefined : minHeight,
         opacity: visible ? 1 : 0,

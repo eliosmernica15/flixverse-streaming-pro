@@ -115,13 +115,17 @@ const ReviewCard = ({
                 {isOwner && (
                   <div className="flex items-center space-x-1">
                     <button
+                      type="button"
                       onClick={onEdit}
+                      aria-label="Edit review"
                       className="rounded-lg p-1.5 transition-colors hover:bg-white/10 focus-ring"
                     >
                       <Edit2 className="w-4 h-4 text-gray-400" />
                     </button>
                     <button
+                      type="button"
                       onClick={onDelete}
+                      aria-label="Delete review"
                       className="rounded-lg p-1.5 transition-colors hover:bg-red-500/20 focus-ring"
                     >
                       <Trash2 className="w-4 h-4 text-red-400" />
@@ -138,8 +142,10 @@ const ReviewCard = ({
 
           <div className="flex items-center space-x-4 mt-3">
             <button
+              type="button"
               onClick={onLike}
               disabled={isLiking || !isAuthenticated}
+              aria-label={isLiked ? "Unlike review" : "Like review"}
               className={`flex items-center space-x-1 text-sm transition-colors focus-ring ${isLiked
                   ? 'text-red-400 hover:text-red-300'
                   : 'text-gray-400 hover:text-white'
@@ -148,7 +154,10 @@ const ReviewCard = ({
               <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
               <span>{review.likes_count}</span>
             </button>
-            <button className="flex items-center space-x-1 text-gray-400 text-sm transition-colors hover:text-white focus-ring">
+            <button
+              type="button"
+              className="flex items-center space-x-1 text-gray-400 text-sm transition-colors hover:text-white focus-ring"
+            >
               <MessageCircle className="w-4 h-4" />
               <span>Reply</span>
             </button>

@@ -21,6 +21,7 @@ import {
   EmbedAction,
 } from "@/lib/player/embedControls";
 import { detectProvider, resolveEmbedSrc, ProviderConfig } from "@/lib/player/providerRegistry";
+import { recordSecurityAudit } from "@/lib/securityAuditLog";
 
 export type PlayerState = {
   isPlaying: boolean;
@@ -44,6 +45,81 @@ interface UseEmbedBridgeProps {
   onPlayStateChange?: (playing: boolean) => void;
   onDurationChange?: (duration: number) => void;
   onEnded?: () => void;
+}
+
+/** Throttle function to limit call frequency */
+function throttle<T extends (...args: unknown[]) => void>(
+  fn: T,
+  delay: number
+): T & { cancel: () => void } {
+  let lastCall = 0;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastArgs: unknown[] | null = null;
+
+  const throttled = ((...args: unknown[]) => {
+    const now = Date.now();
+    const remaining = delay - (now - lastCall);
+    lastArgs = args;
+
+    if (remaining <= 0) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      lastCall = now;
+      fn(...args);
+    } else if (!timeoutId) {
+      timeoutId = setTimeout(() => {
+        lastCall = Date.now();
+        timeoutId = null;
+        if (lastArgs) fn(...lastArgs);
+      }, remaining);
+    }
+  }) as T & { cancel: () => void };
+
+  throttled.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  return throttled;
+}
+
+/** Debounce function to delay calls until after quiet period */
+function debounce<T extends (...args: unknown[]) => void>(
+  fn: T,
+  delay: number
+): T & { cancel: () => void; flush: () => void } {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastArgs: unknown[] | null = null;
+
+  const debounced = ((...args: unknown[]) => {
+    lastArgs = args;
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      timeoutId = null;
+      if (lastArgs) fn(...lastArgs);
+    }, delay);
+  }) as T & { cancel: () => void; flush: () => void };
+
+  debounced.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  debounced.flush = () => {
+    if (timeoutId && lastArgs) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+      fn(...lastArgs);
+    }
+  };
+
+  return debounced;
 }
 
 function parseMessageData(event: MessageEvent): unknown {
@@ -151,6 +227,101 @@ export function useEmbedBridge({
   const callbacksRef = useRef({ onTimeUpdate, onPlayStateChange, onDurationChange, onEnded });
   callbacksRef.current = { onTimeUpdate, onPlayStateChange, onDurationChange, onEnded };
 
+  // Refs for throttled callbacks and debounced commands
+  const throttledCallbacksRef = useRef<{
+    onTimeUpdate?: ReturnType<typeof throttle>;
+    onPlayStateChange?: ReturnType<typeof throttle>;
+    onDurationChange?: ReturnType<typeof throttle>;
+    onEnded?: ReturnType<typeof throttle>;
+  }>({});
+
+  const debouncedCommandsRef = useRef<{
+    sendAction?: ReturnType<typeof debounce>;
+    setVolume?: ReturnType<typeof debounce>;
+    adjustVolume?: ReturnType<typeof debounce>;
+    seek?: ReturnType<typeof debounce>;
+    seekRelative?: ReturnType<typeof debounce>;
+    setPlaybackRate?: ReturnType<typeof debounce>;
+  }>({});
+
+  const cleanupRef = useRef<(() => void)[]>([]);
+
+  // Initialize throttled callbacks (Firestore writes should be throttled)
+  useEffect(() => {
+    // Throttle Firestore writes to max once per 500ms
+    const THROTTLE_DELAY = 500;
+
+    throttledCallbacksRef.current.onTimeUpdate = throttle(
+      (time: number) => callbacksRef.current.onTimeUpdate?.(time),
+      THROTTLE_DELAY
+    );
+    throttledCallbacksRef.current.onPlayStateChange = throttle(
+      (playing: boolean) => callbacksRef.current.onPlayStateChange?.(playing),
+      THROTTLE_DELAY
+    );
+    throttledCallbacksRef.current.onDurationChange = throttle(
+      (duration: number) => callbacksRef.current.onDurationChange?.(duration),
+      THROTTLE_DELAY
+    );
+    throttledCallbacksRef.current.onEnded = throttle(
+      () => callbacksRef.current.onEnded?.(),
+      THROTTLE_DELAY
+    );
+
+    // Capture ref for cleanup to satisfy exhaustive-deps
+    const throttledCallbacks = throttledCallbacksRef.current;
+
+    // Cleanup throttled callbacks on unmount
+    return () => {
+      Object.values(throttledCallbacks).forEach((fn) => fn?.cancel());
+    };
+  }, []);
+
+  // Initialize debounced outgoing commands (debounce to 100ms)
+  useEffect(() => {
+    const DEBOUNCE_DELAY = 100;
+
+    debouncedCommandsRef.current.sendAction = debounce(
+      (action: EmbedAction, opts?: { seekSeconds?: number; volume?: number; steps?: number }) => {
+        sendEmbedAction(iframeRef.current, action, opts);
+      },
+      DEBOUNCE_DELAY
+    );
+    debouncedCommandsRef.current.setVolume = debounce(
+      (volume: number) => sendEmbedVolume(iframeRef.current, volume),
+      DEBOUNCE_DELAY
+    );
+    debouncedCommandsRef.current.adjustVolume = debounce(
+      (direction: "up" | "down", steps: number) => sendEmbedVolumeStep(iframeRef.current, direction, steps),
+      DEBOUNCE_DELAY
+    );
+    debouncedCommandsRef.current.seek = debounce(
+      (seconds: number) => sendEmbedSeek(iframeRef.current, seconds),
+      DEBOUNCE_DELAY
+    );
+    debouncedCommandsRef.current.seekRelative = debounce(
+      (delta: number) => {
+        // This will be handled by sendAction for seekForward/seekBack
+        const direction = delta > 0 ? "forward" : "back";
+        const steps = Math.max(1, Math.round(Math.abs(delta) / 5));
+        sendEmbedAction(iframeRef.current, direction === "forward" ? "seekForward" : "seekBack", { steps });
+      },
+      DEBOUNCE_DELAY
+    );
+    debouncedCommandsRef.current.setPlaybackRate = debounce(
+      (rate: number) => sendEmbedPlaybackRate(iframeRef.current, rate),
+      DEBOUNCE_DELAY
+    );
+
+    // Capture ref for cleanup to satisfy exhaustive-deps
+    const debouncedCommands = debouncedCommandsRef.current;
+
+    // Cleanup debounced commands on unmount
+    return () => {
+      Object.values(debouncedCommands).forEach((fn) => fn?.cancel());
+    };
+  }, [iframeRef]);
+
   // Detect provider when iframe src changes
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -201,7 +372,10 @@ export function useEmbedBridge({
         typeof window !== "undefined" &&
         iframe.src.includes("/api/embed") &&
         event.origin === window.location.origin;
-      if (!fromIframeWindow && !fromProviderOrigin && !fromProxyWrapper) return;
+      if (!fromIframeWindow && !fromProviderOrigin && !fromProxyWrapper) {
+        recordSecurityAudit("embed-postmessage-origin", originHost || "opaque");
+        return;
+      }
 
       const data = parseMessageData(event);
 
@@ -226,10 +400,10 @@ export function useEmbedBridge({
             };
             setState(next);
             if (progress.duration > 0 && progress.duration !== prev.duration) {
-              callbacksRef.current.onDurationChange?.(progress.duration);
+              throttledCallbacksRef.current.onDurationChange?.(progress.duration);
             }
             if (progress.watched !== prev.currentTime) {
-              callbacksRef.current.onTimeUpdate?.(progress.watched);
+              throttledCallbacksRef.current.onTimeUpdate?.(progress.watched);
             }
           }
           return;
@@ -255,10 +429,10 @@ export function useEmbedBridge({
           };
           setState(next);
           if (videasyDuration !== prev.duration) {
-            callbacksRef.current.onDurationChange?.(videasyDuration);
+            throttledCallbacksRef.current.onDurationChange?.(videasyDuration);
           }
           if (videasyTime !== prev.currentTime) {
-            callbacksRef.current.onTimeUpdate?.(videasyTime);
+            throttledCallbacksRef.current.onTimeUpdate?.(videasyTime);
           }
           return;
         }
@@ -289,7 +463,7 @@ export function useEmbedBridge({
         next.isPlaying = false;
         changed = true;
         recognized = true;
-        callbacksRef.current.onEnded?.();
+        throttledCallbacksRef.current.onEnded?.();
       }
 
       // Providers include currentTime/duration on every PLAYER_EVENT (play,
@@ -351,23 +525,32 @@ export function useEmbedBridge({
 
       setState(next);
       if (next.duration !== prev.duration && next.duration > 0) {
-        callbacksRef.current.onDurationChange?.(next.duration);
+        throttledCallbacksRef.current.onDurationChange?.(next.duration);
       }
       if (next.currentTime !== prev.currentTime) {
-        callbacksRef.current.onTimeUpdate?.(next.currentTime);
+        throttledCallbacksRef.current.onTimeUpdate?.(next.currentTime);
       }
       if (next.isPlaying !== prev.isPlaying) {
-        callbacksRef.current.onPlayStateChange?.(next.isPlaying);
+        throttledCallbacksRef.current.onPlayStateChange?.(next.isPlaying);
       }
     };
 
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+
+    // Track cleanup function
+    const cleanup = () => window.removeEventListener("message", onMessage);
+    cleanupRef.current.push(cleanup);
+
+    return () => {
+      cleanup();
+      cleanupRef.current = cleanupRef.current.filter((fn) => fn !== cleanup);
+    };
   }, [enabled, iframeRef]);
 
   const sendAction = useCallback(
     (action: EmbedAction, opts?: { seekSeconds?: number; volume?: number; steps?: number }) => {
-      sendEmbedAction(iframeRef.current, action, opts);
+      // Use debounced version for outgoing commands
+      debouncedCommandsRef.current.sendAction?.(action, opts);
       // Optimistically update local state for responsive UI
       if (action === "play") {
         setState((prev) => ({ ...prev, isPlaying: true }));
@@ -383,7 +566,7 @@ export function useEmbedBridge({
         setState((prev) => ({ ...prev, volume: opts.volume!, isMuted: opts.volume! === 0 }));
       }
     },
-    [iframeRef]
+    []
   );
 
   const togglePlay = useCallback(() => {
@@ -400,30 +583,33 @@ export function useEmbedBridge({
   const setVolume = useCallback(
     (volume: number) => {
       const clamped = Math.max(0, Math.min(1, volume));
-      sendEmbedVolume(iframeRef.current, clamped);
+      // Use debounced command
+      debouncedCommandsRef.current.setVolume?.(clamped);
       setState((prev) => ({ ...prev, volume: clamped, isMuted: clamped === 0 }));
     },
-    [iframeRef]
+    []
   );
 
   const adjustVolume = useCallback(
     (delta: number) => {
       const direction = delta > 0 ? "up" : "down";
       const steps = Math.max(1, Math.round(Math.abs(delta) * 10));
-      sendEmbedVolumeStep(iframeRef.current, direction, steps);
+      // Use debounced command
+      debouncedCommandsRef.current.adjustVolume?.(direction, steps);
       setState((prev) => {
         const next = Math.max(0, Math.min(1, prev.volume + delta));
         return { ...prev, volume: next, isMuted: next === 0 };
       });
     },
-    [iframeRef]
+    []
   );
 
   const seek = useCallback(
     (seconds: number) => {
-      sendEmbedSeek(iframeRef.current, seconds);
+      // Use debounced command
+      debouncedCommandsRef.current.seek?.(seconds);
     },
-    [iframeRef]
+    []
   );
 
   const seekRelative = useCallback(
@@ -456,7 +642,8 @@ export function useEmbedBridge({
   const setPlaybackRate = useCallback(
     (rate: number) => {
       const clamped = Math.max(0.25, Math.min(2, rate));
-      sendEmbedPlaybackRate(iframeRef.current, clamped);
+      // Use debounced command
+      debouncedCommandsRef.current.setPlaybackRate?.(clamped);
       setState((prev) => ({ ...prev, playbackRate: clamped }));
       try {
         localStorage.setItem("flixverse-playback-rate", String(clamped));
@@ -464,7 +651,7 @@ export function useEmbedBridge({
         // ignore
       }
     },
-    [iframeRef]
+    []
   );
 
   // Restore persisted playback rate on mount
@@ -480,6 +667,29 @@ export function useEmbedBridge({
     } catch {
       // ignore
     }
+  }, []);
+
+  // Master cleanup on unmount - ensure all listeners, timeouts, and intervals are cleaned up
+  useEffect(() => {
+    // Capture refs for cleanup to satisfy exhaustive-deps
+    const throttledCallbacks = throttledCallbacksRef.current;
+    const debouncedCommands = debouncedCommandsRef.current;
+    const cleanups = cleanupRef.current;
+
+    return () => {
+      // Cleanup all tracked cleanup functions
+      cleanups.forEach((cleanup) => cleanup());
+      cleanupRef.current = [];
+
+      // Cancel all throttled callbacks
+      Object.values(throttledCallbacks).forEach((fn) => fn?.cancel());
+
+      // Cancel all debounced commands and flush any pending
+      Object.values(debouncedCommands).forEach((fn) => {
+        fn?.cancel();
+        fn?.flush();
+      });
+    };
   }, []);
 
   return {

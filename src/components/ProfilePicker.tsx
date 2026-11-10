@@ -39,12 +39,7 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<ProfileType>("standard");
 
-  useEffect(() => {
-    if (!user) return;
-    loadProfiles();
-  }, [user]);
-
-  const loadProfiles = async () => {
+  const loadProfiles = useCallback(async () => {
     if (!user) return;
     try {
       const { getFirestore, collection, query, where, getDocs } = await import("firebase/firestore");
@@ -89,7 +84,12 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    void loadProfiles();
+  }, [loadProfiles, user]);
 
   const handleCreateProfile = useCallback(async () => {
     if (!newName.trim() || !user) return;
@@ -120,7 +120,7 @@ export function ProfilePicker({ onSelectProfile }: ProfilePickerProps) {
       setNewName("");
       setNewType("standard");
       toast({ title: "Profile created", description: `${newProfile.displayName} has been added.` });
-    } catch (err) {
+    } catch (_err) {
       toast({ title: "Error", description: "Failed to create profile.", variant: "destructive" });
     }
   }, [newName, newType, user, profiles.length, maxProfiles, toast]);

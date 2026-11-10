@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react";
 import { Shuffle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useWatchHistoryContext } from "@/contexts/WatchHistoryContext";
 import { useUserPreferencesContext } from "@/contexts/UserPreferencesContext";
@@ -11,7 +10,6 @@ import {
   fetchTrendingMovies,
   fetchPopularMovies,
   fetchTopRatedMovies,
-  TMDBMovie,
 } from "@/utils/tmdbApi";
 
 /**
@@ -21,12 +19,9 @@ import {
 export function PlaySomething() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const { history } = useWatchHistoryContext();
   const { preferences } = useUserPreferencesContext();
-  const favoriteGenres = preferences.favoriteGenres || [];
-
   const pickRandom = useCallback(async () => {
     setLoading(true);
     try {
@@ -48,7 +43,7 @@ export function PlaySomething() {
 
       // Weight by user preferences if available
       const watchedIds = new Set(history.map((h) => h.content_id));
-      const genrePrefs = favoriteGenres || [];
+      const genrePrefs = preferences.favoriteGenres || [];
 
       const scored = pool.map((m) => {
         let score = m.vote_average || 5;
@@ -75,7 +70,7 @@ export function PlaySomething() {
     } finally {
       setLoading(false);
     }
-  }, [history, favoriteGenres, router, toast]);
+  }, [history, preferences, router, toast]);
 
   return (
     <button
