@@ -55,9 +55,16 @@ export const securityHeaders = [
     value: "strict-origin-when-cross-origin",
   },
   {
+    // Keep an opening relationship with cross-origin popups (Firebase Auth
+    // Google sign-in polls window.closed via its popup; a strict same-origin
+    // value severs that handle and spams the console).
+    key: "Cross-Origin-Opener-Policy",
+    value: "same-origin-allow-popups",
+  },
+  {
     key: "Permissions-Policy",
     value:
-      "camera=(self), microphone=(self), geolocation=(), browsing-topics=(), autoplay=(self), fullscreen=(self), picture-in-picture=(self), clipboard-write=(self), encrypted-media=(self), display-capture=(), payment=()",
+      "camera=(self), microphone=(self), geolocation=(), autoplay=(self), fullscreen=(self), picture-in-picture=(self), clipboard-write=(self), encrypted-media=(self), display-capture=(), payment=()",
   },
   {
     key: "Content-Security-Policy",

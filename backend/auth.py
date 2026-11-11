@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -56,6 +57,12 @@ def _load_service_account() -> dict[str, Any] | None:
         parsed = _parse_service_account_raw(raw)
         if parsed:
             return parsed
+        # An empty/mangled value here used to fall through silently, leaving
+        # the API with no credentials and every authenticated call failing.
+        print(
+            "[auth] FIREBASE_SERVICE_ACCOUNT_JSON is set but is not parseable JSON — ignoring it",
+            file=sys.stderr,
+        )
 
     client_email = os.environ.get("FIREBASE_CLIENT_EMAIL")
     private_key = os.environ.get("FIREBASE_PRIVATE_KEY")
@@ -90,6 +97,12 @@ def _init_firebase() -> None:
         _firebase_ready = True
         return
 
+    print(
+        "[auth] no Firebase service account configured (FIREBASE_SERVICE_ACCOUNT_JSON / "
+        "FIREBASE_CLIENT_EMAIL+FIREBASE_PRIVATE_KEY / GOOGLE_APPLICATION_CREDENTIALS); "
+        "falling back to Identity Toolkit REST verification",
+        file=sys.stderr,
+    )
     firebase_admin.initialize_app(options={"projectId": PROJECT_ID})
     _firebase_ready = True
 

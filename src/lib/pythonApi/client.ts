@@ -33,8 +33,15 @@ export class PythonAuthRequiredError extends Error {
 export function isPythonAuthError(err: unknown): boolean {
   if (err instanceof PythonAuthRequiredError) return true;
   if (err instanceof PythonApiError) {
+    if (err.status !== 401) return false;
     const m = (err.message || "").toLowerCase();
-    return err.status === 401 && (m === "not signed in" || m.includes("unauthorized"));
+    return (
+      m === "not signed in" ||
+      m.includes("unauthorized") ||
+      m.includes("missing authorization") ||
+      m.includes("invalid token") ||
+      m.includes("invalid or revoked token")
+    );
   }
   return false;
 }
