@@ -7,10 +7,9 @@ describe("buildStreamingSources", () => {
   it("orders vidsrc first and all four yapgrid lanes last", () => {
     expect(en.map((s) => s.id)).toEqual([
       "vidsrc",
-      "vidsrc-to",
-      "videasy",
       "vidlink",
       "vidfast",
+      "videasy",
       "yapgrid-g",
       "yapgrid-x",
       "yapgrid-y",
@@ -38,8 +37,8 @@ describe("buildStreamingSources", () => {
 
   it("allows documented VidFast mirrors and rejects lookalike domains", () => {
     expect(isAllowedEmbedUrl("https://player.vidfast.vc/embed")).toBe(true);
-    expect(isAllowedEmbedUrl("https://vidsrcme.ru.attacker.example/embed")).toBe(false);
-    expect(isAllowedEmbedUrl("http://vidsrcme.ru/embed")).toBe(true);
+    expect(isAllowedEmbedUrl("https://vidsrc.to.attacker.example/embed")).toBe(false);
+    expect(isAllowedEmbedUrl("http://vidsrc.to/embed")).toBe(true);
   });
 
   it("uses a canonical host list shared with the CSP configuration", () => {
@@ -49,9 +48,9 @@ describe("buildStreamingSources", () => {
 
   it("adds Albanian subtitle params only to providers that document them", () => {
     const sq = buildStreamingSources(550, "movie", undefined, undefined, { lang: "sq" });
-    expect(sq[0].url).toContain("ds_lang=sq");
+    expect(sq.find((s) => s.id === "vidsrc")?.url).toContain("ds_lang=sq");
     expect(sq.find((s) => s.id === "vidfast")?.url).toContain("sub=sq");
-    expect(sq.find((s) => s.id === "vidsrc-to")?.url).not.toContain("sub=");
+    expect(sq.find((s) => s.id === "vidlink")?.url).not.toContain("sub=");
     expect(sq.every((s) => !s.url.includes("cc="))).toBe(true);
   });
 });
@@ -69,9 +68,9 @@ describe("pickServerByQuality", () => {
     expect(sources[idx].quality).toBe("FHD");
   });
 
-  it("picks 4K when requested and available", () => {
+  it("falls back to the best available quality when 4K is requested but no 4K source exists", () => {
     const idx = pickServerByQuality(sources, "4K", 0);
-    expect(sources[idx].quality).toBe("4K");
+    expect(sources[idx].quality).toBe("FHD");
   });
 
   it("picks HD for 720p/low requests", () => {
@@ -82,12 +81,12 @@ describe("pickServerByQuality", () => {
 
 describe("legacy embed proxy URL compatibility", () => {
   it("returns the input unchanged when not proxied", () => {
-    const url = "https://vidsrcme.ru/embed/movie/550";
+    const url = "https://vidsrc.to/embed/movie/550";
     expect(unproxyEmbedUrl(url)).toBe(url);
   });
 
   it("unwraps links issued by the removed embed proxy", () => {
-    const url = "https://vidsrcme.ru/embed/movie/550";
+    const url = "https://vidsrc.to/embed/movie/550";
     expect(unproxyEmbedUrl(`/api/embed?src=${encodeURIComponent(url)}`)).toBe(url);
   });
 });

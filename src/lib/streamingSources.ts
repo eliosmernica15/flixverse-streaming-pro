@@ -57,24 +57,20 @@ export function buildStreamingSources(
 ): StreamingSource[] {
   const isTv = mediaType === "tv" && season && episode;
   const lang = opts?.lang?.toLowerCase();
-  // VidSrc's canonical domain is `vidsrcme.ru` (per the current docs).
-  // It accepts both IMDB ids (`tt...`) and TMDB ids (numeric). It exposes
-  // a `?ds_lang=<iso639-1>` (or comma-separated priority list) parameter
-  // that pre-selects subtitle tracks, plus `?sub_url=...` for custom .vtt
-  // tracks. `vidsrc.to` is the per-domain mirror documented separately
-  // and uses the simpler `?sub_file=...` parameter.
+  // VidSrc's canonical domain is `vidsrc.to`. The old `vidsrcme.ru` is
+  // NXDOMAIN — the name no longer exists, so every URL pointing at it
+  // failed to load for all users. It accepts both IMDB ids (`tt...`) and
+  // TMDB ids (numeric), and exposes `?ds_lang=<iso639-1>` (or a comma-separated
+  // priority list) to pre-select subtitle tracks, plus `?sub_url=...` for
+  // custom .vtt tracks. We pass `?autoplay=true&ds_lang=<en|sq>` so the
+  // in-player CC menu opens with the user's preferred language highlighted.
   const allowedLangs = new Set(["en", "sq"]);
   const playerLang = lang && allowedLangs.has(lang) ? lang : "en";
 
   const vidsrcBase = isTv
-    ? `https://vidsrcme.ru/embed/tv/${movieId}/${season}/${episode}`
-    : `https://vidsrcme.ru/embed/movie/${movieId}`;
-  const vidsrcUrl = `${vidsrcBase}?autoplay=true&ds_lang=${playerLang}`;
-
-  const vidsrcToBase = isTv
     ? `https://vidsrc.to/embed/tv/${movieId}/${season}/${episode}`
     : `https://vidsrc.to/embed/movie/${movieId}`;
-  const vidsrcToUrl = `${vidsrcToBase}?autoplay=true`;
+  const vidsrcUrl = `${vidsrcBase}?autoplay=true&ds_lang=${playerLang}`;
 
   const vidfastBase = isTv
     ? `https://vidfast.pro/tv/${movieId}/${season}/${episode}?autoPlay=true`
@@ -111,42 +107,17 @@ export function buildStreamingSources(
 
   const primary: (Omit<StreamingSource, "url"> & { providerUrl: string })[] = [
     {
-      // VidSrc (`vidsrcme.ru`) — the canonical VidSrc domain. Accepts both
-      // IMDB ids (`tt...`) and TMDB ids (numeric). Uses the `?ds_lang=<iso>`
-      // parameter (or comma-separated priority list) to pre-select subtitle
-      // tracks, plus `?sub_url=...` for custom .vtt tracks. We pass
-      // `?autoplay=true&ds_lang=<en|sq>` so the in-player CC menu opens
-      // with the user's preferred language already highlighted.
+      // VidSrc — canonical domain `vidsrc.to`. Accepts both IMDB ids
+      // (`tt...`) and TMDB ids (numeric). Uses the `?ds_lang=<iso>` parameter
+      // (or comma-separated priority list) to pre-select subtitle tracks,
+      // plus `?sub_url=...` for custom .vtt tracks. The previous `vidsrcme.ru`
+      // domain is NXDOMAIN (confirmed 2026-11-11).
       id: "vidsrc",
       name: "VidSrc",
       icon: "📺",
       quality: "HD",
       reliability: "high",
       providerUrl: vidsrcUrl,
-    },
-    {
-      // vidsrc.to — per-domain mirror with the same embed API. The docs
-      // describe it as using `?sub_file=` instead of `?sub_url=`, but
-      // `?autoplay=true` works the same. Kept as a fallback in case the
-      // canonical domain is slow or down.
-      id: "vidsrc-to",
-      name: "VidSrc.to",
-      icon: "📺",
-      quality: "HD",
-      reliability: "medium",
-      providerUrl: vidsrcToUrl,
-    },
-    {
-      // Videasy's canonical domain is `player.videasy.to` (the older
-      // `player.videasy.net` is deprecated per their docs).
-      id: "videasy",
-      name: "Videasy",
-      icon: "🎬",
-      quality: "4K",
-      reliability: "high",
-      providerUrl: isTv
-        ? `https://player.videasy.to/tv/${movieId}/${season}/${episode}?autoplay=true`
-        : `https://player.videasy.to/movie/${movieId}?autoplay=true`,
     },
     {
       id: "vidlink",
@@ -168,11 +139,26 @@ export function buildStreamingSources(
       reliability: "high",
       providerUrl: vidfastUrl,
     },
+    {
+      // Videasy — canonical domain is `player.videasy.to`. As of
+      // 2026-11-11 their TLS is broken (cert verify fails) and plain HTTP
+      // returns 503, so demoted out of the top picks until it recovers.
+      id: "videasy",
+      name: "Videasy",
+      icon: "🎬",
+      quality: "FHD",
+      reliability: "medium",
+      providerUrl: isTv
+        ? `https://player.videasy.to/tv/${movieId}/${season}/${episode}?autoplay=true`
+        : `https://player.videasy.to/movie/${movieId}?autoplay=true`,
+    },
     // NOTE: YapGrid lanes are NOT listed here — `ordered` below appends
     // all four yapgridSources (g/x/y/z) after the primary providers.
     // Listing yapgrid-g here too produced a duplicate "YapGrid G" entry
     // in the server selector.
     // Dead / blocked / 404 sources have been removed:
+    //   - vidsrcme.ru — NXDOMAIN (domain defunct as of 2026-11-11); replaced
+    //     by the `vidsrc.to`-based "vidsrc" entry above
     //   - vidsrc.sbs — returns 200 but body says "blocked"
     //   - vidsrc.pm — doesn't work in our test env (user flagged)
     //   - vidsrc.in / vidsrc.su / vidsrc.me / multiembed.mov — blocked

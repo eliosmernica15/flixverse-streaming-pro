@@ -25,8 +25,8 @@ describe("streamingSources utilities", () => {
   test("default order: vidsrc first, yapgrid lanes last", () => {
     const en = buildStreamingSources(550, "movie");
     expect(en[0].id).toBe("vidsrc");
-    expect(en[1].id).toBe("vidsrc-to");
-    expect(en[2].id).toBe("videasy");
+    expect(en[1].id).toBe("vidlink");
+    expect(en[2].id).toBe("vidfast");
     const lastFour = en.slice(-4).map((s) => s.id);
     expect(lastFour).toEqual(["yapgrid-g", "yapgrid-x", "yapgrid-y", "yapgrid-z"]);
     expect(en.find((s) => s.id === "vidfast")?.url).not.toContain("sub=");

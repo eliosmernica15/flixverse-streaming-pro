@@ -47,13 +47,12 @@ export function computeResync(
 
 /**
  * Build a seek URL for a given embed provider by injecting a start-time parameter.
- * Supports VidSrc (vidsrcme.ru / vidsrc.to), VidLink, Videasy, VidFast, YapGrid.
+ * Supports VidSrc (vidsrc.to, including legacy vidsrcme.ru links), VidLink, Videasy, VidFast, YapGrid.
  */
 export function injectSeekParam(url: string, startSeconds: number): string {
   const t = Math.max(0, Math.floor(startSeconds));
 
-  // VidSrc family (canonical vidsrcme.ru + per-domain mirror vidsrc.to):
-  // add &t= param.
+  // VidSrc family (vidsrc.to; legacy vidsrcme.ru): add &t= param.
   if (/vidsrc(me\.ru|\.to)/.test(url)) {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}t=${t}`;

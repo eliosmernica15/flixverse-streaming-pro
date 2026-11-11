@@ -93,12 +93,11 @@ export const PROVIDERS: ProviderConfig[] = [
   {
     id: "vidsrc",
     name: "VidSrc",
-    // Canonical domain per current docs is `vidsrcme.ru`. `vidsrc.to` is
-    // the per-domain mirror. (The legacy `vidsrc.me`/`.net`/`.pm`/`.in`
-    // mirrors all return a "blocked" body and are intentionally not
-    // listed.)
+    // Canonical domain per current docs is `vidsrc.to`. The old `vidsrcme.ru`
+    // is NXDOMAIN (domain defunct as of 2026-11-11) and was removed.
+    // (The legacy `vidsrc.me`/`.net`/`.pm`/`.in` mirrors all return a
+    // "blocked" body and are intentionally not listed.)
     origins: [
-      "vidsrcme.ru",
       "vidsrc.to",
     ],
     keyboardShortcuts: VIDSRC_KEYBOARD,
