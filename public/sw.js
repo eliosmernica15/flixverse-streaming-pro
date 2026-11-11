@@ -1,15 +1,23 @@
-const CACHE_VERSION = "flixverse-v11";
-const OFFLINE_URL = "/offline";
-const IMAGES_CACHE = "flixverse-images-v1";
+// FlixVerse service worker.
+// Design contract:
+//  - Navigations ALWAYS hit the network first; only on total failure do we
+//    serve a *self-contained* branded offline page (inline CSS/JS, no external
+//    chunks, so it can never render half-styled).
+//  - No HTML is precached — stale HTML + fresh build = broken chunk hashes.
+//  - Only long-lived, content-addressed assets (immutable chunks/icons) are
+//    cached for offline reuse, with LRU bounds for IMAGES.
+//  - Everything else goes to the network; failures surface real errors, not
+//    synthetic 503s masquerading as the app.
+const CACHE_VERSION = "flixverse-v12";
+const IMAGES_CACHE = "flixverse-images-v2";
 const MAX_CACHED_IMAGES = 200;
 
-const NAV_TIMEOUT_MS = 4500; // per attempt
+const NAV_TIMEOUT_MS = 4500;
 const NAV_RETRY_DELAY_MS = 800;
 const STATIC_TIMEOUT_MS = 5000;
 const STATIC_RETRY_DELAY_MS = 400;
 
-/** Static shell + offline-library page so the "Offline library" link works without a network. */
-const PRECACHE = [OFFLINE_URL, "/offline-library", "/manifest.json", "/favicon.svg", "/icons/icon-192.png"];
+const PRECACHE = ["/favicon.svg", "/manifest.json", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -22,9 +30,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys
-          .filter((key) => key !== CACHE_VERSION && key !== IMAGES_CACHE)
-          .map((key) => caches.delete(key))
+        keys.map((key) => (key === CACHE_VERSION || key === IMAGES_CACHE ? undefined : caches.delete(key)))
       )
     ).then(() => self.clients.claim())
   );
@@ -44,7 +50,6 @@ function fetchWithTimeout(request, timeoutMs) {
   );
 }
 
-/** One network attempt, then a short pause and one retry. Null on total failure (or upstream 5xx when failOn5xx is set). */
 async function fetchWithRetry(request, timeoutMs, retryDelayMs, { failOn5xx = false } = {}) {
   const attempt = async () => {
     const response = await fetchWithTimeout(request, timeoutMs);
@@ -70,26 +75,28 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
-  // Let the page load TMDB images via img-src. SW fetch() is governed by
-  // connect-src and will fail (and break posters) if CSP is stale/strict.
-
+  // Page navigations: network first, then a self-contained branded offline
+  // page on total failure. NEVER serve stale HTML.
   if (event.request.mode === "navigate") {
     event.respondWith(networkOnlyNavigate(event.request));
     return;
   }
 
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/favicon") ||
-    url.pathname === "/manifest.json"
-  ) {
-    event.respondWith(staleWhileRevalidate(event.request, CACHE_VERSION));
+  // Content-addressed framework assets (JS/CSS chunks): serve fresh from the
+  // network; fall back to cache only when the network is gone. These are
+  // immutable content hashes, so stale-while-revalidate is safe here.
+  if (url.origin === self.location.origin && url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(staleWhileRevalidate(event.request));
     return;
   }
 
-  // Cross-origin catalog art (TMDB posters, ytimg thumbnails, Google avatars,
-  // Cloudinary uploads): cache aggressively so the offline library and slow
-  // networks still render posters instead of broken frames. Bounded via LRU.
+  if (url.origin === self.location.origin && /\.(svg|png|ico|webp|woff2?)$/i.test(url.pathname)) {
+    event.respondWith(staleWhileRevalidate(event.request));
+    return;
+  }
+
+  // Cross-origin catalog art: cache aggressively with LRU bounds so slow
+  // networks and offline Library still render posters.
   if (isCacheableImageHost(url)) {
     event.respondWith(staleWhileRevalidateImages(event.request));
   }
@@ -107,7 +114,6 @@ function isCacheableImageHost(url) {
   return IMAGE_HOSTS.has(url.hostname.toLowerCase());
 }
 
-/** Keep the image cache bounded: delete oldest entries when we're over the cap. */
 async function trimImageCache(cache, max = MAX_CACHED_IMAGES) {
   const keys = await cache.keys();
   if (keys.length <= max) return;
@@ -122,10 +128,12 @@ async function staleWhileRevalidateImages(request) {
   const cache = await caches.open(IMAGES_CACHE);
   const cached = await cache.match(request);
 
-  const fetchPromise = fetch(request, { mode: "cors", credentials: "omit", referrerPolicy: "no-referrer" })
+  const fetchPromise = fetch(request, {
+    mode: "cors",
+    credentials: "omit",
+    referrerPolicy: "no-referrer",
+  })
     .then(async (response) => {
-      // Opaque (type === "opaque") responses can't be inspected; put() them anyway.
-      // Basic CORS responses with status 200 are ideal. Anything else: skip caching.
       const cacheable =
         (response && response.type === "opaque") ||
         (response && response.ok && response.status === 200);
@@ -135,72 +143,88 @@ async function staleWhileRevalidateImages(request) {
       }
       return response;
     })
-    .catch(() => cached || Response.error());
+    .catch(() => cached || new Response("", { status: 504 }));
 
   return cached || fetchPromise;
 }
 
-/**
- * Always fetch fresh HTML - no stale shell that breaks hydration/clicks.
- * But give the network *two* chances (with a timeout) before falling back to
- * the offline page: a single dropped packet should never flash the offline UI.
- */
+function brandedOfflinePage() {
+  const doc = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Offline — FlixVerse</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(120% 90% at 50% 0%,#16060f 0%,#000 60%);color:#f3f4f6;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:grid;place-items:center;text-align:center;padding:24px}
+  .brand{letter-spacing:.28em;font-size:11px;font-weight:800;color:#ef4444;text-transform:uppercase;margin-bottom:18px}
+  .mark{width:84px;height:84px;border-radius:26px;background:linear-gradient(135deg,#ef4444,#f97316);display:flex;align-items:center;justify-content:center;box-shadow:0 24px 60px -18px rgba(239,68,68,.45);margin:0 auto 26px}
+  .mark svg{width:38px;height:38px;stroke:#fff;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  h1{margin:0 0 12px;font-size:clamp(1.9rem,6vw,2.5rem);font-weight:900;letter-spacing:-.02em}
+  h1 span{background:linear-gradient(90deg,#fca5a5,#fdba74,#fca5a5);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  p{margin:0 auto 28px;max-width:26rem;color:#9ca3af;font-size:.85rem;line-height:1.6}
+  .row{display:flex;flex-direction:column;gap:12px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:10px;padding:14px 26px;border-radius:14px;font-size:.8rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;border:0;cursor:pointer;transition:transform .15s ease,filter .15s ease;font-family:inherit}
+  .btn:active{transform:scale(.97)}
+  .primary{color:#fff;background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 14px 38px -12px rgba(239,68,68,.55)}
+  .primary:hover{filter:brightness(1.08)}
+  .ghost{color:#d1d5db;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+  .ghost:hover{color:#fff;border-color:rgba(255,255,255,.16)}
+  .meta{margin-top:34px;font-size:10px;color:#6b7280;letter-spacing:.18em;text-transform:uppercase}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">FLIXVERSE</div>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M3 9.5v5a2 2 0 0 1 2-2h4l5-4v10l-5-4H5a2 2 0 0 1-2-2z"/><path d="M18 8a4 4 0 0 1 0 8"/></svg>
+    </div>
+    <h1>You're <span>offline</span></h1>
+    <p>Streaming needs an internet connection. We'll put you back together as soon as the network is back.</p>
+    <div class="row">
+      <button class="btn primary" onclick="location.reload()">Try again</button>
+      <a class="btn ghost" href="/offline-library">Open offline library</a>
+    </div>
+    <div class="meta">FlixVerse · offline mode</div>
+  </div>
+  <script>
+    addEventListener('online', function () { location.reload(); });
+    // Also poll, because 'online' can fire reliably only on real state changes.
+    setInterval(function () { fetch('/', { method: 'HEAD', cache: 'no-store' }).then(function (r) { if (r.ok) location.reload(); }).catch(function () {}); }, 5000);
+  </script>
+</body>
+</html>`;
+  return new Response(doc, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
 async function networkOnlyNavigate(request) {
-  // An upstream 5xx is as useless to the user as a dropped connection — retry,
-  // then show the branded auto-recovering offline page instead of a raw error.
   const response = await fetchWithRetry(request, NAV_TIMEOUT_MS, NAV_RETRY_DELAY_MS, {
     failOn5xx: true,
   });
   if (response) return response;
-
-  const cache = await caches.open(CACHE_VERSION);
-  const offline = await cache.match(OFFLINE_URL);
-  if (offline) return offline;
-  // `Response.error()` is a network-error response: responding with it for
-  // a navigation surfaces the browser's own error page but is at least a
-  // valid Response. Prefer a real document so the user sees our UI.
-  return new Response(
-    "<!doctype html><meta charset=utf-8><title>Offline</title><body style=\"background:#0a0a0c;color:#fff;font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0\"><div style=\"text-align:center\"><h1 style=\"font-size:1.25rem\">You are offline</h1><p style=\"color:#9ca3af;font-size:.875rem\">FlixVerse will resume when your connection returns.</p></div></body>",
-    { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
-  );
+  return brandedOfflinePage();
 }
 
-async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(CACHE_VERSION);
   const cached = await cache.match(request);
 
   const fetchPromise = fetchWithRetry(request, STATIC_TIMEOUT_MS, STATIC_RETRY_DELAY_MS)
     .then((response) => {
-      // Only cache complete, successful, same-origin responses. Caching a
-      // partial (206) or an opaque response poisons the cache and produces
-      // the "ChunkLoadError" the app then has to reload away from.
+      // Only cache complete, successful, same-origin basic responses.
       if (response && response.ok && response.status === 200 && response.type === "basic") {
         void cache.put(request, response.clone());
       }
-      // Nothing cached and the network is gone: a bare 503 with no body is
-      // what a chunk request wants (Next retries / the boundary reloads).
-      return (
-        response ||
-        cached ||
-        new Response("", {
-          status: 503,
-          statusText: "Service Unavailable",
-          headers: { "Cache-Control": "no-store" },
-        })
-      );
+      return response || cached || new Response("", { status: 503, headers: { "Cache-Control": "no-store" } });
     })
-    .catch(() => {
-      return (
-        cached ||
-        new Response("", {
-          status: 503,
-          statusText: "Service Unavailable",
-          headers: { "Cache-Control": "no-store" },
-        })
-      );
-    });
+    .catch(() => cached || new Response("", { status: 503, headers: { "Cache-Control": "no-store" } }));
 
-  // Serve the cached copy instantly when present; the revalidation above
-  // keeps it fresh. Without a cached copy, wait for the network.
   return cached || fetchPromise;
 }
