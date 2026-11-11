@@ -1,6 +1,6 @@
 import { FullConfig } from "@playwright/test";
 import { spawn, ChildProcess } from "child_process";
-import { setTimeout } from "timers/promises";
+import { setTimeout as sleep } from "timers/promises";
 
 let emulatorProcess: ChildProcess;
 
@@ -38,7 +38,7 @@ export default async function globalSetup(config: FullConfig) {
       if (!resolved && (output.includes("All emulators started") || output.includes("i  functions: Skipping"))) {
         resolved = true;
         // Give a moment for full initialization
-        setTimeout(2000).then(() => {
+        void sleep(2000).then(() => {
           console.log("Firebase emulators started successfully");
           resolve();
         });
