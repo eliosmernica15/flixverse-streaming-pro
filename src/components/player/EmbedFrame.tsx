@@ -1,19 +1,10 @@
 "use client";
 
-import { RefObject, useCallback, useEffect, useState, type MutableRefObject } from "react";
+import { RefObject, useCallback, useEffect, type MutableRefObject } from "react";
 import { RefreshCw, AlertCircle } from "lucide-react";
 import { isAllowedEmbedUrl, StreamingSource } from "@/lib/streamingSources";
 import { recordSecurityAudit } from "@/lib/securityAuditLog";
 import { parseChaptersFromEvent, type Chapter } from "@/lib/player/chapterParser";
-
-function stripSandbox(iframe: HTMLIFrameElement | null) {
-  if (!iframe) return;
-  if (iframe.hasAttribute("sandbox")) {
-    const sandboxValue = iframe.getAttribute("sandbox") || "";
-    recordSecurityAudit("embed-sandbox-attribute-stripped", `host: ${getEmbedHost(iframe.src)}, originalSandbox: ${sandboxValue}`);
-  }
-  iframe.removeAttribute("sandbox");
-}
 
 function getEmbedHost(src: string): string {
   try {
@@ -39,7 +30,19 @@ interface EmbedFrameProps {
   recapChapter?: Chapter | null;
 }
 
-const MINIMAL_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-presentation";
+/**
+ * NOTE: the player iframe is intentionally NOT sandboxed. Our third-party
+ * embed providers refuse to initialize inside `sandbox` frames at all —
+ * including a minimal one — and render
+ * "This content can't be embedded in a sandboxed frame" instead of a player
+ * (confirmed with Videasy; VidSrc behaves the same). The sandbox attribute
+ * was previously set, stripped, re-added and re-stripped across the render
+ * cycle, which let the provider's JS observe it. The embeds are instead
+ * constrained by the CSP `frame-src` allowlist (embedHosts.json), the
+ * `allow=` permissions below (autoplay/encrypted-media/fullscreen/PiP only),
+ * `referrerPolicy="origin"`, and the `isAllowedEmbedUrl` audit on `src`
+ * mutations.
+ */
 
 export function EmbedFrame({
   currentSource,
@@ -59,10 +62,6 @@ export function EmbedFrame({
     (node: HTMLIFrameElement | null) => {
       if (iframeRef && "current" in iframeRef) {
         (iframeRef as MutableRefObject<HTMLIFrameElement | null>).current = node;
-      }
-      if (node) {
-        node.setAttribute("sandbox", MINIMAL_SANDBOX);
-        stripSandbox(node);
       }
     },
     [iframeRef]
@@ -111,24 +110,11 @@ export function EmbedFrame({
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    // Ensure minimal sandbox is set
-    iframe.setAttribute("sandbox", MINIMAL_SANDBOX);
-
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === "attributes") {
           const attrName = mutation.attributeName;
           const target = mutation.target as HTMLIFrameElement;
-
-          if (attrName === "sandbox") {
-            if (target.hasAttribute("sandbox")) {
-              const sandboxValue = target.getAttribute("sandbox") || "";
-              if (sandboxValue !== MINIMAL_SANDBOX) {
-                recordSecurityAudit("embed-sandbox-mutation", `host: ${getEmbedHost(target.src)}, originalSandbox: ${sandboxValue}, expectedSandbox: ${MINIMAL_SANDBOX}`);
-                stripSandbox(target);
-              }
-            }
-          }
 
           if (attrName === "src") {
             const src = target.getAttribute("src");
@@ -140,16 +126,11 @@ export function EmbedFrame({
       });
     });
 
-    observer.observe(iframe, { attributes: true, attributeFilter: ["sandbox", "src"] });
+    observer.observe(iframe, { attributes: true, attributeFilter: ["src"] });
     return () => observer.disconnect();
   }, [iframeRef, currentSource.url, currentServer]);
 
   const handleLoad = () => {
-    const iframe = iframeRef.current;
-    if (iframe) {
-      iframe.setAttribute("sandbox", MINIMAL_SANDBOX);
-      stripSandbox(iframe);
-    }
     onIframeLoad();
   };
 
@@ -191,7 +172,6 @@ export function EmbedFrame({
         src={currentSource.url}
         title={`Watch ${title} on ${currentSource.name}`}
         className={`player-iframe ${embedState === "error" ? "player-iframe--hidden" : ""}`}
-        sandbox={MINIMAL_SANDBOX}
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         referrerPolicy="origin"
         onLoad={handleLoad}
