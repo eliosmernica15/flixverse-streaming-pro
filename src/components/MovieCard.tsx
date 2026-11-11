@@ -260,8 +260,9 @@ const MovieCard = ({ movie, priority = false, matchScore, comingSoon = false }: 
           <div className="absolute inset-0 skeleton-shimmer bg-gradient-to-br from-gray-800/80 to-gray-900/80" />
         )}
 
-        {/* Advanced 3D lighting plane — reacts to cursor position (via CSS vars from use3DTilt) */}
-        <div className="absolute inset-0 z-10 bg-gradient-to-tr from-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{
+        {/* Advanced 3D lighting plane — reacts to cursor position (via CSS vars from use3DTilt).
+            Decorative only — never let it swallow taps/clicks meant for the buttons below it. */}
+        <div className="absolute inset-0 z-10 bg-gradient-to-tr from-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" style={{
           backgroundImage: 'radial-gradient(circle at var(--tilt-sheen-x, 50%) var(--tilt-sheen-y, 50%), rgba(255,255,255,0.15), transparent 70%)'
         }} />
 

@@ -1742,9 +1742,15 @@ input[type="range"].player-volume::-moz-range-thumb {
     contain: paint;
   }
 
-  /* Depth planes. Higher Z reads as "closer to the viewer". */
+  /* Depth planes. Higher Z reads as "closer to the viewer". The overlay
+     buttons must sit above the decorative sheen plane (z-10) so they always
+     win hit-testing, on every input type. */
   .movie-card-poster {
     transform: translateZ(0); /* reference plane */
+  }
+  .movie-card-play,
+  .movie-card-actions {
+    z-index: 20;
   }
   .movie-card-layer {
     transform-style: preserve-3d;
