@@ -1759,13 +1759,26 @@ input[type="range"].player-volume::-moz-range-thumb {
 
   /* Touch / coarse-pointer devices have no hover state, so the card's
      overlay buttons (play, add-to-list, details) would stay invisible and
-     untappable forever. Always show them there. */
+     untappable forever. Always show them there. The play wrapper covers the
+     whole card, so it stays pointer-events:none and only its button takes
+     taps; the card's own tap-to-open keeps working everywhere else. */
   @media (hover: none), (pointer: coarse) {
-    .movie-card-play,
+    .movie-card-play {
+      opacity: 1 !important;
+      transform: none !important;
+      pointer-events: none !important;
+    }
+    .movie-card-play > button {
+      pointer-events: auto !important;
+      touch-action: manipulation;
+    }
     .movie-card-actions {
       opacity: 1 !important;
       transform: none !important;
       pointer-events: auto !important;
+      touch-action: manipulation;
+      z-index: 30;
+      position: absolute;
     }
   }
 
