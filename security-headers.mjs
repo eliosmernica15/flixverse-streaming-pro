@@ -57,7 +57,7 @@ export const securityHeaders = [
   {
     key: "Permissions-Policy",
     value:
-      "camera=(self), microphone=(self), geolocation=(), interest-cohort=(), autoplay=(self), fullscreen=(self), picture-in-picture=(self), clipboard-write=(self), encrypted-media=(self), display-capture=(), payment=()",
+      "camera=(self), microphone=(self), geolocation=(), browsing-topics=(), autoplay=(self), fullscreen=(self), picture-in-picture=(self), clipboard-write=(self), encrypted-media=(self), display-capture=(), payment=()",
   },
   {
     key: "Content-Security-Policy",

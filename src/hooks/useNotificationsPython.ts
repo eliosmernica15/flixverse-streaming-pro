@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Notification } from "@/integrations/firebase/types";
-import { pythonFetch } from "@/lib/pythonApi/client";
+import { pythonFetch, isPythonAuthError } from "@/lib/pythonApi/client";
 import { getPythonWsBase, isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { getFirebaseAuth } from "@/integrations/firebase/client";
 
@@ -21,7 +21,7 @@ export function usePythonNotifications() {
       setNotifications(data.notifications);
       setUnreadCount(data.unreadCount);
     } catch (err) {
-      console.error("[notifications/python] fetch failed:", err);
+      if (!isPythonAuthError(err)) console.error("[notifications/python] fetch failed:", err);
     } finally {
       setLoading(false);
     }

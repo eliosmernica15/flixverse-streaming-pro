@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { pythonFetch } from "@/lib/pythonApi/client";
+import { pythonFetch, isPythonAuthError } from "@/lib/pythonApi/client";
 import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { WatchHistory } from "@/integrations/firebase/types";
 
@@ -27,7 +27,7 @@ export function usePythonWatchHistory() {
       );
       setHistory(data.items || []);
     } catch (err) {
-      console.error("[watch-history/python] fetch failed:", err);
+      if (!isPythonAuthError(err)) console.error("[watch-history/python] fetch failed:", err);
     } finally {
       setLoading(false);
     }
@@ -116,7 +116,7 @@ export function usePythonWatchHistory() {
           return [next, ...prev];
         });
       } catch (err) {
-        console.error("[watch-history/python] upsert failed:", err);
+        if (!isPythonAuthError(err)) console.error("[watch-history/python] upsert failed:", err);
         throw err;
       }
     },
@@ -142,7 +142,7 @@ export function usePythonWatchHistory() {
         // a no-op keeps the local state in sync until ETL replaces this.
         setHistory((prev) => prev.filter((h) => h.id !== historyId));
       } catch (err) {
-        console.error("[watch-history/python] remove failed:", err);
+        if (!isPythonAuthError(err)) console.error("[watch-history/python] remove failed:", err);
       }
     },
     []

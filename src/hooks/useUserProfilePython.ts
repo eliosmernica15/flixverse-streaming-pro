@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { pythonFetch } from "@/lib/pythonApi/client";
+import { pythonFetch, isPythonAuthError } from "@/lib/pythonApi/client";
 import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { UserProfile } from "@/integrations/firebase/types";
 
@@ -36,13 +36,13 @@ export function usePythonUserProfile() {
           const created = await pythonFetch<{ profile: UserProfile | null }>("/profile/me");
           setProfile(created.profile);
         } catch (err) {
-          console.error("[user-profile/python] create failed:", err);
+          if (!isPythonAuthError(err)) console.error("[user-profile/python] create failed:", err);
         } finally {
           creatingProfileRef.current = false;
         }
       }
     } catch (err) {
-      console.error("[user-profile/python] fetch failed:", err);
+      if (!isPythonAuthError(err)) console.error("[user-profile/python] fetch failed:", err);
     } finally {
       setLoading(false);
     }

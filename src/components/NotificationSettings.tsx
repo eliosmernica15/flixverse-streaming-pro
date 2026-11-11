@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useNotifications } from "@/hooks/useNotifications";
-import { pythonFetch } from "@/lib/pythonApi/client";
+import { pythonFetch, isPythonAuthError } from "@/lib/pythonApi/client";
 import { useAuth } from "@/hooks/useAuth";
 
 interface ChannelPrefs {
@@ -56,7 +56,7 @@ const NotificationSettings = () => {
         const data = await pythonFetch<ChannelPrefs>("/notifications/preferences");
         setChannelPrefs(data);
       } catch (err) {
-        console.error("[NotificationSettings] Failed to load channel preferences:", err);
+        if (!isPythonAuthError(err)) console.error("[NotificationSettings] Failed to load channel preferences:", err);
       } finally {
         setLoading(false);
       }
@@ -75,7 +75,7 @@ const NotificationSettings = () => {
         body: JSON.stringify(newPrefs),
       });
     } catch (err) {
-      console.error("[NotificationSettings] Failed to save channel preferences:", err);
+      if (!isPythonAuthError(err)) console.error("[NotificationSettings] Failed to save channel preferences:", err);
       // Revert on error
       setChannelPrefs(channelPrefs);
     } finally {

@@ -11,7 +11,7 @@ import {
   declineWatchPartyInvite,
 } from "@/lib/notifications/partyInvite";
 import { executeGuestJoin } from "@/lib/party/executeGuestJoin";
-import { pythonFetch } from "@/lib/pythonApi/client";
+import { pythonFetch, isPythonAuthError } from "@/lib/pythonApi/client";
 import { useNotifications } from "@/hooks/useNotifications";
 
 const SEEN_KEY = "flixverse_seen_notification_toasts";
@@ -115,7 +115,7 @@ export default function InviteAlertListener() {
         }>("/notifications/preferences");
         channelPrefsRef.current = data;
       } catch (err) {
-        console.error("[InviteAlertListener] Failed to load channel preferences:", err);
+        if (!isPythonAuthError(err)) console.error("[InviteAlertListener] Failed to load channel preferences:", err);
       }
     };
     loadPrefs();
@@ -166,7 +166,7 @@ export default function InviteAlertListener() {
                   user: { displayName: user.displayName, photoURL: user.photoURL },
                 });
               } catch (err) {
-                console.error("[party-invite] accept failed:", err);
+                if (!isPythonAuthError(err)) console.error("[party-invite] accept failed:", err);
                 sonnerToast.error("Could not join party");
               }
             })();
@@ -180,7 +180,7 @@ export default function InviteAlertListener() {
                 await declineWatchPartyInvite(notification, user.uid, myName);
                 sonnerToast.message("Invite declined");
               } catch (err) {
-                console.error("[party-invite] decline failed:", err);
+                if (!isPythonAuthError(err)) console.error("[party-invite] decline failed:", err);
                 sonnerToast.error("Could not decline invite");
               }
             })();

@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { pythonFetch } from "@/lib/pythonApi/client";
+import { pythonFetch, isPythonAuthError } from "@/lib/pythonApi/client";
 import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 import { UserMovieListItem } from "@/integrations/firebase/types";
 import { trackListAdd, trackListRemove } from "@/lib/analytics";
@@ -27,7 +27,7 @@ export function usePythonUserMovieList() {
       );
       setMovieList(data.items || []);
     } catch (err) {
-      console.error("[user-movie-list/python] fetch failed:", err);
+      if (!isPythonAuthError(err)) console.error("[user-movie-list/python] fetch failed:", err);
     } finally {
       setLoading(false);
     }
@@ -87,7 +87,7 @@ export function usePythonUserMovieList() {
         void refresh();
       } catch (err) {
         setMovieList((prev) => prev.filter((it) => it.movie_id !== movie.id));
-        console.error("[user-movie-list/python] add failed:", err);
+        if (!isPythonAuthError(err)) console.error("[user-movie-list/python] add failed:", err);
         throw err;
       } finally {
         setOperatingMovies((prev) => {
@@ -118,7 +118,7 @@ export function usePythonUserMovieList() {
         void refresh();
       } catch (err) {
         setMovieList(originalList);
-        console.error("[user-movie-list/python] remove failed:", err);
+        if (!isPythonAuthError(err)) console.error("[user-movie-list/python] remove failed:", err);
         throw err;
       } finally {
         setOperatingMovies((prev) => {

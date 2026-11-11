@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { pythonFetch } from "@/lib/pythonApi/client";
+import { pythonFetch, isPythonAuthError } from "@/lib/pythonApi/client";
 import { isPythonBackendEnabled, usesHttpTransport } from "@/lib/pythonApi/config";
 
 export interface PythonSubscription {
@@ -37,7 +37,7 @@ export function usePythonSubscription() {
         );
         setSubscription(data.subscription || DEFAULT_SUB);
       } catch (err) {
-        console.error("[subscription/python] fetch failed:", err);
+        if (!isPythonAuthError(err)) console.error("[subscription/python] fetch failed:", err);
         setSubscription(DEFAULT_SUB);
       } finally {
         setLoading(false);

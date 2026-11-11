@@ -20,6 +20,25 @@ export class PythonApiError extends Error {
   }
 }
 
+/** Thrown when the Python API is reached without a signed-in user. */
+export class PythonAuthRequiredError extends Error {
+  status: number = 401;
+  constructor() {
+    super("Not signed in");
+    this.name = "PythonAuthRequiredError";
+  }
+}
+
+/** True when the failure was only because there's no authenticated user. */
+export function isPythonAuthError(err: unknown): boolean {
+  if (err instanceof PythonAuthRequiredError) return true;
+  if (err instanceof PythonApiError) {
+    const m = (err.message || "").toLowerCase();
+    return err.status === 401 && (m === "not signed in" || m.includes("unauthorized"));
+  }
+  return false;
+}
+
 export async function pythonFetch<T>(
   path: string,
   options: RequestInit = {}
@@ -29,7 +48,7 @@ export async function pythonFetch<T>(
 
   const attempt = async (forceRefresh: boolean) => {
     const token = await getToken(forceRefresh);
-    if (!token) throw new PythonApiError("Not signed in", 401);
+    if (!token) throw new PythonAuthRequiredError();
 
     // Best-effort App Check header for monitor-mode verification server-side.
     const appCheckToken = await getAppCheckToken();
