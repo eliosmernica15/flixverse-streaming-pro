@@ -31,7 +31,7 @@ export async function registerWebPush(): Promise<PushRegistrationResult> {
   }
 
   try {
-    const [{ getMessaging, getToken, isSupported }, firebaseModule] = await Promise.all([
+    const [{ getMessaging, getToken, isSupported }] = await Promise.all([
       import("firebase/messaging"),
       import("firebase/app"),
     ]);
@@ -61,11 +61,27 @@ export async function registerWebPush(): Promise<PushRegistrationResult> {
 
 export async function unregisterWebPush(): Promise<void> {
   try {
-    const { getMessaging, deleteToken } = await import("firebase/messaging");
+    const { getMessaging, deleteToken, getToken, isSupported } = await import("firebase/messaging");
     const client = await import("@/integrations/firebase/client");
     const app = client.default();
     if (!app) return;
-    await deleteToken(getMessaging(app));
+    const messaging = getMessaging(app);
+    // Fetch the current token first so we can remove it server-side too.
+    if (await isSupported()) {
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      try {
+        const token = await getToken(messaging, vapidKey ? { vapidKey } : undefined);
+        if (token) {
+          await pythonFetch("/notifications/unregister-token", {
+            method: "DELETE",
+            body: JSON.stringify({ token, platform: "web" }),
+          });
+        }
+      } catch (err) {
+        console.warn("[push] server-side unregister failed (best effort):", err);
+      }
+    }
+    await deleteToken(messaging);
   } catch (err) {
     console.warn("[push] deleteToken failed (token may not exist):", err);
   }

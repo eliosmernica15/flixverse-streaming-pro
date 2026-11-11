@@ -36,6 +36,11 @@ const NotificationBell = dynamic(() => import("./NotificationBell"), {
   loading: () => null,
 });
 
+const PushNotificationPrompt = dynamic(() => import("./PushNotificationPrompt"), {
+  ssr: false,
+  loading: () => null,
+});
+
 const FlixPartyJoinDialog = dynamic(
   () => import("./player/FlixPartyJoinDialog").then((m) => m.FlixPartyJoinDialog),
   { ssr: false }
@@ -180,6 +185,7 @@ const Navigation = () => {
                 </button>
                 <NotificationSettings />
                 <NotificationBell />
+                <PushNotificationPrompt />
               </>
             )}
 

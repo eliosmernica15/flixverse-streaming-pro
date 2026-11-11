@@ -31,6 +31,14 @@ export const useNotifications = () => {
       setHasPermission(false);
     }
 
+    // Silently enroll this device for FCM push when the browser permission is
+    // already granted — no prompt, no side effects for new visitors. This
+    // makes devices with an existing grant receive push after the VAPID key
+    // is configured.
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      void registerWebPush();
+    }
+
     const savedPreferences = localStorage.getItem('notificationPreferences');
     if (savedPreferences) {
       try {

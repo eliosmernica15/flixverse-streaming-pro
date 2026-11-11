@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useNotifications } from "@/hooks/useNotifications";
+import { registerWebPush, unregisterWebPush } from "@/lib/notifications/webPush";
 import { pythonFetch, isPythonAuthError } from "@/lib/pythonApi/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -100,6 +101,12 @@ const NotificationSettings = () => {
 
   const handleChannelToggle = (channel: "email_enabled" | "push_enabled" | "in_app_enabled", value: boolean) => {
     saveChannelPrefs({ [channel]: value });
+    // Toggling Push on/off must also enroll/un-enroll this browser — the
+    // server preference alone never prompts for browser permission.
+    if (channel === "push_enabled") {
+      if (value) void registerWebPush();
+      else void unregisterWebPush();
+    }
   };
 
   const handleTypeChannelToggle = (
