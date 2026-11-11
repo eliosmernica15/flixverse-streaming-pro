@@ -120,7 +120,8 @@
   "overrides": {
     "minimatch@^3": {
       "brace-expansion": "^1.1.21"
-    }
+    },
+    "@grpc/grpc-js": "^1.14.7"
   },
   "optionalDependencies": {
     "next": "16.4.6"
