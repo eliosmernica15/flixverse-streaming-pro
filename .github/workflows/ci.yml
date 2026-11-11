@@ -120,19 +120,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Start Dev Server
-        run: |
-          npm run dev &
-          sleep 15
-          curl -f http://127.0.0.1:3000 || exit 1
-
       - name: Party Sync E2E Tests (Emulator)
         run: npm run test:e2e:emulator
         env:
           PLAYWRIGHT_PARTY_E2E: 1
 
       - name: Visual Regression Tests (with emulator running)
-        run: npm run test:e2e -- --project=chromium --grep="visual regression"
+        run: npx playwright test e2e/visual-regression.spec.ts --project=chromium
         continue-on-error: true
 
   visual-regression:
@@ -153,14 +147,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Start Dev Server
-        run: |
-          npm run dev &
-          sleep 15
-          curl -f http://127.0.0.1:3000 || exit 1
-
       - name: Visual Regression Tests
-        run: npm run test:e2e -- --project=chromium --grep="visual regression"
+        run: npx playwright test e2e/visual-regression.spec.ts --project=chromium
         continue-on-error: true
 
   python-audit:
