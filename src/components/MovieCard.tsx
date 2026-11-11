@@ -330,12 +330,12 @@ const MovieCard = ({ movie, priority = false, matchScore, comingSoon = false }: 
           </div>
         )}
 
-        {/* Center Play button — single primary action. Fades in on hover/focus. */}
+        {/* Center Play button — single primary action. Fades in on hover/focus.
+            Always visible and tappable on coarse-pointer/touch devices (no hover there). */}
         <div
-          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+          className={`movie-card-play absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
             (isHovered || isFocused) ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
-          aria-hidden={!(isHovered || isFocused)}
         >
           <button
             type="button"
@@ -348,12 +348,12 @@ const MovieCard = ({ movie, priority = false, matchScore, comingSoon = false }: 
           </button>
         </div>
 
-        {/* Right-side vertical action stack — visible on hover or focus, overlays on the card */}
+        {/* Right-side vertical action stack — visible on hover or focus, overlays on the card.
+            Always visible and tappable on coarse-pointer/touch devices. */}
         <div
-          className={`absolute right-2 bottom-2 flex flex-col gap-1.5 transition-all duration-300 ${
+          className={`movie-card-actions absolute right-2 bottom-2 flex flex-col gap-1.5 transition-all duration-300 ${
             (isHovered || isFocused) ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
           }`}
-          aria-hidden={!(isHovered || isFocused)}
         >
           <button
             type="button"

@@ -1757,6 +1757,18 @@ input[type="range"].player-volume::-moz-range-thumb {
     transform: translateZ(14px);
   }
 
+  /* Touch / coarse-pointer devices have no hover state, so the card's
+     overlay buttons (play, add-to-list, details) would stay invisible and
+     untappable forever. Always show them there. */
+  @media (hover: none), (pointer: coarse) {
+    .movie-card-play,
+    .movie-card-actions {
+      opacity: 1 !important;
+      transform: none !important;
+      pointer-events: auto !important;
+    }
+  }
+
   /* Cursor-tracked specular sheen. One radial highlight at the pointer,
      plus a faint diagonal streak that gives the surface a glassy grain.
      Opacity is driven by --tilt-active so it fades with the spring. */
