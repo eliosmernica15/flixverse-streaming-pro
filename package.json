@@ -118,8 +118,9 @@
     "vitest": "^5.1.0"
   },
   "overrides": {
-    "brace-expansion@<=1.1.20": "^1.1.21",
-    "@grpc/grpc-js@<=1.13.5": "^1.14.7"
+    "minimatch@^3": {
+      "brace-expansion": "^1.1.21"
+    }
   },
   "optionalDependencies": {
     "next": "16.4.6"
