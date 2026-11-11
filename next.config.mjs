@@ -92,6 +92,32 @@ const nextConfig = {
                 headers: securityHeadersWithoutCsp,
             },
             {
+                source: "/firebase-messaging-sw.js",
+                headers: [
+                    {
+                        key: "Cache-Control",
+                        value: "public, max-age=0, must-revalidate, no-cache",
+                    },
+                    {
+                        key: "Service-Worker-Allowed",
+                        value: "/",
+                    },
+                ],
+            },
+            {
+                source: "/sw.js",
+                headers: [
+                    {
+                        key: "Cache-Control",
+                        value: "public, max-age=0, must-revalidate, no-cache",
+                    },
+                    {
+                        key: "Service-Worker-Allowed",
+                        value: "/",
+                    },
+                ],
+            },
+            {
                 source: "/_next/static/(.*)",
                 headers: [
                     {
