@@ -8,7 +8,7 @@
 //    cached for offline reuse, with LRU bounds for IMAGES.
 //  - Everything else goes to the network; failures surface real errors, not
 //    synthetic 503s masquerading as the app.
-const CACHE_VERSION = "flixverse-v12";
+const CACHE_VERSION = "flixverse-v13";
 const IMAGES_CACHE = "flixverse-images-v2";
 const MAX_CACHED_IMAGES = 200;
 
@@ -185,6 +185,7 @@ function brandedOfflinePage() {
     </div>
     <h1>You're <span>offline</span></h1>
     <p>Streaming needs an internet connection. We'll put you back together as soon as the network is back.</p>
+    <p style="margin: -8px auto 28px; font-size:.75rem; color:#6b7280">If this keeps happening even though other sites work, your provider may be routing Vercel unreliably — try another network, a VPN, or flush your DNS.</p>
     <div class="row">
       <button class="btn primary" onclick="location.reload()">Try again</button>
       <a class="btn ghost" href="/offline-library">Open offline library</a>
